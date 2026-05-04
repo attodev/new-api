@@ -4,6 +4,7 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import fr from './locales/fr.json'
 import ja from './locales/ja.json'
+import kr from './locales/kr.json'
 import ru from './locales/ru.json'
 import vi from './locales/vi.json'
 import zh from './locales/zh.json'
@@ -15,6 +16,7 @@ export const resources = {
   ru,
   ja,
   vi,
+  kr,
 } as const
 
 i18n
@@ -23,7 +25,7 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi'],
+    supportedLngs: ['en', 'zh', 'fr', 'ru', 'ja', 'vi', 'kr'],
     load: 'languageOnly', // Convert zh-CN -> zh
     nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
     debug: import.meta.env.DEV,
@@ -33,6 +35,18 @@ i18n
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
+      convertDetectedLanguage: (lng) => {
+        const normalized = lng?.trim().replace(/_/g, '-').toLowerCase()
+        if (
+          normalized === 'ko' ||
+          normalized === 'ko-kr' ||
+          normalized === 'kr' ||
+          normalized === 'ko-kp'
+        ) {
+          return 'kr'
+        }
+        return lng
+      },
     },
   })
 

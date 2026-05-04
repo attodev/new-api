@@ -19,6 +19,7 @@ const languages = [
   { code: 'ru', label: 'Русский' },
   { code: 'ja', label: '日本語' },
   { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'kr', label: '한국어' },
 ]
 
 export function LanguageSwitcher() {

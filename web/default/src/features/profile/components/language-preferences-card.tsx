@@ -22,12 +22,21 @@ const LANGUAGE_OPTIONS = [
   { value: 'ru', label: 'Русский' },
   { value: 'ja', label: '日本語' },
   { value: 'vi', label: 'Tiếng Việt' },
+  { value: 'kr', label: '한국어' },
 ] as const
 
 function normalizeLanguage(value?: string | null): string {
   if (!value) return 'en'
   const normalized = value.trim().replace(/_/g, '-').toLowerCase()
   if (normalized.startsWith('zh')) return 'zh'
+  if (
+    normalized === 'ko' ||
+    normalized === 'ko-kr' ||
+    normalized === 'kr' ||
+    normalized === 'ko-kp'
+  ) {
+    return 'kr'
+  }
   return LANGUAGE_OPTIONS.some((lang) => lang.value === normalized)
     ? normalized
     : 'en'
