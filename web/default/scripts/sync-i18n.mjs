@@ -203,7 +203,7 @@ function isLikelyUntranslated({ locale, baseValue, value }) {
   if (!/[A-Za-z]{3,}/.test(s)) return false
 
   // For locales with non-latin scripts, equality with EN is a strong signal.
-  if (locale === 'ja' || locale === 'zh') return true
+  if (locale === 'ja' || locale === 'zh' || locale === 'kr') return true
   if (locale === 'ru') return true
 
   // For fr/vi: still useful but noisier; keep it conservative.
@@ -312,9 +312,7 @@ async function main() {
 }
 
 main().catch((err) => {
-   
   console.error(err)
   process.exitCode = 1
 })
-
 

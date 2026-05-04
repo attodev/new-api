@@ -24,6 +24,7 @@ export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'ru', label: 'Русский' },
   { code: 'ja', label: '日本語' },
   { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'kr', label: '한국어' },
 ] as const
 
 export type InterfaceLanguageCode =
@@ -34,6 +35,14 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
 
   const normalized = value.trim().replace(/_/g, '-').toLowerCase()
   if (normalized.startsWith('zh')) return 'zh'
+  if (
+    normalized === 'ko' ||
+    normalized === 'ko-kr' ||
+    normalized === 'kr' ||
+    normalized === 'ko-kp'
+  ) {
+    return 'kr'
+  }
 
   return INTERFACE_LANGUAGE_OPTIONS.some((lang) => lang.code === normalized)
     ? normalized
