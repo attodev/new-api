@@ -24,6 +24,8 @@ import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentG
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
+import SettingsPaymentGatewayWaffoPancake from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffoPancake';
+import SettingsPaymentGatewayPayPal from '../../pages/Setting/Payment/SettingsPaymentGatewayPayPal';
 import { API, showError, showSuccess, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 import RiskAcknowledgementModal from '../common/modals/RiskAcknowledgementModal';
@@ -56,6 +58,23 @@ const PaymentSetting = () => {
     'payment_setting.compliance_terms_version': '',
     'payment_setting.compliance_confirmed_at': 0,
     'payment_setting.compliance_confirmed_by': 0,
+
+    PayPalClientId: '',
+    PayPalClientSecret: '',
+    PayPalUnitPrice: 1.0,
+    PayPalMinTopUp: 1,
+    PayPalSandbox: false,
+
+    WaffoPancakeEnabled: false,
+    WaffoPancakeSandbox: false,
+    WaffoPancakeMerchantID: '',
+    WaffoPancakePrivateKey: '',
+    WaffoPancakeStoreID: '',
+    WaffoPancakeProductID: '',
+    WaffoPancakeReturnURL: '',
+    WaffoPancakeCurrency: 'USD',
+    WaffoPancakeUnitPrice: 1.0,
+    WaffoPancakeMinTopUp: 1,
   });
 
   let [loading, setLoading] = useState(false);
@@ -160,7 +179,25 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
+          case 'PayPalUnitPrice':
+          case 'PayPalMinTopUp':
+          case 'WaffoPancakeUnitPrice':
+          case 'WaffoPancakeMinTopUp':
             newInputs[item.key] = parseFloat(item.value);
+            break;
+          case 'PayPalSandbox':
+            newInputs[item.key] = item.value === 'true';
+            break;
+          case 'WaffoPancakeMerchantID':
+          case 'WaffoPancakePrivateKey':
+          case 'WaffoPancakeStoreID':
+          case 'WaffoPancakeProductID':
+          case 'WaffoPancakeReturnURL':
+          case 'WaffoPancakeCurrency':
+            newInputs[item.key] = item.value;
+            break;
+          case 'WaffoPancakeSandbox':
+            newInputs[item.key] = toBoolean(item.value);
             break;
           default:
             if (item.key.endsWith('Enabled')) {
@@ -289,6 +326,13 @@ const PaymentSetting = () => {
                   hideSectionTitle
                 />
               </Tabs.TabPane>
+              <Tabs.TabPane tab={t('PayPal 设置')} itemKey='paypal'>
+                <SettingsPaymentGatewayPayPal
+                  options={inputs}
+                  refresh={onRefresh}
+                  hideSectionTitle
+                />
+              </Tabs.TabPane>
               <Tabs.TabPane tab={t('Creem 设置')} itemKey='creem'>
                 <SettingsPaymentGatewayCreem
                   options={inputs}
@@ -298,6 +342,13 @@ const PaymentSetting = () => {
               </Tabs.TabPane>
               <Tabs.TabPane tab={t('Waffo 设置')} itemKey='waffo'>
                 <SettingsPaymentGatewayWaffo
+                  options={inputs}
+                  refresh={onRefresh}
+                  hideSectionTitle
+                />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={t('Waffo Pancake 设置')} itemKey='waffo-pancake'>
+                <SettingsPaymentGatewayWaffoPancake
                   options={inputs}
                   refresh={onRefresh}
                   hideSectionTitle

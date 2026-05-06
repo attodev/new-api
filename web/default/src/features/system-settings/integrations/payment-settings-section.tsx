@@ -130,6 +130,11 @@ const paymentSchema = z.object({
   StripeUnitPrice: z.coerce.number().min(0),
   StripeMinTopUp: z.coerce.number().min(0),
   StripePromotionCodesEnabled: z.boolean(),
+  PayPalClientId: z.string(),
+  PayPalClientSecret: z.string(),
+  PayPalSandbox: z.boolean(),
+  PayPalUnitPrice: z.coerce.number().min(0),
+  PayPalMinTopUp: z.coerce.number().min(0),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -415,6 +420,11 @@ export function PaymentSettingsSection({
       StripeUnitPrice: values.StripeUnitPrice,
       StripeMinTopUp: values.StripeMinTopUp,
       StripePromotionCodesEnabled: values.StripePromotionCodesEnabled,
+      PayPalClientId: values.PayPalClientId.trim(),
+      PayPalClientSecret: values.PayPalClientSecret.trim(),
+      PayPalSandbox: values.PayPalSandbox,
+      PayPalUnitPrice: values.PayPalUnitPrice,
+      PayPalMinTopUp: values.PayPalMinTopUp,
       CreemApiKey: values.CreemApiKey.trim(),
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
@@ -460,6 +470,11 @@ export function PaymentSettingsSection({
       StripeMinTopUp: initialRef.current.StripeMinTopUp,
       StripePromotionCodesEnabled:
         initialRef.current.StripePromotionCodesEnabled,
+      PayPalClientId: initialRef.current.PayPalClientId.trim(),
+      PayPalClientSecret: initialRef.current.PayPalClientSecret.trim(),
+      PayPalSandbox: initialRef.current.PayPalSandbox,
+      PayPalUnitPrice: initialRef.current.PayPalUnitPrice,
+      PayPalMinTopUp: initialRef.current.PayPalMinTopUp,
       CreemApiKey: initialRef.current.CreemApiKey.trim(),
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
@@ -581,6 +596,35 @@ export function PaymentSettingsSection({
         key: 'StripePromotionCodesEnabled',
         value: sanitized.StripePromotionCodesEnabled,
       })
+    }
+
+    if (
+      sanitized.PayPalClientId &&
+      sanitized.PayPalClientId !== initial.PayPalClientId
+    ) {
+      updates.push({ key: 'PayPalClientId', value: sanitized.PayPalClientId })
+    }
+
+    if (
+      sanitized.PayPalClientSecret &&
+      sanitized.PayPalClientSecret !== initial.PayPalClientSecret
+    ) {
+      updates.push({
+        key: 'PayPalClientSecret',
+        value: sanitized.PayPalClientSecret,
+      })
+    }
+
+    if (sanitized.PayPalSandbox !== initial.PayPalSandbox) {
+      updates.push({ key: 'PayPalSandbox', value: sanitized.PayPalSandbox })
+    }
+
+    if (sanitized.PayPalUnitPrice !== initial.PayPalUnitPrice) {
+      updates.push({ key: 'PayPalUnitPrice', value: sanitized.PayPalUnitPrice })
+    }
+
+    if (sanitized.PayPalMinTopUp !== initial.PayPalMinTopUp) {
+      updates.push({ key: 'PayPalMinTopUp', value: sanitized.PayPalMinTopUp })
     }
 
     if (
@@ -1351,6 +1395,156 @@ export function PaymentSettingsSection({
                       <FormLabel>{t('Promotion codes')}</FormLabel>
                       <FormDescription>
                         {t('Allow users to enter promo codes')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-4'>
+            <div>
+              <h3 className='text-lg font-medium'>{t('PayPal Gateway')}</h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configuration for PayPal payment integration')}
+              </p>
+            </div>
+
+            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+              <p className='mb-2 font-medium'>{t('Callback Configuration:')}</p>
+              <ul className='list-inside list-disc space-y-1'>
+                <li>
+                  {t('Return URL:')}{' '}
+                  <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                    {'<ServerAddress>/api/paypal/capture'}
+                  </code>
+                </li>
+                <li>
+                  {t('Configure at:')}{' '}
+                  <a
+                    href='https://developer.paypal.com/dashboard/'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='underline hover:no-underline'
+                  >
+                    {t('PayPal Developer Dashboard')}
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='PayPalClientId'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Client ID')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('PayPal application Client ID')}
+                        autoComplete='off'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Leave blank unless updating')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='PayPalClientSecret'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Client Secret')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('PayPal application Client Secret')}
+                        autoComplete='new-password'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Leave blank unless updating')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-3'>
+              <FormField
+                control={form.control}
+                name='PayPalUnitPrice'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Unit price (local currency / USD)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='0.01'
+                        min={0}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('e.g., 8 means 8 local currency per USD')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='PayPalMinTopUp'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='0.01'
+                        min={0}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Minimum recharge amount in USD')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='PayPalSandbox'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Sandbox mode')}</FormLabel>
+                      <FormDescription>
+                        {t('Use the PayPal sandbox environment')}
                       </FormDescription>
                     </SettingsSwitchContent>
                     <FormControl>

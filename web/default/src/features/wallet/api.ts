@@ -28,6 +28,8 @@ import type {
   AmountResponse,
   PaymentResponse,
   StripePaymentResponse,
+  PayPalPaymentResponse,
+  PayPalPaymentRequest,
   AffiliateCodeResponse,
   AffiliateTransferResponse,
   BillingHistoryResponse,
@@ -115,6 +117,18 @@ export async function requestStripePayment(
   request: PaymentRequest
 ): Promise<StripePaymentResponse> {
   const res = await api.post('/api/user/stripe/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * Request PayPal payment
+ */
+export async function requestPayPalPayment(
+  request: PayPalPaymentRequest
+): Promise<PayPalPaymentResponse> {
+  const res = await api.post('/api/user/paypal/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data

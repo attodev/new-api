@@ -25,10 +25,12 @@ import {
   calculateWaffoPancakeAmount,
   requestPayment,
   requestStripePayment,
+  requestPayPalPayment,
   isApiSuccess,
 } from '../api'
 import {
   isStripePayment,
+  isPayPalPayment,
   isWaffoPancakePayment,
   submitPaymentForm,
 } from '../lib'
@@ -82,32 +84,32 @@ export function usePayment() {
         setProcessing(true)
 
         const isStripe = isStripePayment(paymentType)
+        const isPayPal = isPayPalPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
-        const response = isStripe
-          ? await requestStripePayment({
-              amount,
-              payment_method: 'stripe',
-            })
-          : await requestPayment({
-              amount,
-              payment_method: paymentType,
-            })
+        let response
+        if (isStripe) {
+          response = await requestStripePayment({ amount, payment_method: 'stripe' })
+        } else if (isPayPal) {
+          response = await requestPayPalPayment({ amount, payment_method: 'paypal' })
+        } else {
+          response = await requestPayment({ amount, payment_method: paymentType })
+        }
 
         if (!isApiSuccess(response)) {
           toast.error(response.message || i18next.t('Payment request failed'))
           return false
         }
 
-        // Handle Stripe payment
-        if (isStripe && response.data?.pay_link) {
+        // Handle redirect-based payments (Stripe / PayPal)
+        if ((isStripe || isPayPal) && response.data?.pay_link) {
           window.open(response.data.pay_link as string, '_blank')
           toast.success(i18next.t('Redirecting to payment page...'))
           return true
         }
 
-        // Handle non-Stripe payment
-        if (!isStripe && response.data) {
+        // Handle non-redirect payment (Epay form submit)
+        if (!isStripe && !isPayPal && response.data) {
           const url = (response as unknown as { url?: string }).url
           if (url) {
             submitPaymentForm(url, response.data)
