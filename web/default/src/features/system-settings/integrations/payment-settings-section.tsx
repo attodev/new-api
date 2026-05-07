@@ -805,6 +805,32 @@ export function PaymentSettingsSection({
     }
   }
 
+  const clearStripeSettings = async () => {
+    const keys = ['StripeApiSecret', 'StripeWebhookSecret', 'StripePriceId']
+    for (const key of keys) {
+      await updateOption.mutateAsync({ key, value: '' })
+    }
+    form.setValue('StripeApiSecret', '')
+    form.setValue('StripeWebhookSecret', '')
+    form.setValue('StripePriceId', '')
+    initialRef.current.StripeApiSecret = ''
+    initialRef.current.StripeWebhookSecret = ''
+    initialRef.current.StripePriceId = ''
+  }
+
+  const clearPayPalSettings = async () => {
+    const keys = ['PayPalClientId', 'PayPalClientSecret', 'PayPalWebhookID']
+    for (const key of keys) {
+      await updateOption.mutateAsync({ key, value: '' })
+    }
+    form.setValue('PayPalClientId', '')
+    form.setValue('PayPalClientSecret', '')
+    form.setValue('PayPalWebhookID', '')
+    initialRef.current.PayPalClientId = ''
+    initialRef.current.PayPalClientSecret = ''
+    initialRef.current.PayPalWebhookID = ''
+  }
+
   const currentFormValues = form.watch()
   const waffoValues: WaffoSettingsValues = {
     WaffoEnabled: currentFormValues.WaffoEnabled,
@@ -1414,6 +1440,27 @@ export function PaymentSettingsSection({
                 )}
               />
             </div>
+
+            <div className='flex gap-2'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (
+                    window.confirm(
+                      t('Clear all Stripe credentials and disable Stripe payments?')
+                    )
+                  ) {
+                    clearStripeSettings()
+                  }
+                }}
+                disabled={updateOption.isPending}
+              >
+                {t('Clear')}
+              </Button>
+            </div>
           </div>
 
           <Separator />
@@ -1587,6 +1634,27 @@ export function PaymentSettingsSection({
                   </SettingsSwitchItem>
                 )}
               />
+            </div>
+
+            <div className='flex gap-2'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (
+                    window.confirm(
+                      t('Clear all PayPal credentials and disable PayPal payments?')
+                    )
+                  ) {
+                    clearPayPalSettings()
+                  }
+                }}
+                disabled={updateOption.isPending}
+              >
+                {t('Clear')}
+              </Button>
             </div>
           </div>
 
