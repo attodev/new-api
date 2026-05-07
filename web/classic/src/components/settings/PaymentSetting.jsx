@@ -61,6 +61,7 @@ const PaymentSetting = () => {
 
     PayPalClientId: '',
     PayPalClientSecret: '',
+    PayPalWebhookID: '',
     PayPalUnitPrice: 1.0,
     PayPalMinTopUp: 1,
     PayPalSandbox: false,

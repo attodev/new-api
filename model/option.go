@@ -89,6 +89,7 @@ func InitOptionMap() {
 	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
 	common.OptionMap["PayPalClientId"] = setting.PayPalClientId
 	common.OptionMap["PayPalClientSecret"] = setting.PayPalClientSecret
+	common.OptionMap["PayPalWebhookID"] = setting.PayPalWebhookID
 	common.OptionMap["PayPalSandbox"] = strconv.FormatBool(setting.PayPalSandbox)
 	common.OptionMap["PayPalUnitPrice"] = strconv.FormatFloat(setting.PayPalUnitPrice, 'f', -1, 64)
 	common.OptionMap["PayPalMinTopUp"] = strconv.Itoa(setting.PayPalMinTopUp)
@@ -419,6 +420,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.PayPalClientId = value
 	case "PayPalClientSecret":
 		setting.PayPalClientSecret = value
+	case "PayPalWebhookID":
+		setting.PayPalWebhookID = value
 	case "PayPalSandbox":
 		setting.PayPalSandbox = value == "true"
 	case "PayPalUnitPrice":

@@ -132,6 +132,7 @@ const paymentSchema = z.object({
   StripePromotionCodesEnabled: z.boolean(),
   PayPalClientId: z.string(),
   PayPalClientSecret: z.string(),
+  PayPalWebhookID: z.string(),
   PayPalSandbox: z.boolean(),
   PayPalUnitPrice: z.coerce.number().min(0),
   PayPalMinTopUp: z.coerce.number().min(0),
@@ -422,6 +423,7 @@ export function PaymentSettingsSection({
       StripePromotionCodesEnabled: values.StripePromotionCodesEnabled,
       PayPalClientId: values.PayPalClientId.trim(),
       PayPalClientSecret: values.PayPalClientSecret.trim(),
+      PayPalWebhookID: values.PayPalWebhookID.trim(),
       PayPalSandbox: values.PayPalSandbox,
       PayPalUnitPrice: values.PayPalUnitPrice,
       PayPalMinTopUp: values.PayPalMinTopUp,
@@ -472,6 +474,7 @@ export function PaymentSettingsSection({
         initialRef.current.StripePromotionCodesEnabled,
       PayPalClientId: initialRef.current.PayPalClientId.trim(),
       PayPalClientSecret: initialRef.current.PayPalClientSecret.trim(),
+      PayPalWebhookID: initialRef.current.PayPalWebhookID.trim(),
       PayPalSandbox: initialRef.current.PayPalSandbox,
       PayPalUnitPrice: initialRef.current.PayPalUnitPrice,
       PayPalMinTopUp: initialRef.current.PayPalMinTopUp,
@@ -613,6 +616,10 @@ export function PaymentSettingsSection({
         key: 'PayPalClientSecret',
         value: sanitized.PayPalClientSecret,
       })
+    }
+
+    if (sanitized.PayPalWebhookID !== initial.PayPalWebhookID) {
+      updates.push({ key: 'PayPalWebhookID', value: sanitized.PayPalWebhookID })
     }
 
     if (sanitized.PayPalSandbox !== initial.PayPalSandbox) {
@@ -1488,6 +1495,30 @@ export function PaymentSettingsSection({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name='PayPalWebhookID'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Webhook ID')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t(
+                        'Webhook ID from PayPal Developer Dashboard'
+                      )}
+                      autoComplete='off'
+                      {...field}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Used to verify PayPal webhook signatures')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className='grid gap-6 md:grid-cols-3'>
               <FormField

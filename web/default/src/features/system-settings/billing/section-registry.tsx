@@ -149,6 +149,7 @@ const BILLING_SECTIONS = [
           StripePromotionCodesEnabled: settings.StripePromotionCodesEnabled,
           PayPalClientId: settings.PayPalClientId ?? '',
           PayPalClientSecret: settings.PayPalClientSecret ?? '',
+          PayPalWebhookID: settings.PayPalWebhookID ?? '',
           PayPalSandbox: settings.PayPalSandbox ?? false,
           PayPalUnitPrice: settings.PayPalUnitPrice ?? 1,
           PayPalMinTopUp: settings.PayPalMinTopUp ?? 1,

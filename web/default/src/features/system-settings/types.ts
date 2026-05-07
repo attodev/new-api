@@ -239,6 +239,7 @@ export type BillingSettings = {
   StripePromotionCodesEnabled: boolean
   PayPalClientId: string
   PayPalClientSecret: string
+  PayPalWebhookID: string
   PayPalSandbox: boolean
   PayPalUnitPrice: number
   PayPalMinTopUp: number

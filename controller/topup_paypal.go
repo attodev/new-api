@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -398,6 +399,270 @@ func getPayPalPayMoney(amount float64, group string) float64 {
 		}
 	}
 	return amount * setting.PayPalUnitPrice * topupGroupRatio * discount
+}
+
+// ============================================================================
+// PayPal Webhook
+// ============================================================================
+
+// paypalVerifyRequest is the body sent to PayPal's signature-verification endpoint.
+type paypalVerifyRequest struct {
+	AuthAlgo         string          `json:"auth_algo"`
+	CertURL          string          `json:"cert_url"`
+	TransmissionID   string          `json:"transmission_id"`
+	TransmissionSig  string          `json:"transmission_sig"`
+	TransmissionTime string          `json:"transmission_time"`
+	WebhookID        string          `json:"webhook_id"`
+	WebhookEvent     json.RawMessage `json:"webhook_event"`
+}
+
+// verifyPayPalWebhookSignature calls PayPal's verify API and returns true when
+// the signature is valid.
+func verifyPayPalWebhookSignature(ctx context.Context, req paypalVerifyRequest) (bool, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	bodyBytes, err := common.Marshal(req)
+	if err != nil {
+		return false, err
+	}
+
+	baseURL := getPayPalBaseURL()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		baseURL+"/v1/notifications/verify-webhook-signature",
+		strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return false, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	var result struct {
+		VerificationStatus string `json:"verification_status"`
+	}
+	if err := common.Unmarshal(respBody, &result); err != nil {
+		return false, err
+	}
+	return result.VerificationStatus == "SUCCESS", nil
+}
+
+// getPayPalOrderReferenceID calls GET /v2/checkout/orders/{orderID} and returns
+// the reference_id stored in purchase_units[0], which is our internal trade_no.
+func getPayPalOrderReferenceID(ctx context.Context, orderID string) (string, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	baseURL := getPayPalBaseURL()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		baseURL+"/v2/checkout/orders/"+orderID, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var order paypalOrderResponse
+	if err := common.Unmarshal(body, &order); err != nil {
+		return "", err
+	}
+	if len(order.PurchaseUnits) == 0 {
+		return "", fmt.Errorf("PayPal 주문에 purchase_units 없음 order_id=%s", orderID)
+	}
+	return order.PurchaseUnits[0].ReferenceID, nil
+}
+
+// fulfillPayPalOrder credits the user for the given trade_no idempotently.
+// It must be called while holding the order lock.
+func fulfillPayPalOrder(ctx context.Context, referenceID string, clientIP string, eventType string) {
+	topUp := model.GetTopUpByTradeNo(referenceID)
+	if topUp == nil {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 주문 없음 ref=%q event=%s", referenceID, eventType))
+		return
+	}
+	if topUp.Status == common.TopUpStatusSuccess {
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 이미 처리됨 ref=%q event=%s", referenceID, eventType))
+		return
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 상태 이상 ref=%q status=%q event=%s", referenceID, topUp.Status, eventType))
+		return
+	}
+	if err := model.RechargePayPal(referenceID, clientIP); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("PayPal webhook 충전 실패 ref=%q event=%s error=%q", referenceID, eventType, err.Error()))
+		return
+	}
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 충전 성공 ref=%q event=%s", referenceID, eventType))
+}
+
+// PayPalWebhook handles incoming webhook events from PayPal.
+//
+// Relevant events:
+//   - CHECKOUT.ORDER.APPROVED : user approved; we call capture here so that
+//     orders are fulfilled even when the browser redirect (PayPalCapture) fails.
+//   - PAYMENT.CAPTURE.COMPLETED : capture is confirmed; credit the user.
+func PayPalWebhook(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	if strings.TrimSpace(setting.PayPalWebhookID) == "" {
+		logger.LogWarn(ctx, "PayPal webhook 비활성화됨 (WebhookID 미설정)")
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		logger.LogError(ctx, "PayPal webhook body 읽기 실패: "+err.Error())
+		c.AbortWithStatus(http.StatusServiceUnavailable)
+		return
+	}
+
+	// Verify signature via PayPal API
+	verified, err := verifyPayPalWebhookSignature(ctx, paypalVerifyRequest{
+		AuthAlgo:         c.GetHeader("PAYPAL-AUTH-ALGO"),
+		CertURL:          c.GetHeader("PAYPAL-CERT-URL"),
+		TransmissionID:   c.GetHeader("PAYPAL-TRANSMISSION-ID"),
+		TransmissionSig:  c.GetHeader("PAYPAL-TRANSMISSION-SIG"),
+		TransmissionTime: c.GetHeader("PAYPAL-TRANSMISSION-TIME"),
+		WebhookID:        setting.PayPalWebhookID,
+		WebhookEvent:     json.RawMessage(body),
+	})
+	if err != nil || !verified {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 서명 검증 실패 client_ip=%s error=%v", c.ClientIP(), err))
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// Parse event envelope
+	var event struct {
+		EventType string `json:"event_type"`
+		Resource  struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+			// CHECKOUT.ORDER.APPROVED — purchase_units contains reference_id
+			PurchaseUnits []struct {
+				ReferenceID string `json:"reference_id"`
+			} `json:"purchase_units"`
+			// PAYMENT.CAPTURE.COMPLETED — order_id lives here
+			SupplementaryData struct {
+				RelatedIDs struct {
+					OrderID string `json:"order_id"`
+				} `json:"related_ids"`
+			} `json:"supplementary_data"`
+		} `json:"resource"`
+	}
+	if err := common.Unmarshal(body, &event); err != nil {
+		logger.LogError(ctx, "PayPal webhook 파싱 실패: "+err.Error())
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 수신 event=%s client_ip=%s", event.EventType, c.ClientIP()))
+
+	switch event.EventType {
+
+	case "CHECKOUT.ORDER.APPROVED":
+		// User approved the order on PayPal. Capture it immediately so that
+		// credit is granted even when the browser redirect (PayPalCapture) fails.
+		paypalOrderID := event.Resource.ID
+		if paypalOrderID == "" {
+			logger.LogWarn(ctx, "PayPal CHECKOUT.ORDER.APPROVED: resource.id 없음")
+			c.Status(http.StatusOK)
+			return
+		}
+
+		var referenceID string
+		if len(event.Resource.PurchaseUnits) > 0 {
+			referenceID = event.Resource.PurchaseUnits[0].ReferenceID
+		}
+		if referenceID == "" {
+			// Fallback: fetch order details
+			referenceID, err = getPayPalOrderReferenceID(ctx, paypalOrderID)
+			if err != nil {
+				logger.LogError(ctx, fmt.Sprintf("PayPal APPROVED: 주문 조회 실패 order_id=%s error=%q", paypalOrderID, err.Error()))
+				c.Status(http.StatusOK)
+				return
+			}
+		}
+
+		LockOrder(referenceID)
+		defer UnlockOrder(referenceID)
+
+		// Check if already fulfilled (e.g. PayPalCapture ran first)
+		topUp := model.GetTopUpByTradeNo(referenceID)
+		if topUp == nil || topUp.Status == common.TopUpStatusSuccess {
+			c.Status(http.StatusOK)
+			return
+		}
+
+		// Capture; PayPal will then fire PAYMENT.CAPTURE.COMPLETED
+		captureResult, err := capturePayPalOrder(ctx, paypalOrderID)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("PayPal APPROVED: capture 실패 ref=%q order_id=%s error=%q",
+				referenceID, paypalOrderID, err.Error()))
+			c.Status(http.StatusOK)
+			return
+		}
+		if captureResult.Status != "COMPLETED" {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: capture 상태 이상 ref=%q status=%q",
+				referenceID, captureResult.Status))
+			c.Status(http.StatusOK)
+			return
+		}
+		fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), event.EventType)
+
+	case "PAYMENT.CAPTURE.COMPLETED":
+		// Capture is confirmed (may have been triggered by PayPalCapture or the
+		// CHECKOUT.ORDER.APPROVED handler above). Credit the user idempotently.
+		orderID := event.Resource.SupplementaryData.RelatedIDs.OrderID
+		if orderID == "" {
+			logger.LogWarn(ctx, "PayPal PAYMENT.CAPTURE.COMPLETED: order_id 없음")
+			c.Status(http.StatusOK)
+			return
+		}
+
+		referenceID, err := getPayPalOrderReferenceID(ctx, orderID)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: 주문 조회 실패 order_id=%s error=%q", orderID, err.Error()))
+			c.Status(http.StatusOK)
+			return
+		}
+
+		LockOrder(referenceID)
+		defer UnlockOrder(referenceID)
+
+		fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), event.EventType)
+
+	default:
+		// Unrelated event; acknowledge so PayPal stops retrying.
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 무시 event=%s", event.EventType))
+	}
+
+	c.Status(http.StatusOK)
 }
 
 func RequestPayPalAmount(c *gin.Context) {

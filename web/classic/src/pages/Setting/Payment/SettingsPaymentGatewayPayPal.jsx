@@ -25,7 +25,7 @@ import {
   showSuccess,
 } from '../../../helpers';
 import { useTranslation } from 'react-i18next';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, TriangleAlert } from 'lucide-react';
 
 export default function SettingsPaymentGatewayPayPal(props) {
   const { t } = useTranslation();
@@ -34,6 +34,7 @@ export default function SettingsPaymentGatewayPayPal(props) {
   const [inputs, setInputs] = useState({
     PayPalClientId: '',
     PayPalClientSecret: '',
+    PayPalWebhookID: '',
     PayPalUnitPrice: 1.0,
     PayPalMinTopUp: 1,
     PayPalSandbox: false,
@@ -46,6 +47,7 @@ export default function SettingsPaymentGatewayPayPal(props) {
       const currentInputs = {
         PayPalClientId: props.options.PayPalClientId || '',
         PayPalClientSecret: props.options.PayPalClientSecret || '',
+        PayPalWebhookID: props.options.PayPalWebhookID || '',
         PayPalUnitPrice:
           props.options.PayPalUnitPrice !== undefined
             ? parseFloat(props.options.PayPalUnitPrice)
@@ -81,6 +83,12 @@ export default function SettingsPaymentGatewayPayPal(props) {
         options.push({
           key: 'PayPalClientSecret',
           value: inputs.PayPalClientSecret,
+        });
+      }
+      if (inputs.PayPalWebhookID !== undefined) {
+        options.push({
+          key: 'PayPalWebhookID',
+          value: inputs.PayPalWebhookID,
         });
       }
       if (
@@ -160,6 +168,18 @@ export default function SettingsPaymentGatewayPayPal(props) {
                 {t('中创建应用并获取 Client ID 和 Secret。建议先在沙盒环境中完成联调。')}
               </>
             }
+            style={{ marginBottom: 12 }}
+          />
+          <Banner
+            type='warning'
+            icon={<TriangleAlert size={16} />}
+            description={
+              <>
+                {t('Webhook ID는 PayPal Developer Dashboard → 앱 선택 → Webhooks에서 발급받으세요. 이벤트는 ')}<b>CHECKOUT.ORDER.APPROVED</b>{t(' 와 ')}<b>PAYMENT.CAPTURE.COMPLETED</b>{t(' 를 구독해야 합니다.')}
+                <br />
+                {t('Webhook URL')}: {props.options?.ServerAddress || t('서버 주소')}/api/paypal/webhook
+              </>
+            }
             style={{ marginBottom: 16 }}
           />
           <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}>
@@ -178,6 +198,19 @@ export default function SettingsPaymentGatewayPayPal(props) {
                 placeholder={t('PayPal 应用 Client Secret，留空表示保持当前不变')}
                 extraText={t('保存后不会回显')}
                 type='password'
+              />
+            </Col>
+          </Row>
+          <Row
+            gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+            style={{ marginTop: 16 }}
+          >
+            <Col xs={24} sm={24} md={24} lg={24} xl={24}>
+              <Form.Input
+                field='PayPalWebhookID'
+                label={t('Webhook ID')}
+                placeholder={t('PayPal Developer Dashboard에서 발급받은 Webhook ID')}
+                extraText={t('Webhook 미설정 시 브라우저 리다이렉트에만 의존합니다 (불안정)')}
               />
             </Col>
           </Row>
