@@ -469,10 +469,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	if tradeNo == "" {
-		return errors.New("未提供支付单号")
+		return errors.New("미지불 주문번호 없음")
 	}
 
-	var quota float64
+	var quotaToAdd int
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -482,7 +482,7 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
-			return errors.New("充值订单不存在")
+			return errors.New("충전 주문 없음")
 		}
 
 		if topUp.PaymentProvider != PaymentProviderPayPal {
@@ -490,7 +490,7 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
-			return errors.New("充值订单状态错误")
+			return errors.New("충전 주문 상태 오류")
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -499,16 +499,17 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 			return err
 		}
 
-		quota = topUp.Money * common.QuotaPerUnit
-		return tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quota)).Error
+		// Use decimal arithmetic to avoid float64 → int type mismatch on PostgreSQL.
+		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		return tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error
 	})
 
 	if err != nil {
 		common.SysError("paypal topup failed: " + err.Error())
-		return errors.New("充值失败，请稍后重试")
+		return errors.New("충전 실패, 잠시 후 다시 시도해 주세요")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用PayPal充值成功，充值金额: %v，支付金额：%.2f USD", logger.FormatQuota(int(quota)), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderPayPal)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("PayPal 충전 성공 — 충전 금액: %v, 결제 금액: %.2f USD", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderPayPal)
 
 	return nil
 }
