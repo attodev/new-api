@@ -96,6 +96,18 @@ export async function calculateStripeAmount(
 }
 
 /**
+ * Calculate payment amount for PayPal payment
+ */
+export async function calculatePayPalAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/user/paypal/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
  * Request regular payment
  */
 export async function requestPayment(

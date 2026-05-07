@@ -22,7 +22,8 @@ func isStripeTopUpEnabled() bool {
 
 func isPayPalTopUpEnabled() bool {
 	return strings.TrimSpace(setting.PayPalClientId) != "" &&
-		strings.TrimSpace(setting.PayPalClientSecret) != ""
+		strings.TrimSpace(setting.PayPalClientSecret) != "" &&
+		strings.TrimSpace(setting.PayPalWebhookID) != ""
 }
 
 func isStripeWebhookConfigured() bool {
