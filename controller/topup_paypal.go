@@ -213,8 +213,10 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		return "", "", err
 	}
 
-	if resp.StatusCode != http.StatusCreated {
-		return "", "", fmt.Errorf("PayPal 创建订单失败: status=%d body=%s", resp.StatusCode, string(respBody))
+	// PayPal returns 201 for standard orders and 200 for orders with
+	// payment_source.paypal (PAYER_ACTION_REQUIRED flow).
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("PayPal 주문 생성 실패: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	var order paypalOrderResponse
@@ -228,7 +230,7 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		}
 	}
 
-	return "", "", fmt.Errorf("PayPal 订单响应中未找到支付链接")
+	return "", "", fmt.Errorf("PayPal 주문 응답에 결제 링크 없음 order_id=%s status=%s", order.ID, order.Status)
 }
 
 // capturePayPalOrder captures a PayPal order by its PayPal order ID.
