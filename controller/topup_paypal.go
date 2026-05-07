@@ -347,7 +347,7 @@ func RequestPayPalPay(c *gin.Context) {
 		return
 	}
 
-	logger.LogInfo(c.Request.Context(), fmt.Sprintf("PayPal 充值订单创建成功 user_id=%d trade_no=%s paypal_order=%s amount=%d money=%.2f", id, referenceId, paypalOrderId, req.Amount, chargedMoney))
+	logger.LogInfo(c.Request.Context(), fmt.Sprintf("PayPal 충전 주문 생성 성공 user_id=%d trade_no=%s paypal_order=%s amount=%d money=%.2f capture_url=%q approval_url=%q", id, referenceId, paypalOrderId, req.Amount, chargedMoney, captureURL, approvalURL))
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{

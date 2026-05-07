@@ -110,7 +110,16 @@ export function usePayment() {
 
         // Handle redirect-based payments (Stripe / PayPal)
         if ((isStripe || isPayPal) && response.data?.pay_link) {
-          window.open(response.data.pay_link as string, '_blank')
+          const payLink = response.data.pay_link as string
+          if (isPayPal) {
+            // PayPal uses a server-side redirect flow: after payment, PayPal
+            // redirects the browser back to /api/paypal/capture which fulfills
+            // the order and then redirects to /console/log.  We must navigate
+            // the CURRENT window (not a new tab) so the capture URL is reached.
+            window.location.href = payLink
+          } else {
+            window.open(payLink, '_blank')
+          }
           toast.success(i18next.t('Redirecting to payment page...'))
           return true
         }
