@@ -1458,14 +1458,14 @@ export function PaymentSettingsSection({
                     <FormLabel>{t('Client ID')}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder={t('PayPal application Client ID')}
+                        placeholder={t('Enter PayPal Client ID')}
                         autoComplete='off'
                         {...field}
                         onChange={(event) => field.onChange(event.target.value)}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Leave blank unless updating')}
+                      {t('PayPal Client ID (public identifier)')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
