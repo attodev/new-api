@@ -400,12 +400,18 @@ func PayPalCapture(c *gin.Context) {
 		return
 	}
 	if err := validatePayPalCapturedOrderResponse(topUp, paypalOrderID, captureResult); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return capture 结果验证失败 error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal return capture 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
 		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
 		return
 	}
 
-	logger.LogInfo(ctx, fmt.Sprintf("PayPal return capture 成功 ref=%q order_id=%q client_ip=%s, 等待 CAPTURE.COMPLETED webhook 完成充值", referenceID, paypalOrderID, c.ClientIP()))
+	// Credit the user immediately on browser return.
+	// fulfillPayPalOrder is idempotent — a subsequent PAYMENT.CAPTURE.COMPLETED
+	// webhook will be a no-op if the order was already credited here.
+	if err := fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), "browser-capture"); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("PayPal return 충전 실패 ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
+		// Don't block the redirect — the PAYMENT.CAPTURE.COMPLETED webhook will retry.
+	}
 	c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/log")
 }
 
