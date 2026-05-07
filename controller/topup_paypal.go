@@ -567,18 +567,18 @@ func validatePayPalCaptureForTopUp(topUp *model.TopUp, orderID string, reference
 
 func validatePayPalCapturedOrderResponse(topUp *model.TopUp, orderID string, order *paypalOrderResponse) error {
 	if order == nil {
-		return fmt.Errorf("PayPal capture 响应为空")
+		return fmt.Errorf("PayPal capture 응답이 비어있음")
 	}
-	referenceID := getPayPalOrderReferenceID(order)
 	if order.ID != "" && order.ID != orderID {
-		return fmt.Errorf("PayPal capture order id 不一致 expected=%s actual=%s", orderID, order.ID)
+		return fmt.Errorf("PayPal capture order id 불일치 expected=%s actual=%s", orderID, order.ID)
 	}
 	if order.Status != "COMPLETED" {
-		return fmt.Errorf("PayPal capture order 状态不一致 ref=%s status=%s", topUp.TradeNo, order.Status)
+		return fmt.Errorf("PayPal capture order 상태 불일치 order_id=%s status=%s", orderID, order.Status)
 	}
 	if len(order.PurchaseUnits) == 0 || len(order.PurchaseUnits[0].Payments.Captures) == 0 {
-		return fmt.Errorf("PayPal capture 响应缺少 capture 明细 ref=%s", topUp.TradeNo)
+		return fmt.Errorf("PayPal capture 응답에 capture 명세 없음 order_id=%s", orderID)
 	}
+	referenceID := getPayPalOrderReferenceID(order)
 	capture := order.PurchaseUnits[0].Payments.Captures[0]
 	return validatePayPalCaptureForTopUp(topUp, orderID, referenceID, capture.Status, capture.Amount.CurrencyCode, capture.Amount.Value)
 }
