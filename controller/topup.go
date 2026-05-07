@@ -24,10 +24,12 @@ import (
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
-	// 获取支付方式
-	payMethods := operation_setting.PayMethods
-	if !complianceConfirmed {
-		payMethods = []map[string]string{}
+	// 只有 Epay 网关已完整配置时才暴露 Epay 支付方式；
+	// 未配置时 PayMethods 变量含硬编码的默认方法（支付宝/微信等），
+	// 不应暴露给前端。
+	var payMethods []map[string]string
+	if complianceConfirmed && isEpayTopUpEnabled() {
+		payMethods = operation_setting.PayMethods
 	}
 
 	// 如果启用了 Stripe 支付，添加到支付方法列表
