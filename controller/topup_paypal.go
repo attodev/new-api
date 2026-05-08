@@ -356,16 +356,29 @@ func RequestPayPalPay(c *gin.Context) {
 	})
 }
 
+// paypalRedirect issues a 302 redirect using a path-only URL so the browser
+// stays on the same origin regardless of how ServerAddress is configured.
+func paypalRedirect(c *gin.Context, path string) {
+	c.Redirect(http.StatusFound, path)
+}
+
 // PayPalCapture handles the redirect back from PayPal after user approves.
 // PayPal appends ?token={paypalOrderId}&PayerID={payerId} to the return URL.
 // Our return URL also includes ?ref={referenceId}.
+//
+// Capture flow:
+//  1. Call PayPal capture API.
+//  2. If capture is COMPLETED → credit user immediately (idempotent with webhook).
+//  3. If capture is PENDING   → log and redirect to topup; PAYMENT.CAPTURE.COMPLETED
+//     webhook will credit when PayPal settles.
+//  4. Any other status / error → log and redirect to topup.
 func PayPalCapture(c *gin.Context) {
 	ctx := c.Request.Context()
 	referenceID := c.Query("ref")
 	paypalOrderID := c.Query("token")
 	if referenceID == "" || paypalOrderID == "" {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return 缺少参数 ref=%q token=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 파라미터 누락 ref=%q token=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
 
@@ -374,34 +387,52 @@ func PayPalCapture(c *gin.Context) {
 
 	topUp := model.GetTopUpByTradeNo(referenceID)
 	if topUp == nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return 本地订单不存在 ref=%q order_id=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 로컬 주문 없음 ref=%q order_id=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
 	if err := validatePayPalTopUpOrder(topUp, paypalOrderID, referenceID); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return 订单验证失败 error=%q client_ip=%s", err.Error(), c.ClientIP()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 주문 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
 	if topUp.Status == common.TopUpStatusSuccess {
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/log")
+		// Already fulfilled (e.g. by a previous webhook). Just send to logs.
+		paypalRedirect(c, "/console/log")
 		return
 	}
 	if topUp.Status != common.TopUpStatusPending {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return 本地订单状态异常 ref=%q status=%q client_ip=%s", referenceID, topUp.Status, c.ClientIP()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 주문 상태 이상 ref=%q status=%q client_ip=%s", referenceID, topUp.Status, c.ClientIP()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
 
 	captureResult, err := capturePayPalOrder(ctx, paypalOrderID)
 	if err != nil {
-		logger.LogError(ctx, fmt.Sprintf("PayPal return capture 失败 ref=%q order_id=%q client_ip=%s error=%q", referenceID, paypalOrderID, c.ClientIP(), err.Error()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture API 실패 ref=%q order_id=%q client_ip=%s error=%q", referenceID, paypalOrderID, c.ClientIP(), err.Error()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
+
+	// Determine capture status (order-level and capture-level).
+	// PayPal sandbox sometimes returns PENDING for the capture even when the
+	// order itself completes normally.  In that case we skip immediate credit
+	// and let the PAYMENT.CAPTURE.COMPLETED webhook do it later.
+	captureStatus := ""
+	if len(captureResult.PurchaseUnits) > 0 && len(captureResult.PurchaseUnits[0].Payments.Captures) > 0 {
+		captureStatus = captureResult.PurchaseUnits[0].Payments.Captures[0].Status
+	}
+
+	if captureStatus == "PENDING" {
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal capture PENDING ref=%q order_id=%q — PAYMENT.CAPTURE.COMPLETED webhook will credit", referenceID, paypalOrderID))
+		paypalRedirect(c, "/console/topup")
+		return
+	}
+
+	// Full validation: order COMPLETED, capture COMPLETED, amount/currency match.
 	if err := validatePayPalCapturedOrderResponse(topUp, paypalOrderID, captureResult); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal return capture 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
-		c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/topup")
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		paypalRedirect(c, "/console/topup")
 		return
 	}
 
@@ -409,10 +440,10 @@ func PayPalCapture(c *gin.Context) {
 	// fulfillPayPalOrder is idempotent — a subsequent PAYMENT.CAPTURE.COMPLETED
 	// webhook will be a no-op if the order was already credited here.
 	if err := fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), "browser-capture"); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("PayPal return 충전 실패 ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
-		// Don't block the redirect — the PAYMENT.CAPTURE.COMPLETED webhook will retry.
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture 충전 실패 ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
+		// Don't block redirect — webhook will retry.
 	}
-	c.Redirect(http.StatusFound, system_setting.ServerAddress+"/console/log")
+	paypalRedirect(c, "/console/log")
 }
 
 func getPayPalPayMoney(amount float64, group string) float64 {
