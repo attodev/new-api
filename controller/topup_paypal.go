@@ -166,6 +166,12 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		returnURL += "?ref=" + referenceId
 	}
 
+	// Standard PayPal Checkout flow (application_context).
+	// We deliberately avoid payment_source.paypal / PAYER_ACTION_REQUIRED because
+	// that flow causes PayPal sandbox to show "PENDING → FAILED" and produces
+	// unstable capture behaviour.  The standard CREATED → APPROVED → CAPTURED
+	// path is well-tested, works with any PayPal-supported payment method, and
+	// is what virtually all other PayPal integrations use.
 	payload := map[string]interface{}{
 		"intent": "CAPTURE",
 		"purchase_units": []map[string]interface{}{
@@ -177,15 +183,11 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 				},
 			},
 		},
-		"payment_source": map[string]interface{}{
-			"paypal": map[string]interface{}{
-				"experience_context": map[string]interface{}{
-					"payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
-					"user_action":               "PAY_NOW",
-					"return_url":                returnURL,
-					"cancel_url":                cancelURL,
-				},
-			},
+		"application_context": map[string]interface{}{
+			"return_url":          returnURL,
+			"cancel_url":          cancelURL,
+			"user_action":         "PAY_NOW",
+			"shipping_preference": "NO_SHIPPING",
 		},
 	}
 
@@ -213,9 +215,8 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		return "", "", err
 	}
 
-	// PayPal returns 201 for standard orders and 200 for orders with
-	// payment_source.paypal (PAYER_ACTION_REQUIRED flow).
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	// Standard order creation returns 201 Created.
+	if resp.StatusCode != http.StatusCreated {
 		return "", "", fmt.Errorf("PayPal 주문 생성 실패: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
@@ -224,8 +225,9 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		return "", "", err
 	}
 
+	// Standard flow uses "approve" link; keep "payer-action" as fallback.
 	for _, link := range order.Links {
-		if link.Rel == "payer-action" || link.Rel == "approve" {
+		if link.Rel == "approve" || link.Rel == "payer-action" {
 			return order.ID, link.Href, nil
 		}
 	}
