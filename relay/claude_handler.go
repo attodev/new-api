@@ -29,12 +29,15 @@ import (
 // keep the upstream model name in sync.
 func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName string) (modelAdapted bool) {
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
+		(strings.HasPrefix(request.Model, "claude-opus-4-6") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-8")) {
 		request.Model = baseModel
 		request.Thinking = request.Thinking.WithAdaptive()
 		request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, effortLevel)
-		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
+		if strings.HasPrefix(request.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400.
 			request.Temperature = nil
 			request.TopP = nil
 			request.TopK = nil
@@ -46,8 +49,9 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		strings.HasSuffix(request.Model, "-thinking") {
 		if request.Thinking == nil {
 			baseModel := strings.TrimSuffix(request.Model, "-thinking")
-			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
+			if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
+				strings.HasPrefix(baseModel, "claude-opus-4-8") {
+				// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
 				request.Thinking = request.Thinking.WithAdaptive()
 				request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, "high")
 				request.Temperature = nil

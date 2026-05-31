@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func commonPointer[T any](value T) *T {
+	return &value
+}
+
 func TestFormatClaudeResponseInfo_MessageStart(t *testing.T) {
 	claudeInfo := &ClaudeResponseInfo{
 		Usage: &dto.Usage{},
@@ -358,6 +362,58 @@ func TestRequestOpenAI2ClaudeMessage_KeepsToolUseWithEmptyArguments(t *testing.T
 	}
 	require.NotNil(t, toolUse, "the tool_use block must be kept, not dropped")
 	require.Equal(t, "call_1", toolUse.Id)
+}
+
+func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48HighUsesAdaptiveThinking(t *testing.T) {
+	request := dto.GeneralOpenAIRequest{
+		Model:       "claude-opus-4-8-high",
+		Temperature: commonPointer(0.7),
+		TopP:        commonPointer(0.9),
+		TopK:        commonPointer(40),
+		Messages: []dto.Message{
+			{
+				Role:    "user",
+				Content: "hello",
+			},
+		},
+	}
+
+	claudeRequest, err := RequestOpenAI2ClaudeMessage(nil, request)
+	require.NoError(t, err)
+	require.Equal(t, "claude-opus-4-8", claudeRequest.Model)
+	require.NotNil(t, claudeRequest.Thinking)
+	require.Equal(t, "adaptive", claudeRequest.Thinking.Type)
+	require.Equal(t, "summarized", claudeRequest.Thinking.Display)
+	require.JSONEq(t, `{"effort":"high"}`, string(claudeRequest.OutputConfig))
+	require.Nil(t, claudeRequest.Temperature)
+	require.Nil(t, claudeRequest.TopP)
+	require.Nil(t, claudeRequest.TopK)
+}
+
+func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(t *testing.T) {
+	request := dto.GeneralOpenAIRequest{
+		Model:       "claude-opus-4-8-thinking",
+		Temperature: commonPointer(0.7),
+		TopP:        commonPointer(0.9),
+		TopK:        commonPointer(40),
+		Messages: []dto.Message{
+			{
+				Role:    "user",
+				Content: "hello",
+			},
+		},
+	}
+
+	claudeRequest, err := RequestOpenAI2ClaudeMessage(nil, request)
+	require.NoError(t, err)
+	require.Equal(t, "claude-opus-4-8", claudeRequest.Model)
+	require.NotNil(t, claudeRequest.Thinking)
+	require.Equal(t, "adaptive", claudeRequest.Thinking.Type)
+	require.Equal(t, "summarized", claudeRequest.Thinking.Display)
+	require.JSONEq(t, `{"effort":"high"}`, string(claudeRequest.OutputConfig))
+	require.Nil(t, claudeRequest.Temperature)
+	require.Nil(t, claudeRequest.TopP)
+	require.Nil(t, claudeRequest.TopK)
 }
 
 func TestRequestOpenAI2ClaudeMessage_SupportsPDFFileContent(t *testing.T) {
