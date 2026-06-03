@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
@@ -61,6 +62,98 @@ func (w *WalletFunding) Refund() error {
 	// IncreaseUserQuota 是 quota += N 的非幂等操作，不能重试，否则会多退额度。
 	// 订阅的 RefundSubscriptionPreConsume 有 requestId 幂等保护所以可以重试。
 	return model.IncreaseUserQuota(w.userId, w.consumed, false)
+}
+
+func resolveOrganizationOwnerForWallet(userId int) (int, error) {
+	user, err := model.GetUserById(userId, false)
+	if err != nil {
+		return 0, err
+	}
+	if user.OrganizationId <= 0 {
+		return 0, nil
+	}
+	ownerUserId, err := model.GetOrganizationOwnerUserId(user.OrganizationId)
+	if err != nil {
+		return 0, err
+	}
+	if ownerUserId <= 0 || ownerUserId == userId {
+		return 0, nil
+	}
+	return ownerUserId, nil
+}
+
+func AdjustWalletQuotaForUser(userId int, delta int) error {
+	if delta == 0 {
+		return nil
+	}
+	ownerUserId, err := resolveOrganizationOwnerForWallet(userId)
+	if err != nil {
+		return err
+	}
+
+	if delta > 0 {
+		if err := model.DecreaseUserQuota(userId, delta, false); err != nil {
+			return err
+		}
+		if ownerUserId > 0 {
+			if err := model.DecreaseUserQuota(ownerUserId, delta, false); err != nil {
+				_ = model.IncreaseUserQuota(userId, delta, false)
+				return err
+			}
+		}
+		return nil
+	}
+
+	refund := -delta
+	if err := model.IncreaseUserQuota(userId, refund, false); err != nil {
+		return err
+	}
+	if ownerUserId > 0 {
+		if err := model.IncreaseUserQuota(ownerUserId, refund, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// OrganizationWalletFunding — organization member limit + owner wallet
+// ---------------------------------------------------------------------------
+
+type OrganizationWalletFunding struct {
+	memberId int
+	ownerId  int
+	consumed int
+}
+
+func (o *OrganizationWalletFunding) Source() string { return BillingSourceWallet }
+
+func (o *OrganizationWalletFunding) PreConsume(amount int) error {
+	if amount <= 0 {
+		return nil
+	}
+	if o.memberId <= 0 || o.ownerId <= 0 || o.memberId == o.ownerId {
+		return errors.New("invalid organization wallet funding users")
+	}
+	if err := AdjustWalletQuotaForUser(o.memberId, amount); err != nil {
+		return err
+	}
+	o.consumed = amount
+	return nil
+}
+
+func (o *OrganizationWalletFunding) Settle(delta int) error {
+	if delta == 0 {
+		return nil
+	}
+	return AdjustWalletQuotaForUser(o.memberId, delta)
+}
+
+func (o *OrganizationWalletFunding) Refund() error {
+	if o.consumed <= 0 {
+		return nil
+	}
+	return AdjustWalletQuotaForUser(o.memberId, -o.consumed)
 }
 
 // ---------------------------------------------------------------------------

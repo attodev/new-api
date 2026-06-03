@@ -41,6 +41,22 @@ func HasOrganizationOwnerRole(role string) bool {
 	return role == OrganizationRoleOwner
 }
 
+func GetOrganizationOwnerUserId(organizationId int) (int, error) {
+	if organizationId <= 0 {
+		return 0, nil
+	}
+
+	var ownerUserId int
+	err := DB.Model(&Organization{}).
+		Where("id = ?", organizationId).
+		Select("owner_user_id").
+		First(&ownerUserId).Error
+	if err != nil {
+		return 0, err
+	}
+	return ownerUserId, nil
+}
+
 func CreateOrganization(name string, description string, ownerUserId int) (*Organization, error) {
 	name = strings.TrimSpace(name)
 	description = strings.TrimSpace(description)

@@ -302,6 +302,9 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 
 	switch s.funding.Source() {
 	case BillingSourceWallet:
+		if _, ok := s.funding.(*OrganizationWalletFunding); ok {
+			return false
+		}
 		return s.relayInfo.UserQuota > trustQuota
 	case BillingSourceSubscription:
 		// 订阅不能启用信任旁路。原因：
@@ -348,6 +351,10 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
+		user, err := model.GetUserById(relayInfo.UserId, false)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
 		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
@@ -366,9 +373,39 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		}
 		relayInfo.UserQuota = userQuota
 
+		var funding FundingSource = &WalletFunding{userId: relayInfo.UserId}
+		if user.OrganizationId > 0 {
+			ownerUserId, err := model.GetOrganizationOwnerUserId(user.OrganizationId)
+			if err != nil {
+				return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+			}
+			if ownerUserId > 0 && ownerUserId != relayInfo.UserId {
+				ownerQuota, err := model.GetUserQuota(ownerUserId, false)
+				if err != nil {
+					return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+				}
+				if ownerQuota <= 0 {
+					return nil, types.NewErrorWithStatusCode(
+						fmt.Errorf("组织所有者额度不足, 剩余额度: %s", logger.FormatQuota(ownerQuota)),
+						types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+						types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+				}
+				if ownerQuota-preConsumedQuota < 0 {
+					return nil, types.NewErrorWithStatusCode(
+						fmt.Errorf("组织所有者预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(ownerQuota), logger.FormatQuota(preConsumedQuota)),
+						types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+						types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+				}
+				funding = &OrganizationWalletFunding{
+					memberId: relayInfo.UserId,
+					ownerId:  ownerUserId,
+				}
+			}
+		}
+
 		session := &BillingSession{
 			relayInfo: relayInfo,
-			funding:   &WalletFunding{userId: relayInfo.UserId},
+			funding:   funding,
 		}
 		if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
 			return nil, apiErr
