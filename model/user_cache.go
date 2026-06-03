@@ -15,13 +15,15 @@ import (
 
 // UserBase struct remains the same as it represents the cached data structure
 type UserBase struct {
-	Id       int    `json:"id"`
-	Group    string `json:"group"`
-	Email    string `json:"email"`
-	Quota    int    `json:"quota"`
-	Status   int    `json:"status"`
-	Username string `json:"username"`
-	Setting  string `json:"setting"`
+	Id               int    `json:"id"`
+	Group            string `json:"group"`
+	OrganizationId   int    `json:"organization_id"`
+	OrganizationRole string `json:"organization_role"`
+	Email            string `json:"email"`
+	Quota            int    `json:"quota"`
+	Status           int    `json:"status"`
+	Username         string `json:"username"`
+	Setting          string `json:"setting"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
