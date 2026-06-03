@@ -14,6 +14,13 @@ import (
 func setupOrganizationModelTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
+	originalDB := DB
+	originalLOGDB := LOG_DB
+	originalUsingSQLite := common.UsingSQLite
+	originalUsingMySQL := common.UsingMySQL
+	originalUsingPostgreSQL := common.UsingPostgreSQL
+	originalRedisEnabled := common.RedisEnabled
+
 	common.UsingSQLite = true
 	common.UsingMySQL = false
 	common.UsingPostgreSQL = false
@@ -31,6 +38,12 @@ func setupOrganizationModelTestDB(t *testing.T) *gorm.DB {
 		if err == nil {
 			_ = sqlDB.Close()
 		}
+		DB = originalDB
+		LOG_DB = originalLOGDB
+		common.UsingSQLite = originalUsingSQLite
+		common.UsingMySQL = originalUsingMySQL
+		common.UsingPostgreSQL = originalUsingPostgreSQL
+		common.RedisEnabled = originalRedisEnabled
 	})
 
 	return db
