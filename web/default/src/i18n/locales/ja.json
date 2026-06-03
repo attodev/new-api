@@ -4535,6 +4535,14 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Failed to load organizations": "組織を読み込めませんでした",
+    "Initial organization quota": "初期組織クォータ",
+    "Organization quota updated": "組織クォータを更新しました",
+    "Failed to update organization": "組織を更新できませんでした",
+    "Organization wallet": "組織ウォレット",
+    "Organization quota": "組織クォータ",
+    "Organization used quota": "組織使用済みクォータ",
+    "Manage organization quota": "組織クォータ管理"
   }
 }

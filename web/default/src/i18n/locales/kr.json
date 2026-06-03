@@ -3926,6 +3926,14 @@
     "Your Turnstile site key": "Your Turnstile site 키",
     "Zhipu": "Zhipu AI",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "확대/축소"
+    "Zoom": "확대/축소",
+    "Failed to load organizations": "조직 목록을 불러오지 못했습니다",
+    "Initial organization quota": "초기 조직 quota",
+    "Organization quota updated": "조직 quota를 수정했습니다",
+    "Failed to update organization": "조직을 수정하지 못했습니다",
+    "Organization wallet": "조직 지갑",
+    "Organization quota": "조직 quota",
+    "Organization used quota": "조직 사용 quota",
+    "Manage organization quota": "조직 quota 관리"
   }
 }

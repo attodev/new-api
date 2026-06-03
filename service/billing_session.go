@@ -375,31 +375,25 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 		var funding FundingSource = &WalletFunding{userId: relayInfo.UserId}
 		if user.OrganizationId > 0 {
-			ownerUserId, err := model.GetOrganizationOwnerUserId(user.OrganizationId)
+			organizationQuota, err := model.GetOrganizationQuota(user.OrganizationId)
 			if err != nil {
 				return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 			}
-			if ownerUserId > 0 && ownerUserId != relayInfo.UserId {
-				ownerQuota, err := model.GetUserQuota(ownerUserId, false)
-				if err != nil {
-					return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
-				}
-				if ownerQuota <= 0 {
-					return nil, types.NewErrorWithStatusCode(
-						fmt.Errorf("组织所有者额度不足, 剩余额度: %s", logger.FormatQuota(ownerQuota)),
-						types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-						types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-				}
-				if ownerQuota-preConsumedQuota < 0 {
-					return nil, types.NewErrorWithStatusCode(
-						fmt.Errorf("组织所有者预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(ownerQuota), logger.FormatQuota(preConsumedQuota)),
-						types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-						types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-				}
-				funding = &OrganizationWalletFunding{
-					memberId: relayInfo.UserId,
-					ownerId:  ownerUserId,
-				}
+			if organizationQuota <= 0 {
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("组织额度不足, 剩余额度: %s", logger.FormatQuota(organizationQuota)),
+					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
+			if organizationQuota-preConsumedQuota < 0 {
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("组织预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(preConsumedQuota)),
+					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
+			funding = &OrganizationWalletFunding{
+				memberId:       relayInfo.UserId,
+				organizationId: user.OrganizationId,
 			}
 		}
 

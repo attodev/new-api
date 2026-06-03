@@ -48,10 +48,13 @@ import {
   assignOrganizationUser,
   createOrganization,
   getAssignableOrganizationUsers,
+  getOrganizationProfile,
   getOrganizationUsers,
+  getOrganizations,
+  updateOrganization,
   updateOrganizationUser,
 } from '../api'
-import type { OrganizationRole, OrganizationUser } from '../types'
+import type { Organization, OrganizationRole, OrganizationUser } from '../types'
 
 const USER_STATUS_ENABLED = 1
 const USER_STATUS_DISABLED = 2
@@ -66,6 +69,9 @@ export function OrganizationUsersTable() {
   const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.auth.user)
   const [users, setUsers] = useState<OrganizationUser[]>([])
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [organizationProfile, setOrganizationProfile] =
+    useState<Organization | null>(null)
   const [candidateUsers, setCandidateUsers] = useState<
     Array<User | OrganizationUser>
   >([])
@@ -76,6 +82,7 @@ export function OrganizationUsersTable() {
   const [assigning, setAssigning] = useState(false)
   const [organizationName, setOrganizationName] = useState('')
   const [organizationDescription, setOrganizationDescription] = useState('')
+  const [organizationQuotaAmount, setOrganizationQuotaAmount] = useState('')
   const [ownerUserId, setOwnerUserId] = useState('')
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState<OrganizationRole>(
@@ -110,6 +117,42 @@ export function OrganizationUsersTable() {
     }
   }
 
+  async function loadOrganizations() {
+    if (!isRoot) {
+      setOrganizations([])
+      return
+    }
+    try {
+      const res = await getOrganizations({ page: 1, size: 50 })
+      if (res.success && res.data?.items) {
+        setOrganizations(res.data.items)
+      } else {
+        toast.error(res.message || t('Failed to load organizations'))
+      }
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to load organizations')
+      )
+    }
+  }
+
+  async function loadOrganizationProfile() {
+    if (!isOrganizationOwner && !currentUser?.organization_role) {
+      setOrganizationProfile(null)
+      return
+    }
+    try {
+      const res = await getOrganizationProfile()
+      if (res.success && res.data) {
+        setOrganizationProfile(res.data)
+      }
+    } catch {
+      setOrganizationProfile(null)
+    }
+  }
+
   async function loadCandidateUsers() {
     if (!isRoot && !isOrganizationOwner) return
     setLoadingCandidates(true)
@@ -138,6 +181,14 @@ export function OrganizationUsersTable() {
   }, [canManageOrganizationUsers])
 
   useEffect(() => {
+    void loadOrganizations()
+  }, [isRoot])
+
+  useEffect(() => {
+    void loadOrganizationProfile()
+  }, [currentUser?.organization_id, currentUser?.organization_role])
+
+  useEffect(() => {
     void loadCandidateUsers()
   }, [isRoot, isOrganizationOwner])
 
@@ -154,12 +205,17 @@ export function OrganizationUsersTable() {
         name: organizationName.trim(),
         description: organizationDescription.trim(),
         owner_user_id: parsedOwnerUserId,
+        quota: organizationQuotaAmount.trim()
+          ? parseQuotaFromDollars(Number(organizationQuotaAmount))
+          : 0,
       })
       if (res.success) {
         toast.success(t('Organization created'))
         setOrganizationName('')
         setOrganizationDescription('')
+        setOrganizationQuotaAmount('')
         await loadCandidateUsers()
+        await loadOrganizations()
       } else {
         toast.error(res.message || t('Failed to create organization'))
       }
@@ -223,6 +279,35 @@ export function OrganizationUsersTable() {
     await saveQuota(user, parseQuotaFromDollars(value))
   }
 
+  async function saveOrganizationQuota(
+    organization: Organization,
+    amount: string
+  ) {
+    if (!amount.trim()) return
+
+    const value = Number(amount)
+    if (!Number.isFinite(value)) return
+
+    const quota = parseQuotaFromDollars(value)
+    if (quota === organization.quota) return
+
+    try {
+      const res = await updateOrganization(organization.id, { quota })
+      if (res.success) {
+        toast.success(t('Organization quota updated'))
+        await Promise.all([loadOrganizations(), loadOrganizationProfile()])
+      } else {
+        toast.error(res.message || t('Failed to update organization'))
+      }
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to update organization')
+      )
+    }
+  }
+
   async function toggleStatus(user: OrganizationUser) {
     await saveUser(user, {
       status:
@@ -268,6 +353,16 @@ export function OrganizationUsersTable() {
                     setOrganizationDescription(event.currentTarget.value)
                   }
                   placeholder={t('Description')}
+                />
+                <Input
+                  value={organizationQuotaAmount}
+                  onChange={(event) =>
+                    setOrganizationQuotaAmount(event.currentTarget.value)
+                  }
+                  type='number'
+                  step={tokensOnly ? 1 : 0.01}
+                  min={0}
+                  placeholder={t('Initial organization quota')}
                 />
               </div>
               <div className='flex flex-wrap items-center gap-2'>
@@ -370,6 +465,92 @@ export function OrganizationUsersTable() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {organizationProfile && (
+        <div className='grid gap-3 rounded-md border p-3 sm:grid-cols-2'>
+          <div>
+            <div className='text-sm font-medium'>
+              {t('Organization wallet')}
+            </div>
+            <div className='text-muted-foreground text-xs'>
+              {organizationProfile.name}
+            </div>
+          </div>
+          <div className='grid gap-2 text-sm sm:grid-cols-2'>
+            <div>
+              <div className='text-muted-foreground text-xs'>
+                {t('Organization quota')}
+              </div>
+              <div className='font-medium'>
+                {formatQuota(organizationProfile.quota)}
+              </div>
+            </div>
+            <div>
+              <div className='text-muted-foreground text-xs'>
+                {t('Organization used quota')}
+              </div>
+              <div className='font-medium'>
+                {formatQuota(organizationProfile.used_quota)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRoot && organizations.length > 0 && (
+        <div className='space-y-3 rounded-md border p-3'>
+          <div className='text-sm font-medium'>
+            {t('Manage organization quota')}
+          </div>
+          <div className='grid gap-2 md:grid-cols-2'>
+            {organizations.map((organization) => (
+              <div key={organization.id} className='rounded-md border p-3'>
+                <div className='flex items-start justify-between gap-2'>
+                  <div>
+                    <div className='font-medium'>{organization.name}</div>
+                    <div className='text-muted-foreground text-xs'>
+                      {t('Organization quota')}:{' '}
+                      {formatQuota(organization.quota)}
+                    </div>
+                    <div className='text-muted-foreground text-xs'>
+                      {t('Organization used quota')}:{' '}
+                      {formatQuota(organization.used_quota)}
+                    </div>
+                  </div>
+                  <span className='text-muted-foreground text-xs'>
+                    #{organization.id}
+                  </span>
+                </div>
+                <div className='mt-3 flex items-center gap-2'>
+                  <Input
+                    key={`${organization.id}-${organization.quota}`}
+                    className='w-32'
+                    type='number'
+                    step={tokensOnly ? 1 : 0.01}
+                    min={0}
+                    defaultValue={quotaUnitsToDollars(organization.quota)}
+                    placeholder={t('Quota amount')}
+                    onBlur={(event) =>
+                      void saveOrganizationQuota(
+                        organization,
+                        event.currentTarget.value
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.currentTarget.blur()
+                      }
+                    }}
+                  />
+                  <span className='text-muted-foreground text-xs'>
+                    {currencyLabel}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

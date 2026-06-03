@@ -4535,6 +4535,14 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Failed to load organizations": "Impossible de charger les organisations",
+    "Initial organization quota": "Quota initial de l’organisation",
+    "Organization quota updated": "Quota de l’organisation mis à jour",
+    "Failed to update organization": "Impossible de mettre à jour l’organisation",
+    "Organization wallet": "Portefeuille de l’organisation",
+    "Organization quota": "Quota de l’organisation",
+    "Organization used quota": "Quota utilisé par l’organisation",
+    "Manage organization quota": "Gérer le quota de l’organisation"
   }
 }

@@ -153,12 +153,15 @@ func SetApiRouter(router *gin.Engine) {
 		organizationsRoute := apiRouter.Group("/organizations")
 		organizationsRoute.Use(middleware.RootAuth())
 		{
+			organizationsRoute.GET("/", controller.ListOrganizations)
 			organizationsRoute.POST("/", controller.CreateOrganization)
+			organizationsRoute.PATCH("/:id", controller.UpdateOrganization)
 		}
 
 		organizationRoute := apiRouter.Group("/organization")
 		organizationRoute.Use(middleware.UserAuth())
 		{
+			organizationRoute.GET("/", controller.GetOrganizationProfile)
 			organizationRoute.GET("/users", controller.ListOrganizationUsers)
 			organizationRoute.GET("/assignable-users", controller.ListAssignableOrganizationUsers)
 			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)

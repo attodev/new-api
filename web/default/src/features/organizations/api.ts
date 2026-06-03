@@ -22,6 +22,8 @@ import type {
   AssignOrganizationUserPayload,
   CreateOrganizationPayload,
   Organization,
+  OrganizationsPage,
+  OrganizationUpdatePayload,
   OrganizationUserUpdatePayload,
   OrganizationUsersPage,
 } from './types'
@@ -30,6 +32,33 @@ export async function createOrganization(
   payload: CreateOrganizationPayload
 ): Promise<ApiResponse<Organization>> {
   const res = await api.post('/api/organizations', payload)
+  return res.data
+}
+
+export async function getOrganizations(params: {
+  page?: number
+  size?: number
+}): Promise<ApiResponse<OrganizationsPage>> {
+  const search = new URLSearchParams()
+  if (params.page) search.set('p', String(params.page))
+  if (params.size) search.set('page_size', String(params.size))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.get(`/api/organizations${suffix}`)
+  return res.data
+}
+
+export async function updateOrganization(
+  organizationId: number,
+  payload: OrganizationUpdatePayload
+): Promise<ApiResponse> {
+  const res = await api.patch(`/api/organizations/${organizationId}`, payload)
+  return res.data
+}
+
+export async function getOrganizationProfile(): Promise<
+  ApiResponse<Organization>
+> {
+  const res = await api.get('/api/organization')
   return res.data
 }
 

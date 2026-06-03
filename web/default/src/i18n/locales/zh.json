@@ -4535,6 +4535,14 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Failed to load organizations": "加载组织失败",
+    "Initial organization quota": "初始组织额度",
+    "Organization quota updated": "组织额度已更新",
+    "Failed to update organization": "更新组织失败",
+    "Organization wallet": "组织钱包",
+    "Organization quota": "组织额度",
+    "Organization used quota": "组织已用额度",
+    "Manage organization quota": "管理组织额度"
   }
 }

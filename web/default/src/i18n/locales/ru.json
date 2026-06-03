@@ -4535,6 +4535,14 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Failed to load organizations": "Не удалось загрузить организации",
+    "Initial organization quota": "Начальная квота организации",
+    "Organization quota updated": "Квота организации обновлена",
+    "Failed to update organization": "Не удалось обновить организацию",
+    "Organization wallet": "Кошелек организации",
+    "Organization quota": "Квота организации",
+    "Organization used quota": "Использованная квота организации",
+    "Manage organization quota": "Управление квотой организации"
   }
 }

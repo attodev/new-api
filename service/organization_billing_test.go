@@ -34,8 +34,16 @@ func seedOrganization(t *testing.T, id int, ownerUserId int) {
 		Name:        "org",
 		OwnerUserId: ownerUserId,
 		Status:      model.OrganizationStatusEnabled,
+		Quota:       1000,
 	}
 	require.NoError(t, model.DB.Create(org).Error)
+}
+
+func getOrganizationForBillingTest(t *testing.T, organizationId int) model.Organization {
+	t.Helper()
+	var org model.Organization
+	require.NoError(t, model.DB.First(&org, organizationId).Error)
+	return org
 }
 
 func newOrganizationBillingContext() *gin.Context {
@@ -51,7 +59,7 @@ func getUserQuotaForBillingTest(t *testing.T, userId int) int {
 	return quota
 }
 
-func TestOrganizationWalletBillingPreConsumesMemberLimitAndOwnerWallet(t *testing.T) {
+func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t *testing.T) {
 	truncate(t)
 
 	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
@@ -70,10 +78,13 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOwnerWallet(t *testin
 	require.NotNil(t, session)
 
 	require.Equal(t, 75, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 975, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 975, org.Quota)
+	require.Equal(t, 0, org.UsedQuota)
 }
 
-func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOwnerWallet(t *testing.T) {
+func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWallet(t *testing.T) {
 	truncate(t)
 
 	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
@@ -92,10 +103,13 @@ func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOwnerWallet(t *te
 	require.NoError(t, session.Settle(10))
 
 	require.Equal(t, 90, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 990, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 990, org.Quota)
+	require.Equal(t, 0, org.UsedQuota)
 }
 
-func TestOrganizationWalletBillingOwnerRequestChargesOnce(t *testing.T) {
+func TestOrganizationWalletBillingOwnerRequestUsesOrganizationWallet(t *testing.T) {
 	truncate(t)
 
 	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
@@ -113,14 +127,18 @@ func TestOrganizationWalletBillingOwnerRequestChargesOnce(t *testing.T) {
 	require.NotNil(t, session)
 
 	require.Equal(t, 975, getUserQuotaForBillingTest(t, 1))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 975, org.Quota)
+	require.Equal(t, 0, org.UsedQuota)
 }
 
-func TestOrganizationWalletBillingRejectsWhenOwnerWalletInsufficient(t *testing.T) {
+func TestOrganizationWalletBillingRejectsWhenOrganizationWalletInsufficient(t *testing.T) {
 	truncate(t)
 
-	seedOrganizationUser(t, 1, "owner", 10, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
 	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
 	seedOrganization(t, 1, 1)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 10).Error)
 
 	relayInfo := &relaycommon.RelayInfo{
 		UserId:          2,
@@ -134,5 +152,7 @@ func TestOrganizationWalletBillingRejectsWhenOwnerWalletInsufficient(t *testing.
 	require.NotNil(t, apiErr)
 
 	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 10, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 10, org.Quota)
 }

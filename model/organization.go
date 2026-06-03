@@ -24,6 +24,8 @@ type Organization struct {
 	Name        string `json:"name" gorm:"type:varchar(64);not null;uniqueIndex" validate:"max=64"`
 	Description string `json:"description,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	OwnerUserId int    `json:"owner_user_id" gorm:"column:owner_user_id;index"`
+	Quota       int    `json:"quota" gorm:"type:int;default:0"`
+	UsedQuota   int    `json:"used_quota" gorm:"type:int;default:0;column:used_quota"`
 	Status      int    `json:"status" gorm:"type:int;default:1"`
 	CreatedAt   int64  `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	UpdatedAt   int64  `json:"updated_at" gorm:"autoUpdateTime;column:updated_at"`
@@ -57,17 +59,71 @@ func GetOrganizationOwnerUserId(organizationId int) (int, error) {
 	return ownerUserId, nil
 }
 
-func CreateOrganization(name string, description string, ownerUserId int) (*Organization, error) {
+func GetOrganizationQuota(organizationId int) (int, error) {
+	if organizationId <= 0 {
+		return 0, nil
+	}
+
+	var quota int
+	err := DB.Model(&Organization{}).
+		Where("id = ?", organizationId).
+		Select("quota").
+		First(&quota).Error
+	return quota, err
+}
+
+func IncreaseOrganizationQuota(organizationId int, quota int) error {
+	if quota < 0 {
+		return errors.New("quota cannot be negative")
+	}
+	if organizationId <= 0 || quota == 0 {
+		return nil
+	}
+	return DB.Model(&Organization{}).
+		Where("id = ?", organizationId).
+		Update("quota", gorm.Expr("quota + ?", quota)).Error
+}
+
+func DecreaseOrganizationQuota(organizationId int, quota int) error {
+	if quota < 0 {
+		return errors.New("quota cannot be negative")
+	}
+	if organizationId <= 0 || quota == 0 {
+		return nil
+	}
+	return DB.Model(&Organization{}).
+		Where("id = ?", organizationId).
+		Update("quota", gorm.Expr("quota - ?", quota)).Error
+}
+
+func UpdateOrganizationUsedQuota(organizationId int, quota int) error {
+	if organizationId <= 0 || quota == 0 {
+		return nil
+	}
+	return DB.Model(&Organization{}).
+		Where("id = ?", organizationId).
+		Update("used_quota", gorm.Expr("used_quota + ?", quota)).Error
+}
+
+func CreateOrganization(name string, description string, ownerUserId int, quota ...int) (*Organization, error) {
 	name = strings.TrimSpace(name)
 	description = strings.TrimSpace(description)
 	if name == "" || ownerUserId <= 0 {
 		return nil, errors.New("invalid organization parameters")
+	}
+	initialQuota := 0
+	if len(quota) > 0 {
+		initialQuota = quota[0]
+	}
+	if initialQuota < 0 {
+		return nil, errors.New("quota cannot be negative")
 	}
 
 	org := &Organization{
 		Name:        name,
 		Description: description,
 		OwnerUserId: ownerUserId,
+		Quota:       initialQuota,
 		Status:      OrganizationStatusEnabled,
 	}
 

@@ -15,6 +15,7 @@ type createOrganizationRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	OwnerUserId int    `json:"owner_user_id"`
+	Quota       *int   `json:"quota,omitempty"`
 }
 
 type updateOrganizationUserRequest struct {
@@ -25,6 +26,12 @@ type updateOrganizationUserRequest struct {
 
 type assignOrganizationUserRequest struct {
 	OrganizationRole string `json:"organization_role"`
+}
+
+type updateOrganizationRequest struct {
+	Description *string `json:"description,omitempty"`
+	Quota       *int    `json:"quota,omitempty"`
+	Status      *int    `json:"status,omitempty"`
 }
 
 func CreateOrganization(c *gin.Context) {
@@ -39,8 +46,100 @@ func CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	org, err := model.CreateOrganization(req.Name, req.Description, req.OwnerUserId)
+	initialQuota := 0
+	if req.Quota != nil {
+		initialQuota = *req.Quota
+	}
+	org, err := model.CreateOrganization(req.Name, req.Description, req.OwnerUserId, initialQuota)
 	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, org)
+}
+
+func ListOrganizations(c *gin.Context) {
+	if c.GetInt("role") != common.RoleRootUser {
+		common.ApiError(c, errors.New("root permission required"))
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	var organizations []model.Organization
+	query := model.DB.Model(&model.Organization{})
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := query.Order("id desc").Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&organizations).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(organizations)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func UpdateOrganization(c *gin.Context) {
+	if c.GetInt("role") != common.RoleRootUser {
+		common.ApiError(c, errors.New("root permission required"))
+		return
+	}
+
+	organizationId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	var req updateOrganizationRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Description != nil {
+		updates["description"] = strings.TrimSpace(*req.Description)
+	}
+	if req.Quota != nil {
+		if *req.Quota < 0 {
+			common.ApiError(c, errors.New("quota cannot be negative"))
+			return
+		}
+		updates["quota"] = *req.Quota
+	}
+	if req.Status != nil {
+		updates["status"] = *req.Status
+	}
+	if len(updates) == 0 {
+		common.ApiError(c, errors.New("no organization fields to update"))
+		return
+	}
+
+	if err := model.DB.Model(&model.Organization{}).Where("id = ?", organizationId).Updates(updates).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+func GetOrganizationProfile(c *gin.Context) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
+		return
+	}
+
+	var org model.Organization
+	if err := model.DB.First(&org, actor.OrganizationId).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}

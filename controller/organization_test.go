@@ -79,7 +79,7 @@ func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 		root,
 		http.MethodPost,
 		"/api/organizations",
-		fmt.Sprintf(`{"name":"Acme","description":"Customer","owner_user_id":%d}`, owner.Id),
+		fmt.Sprintf(`{"name":"Acme","description":"Customer","owner_user_id":%d,"quota":500}`, owner.Id),
 	)
 
 	require.Equal(t, http.StatusOK, res.Code)
@@ -89,6 +89,55 @@ func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 	require.NoError(t, model.DB.First(&reloaded, owner.Id).Error)
 	require.NotZero(t, reloaded.OrganizationId)
 	require.Equal(t, model.OrganizationRoleOwner, reloaded.OrganizationRole)
+
+	var org model.Organization
+	require.NoError(t, model.DB.First(&org, reloaded.OrganizationId).Error)
+	require.Equal(t, 500, org.Quota)
+}
+
+func TestOrganizationRootCanUpdateOrganizationQuota(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	org := model.Organization{Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganization,
+		root,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organizations/%d", org.Id),
+		`{"quota":750}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+
+	var reloaded model.Organization
+	require.NoError(t, model.DB.First(&reloaded, org.Id).Error)
+	require.Equal(t, 750, reloaded.Quota)
+}
+
+func TestOrganizationAdminCanReadOrganizationProfile(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, UsedQuota: 25, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationProfile,
+		owner,
+		http.MethodGet,
+		"/api/organization",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"quota":1000`)
+	require.Contains(t, body, `"used_quota":25`)
 }
 
 func TestOrganizationAdminCannotUpdateOutsideOrganization(t *testing.T) {

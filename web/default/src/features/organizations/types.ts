@@ -45,6 +45,15 @@ export interface Organization {
   description: string
   status: number
   owner_user_id: number
+  quota: number
+  used_quota: number
+}
+
+export interface OrganizationsPage {
+  page: number
+  page_size: number
+  total: number
+  items: Organization[]
 }
 
 export interface ApiResponse<T = unknown> {
@@ -59,6 +68,7 @@ export interface CreateOrganizationPayload {
   name: string
   description?: string
   owner_user_id: number
+  quota?: number
 }
 
 export interface OrganizationUserUpdatePayload {
@@ -69,4 +79,10 @@ export interface OrganizationUserUpdatePayload {
 
 export interface AssignOrganizationUserPayload {
   organization_role: OrganizationRole
+}
+
+export interface OrganizationUpdatePayload {
+  description?: string
+  quota?: number
+  status?: number
 }

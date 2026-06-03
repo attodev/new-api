@@ -4535,6 +4535,14 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Failed to load organizations": "Không tải được tổ chức",
+    "Initial organization quota": "Hạn mức tổ chức ban đầu",
+    "Organization quota updated": "Đã cập nhật hạn mức tổ chức",
+    "Failed to update organization": "Không cập nhật được tổ chức",
+    "Organization wallet": "Ví tổ chức",
+    "Organization quota": "Hạn mức tổ chức",
+    "Organization used quota": "Hạn mức tổ chức đã dùng",
+    "Manage organization quota": "Quản lý hạn mức tổ chức"
   }
 }
