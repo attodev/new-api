@@ -21,6 +21,12 @@ import { Building2, Power, RefreshCw, UserPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
+import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
 import {
   ORGANIZATION_ROLE,
   hasOrganizationOwnerRole,
@@ -54,6 +60,7 @@ const ORGANIZATION_ROLES: OrganizationRole[] = [
   ORGANIZATION_ROLE.ADMIN,
   ORGANIZATION_ROLE.OWNER,
 ]
+const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 
 export function OrganizationUsersTable() {
   const { t } = useTranslation()
@@ -79,6 +86,9 @@ export function OrganizationUsersTable() {
   const isOrganizationOwner = hasOrganizationOwnerRole(
     currentUser?.organization_role
   )
+  const { meta: currencyMeta } = getCurrencyDisplay()
+  const currencyLabel = getCurrencyLabel()
+  const tokensOnly = currencyMeta.kind === 'tokens'
   const canManageOrganizationUsers =
     Boolean(currentUser?.organization_id) || isOrganizationOwner
 
@@ -202,6 +212,15 @@ export function OrganizationUsersTable() {
   async function saveQuota(user: OrganizationUser, quota: number) {
     if (!Number.isFinite(quota) || quota === user.quota) return
     await saveUser(user, { quota })
+  }
+
+  async function saveDisplayQuota(user: OrganizationUser, amount: string) {
+    if (!amount.trim()) return
+
+    const value = Number(amount)
+    if (!Number.isFinite(value)) return
+
+    await saveQuota(user, parseQuotaFromDollars(value))
   }
 
   async function toggleStatus(user: OrganizationUser) {
@@ -387,16 +406,55 @@ export function OrganizationUsersTable() {
                     : t('Disabled')}
                 </td>
                 <td className='px-3 py-2'>
-                  <Input
-                    className='w-32'
-                    type='number'
-                    defaultValue={user.quota}
-                    disabled={savingId === user.id}
-                    onBlur={(event) => {
-                      const value = Number(event.currentTarget.value)
-                      void saveQuota(user, value)
-                    }}
-                  />
+                  <div className='min-w-64 space-y-2'>
+                    <div className='text-muted-foreground text-xs'>
+                      {t('Current quota balance')}: {formatQuota(user.quota)}
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      <Input
+                        key={`${user.id}-${user.quota}`}
+                        className='w-32'
+                        type='number'
+                        step={tokensOnly ? 1 : 0.01}
+                        min={0}
+                        defaultValue={quotaUnitsToDollars(user.quota)}
+                        placeholder={t('Quota amount')}
+                        disabled={savingId === user.id}
+                        onBlur={(event) => {
+                          void saveDisplayQuota(user, event.currentTarget.value)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur()
+                          }
+                        }}
+                      />
+                      <span className='text-muted-foreground text-xs'>
+                        {currencyLabel}
+                      </span>
+                    </div>
+                    {!tokensOnly && (
+                      <div className='flex flex-wrap gap-1'>
+                        {QUICK_QUOTA_AMOUNTS.map((amount) => (
+                          <Button
+                            key={amount}
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            disabled={savingId === user.id}
+                            onClick={() =>
+                              void saveQuota(
+                                user,
+                                parseQuotaFromDollars(amount)
+                              )
+                            }
+                          >
+                            {formatQuota(parseQuotaFromDollars(amount))}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className='px-3 py-2 text-right'>
                   <Button

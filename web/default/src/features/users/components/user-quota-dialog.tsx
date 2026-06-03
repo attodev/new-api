@@ -36,6 +36,8 @@ import { Label } from '@/components/ui/label'
 import { adjustUserQuota } from '../api'
 import type { QuotaAdjustMode } from '../types'
 
+const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
+
 interface UserQuotaDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -172,6 +174,25 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
               }}
             />
           </div>
+
+          {!tokensOnly && (
+            <div className='space-y-2'>
+              <Label>{t('Quick amount')}</Label>
+              <div className='flex flex-wrap gap-1'>
+                {QUICK_QUOTA_AMOUNTS.map((quickAmount) => (
+                  <Button
+                    key={quickAmount}
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => setAmount(String(quickAmount))}
+                  >
+                    {formatQuota(parseQuotaFromDollars(quickAmount))}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant='outline' onClick={handleCancel}>
