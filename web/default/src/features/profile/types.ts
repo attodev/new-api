@@ -45,6 +45,10 @@ export interface UserProfile {
   email?: string
   /** User group */
   group: string
+  /** Organization ID, 0 means no organization */
+  organization_id?: number
+  /** Organization role: member, admin, owner */
+  organization_role?: string
   /** Current quota balance */
   quota: number
   /** Total used quota */

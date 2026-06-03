@@ -31,6 +31,8 @@ export interface AuthUser {
   role: number
   status?: number
   group?: string
+  organization_id?: number
+  organization_role?: string
   quota?: number
   used_quota?: number
   request_count?: number
