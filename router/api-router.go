@@ -162,6 +162,7 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.GET("/users", controller.ListOrganizationUsers)
 			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
 			organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)
+			organizationRoute.PUT("/users/:id/membership", controller.AssignOrganizationUser)
 		}
 
 		// Subscription billing (plans, purchase, admin management)

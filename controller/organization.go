@@ -23,6 +23,10 @@ type updateOrganizationUserRequest struct {
 	Remark *string `json:"remark,omitempty"`
 }
 
+type assignOrganizationUserRequest struct {
+	OrganizationRole string `json:"organization_role"`
+}
+
 func CreateOrganization(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
 		common.ApiError(c, errors.New("root permission required"))
@@ -155,6 +159,55 @@ func UpdateOrganizationUser(c *gin.Context) {
 	}
 	if err := model.InvalidateUserCache(target.Id); err != nil {
 		common.SysLog("failed to invalidate organization user cache: " + err.Error())
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+func AssignOrganizationUser(c *gin.Context) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization owner permission required"))
+		return
+	}
+
+	targetId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	target, err := model.GetUserById(targetId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if target.Role >= common.RoleAdminUser {
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		return
+	}
+
+	var req assignOrganizationUserRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !model.IsValidOrganizationRole(req.OrganizationRole) {
+		common.ApiError(c, errors.New("invalid organization role"))
+		return
+	}
+
+	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
+		"organization_id":   actor.OrganizationId,
+		"organization_role": req.OrganizationRole,
+	}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.InvalidateUserCache(target.Id); err != nil {
+		common.SysLog("failed to invalidate organization membership cache: " + err.Error())
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }

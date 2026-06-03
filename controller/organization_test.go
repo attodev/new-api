@@ -150,3 +150,93 @@ func TestOrganizationAdminCannotUpdateGlobalAdmin(t *testing.T) {
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
 	require.Equal(t, 10, reloaded.Quota)
 }
+
+func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		owner,
+		http.MethodPut,
+		fmt.Sprintf("/api/organization/users/%d/membership", target.Id),
+		`{"organization_role":"member"}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+
+	var reloaded model.User
+	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
+	require.Equal(t, 1, reloaded.OrganizationId)
+	require.Equal(t, model.OrganizationRoleMember, reloaded.OrganizationRole)
+}
+
+func TestOrganizationAdminCannotAssignMembership(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		admin,
+		http.MethodPut,
+		fmt.Sprintf("/api/organization/users/%d/membership", target.Id),
+		`{"organization_role":"member"}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+func TestOrganizationOwnerCannotAssignGlobalAdmin(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	target := model.User{Username: "global", Password: "password", Role: common.RoleAdminUser, AffCode: "global"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		owner,
+		http.MethodPut,
+		fmt.Sprintf("/api/organization/users/%d/membership", target.Id),
+		`{"organization_role":"member"}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+
+	var reloaded model.User
+	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
+	require.Zero(t, reloaded.OrganizationId)
+	require.Empty(t, reloaded.OrganizationRole)
+}
+
+func TestOrganizationOwnerCannotAssignInvalidRole(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		owner,
+		http.MethodPut,
+		fmt.Sprintf("/api/organization/users/%d/membership", target.Id),
+		`{"organization_role":"root"}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
