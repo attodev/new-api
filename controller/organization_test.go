@@ -189,6 +189,53 @@ func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {
 	require.Equal(t, model.OrganizationRoleMember, reloaded.OrganizationRole)
 }
 
+func TestOrganizationOwnerCanListAssignableUsers(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	unassigned := model.User{Username: "unassigned", Password: "password", Role: common.RoleCommonUser, AffCode: "unassigned"}
+	otherOrg := model.User{Username: "other", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleMember, AffCode: "other"}
+	globalAdmin := model.User{Username: "global", Password: "password", Role: common.RoleAdminUser, AffCode: "global"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&unassigned).Error)
+	require.NoError(t, model.DB.Create(&otherOrg).Error)
+	require.NoError(t, model.DB.Create(&globalAdmin).Error)
+
+	res := performOrganizationRequest(
+		ListAssignableOrganizationUsers,
+		owner,
+		http.MethodGet,
+		"/api/organization/assignable-users",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"username":"owner"`)
+	require.Contains(t, body, `"username":"member"`)
+	require.Contains(t, body, `"username":"unassigned"`)
+	require.NotContains(t, body, `"username":"other"`)
+	require.NotContains(t, body, `"username":"global"`)
+}
+
+func TestOrganizationAdminCannotListAssignableUsers(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	require.NoError(t, model.DB.Create(&admin).Error)
+
+	res := performOrganizationRequest(
+		ListAssignableOrganizationUsers,
+		admin,
+		http.MethodGet,
+		"/api/organization/assignable-users",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
 func TestOrganizationAdminCannotAssignMembership(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}

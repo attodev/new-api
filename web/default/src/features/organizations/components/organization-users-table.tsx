@@ -17,24 +17,76 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useState } from 'react'
-import { Power, RefreshCw } from 'lucide-react'
+import { Building2, Power, RefreshCw, UserPlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth-store'
+import {
+  ORGANIZATION_ROLE,
+  hasOrganizationOwnerRole,
+} from '@/lib/organization-roles'
+import { ROLE } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { getOrganizationUsers, updateOrganizationUser } from '../api'
-import type { OrganizationUser } from '../types'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { getUsers } from '@/features/users/api'
+import type { User } from '@/features/users/types'
+import {
+  assignOrganizationUser,
+  createOrganization,
+  getAssignableOrganizationUsers,
+  getOrganizationUsers,
+  updateOrganizationUser,
+} from '../api'
+import type { OrganizationRole, OrganizationUser } from '../types'
 
 const USER_STATUS_ENABLED = 1
 const USER_STATUS_DISABLED = 2
+const ORGANIZATION_ROLES: OrganizationRole[] = [
+  ORGANIZATION_ROLE.MEMBER,
+  ORGANIZATION_ROLE.ADMIN,
+  ORGANIZATION_ROLE.OWNER,
+]
 
 export function OrganizationUsersTable() {
   const { t } = useTranslation()
+  const currentUser = useAuthStore((s) => s.auth.user)
   const [users, setUsers] = useState<OrganizationUser[]>([])
+  const [candidateUsers, setCandidateUsers] = useState<
+    Array<User | OrganizationUser>
+  >([])
   const [loading, setLoading] = useState(false)
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+  const [organizationName, setOrganizationName] = useState('')
+  const [organizationDescription, setOrganizationDescription] = useState('')
+  const [ownerUserId, setOwnerUserId] = useState('')
+  const [assignUserId, setAssignUserId] = useState('')
+  const [assignRole, setAssignRole] = useState<OrganizationRole>(
+    ORGANIZATION_ROLE.MEMBER
+  )
+
+  const isRoot = (currentUser?.role ?? 0) >= ROLE.SUPER_ADMIN
+  const isOrganizationOwner = hasOrganizationOwnerRole(
+    currentUser?.organization_role
+  )
+  const canManageOrganizationUsers =
+    Boolean(currentUser?.organization_id) || isOrganizationOwner
 
   async function loadUsers() {
+    if (!canManageOrganizationUsers) {
+      setUsers([])
+      return
+    }
     setLoading(true)
     try {
       const res = await getOrganizationUsers({ page: 1, size: 20 })
@@ -48,9 +100,86 @@ export function OrganizationUsersTable() {
     }
   }
 
+  async function loadCandidateUsers() {
+    if (!isRoot && !isOrganizationOwner) return
+    setLoadingCandidates(true)
+    try {
+      const res = isRoot
+        ? await getUsers({ p: 1, page_size: 50 })
+        : await getAssignableOrganizationUsers({ page: 1, size: 50 })
+      if (res.success && res.data?.items) {
+        const items = res.data.items.filter((user) => user.role < ROLE.ADMIN)
+        setCandidateUsers(items)
+        if (items.length > 0) {
+          const firstId = String(items[0].id)
+          if (isRoot && !ownerUserId) setOwnerUserId(firstId)
+          if (isOrganizationOwner && !assignUserId) setAssignUserId(firstId)
+        }
+      } else {
+        toast.error(res.message || t('Failed to load users'))
+      }
+    } finally {
+      setLoadingCandidates(false)
+    }
+  }
+
   useEffect(() => {
     void loadUsers()
-  }, [])
+  }, [canManageOrganizationUsers])
+
+  useEffect(() => {
+    void loadCandidateUsers()
+  }, [isRoot, isOrganizationOwner])
+
+  async function handleCreateOrganization() {
+    const parsedOwnerUserId = Number(ownerUserId)
+    if (!organizationName.trim() || !Number.isInteger(parsedOwnerUserId)) {
+      toast.error(t('Organization name and owner are required'))
+      return
+    }
+
+    setCreating(true)
+    try {
+      const res = await createOrganization({
+        name: organizationName.trim(),
+        description: organizationDescription.trim(),
+        owner_user_id: parsedOwnerUserId,
+      })
+      if (res.success) {
+        toast.success(t('Organization created'))
+        setOrganizationName('')
+        setOrganizationDescription('')
+        await loadCandidateUsers()
+      } else {
+        toast.error(res.message || t('Failed to create organization'))
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function handleAssignUser() {
+    const parsedUserId = Number(assignUserId)
+    if (!Number.isInteger(parsedUserId)) {
+      toast.error(t('User is required'))
+      return
+    }
+
+    setAssigning(true)
+    try {
+      const res = await assignOrganizationUser(parsedUserId, {
+        organization_role: assignRole,
+      })
+      if (res.success) {
+        toast.success(t('Organization member assigned'))
+        await Promise.all([loadUsers(), loadCandidateUsers()])
+      } else {
+        toast.error(res.message || t('Failed to assign organization member'))
+      }
+    } finally {
+      setAssigning(false)
+    }
+  }
 
   async function saveUser(
     user: OrganizationUser,
@@ -98,6 +227,149 @@ export function OrganizationUsersTable() {
         </Button>
       </div>
 
+      {(isRoot || isOrganizationOwner) && (
+        <div className='grid gap-3 lg:grid-cols-2'>
+          {isRoot && (
+            <div className='space-y-3 rounded-md border p-3'>
+              <div className='flex items-center gap-2 text-sm font-medium'>
+                <Building2 className='size-4' />
+                {t('Create Organization')}
+              </div>
+              <div className='grid gap-2 sm:grid-cols-2'>
+                <Input
+                  value={organizationName}
+                  onChange={(event) =>
+                    setOrganizationName(event.currentTarget.value)
+                  }
+                  placeholder={t('Organization Name')}
+                />
+                <Input
+                  value={organizationDescription}
+                  onChange={(event) =>
+                    setOrganizationDescription(event.currentTarget.value)
+                  }
+                  placeholder={t('Description')}
+                />
+              </div>
+              <div className='flex flex-wrap items-center gap-2'>
+                <Select
+                  items={candidateUsers.map((user) => ({
+                    value: String(user.id),
+                    label: user.username,
+                  }))}
+                  value={ownerUserId}
+                  onValueChange={(value) =>
+                    value !== null && setOwnerUserId(value)
+                  }
+                  disabled={loadingCandidates || candidateUsers.length === 0}
+                >
+                  <SelectTrigger className='min-w-56 flex-1'>
+                    <SelectValue placeholder={t('Owner User')} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {candidateUsers.map((user) => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {user.username} #{user.id}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Input
+                  className='w-28'
+                  value={ownerUserId}
+                  onChange={(event) =>
+                    setOwnerUserId(event.currentTarget.value)
+                  }
+                  placeholder={t('User ID')}
+                />
+                <Button
+                  onClick={() => void handleCreateOrganization()}
+                  disabled={creating}
+                >
+                  <Building2 />
+                  {t('Create')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isOrganizationOwner && (
+            <div className='space-y-3 rounded-md border p-3'>
+              <div className='flex items-center gap-2 text-sm font-medium'>
+                <UserPlus className='size-4' />
+                {t('Assign Organization Member')}
+              </div>
+              <div className='flex flex-wrap items-center gap-2'>
+                <Select
+                  items={candidateUsers.map((user) => ({
+                    value: String(user.id),
+                    label: user.username,
+                  }))}
+                  value={assignUserId}
+                  onValueChange={(value) =>
+                    value !== null && setAssignUserId(value)
+                  }
+                  disabled={loadingCandidates || candidateUsers.length === 0}
+                >
+                  <SelectTrigger className='min-w-56 flex-1'>
+                    <SelectValue placeholder={t('User')} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {candidateUsers.map((user) => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {user.username} #{user.id}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Input
+                  className='w-28'
+                  value={assignUserId}
+                  onChange={(event) =>
+                    setAssignUserId(event.currentTarget.value)
+                  }
+                  placeholder={t('User ID')}
+                />
+                <Select
+                  items={ORGANIZATION_ROLES.map((role) => ({
+                    value: role,
+                    label: role,
+                  }))}
+                  value={assignRole}
+                  onValueChange={(value) =>
+                    value !== null && setAssignRole(value as OrganizationRole)
+                  }
+                >
+                  <SelectTrigger className='w-32'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {ORGANIZATION_ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {t(role)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => void handleAssignUser()}
+                  disabled={assigning}
+                >
+                  <UserPlus />
+                  {t('Assign')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className='overflow-x-auto rounded-md border'>
         <table className='w-full min-w-[720px] text-sm'>
           <thead className='bg-muted/50'>
@@ -106,9 +378,7 @@ export function OrganizationUsersTable() {
                 {t('Username')}
               </th>
               <th className='px-3 py-2 text-left font-medium'>{t('Role')}</th>
-              <th className='px-3 py-2 text-left font-medium'>
-                {t('Status')}
-              </th>
+              <th className='px-3 py-2 text-left font-medium'>{t('Status')}</th>
               <th className='px-3 py-2 text-left font-medium'>{t('Quota')}</th>
               <th className='px-3 py-2 text-right font-medium'>
                 {t('Actions')}
@@ -121,7 +391,7 @@ export function OrganizationUsersTable() {
                 <td className='px-3 py-2'>
                   <div className='font-medium'>{user.username}</div>
                   {user.display_name && (
-                    <div className='text-xs text-muted-foreground'>
+                    <div className='text-muted-foreground text-xs'>
                       {user.display_name}
                     </div>
                   )}
@@ -162,7 +432,7 @@ export function OrganizationUsersTable() {
             {!loading && users.length === 0 && (
               <tr>
                 <td
-                  className='px-3 py-8 text-center text-muted-foreground'
+                  className='text-muted-foreground px-3 py-8 text-center'
                   colSpan={5}
                 >
                   {t('No data')}

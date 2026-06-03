@@ -39,6 +39,14 @@ export interface OrganizationUsersPage {
   items: OrganizationUser[]
 }
 
+export interface Organization {
+  id: number
+  name: string
+  description: string
+  status: number
+  owner_user_id: number
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean
   message?: string
@@ -47,8 +55,18 @@ export interface ApiResponse<T = unknown> {
 
 export type OrganizationUsersResponse = ApiResponse<OrganizationUsersPage>
 
+export interface CreateOrganizationPayload {
+  name: string
+  description?: string
+  owner_user_id: number
+}
+
 export interface OrganizationUserUpdatePayload {
   status?: number
   quota?: number
   remark?: string
+}
+
+export interface AssignOrganizationUserPayload {
+  organization_role: OrganizationRole
 }

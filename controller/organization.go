@@ -83,6 +83,38 @@ func ListOrganizationUsers(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+func ListAssignableOrganizationUsers(c *gin.Context) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization owner permission required"))
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	var users []model.User
+	query := model.DB.
+		Where("role < ?", common.RoleAdminUser).
+		Where("organization_id = ? OR organization_id = 0", actor.OrganizationId)
+
+	var total int64
+	if err := query.Model(&model.User{}).Count(&total).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := query.Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&users).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(users)
+	common.ApiSuccess(c, pageInfo)
+}
+
 func GetOrganizationUser(c *gin.Context) {
 	actor, err := getOrganizationActor(c)
 	if err != nil {

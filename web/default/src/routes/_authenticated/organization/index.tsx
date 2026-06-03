@@ -17,15 +17,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { OrganizationUsersTable } from '@/features/organizations/components/organization-users-table'
-import { hasOrganizationAdminRole } from '@/lib/organization-roles'
 import { useAuthStore } from '@/stores/auth-store'
+import { hasOrganizationAdminRole } from '@/lib/organization-roles'
+import { ROLE } from '@/lib/roles'
+import { OrganizationUsersTable } from '@/features/organizations/components/organization-users-table'
 
 export const Route = createFileRoute('/_authenticated/organization/')({
   beforeLoad: () => {
     const { auth } = useAuthStore.getState()
 
-    if (!auth.user || !hasOrganizationAdminRole(auth.user.organization_role)) {
+    const isRoot = (auth.user?.role ?? 0) >= ROLE.SUPER_ADMIN
+    const isOrganizationAdmin = hasOrganizationAdminRole(
+      auth.user?.organization_role
+    )
+
+    if (!auth.user || (!isRoot && !isOrganizationAdmin)) {
       throw redirect({
         to: '/403',
       })

@@ -59,7 +59,7 @@ export function useSidebarView(): ResolvedSidebarView {
 
     return configFilteredRoot.filter((group) => {
       if (group.id === 'admin') return isAdmin
-      if (group.id === 'organization') return isOrganizationAdmin
+      if (group.id === 'organization') return isAdmin || isOrganizationAdmin
       return true
     })
   }, [configFilteredRoot, user?.organization_role, user?.role])

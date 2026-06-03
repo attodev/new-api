@@ -160,6 +160,7 @@ func SetApiRouter(router *gin.Engine) {
 		organizationRoute.Use(middleware.UserAuth())
 		{
 			organizationRoute.GET("/users", controller.ListOrganizationUsers)
+			organizationRoute.GET("/assignable-users", controller.ListAssignableOrganizationUsers)
 			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
 			organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)
 			organizationRoute.PUT("/users/:id/membership", controller.AssignOrganizationUser)

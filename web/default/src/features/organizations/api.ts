@@ -19,9 +19,19 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import type {
   ApiResponse,
+  AssignOrganizationUserPayload,
+  CreateOrganizationPayload,
+  Organization,
   OrganizationUserUpdatePayload,
   OrganizationUsersPage,
 } from './types'
+
+export async function createOrganization(
+  payload: CreateOrganizationPayload
+): Promise<ApiResponse<Organization>> {
+  const res = await api.post('/api/organizations', payload)
+  return res.data
+}
 
 export async function getOrganizationUsers(params: {
   page?: number
@@ -35,10 +45,33 @@ export async function getOrganizationUsers(params: {
   return res.data
 }
 
+export async function getAssignableOrganizationUsers(params: {
+  page?: number
+  size?: number
+}): Promise<ApiResponse<OrganizationUsersPage>> {
+  const search = new URLSearchParams()
+  if (params.page) search.set('p', String(params.page))
+  if (params.size) search.set('page_size', String(params.size))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.get(`/api/organization/assignable-users${suffix}`)
+  return res.data
+}
+
 export async function updateOrganizationUser(
   userId: number,
   payload: OrganizationUserUpdatePayload
 ): Promise<ApiResponse> {
   const res = await api.patch(`/api/organization/users/${userId}`, payload)
+  return res.data
+}
+
+export async function assignOrganizationUser(
+  userId: number,
+  payload: AssignOrganizationUserPayload
+): Promise<ApiResponse> {
+  const res = await api.put(
+    `/api/organization/users/${userId}/membership`,
+    payload
+  )
   return res.data
 }
