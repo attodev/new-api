@@ -20,6 +20,7 @@ import { useMemo } from 'react'
 import { useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
+import { hasOrganizationAdminRole } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
 import { resolveSidebarView } from '@/components/layout/lib/sidebar-view-registry'
 import type { NavGroup, ResolvedSidebarView } from '@/components/layout/types'
@@ -45,16 +46,23 @@ const ROOT_VIEW_KEY = '__root'
 export function useSidebarView(): ResolvedSidebarView {
   const { t } = useTranslation()
   const pathname = useLocation({ select: (l) => l.pathname })
-  const userRole = useAuthStore((s) => s.auth.user?.role)
+  const user = useAuthStore((s) => s.auth.user)
   const rootSidebarData = useSidebarData()
   const configFilteredRoot = useSidebarConfig(rootSidebarData.navGroups)
 
   const rootNavGroups = useMemo<NavGroup[]>(() => {
+    const userRole = user?.role
     const isAdmin = userRole !== undefined && userRole >= ROLE.ADMIN
-    return configFilteredRoot.filter((group) =>
-      group.id === 'admin' ? isAdmin : true
+    const isOrganizationAdmin = hasOrganizationAdminRole(
+      user?.organization_role
     )
-  }, [configFilteredRoot, userRole])
+
+    return configFilteredRoot.filter((group) => {
+      if (group.id === 'admin') return isAdmin
+      if (group.id === 'organization') return isOrganizationAdmin
+      return true
+    })
+  }, [configFilteredRoot, user?.organization_role, user?.role])
 
   const view = resolveSidebarView(pathname)
 

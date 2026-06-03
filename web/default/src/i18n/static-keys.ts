@@ -104,6 +104,11 @@ export const STATIC_I18N_KEYS = [
   'Failed to update user',
   'Failed to delete user',
   'No user selected',
+  'Organization',
+  'Organization Users',
+  'Failed to load organization users',
+  'Organization user updated',
+  'Failed to update organization user',
 
   // Redemption codes
   'Unused',
