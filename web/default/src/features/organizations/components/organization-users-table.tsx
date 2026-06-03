@@ -17,7 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useState } from 'react'
-import { Building2, Power, RefreshCw, UserPlus } from 'lucide-react'
+import {
+  Building2,
+  Power,
+  RefreshCw,
+  Save,
+  UserPlus,
+  Wallet,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
@@ -83,6 +90,9 @@ export function OrganizationUsersTable() {
   const [organizationName, setOrganizationName] = useState('')
   const [organizationDescription, setOrganizationDescription] = useState('')
   const [organizationQuotaAmount, setOrganizationQuotaAmount] = useState('')
+  const [organizationQuotaInputs, setOrganizationQuotaInputs] = useState<
+    Record<number, string>
+  >({})
   const [ownerUserId, setOwnerUserId] = useState('')
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState<OrganizationRole>(
@@ -126,6 +136,14 @@ export function OrganizationUsersTable() {
       const res = await getOrganizations({ page: 1, size: 50 })
       if (res.success && res.data?.items) {
         setOrganizations(res.data.items)
+        setOrganizationQuotaInputs(
+          Object.fromEntries(
+            res.data.items.map((organization) => [
+              organization.id,
+              String(quotaUnitsToDollars(organization.quota)),
+            ])
+          )
+        )
       } else {
         toast.error(res.message || t('Failed to load organizations'))
       }
@@ -214,8 +232,7 @@ export function OrganizationUsersTable() {
         setOrganizationName('')
         setOrganizationDescription('')
         setOrganizationQuotaAmount('')
-        await loadCandidateUsers()
-        await loadOrganizations()
+        await Promise.all([loadCandidateUsers(), loadOrganizations()])
       } else {
         toast.error(res.message || t('Failed to create organization'))
       }
@@ -279,10 +296,8 @@ export function OrganizationUsersTable() {
     await saveQuota(user, parseQuotaFromDollars(value))
   }
 
-  async function saveOrganizationQuota(
-    organization: Organization,
-    amount: string
-  ) {
+  async function saveOrganizationQuota(organization: Organization) {
+    const amount = organizationQuotaInputs[organization.id] ?? ''
     if (!amount.trim()) return
 
     const value = Number(amount)
@@ -471,7 +486,8 @@ export function OrganizationUsersTable() {
       {organizationProfile && (
         <div className='grid gap-3 rounded-md border p-3 sm:grid-cols-2'>
           <div>
-            <div className='text-sm font-medium'>
+            <div className='flex items-center gap-2 text-sm font-medium'>
+              <Wallet className='size-4' />
               {t('Organization wallet')}
             </div>
             <div className='text-muted-foreground text-xs'>
@@ -501,7 +517,8 @@ export function OrganizationUsersTable() {
 
       {isRoot && organizations.length > 0 && (
         <div className='space-y-3 rounded-md border p-3'>
-          <div className='text-sm font-medium'>
+          <div className='flex items-center gap-2 text-sm font-medium'>
+            <Wallet className='size-4' />
             {t('Manage organization quota')}
           </div>
           <div className='grid gap-2 md:grid-cols-2'>
@@ -525,28 +542,39 @@ export function OrganizationUsersTable() {
                 </div>
                 <div className='mt-3 flex items-center gap-2'>
                   <Input
-                    key={`${organization.id}-${organization.quota}`}
                     className='w-32'
                     type='number'
                     step={tokensOnly ? 1 : 0.01}
                     min={0}
-                    defaultValue={quotaUnitsToDollars(organization.quota)}
+                    value={
+                      organizationQuotaInputs[organization.id] ??
+                      String(quotaUnitsToDollars(organization.quota))
+                    }
                     placeholder={t('Quota amount')}
-                    onBlur={(event) =>
-                      void saveOrganizationQuota(
-                        organization,
-                        event.currentTarget.value
-                      )
+                    onChange={(event) =>
+                      setOrganizationQuotaInputs((prev) => ({
+                        ...prev,
+                        [organization.id]: event.currentTarget.value,
+                      }))
                     }
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
-                        event.currentTarget.blur()
+                        void saveOrganizationQuota(organization)
                       }
                     }}
                   />
                   <span className='text-muted-foreground text-xs'>
                     {currencyLabel}
                   </span>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => void saveOrganizationQuota(organization)}
+                  >
+                    <Save />
+                    {t('Save')}
+                  </Button>
                 </div>
               </div>
             ))}

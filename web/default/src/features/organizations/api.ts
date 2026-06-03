@@ -31,7 +31,7 @@ import type {
 export async function createOrganization(
   payload: CreateOrganizationPayload
 ): Promise<ApiResponse<Organization>> {
-  const res = await api.post('/api/organizations', payload)
+  const res = await api.post('/api/organizations/', payload)
   return res.data
 }
 
@@ -43,7 +43,7 @@ export async function getOrganizations(params: {
   if (params.page) search.set('p', String(params.page))
   if (params.size) search.set('page_size', String(params.size))
   const suffix = search.toString() ? `?${search.toString()}` : ''
-  const res = await api.get(`/api/organizations${suffix}`)
+  const res = await api.get(`/api/organizations/${suffix}`)
   return res.data
 }
 
@@ -58,7 +58,7 @@ export async function updateOrganization(
 export async function getOrganizationProfile(): Promise<
   ApiResponse<Organization>
 > {
-  const res = await api.get('/api/organization')
+  const res = await api.get('/api/organization/')
   return res.data
 }
 
