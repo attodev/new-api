@@ -1,34 +1,36 @@
-# Organization Management Design
+# 조직 관리 설계
 
-## Context
+## 배경
 
-The project currently uses `User.Role` for global access levels:
+현재 프로젝트는 전역 접근 권한을 `User.Role`로 관리한다.
 
 - `RoleCommonUser = 1`
 - `RoleAdminUser = 10`
 - `RoleRootUser = 100`
 
-The existing `User.Group` field is not an organizational/team field. It is already used for model access, channel availability, pricing ratios, top-up ratios, token group selection, subscription upgrades, logs, and performance metrics. Reusing `Group` for team management would mix billing/model semantics with organization membership.
+기존 `User.Group` 필드는 조직이나 팀을 나타내는 필드가 아니다. 이미 모델 접근, 채널 사용 가능 여부, 그룹별 과금 배율, 충전 배율, 토큰 그룹 선택, 구독 업그레이드, 로그, 성능 지표에 사용되고 있다. 따라서 `Group`을 조직 관리에 재사용하면 과금/모델 접근 의미와 조직 멤버십 의미가 섞이게 된다.
 
-## Goals
+## 목표
 
-Add a new organization domain for team-like user management without changing the meaning of `Group` or granting organization managers global admin permissions.
+기존 `Group`의 의미를 바꾸지 않고, 조직 관리자에게 전역 관리자 권한을 부여하지 않으면서 팀과 유사한 사용자 관리 단위를 추가한다.
 
-Initial behavior:
+초기 동작은 다음과 같다.
 
-- Global root users (`RoleRootUser`) create and manage organizations.
-- Users can belong to one organization.
-- Organization roles are `member`, `admin`, and `owner`.
-- Organization admins can manage limited operational fields for users in their own organization.
-- Organization owners can additionally manage membership and organization roles within their own organization.
+- 전역 루트 사용자(`RoleRootUser`)가 조직을 생성하고 관리한다.
+- 사용자는 하나의 조직에만 소속될 수 있다.
+- 조직 역할은 `member`, `admin`, `owner` 세 단계로 시작한다.
+- 조직 admin은 자기 조직 사용자에 대해 제한된 운영 필드만 관리할 수 있다.
+- 조직 owner는 자기 조직의 멤버십과 조직 역할도 추가로 관리할 수 있다.
 
-## Non-Goals
+## 비목표
 
-This first version does not replace the global admin system, does not redesign permissions into a full RBAC model, and does not allow users to self-create organizations. It also does not let organization admins manage channels, model pricing, payment settings, global `User.Role`, `User.Group`, passwords, or global admins/root users.
+첫 버전에서는 기존 전역 관리자 시스템을 대체하지 않는다. 전체 권한 구조를 범용 RBAC로 재설계하지도 않는다. 사용자가 직접 조직을 생성하는 셀프서비스 기능도 포함하지 않는다.
 
-## Data Model
+조직 admin은 채널, 모델 가격, 결제 설정, 전역 `User.Role`, 기존 `User.Group`, 비밀번호, 전역 admin/root 사용자를 관리할 수 없다.
 
-Add an `Organization` model backed by an `organizations` table:
+## 데이터 모델
+
+`organizations` 테이블을 사용하는 `Organization` 모델을 추가한다.
 
 - `id`
 - `name`
@@ -38,117 +40,119 @@ Add an `Organization` model backed by an `organizations` table:
 - `created_at`
 - `updated_at`
 
-Extend `User` with:
+`User` 모델에는 다음 필드를 추가한다.
 
 - `organization_id`
 - `organization_role`
 
-The initial organization roles are:
+초기 조직 역할은 다음과 같다.
 
 - `member`
 - `admin`
 - `owner`
 
-Users are limited to one organization in this version. The organization model is intentionally separate from `Group`, so pricing/model access behavior remains unchanged.
+이 버전에서는 한 사용자가 하나의 조직에만 소속된다. 조직 모델은 의도적으로 `Group`과 분리하며, 기존 가격 계산과 모델 접근 동작은 변경하지 않는다.
 
-## Authorization
+## 권한
 
-Global `User.Role` and organization roles remain separate.
+전역 `User.Role`과 조직 역할은 별도로 유지한다.
 
-Organization admins and owners may still have `RoleCommonUser`. They must not pass existing `AdminAuth()` checks unless they also have a global admin role. Organization APIs should use dedicated helpers or middleware that check:
+조직 admin과 owner는 전역 역할로는 여전히 `RoleCommonUser`일 수 있다. 전역 admin 역할도 함께 가진 사용자가 아니라면 기존 `AdminAuth()` 검사를 통과해서는 안 된다. 조직 API는 별도의 helper 또는 middleware를 사용해 다음 항목을 검사한다.
 
-- authenticated user id
-- global root/admin override where appropriate
-- organization membership
-- organization role
-- target user organization
-- target user global role
+- 인증된 사용자 id
+- 필요한 경우 전역 root/admin override
+- 조직 소속 여부
+- 조직 역할
+- 대상 사용자의 조직
+- 대상 사용자의 전역 역할
 
-Global root users are never manageable through organization admin flows. Global admin users are also excluded from organization admin target operations in the initial version.
+전역 root 사용자는 조직 관리자 흐름을 통해 관리할 수 없다. 전역 admin 사용자도 초기 버전에서는 조직 관리자 대상 작업에서 제외한다.
 
-## API Shape
+## API 형태
 
-Use organization-specific API routes instead of widening existing admin routes.
+기존 admin API를 넓히지 않고, 조직 전용 API 경로를 사용한다.
 
-Global root organization management under `/api/organizations`:
+전역 root의 조직 관리는 `/api/organizations` 아래에 둔다.
 
-- create organization
-- update organization metadata
-- enable/disable organization
-- assign users to organizations
-- set organization roles
+- 조직 생성
+- 조직 메타데이터 수정
+- 조직 활성화/비활성화
+- 사용자를 조직에 배정
+- 조직 역할 설정
 
-Current-user organization management under `/api/organization`:
+현재 사용자의 조직 관리는 `/api/organization` 아래에 둔다.
 
-- list users in the current user's organization
-- view user details in the current user's organization
-- update limited fields for users in the current user's organization
-- for owners only, assign/remove users within their organization and update organization roles
+- 현재 사용자가 속한 조직의 사용자 목록 조회
+- 현재 사용자가 속한 조직의 사용자 상세 조회
+- 현재 사용자가 속한 조직 사용자에 대한 제한 필드 수정
+- owner 전용으로 조직 내 사용자 추가/제거 및 조직 역할 변경
 
-This split keeps global root organization administration separate from current organization self-management.
+이 분리는 전역 root의 조직 관리와 현재 조직의 자체 관리를 명확히 나누기 위한 것이다.
 
-## Allowed User Operations
+## 허용되는 사용자 작업
 
-Organization admins can initially:
+조직 admin은 초기 버전에서 다음 작업을 할 수 있다.
 
-- list users in their organization
-- view user details in their organization
-- enable or disable non-global-admin users in their organization
-- adjust quota for non-global-admin users in their organization
-- update notes or remarks for non-global-admin users in their organization
-- view organization-scoped usage/log data where existing log queries can be safely scoped
+- 자기 조직 사용자 목록 조회
+- 자기 조직 사용자 상세 조회
+- 자기 조직의 비전역-admin 사용자 활성화/비활성화
+- 자기 조직의 비전역-admin 사용자 quota 조정
+- 자기 조직의 비전역-admin 사용자 note 또는 remark 수정
+- 기존 로그 조회가 안전하게 조직 범위로 제한될 수 있는 경우 조직 범위 사용량/로그 조회
 
-Organization owners can additionally:
+조직 owner는 추가로 다음 작업을 할 수 있다.
 
-- add users to their organization
-- remove users from their organization
-- change organization roles within their organization
+- 사용자를 자기 조직에 추가
+- 사용자를 자기 조직에서 제거
+- 자기 조직 안에서 조직 역할 변경
 
-Organization admins and owners cannot:
+조직 admin과 owner는 다음 작업을 할 수 없다.
 
-- change global `User.Role`
-- change `User.Group`
-- change or reset passwords
-- manage root users
-- manage global admin users through organization flows
-- manage channels, model pricing, payment settings, or system settings
+- 전역 `User.Role` 변경
+- 기존 `User.Group` 변경
+- 비밀번호 변경 또는 초기화
+- root 사용자 관리
+- 조직 관리 흐름을 통한 전역 admin 사용자 관리
+- 채널, 모델 가격, 결제 설정, 시스템 설정 관리
 
-## Frontend
+## 프론트엔드
 
-The default frontend should display organization concepts separately from user groups. UI labels should use "Organization" in English and "조직" in Korean-facing copy. Organization admin screens should not rely on `role >= ROLE.ADMIN`; they should check explicit organization permissions from the authenticated user profile or a dedicated endpoint.
+기본 프론트엔드는 조직 개념을 기존 사용자 그룹과 분리해 표시해야 한다. UI 문구는 영어에서 "Organization", 한국어에서 "조직"을 사용한다.
 
-Existing admin screens should remain protected by the current global admin checks.
+조직 admin 화면은 `role >= ROLE.ADMIN`에 의존해서는 안 된다. 인증된 사용자 프로필에 포함된 명시적 조직 권한 또는 전용 endpoint를 통해 조직 권한을 확인해야 한다.
 
-## Migrations
+기존 admin 화면은 현재 전역 admin 검사로 계속 보호한다.
 
-Database changes must be compatible with SQLite, MySQL 5.7.8+, and PostgreSQL 9.6+.
+## 마이그레이션
 
-Use GORM migrations where possible. If raw SQL is required, follow the project's cross-database conventions and avoid database-specific types. Store `organization_role` as a short string with constants for `member`, `admin`, and `owner`.
+데이터베이스 변경은 SQLite, MySQL 5.7.8 이상, PostgreSQL 9.6 이상과 모두 호환되어야 한다.
 
-## Testing
+가능하면 GORM migration을 사용한다. raw SQL이 필요한 경우 프로젝트의 DB 호환 규칙을 따르고 DB 전용 타입을 피한다. `organization_role`은 `member`, `admin`, `owner` 상수를 사용하는 짧은 문자열로 저장한다.
 
-Backend tests should cover:
+## 테스트
 
-- role validation for organization roles
-- organization admin cannot manage users outside the organization
-- organization admin cannot manage global admins or root users
-- organization owner can change organization roles within the organization
-- global root can create and manage organizations
-- existing global admin behavior is unchanged
+백엔드 테스트는 다음 항목을 다룬다.
 
-Frontend tests or focused verification should cover:
+- 조직 역할 검증
+- 조직 admin은 조직 밖 사용자를 관리할 수 없음
+- 조직 admin은 전역 admin 또는 root 사용자를 관리할 수 없음
+- 조직 owner는 자기 조직 안에서 조직 역할을 변경할 수 있음
+- 전역 root는 조직을 생성하고 관리할 수 있음
+- 기존 전역 admin 동작은 변경되지 않음
 
-- organization admin UI is visible to organization admins
-- global admin UI remains hidden from organization-only admins
-- user management actions are limited to the organization scope
+프론트엔드 테스트 또는 집중 검증은 다음 항목을 다룬다.
 
-## Future Expansion
+- 조직 admin에게 조직 admin UI가 보임
+- 조직 권한만 있는 사용자에게 전역 admin UI는 숨겨짐
+- 사용자 관리 작업이 조직 범위로 제한됨
 
-This design leaves room to move toward broader organization administration later:
+## 향후 확장
 
-- organization-level settings
-- organization-scoped API keys
-- organization billing or quota budgets
-- organization invitations
-- multi-organization membership
-- full permission/RBAC model
+이 설계는 이후 더 넓은 조직 관리 기능으로 확장할 수 있도록 여지를 남긴다.
+
+- 조직 단위 설정
+- 조직 단위 API key
+- 조직 과금 또는 quota budget
+- 조직 초대
+- 다중 조직 멤버십
+- 전체 권한/RBAC 모델
