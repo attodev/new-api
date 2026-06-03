@@ -150,6 +150,20 @@ func SetApiRouter(router *gin.Engine) {
 			}
 		}
 
+		organizationsRoute := apiRouter.Group("/organizations")
+		organizationsRoute.Use(middleware.RootAuth())
+		{
+			organizationsRoute.POST("/", controller.CreateOrganization)
+		}
+
+		organizationRoute := apiRouter.Group("/organization")
+		organizationRoute.Use(middleware.UserAuth())
+		{
+			organizationRoute.GET("/users", controller.ListOrganizationUsers)
+			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
+			organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)
+		}
+
 		// Subscription billing (plans, purchase, admin management)
 		subscriptionRoute := apiRouter.Group("/subscription")
 		subscriptionRoute.Use(middleware.UserAuth())
