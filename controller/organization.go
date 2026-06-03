@@ -98,6 +98,7 @@ func ListAssignableOrganizationUsers(c *gin.Context) {
 	var users []model.User
 	query := model.DB.
 		Where("role < ?", common.RoleAdminUser).
+		Where("id <> ?", actor.Id).
 		Where("organization_id = ? OR organization_id = 0", actor.OrganizationId)
 
 	var total int64
@@ -218,6 +219,10 @@ func AssignOrganizationUser(c *gin.Context) {
 	}
 	if target.Role >= common.RoleAdminUser {
 		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		return
+	}
+	if target.Id == actor.Id {
+		common.ApiError(c, errors.New("organization owners cannot reassign themselves"))
 		return
 	}
 

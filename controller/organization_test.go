@@ -212,11 +212,33 @@ func TestOrganizationOwnerCanListAssignableUsers(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, res.Code)
 	body := res.Body.String()
-	require.Contains(t, body, `"username":"owner"`)
+	require.NotContains(t, body, `"username":"owner"`)
 	require.Contains(t, body, `"username":"member"`)
 	require.Contains(t, body, `"username":"unassigned"`)
 	require.NotContains(t, body, `"username":"other"`)
 	require.NotContains(t, body, `"username":"global"`)
+}
+
+func TestOrganizationOwnerCannotAssignSelf(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		owner,
+		http.MethodPut,
+		fmt.Sprintf("/api/organization/users/%d/membership", owner.Id),
+		`{"organization_role":"member"}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", owner.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+
+	var reloaded model.User
+	require.NoError(t, model.DB.First(&reloaded, owner.Id).Error)
+	require.Equal(t, model.OrganizationRoleOwner, reloaded.OrganizationRole)
 }
 
 func TestOrganizationAdminCannotListAssignableUsers(t *testing.T) {

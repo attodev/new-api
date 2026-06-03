@@ -276,17 +276,9 @@ export function OrganizationUsersTable() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <Input
-                  className='w-28'
-                  value={ownerUserId}
-                  onChange={(event) =>
-                    setOwnerUserId(event.currentTarget.value)
-                  }
-                  placeholder={t('User ID')}
-                />
                 <Button
                   onClick={() => void handleCreateOrganization()}
-                  disabled={creating}
+                  disabled={creating || !ownerUserId}
                 >
                   <Building2 />
                   {t('Create')}
@@ -326,14 +318,6 @@ export function OrganizationUsersTable() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <Input
-                  className='w-28'
-                  value={assignUserId}
-                  onChange={(event) =>
-                    setAssignUserId(event.currentTarget.value)
-                  }
-                  placeholder={t('User ID')}
-                />
                 <Select
                   items={ORGANIZATION_ROLES.map((role) => ({
                     value: role,
@@ -359,7 +343,7 @@ export function OrganizationUsersTable() {
                 </Select>
                 <Button
                   onClick={() => void handleAssignUser()}
-                  disabled={assigning}
+                  disabled={assigning || !assignUserId}
                 >
                   <UserPlus />
                   {t('Assign')}
