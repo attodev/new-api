@@ -72,6 +72,9 @@ async function fetchLogStats<T>(
 export const getAllLogs = (params: GetLogsParams = {}) =>
   fetchLogs('/api/log', params, true)
 
+export const getOrganizationLogs = (params: GetLogsParams = {}) =>
+  fetchLogs('/api/organization/logs', params, true)
+
 export const getUserLogs = (
   params: Omit<GetLogsParams, 'username' | 'channel'> = {}
 ) => fetchLogs('/api/log', params, false)
@@ -97,6 +100,10 @@ export async function getUserInfo(
 export const getAllMidjourneyLogs = (params: GetMidjourneyLogsParams) =>
   fetchLogs('/api/mj', params, true)
 
+export const getOrganizationMidjourneyLogs = (
+  params: GetMidjourneyLogsParams
+) => fetchLogs('/api/organization/mj', params, true)
+
 export const getUserMidjourneyLogs = (params: GetMidjourneyLogsParams) =>
   fetchLogs('/api/mj', params, false)
 
@@ -106,6 +113,9 @@ export const getUserMidjourneyLogs = (params: GetMidjourneyLogsParams) =>
 
 export const getAllTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, true)
+
+export const getOrganizationTaskLogs = (params: GetTaskLogsParams) =>
+  fetchLogs('/api/organization/task', params, true)
 
 export const getUserTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, false)

@@ -18,11 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQueryClient, useIsFetching } from '@tanstack/react-query'
-import { useNavigate, getRouteApi } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { type Table } from '@tanstack/react-table'
 import { Eye, EyeOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useIsAdmin } from '@/hooks/use-admin'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -50,7 +49,6 @@ import {
 } from './logs-filter-toolbar'
 import { useUsageLogsContext } from './usage-logs-provider'
 
-const route = getRouteApi('/_authenticated/usage-logs/$section')
 const logTypeValues = ['0', '1', '2', '3', '4', '5', '6'] as const
 
 type LogTypeValue = (typeof logTypeValues)[number]
@@ -61,6 +59,10 @@ function isLogTypeValue(value: string): value is LogTypeValue {
 
 interface CommonLogsFilterBarProps<TData> {
   table: Table<TData>
+  isAdmin: boolean
+  routeTo: '/usage-logs/$section' | '/organization/usage-logs/$section'
+  searchParams: Record<string, unknown>
+  showStats?: boolean
 }
 
 export function CommonLogsFilterBar<TData>(
@@ -69,8 +71,7 @@ export function CommonLogsFilterBar<TData>(
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const searchParams = route.useSearch()
-  const isAdmin = useIsAdmin()
+  const { isAdmin, routeTo, searchParams, showStats = true } = props
   const { sensitiveVisible, setSensitiveVisible } = useUsageLogsContext()
   const fetchingLogs = useIsFetching({ queryKey: ['logs'] })
 
@@ -127,7 +128,7 @@ export function CommonLogsFilterBar<TData>(
   const handleApply = useCallback(() => {
     const filterParams = buildSearchParams(filters, 'common')
     navigate({
-      to: '/usage-logs/$section',
+      to: routeTo,
       params: { section: 'common' },
       search: {
         ...filterParams,
@@ -137,7 +138,7 @@ export function CommonLogsFilterBar<TData>(
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
     queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
-  }, [filters, logType, navigate, queryClient])
+  }, [filters, logType, navigate, queryClient, routeTo])
 
   const handleReset = useCallback(() => {
     const { start, end } = getDefaultTimeRange()
@@ -146,7 +147,7 @@ export function CommonLogsFilterBar<TData>(
     setLogType(LOG_TYPE_ALL_VALUE)
 
     navigate({
-      to: '/usage-logs/$section',
+      to: routeTo,
       params: { section: 'common' },
       search: {
         page: 1,
@@ -157,7 +158,7 @@ export function CommonLogsFilterBar<TData>(
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
     queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
-  }, [navigate, queryClient])
+  }, [navigate, queryClient, routeTo])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -198,7 +199,7 @@ export function CommonLogsFilterBar<TData>(
 
   const statsBar = (
     <div className='flex flex-wrap items-center gap-2'>
-      <CommonLogsStats />
+      {showStats && <CommonLogsStats />}
       <Tooltip>
         <TooltipTrigger
           render={

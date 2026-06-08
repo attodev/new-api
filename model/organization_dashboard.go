@@ -2,16 +2,19 @@ package model
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type OrganizationDashboard struct {
-	Organization OrganizationDashboardOrganization `json:"organization"`
-	Summary      OrganizationDashboardSummary      `json:"summary"`
-	DailyUsage   []OrganizationDashboardDailyUsage `json:"daily_usage"`
-	TopUsers     []OrganizationDashboardUserUsage  `json:"top_users"`
-	TopModels    []OrganizationDashboardModelUsage `json:"top_models"`
+	Organization OrganizationDashboardOrganization      `json:"organization"`
+	Summary      OrganizationDashboardSummary           `json:"summary"`
+	DailyUsage   []OrganizationDashboardDailyUsage      `json:"daily_usage"`
+	TopUsers     []OrganizationDashboardUserUsage       `json:"top_users"`
+	TopModels    []OrganizationDashboardModelUsage      `json:"top_models"`
+	ModelUsage   []OrganizationDashboardModelDailyUsage `json:"model_usage"`
+	UserUsage    []OrganizationDashboardUserDailyUsage  `json:"user_usage"`
 }
 
 type OrganizationDashboardOrganization struct {
@@ -44,7 +47,23 @@ type OrganizationDashboardUserUsage struct {
 	PeriodRequests int    `json:"period_requests"`
 }
 
+type OrganizationDashboardUserDailyUsage struct {
+	Date        string `json:"date"`
+	UserID      int    `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Quota       int    `json:"quota"`
+	Requests    int    `json:"requests"`
+}
+
 type OrganizationDashboardModelUsage struct {
+	Model    string `json:"model"`
+	Quota    int    `json:"quota"`
+	Requests int    `json:"requests"`
+}
+
+type OrganizationDashboardModelDailyUsage struct {
+	Date     string `json:"date"`
 	Model    string `json:"model"`
 	Quota    int    `json:"quota"`
 	Requests int    `json:"requests"`
@@ -68,6 +87,8 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 		DailyUsage: []OrganizationDashboardDailyUsage{},
 		TopUsers:   []OrganizationDashboardUserUsage{},
 		TopModels:  []OrganizationDashboardModelUsage{},
+		ModelUsage: []OrganizationDashboardModelDailyUsage{},
+		UserUsage:  []OrganizationDashboardUserDailyUsage{},
 	}
 
 	var users []User
@@ -95,7 +116,9 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 
 	dailyUsage := map[string]*OrganizationDashboardDailyUsage{}
 	userUsage := map[int]*OrganizationDashboardUserUsage{}
+	userDailyUsage := map[string]*OrganizationDashboardUserDailyUsage{}
 	modelUsage := map[string]*OrganizationDashboardModelUsage{}
+	modelDailyUsage := map[string]*OrganizationDashboardModelDailyUsage{}
 	activeUsers := map[int]bool{}
 
 	for _, quotaRow := range quotaRows {
@@ -127,6 +150,23 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 		userUsage[quotaRow.UserID].PeriodQuota += quotaRow.Quota
 		userUsage[quotaRow.UserID].PeriodRequests += quotaRow.Count
 
+		userDailyUsageKey := date + "\x00" + strconv.Itoa(quotaRow.UserID)
+		if userDailyUsage[userDailyUsageKey] == nil {
+			user := usersByID[quotaRow.UserID]
+			displayName := user.DisplayName
+			if displayName == "" {
+				displayName = user.Username
+			}
+			userDailyUsage[userDailyUsageKey] = &OrganizationDashboardUserDailyUsage{
+				Date:        date,
+				UserID:      quotaRow.UserID,
+				Username:    user.Username,
+				DisplayName: displayName,
+			}
+		}
+		userDailyUsage[userDailyUsageKey].Quota += quotaRow.Quota
+		userDailyUsage[userDailyUsageKey].Requests += quotaRow.Count
+
 		modelName := strings.TrimSpace(quotaRow.ModelName)
 		if modelName == "" {
 			modelName = "(unknown)"
@@ -136,6 +176,16 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 		}
 		modelUsage[modelName].Quota += quotaRow.Quota
 		modelUsage[modelName].Requests += quotaRow.Count
+
+		modelDailyUsageKey := date + "\x00" + modelName
+		if modelDailyUsage[modelDailyUsageKey] == nil {
+			modelDailyUsage[modelDailyUsageKey] = &OrganizationDashboardModelDailyUsage{
+				Date:  date,
+				Model: modelName,
+			}
+		}
+		modelDailyUsage[modelDailyUsageKey].Quota += quotaRow.Quota
+		modelDailyUsage[modelDailyUsageKey].Requests += quotaRow.Count
 	}
 	dashboard.Summary.ActiveMemberCount = len(activeUsers)
 
@@ -156,6 +206,16 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 		return dashboard.TopUsers[i].PeriodQuota > dashboard.TopUsers[j].PeriodQuota
 	})
 
+	for _, usage := range userDailyUsage {
+		dashboard.UserUsage = append(dashboard.UserUsage, *usage)
+	}
+	sort.Slice(dashboard.UserUsage, func(i, j int) bool {
+		if dashboard.UserUsage[i].Date == dashboard.UserUsage[j].Date {
+			return dashboard.UserUsage[i].Username < dashboard.UserUsage[j].Username
+		}
+		return dashboard.UserUsage[i].Date < dashboard.UserUsage[j].Date
+	})
+
 	for _, usage := range modelUsage {
 		dashboard.TopModels = append(dashboard.TopModels, *usage)
 	}
@@ -164,6 +224,16 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 			return dashboard.TopModels[i].Model < dashboard.TopModels[j].Model
 		}
 		return dashboard.TopModels[i].Quota > dashboard.TopModels[j].Quota
+	})
+
+	for _, usage := range modelDailyUsage {
+		dashboard.ModelUsage = append(dashboard.ModelUsage, *usage)
+	}
+	sort.Slice(dashboard.ModelUsage, func(i, j int) bool {
+		if dashboard.ModelUsage[i].Date == dashboard.ModelUsage[j].Date {
+			return dashboard.ModelUsage[i].Model < dashboard.ModelUsage[j].Model
+		}
+		return dashboard.ModelUsage[i].Date < dashboard.ModelUsage[j].Date
 	})
 
 	return dashboard, nil

@@ -208,6 +208,8 @@ func RequestWaffoPay(c *gin.Context) {
 	// 创建本地订单
 	topUp := &model.TopUp{
 		UserId:          id,
+		TargetType:      getTopUpTargetType(c),
+		TargetId:        getTopUpTargetId(c),
 		Amount:          amount,
 		Money:           payMoney,
 		TradeNo:         merchantOrderId,

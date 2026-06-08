@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getRouteApi } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   type ColumnDef,
   flexRender,
@@ -44,12 +44,10 @@ import {
 } from '../constants'
 import { useColumnsByCategory } from '../lib/columns'
 import { fetchLogsByCategory } from '../lib/utils'
-import type { LogCategory } from '../types'
+import type { LogCategory, UsageLogsScope } from '../types'
 import { CommonLogsFilterBar } from './common-logs-filter-bar'
 import { TaskLogsFilterBar } from './task-logs-filter-bar'
 import { UsageLogsMobileList } from './usage-logs-mobile-card'
-
-const route = getRouteApi('/_authenticated/usage-logs/$section')
 
 const logTypeRowTint: Record<number, string> = {
   [LOG_TYPE_ENUM.ERROR]: 'bg-rose-50/40 dark:bg-rose-950/20',
@@ -63,13 +61,25 @@ function deserializeLogTypeFilter(value: unknown): unknown[] {
 
 interface UsageLogsTableProps {
   logCategory: LogCategory
+  scope?: UsageLogsScope
+  routeTo: '/usage-logs/$section' | '/organization/usage-logs/$section'
+  organizationId?: number
+  waitForOrganization?: boolean
 }
 
-export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
+export function UsageLogsTable({
+  logCategory,
+  scope = 'user',
+  routeTo,
+  organizationId,
+  waitForOrganization = false,
+}: UsageLogsTableProps) {
   const { t } = useTranslation()
-  const isAdmin = useIsAdmin()
+  const userIsAdmin = useIsAdmin()
+  const isAdmin = userIsAdmin || scope === 'organization'
   const isMobile = useMediaQuery('(max-width: 640px)')
-  const searchParams = route.useSearch()
+  const searchParams = useSearch({ strict: false }) as Record<string, unknown>
+  const navigate = useNavigate()
 
   const {
     columnFilters,
@@ -78,8 +88,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     onPaginationChange,
     ensurePageInRange,
   } = useTableUrlState({
-    search: route.useSearch(),
-    navigate: route.useNavigate(),
+    search: searchParams,
+    navigate,
     pagination: { defaultPage: 1, defaultPageSize: isMobile ? 20 : 100 },
     globalFilter: { enabled: false },
     columnFilters: [
@@ -112,6 +122,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: [
       'logs',
+      scope,
+      organizationId,
       logCategory,
       isAdmin,
       pagination.pageIndex + 1,
@@ -123,11 +135,13 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     queryFn: async () => {
       const result = await fetchLogsByCategory({
         logCategory,
+        scope,
         isAdmin,
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
         searchParams,
         columnFilters,
+        organizationId,
       })
 
       if (!result?.success) {
@@ -138,11 +152,12 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       return result.data || DEFAULT_LOGS_DATA
     },
     placeholderData: (previousData, previousQuery) => {
-      if (previousQuery?.queryKey[1] === logCategory) {
+      if (previousQuery?.queryKey[3] === logCategory) {
         return previousData
       }
       return undefined
     },
+    enabled: !waitForOrganization || organizationId !== undefined,
   })
 
   const logs = data?.items || []
@@ -201,9 +216,21 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       }
       toolbar={
         isCommon ? (
-          <CommonLogsFilterBar table={table} />
+          <CommonLogsFilterBar
+            table={table}
+            isAdmin={isAdmin}
+            routeTo={routeTo}
+            searchParams={searchParams}
+            showStats={scope !== 'organization'}
+          />
         ) : (
-          <TaskLogsFilterBar table={table} logCategory={logCategory} />
+          <TaskLogsFilterBar
+            table={table}
+            logCategory={logCategory}
+            isAdmin={isAdmin}
+            routeTo={routeTo}
+            searchParams={searchParams}
+          />
         )
       }
       renderRow={(row) => {

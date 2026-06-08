@@ -59,15 +59,26 @@ import {
   getPaymentMethodName,
   formatTimestamp,
 } from '../../lib/billing'
+import type { ApiResponse, BillingHistoryResponse } from '../../types'
 
 interface BillingHistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  getBillingHistory?: (
+    page: number,
+    pageSize: number,
+    keyword?: string
+  ) => Promise<ApiResponse<BillingHistoryResponse>>
+  forceSelfHistory?: boolean
+  description?: string
 }
 
 export function BillingHistoryDialog({
   open,
   onOpenChange,
+  getBillingHistory,
+  forceSelfHistory,
+  description,
 }: BillingHistoryDialogProps) {
   const { t } = useTranslation()
   const {
@@ -83,7 +94,7 @@ export function BillingHistoryDialog({
     handlePageSizeChange,
     handleSearch,
     handleCompleteOrder,
-  } = useBillingHistory()
+  } = useBillingHistory({ getBillingHistory, forceSelfHistory })
 
   const [confirmTradeNo, setConfirmTradeNo] = useState<string | null>(null)
   const { copyToClipboard, copiedText } = useCopyToClipboard({ notify: false })
@@ -106,7 +117,8 @@ export function BillingHistoryDialog({
           <DialogHeader>
             <DialogTitle>{t('Billing History')}</DialogTitle>
             <DialogDescription>
-              {t('View your topup transaction records and payment history')}
+              {description ??
+                t('View your topup transaction records and payment history')}
             </DialogDescription>
           </DialogHeader>
 

@@ -27,6 +27,7 @@ import {
   isApiSuccess,
 } from '../api'
 import type { TopupRecord } from '../types'
+import type { ApiResponse, BillingHistoryResponse } from '../types'
 
 // ============================================================================
 // Billing History Hook
@@ -37,11 +38,25 @@ interface UseBillingHistoryOptions {
   initialPage?: number
   /** Initial page size */
   initialPageSize?: number
+  /** Custom history loader for scoped wallets */
+  getBillingHistory?: (
+    page: number,
+    pageSize: number,
+    keyword?: string
+  ) => Promise<ApiResponse<BillingHistoryResponse>>
+  /** Disable admin-wide history and manual completion controls */
+  forceSelfHistory?: boolean
 }
 
 export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
-  const { initialPage = 1, initialPageSize = 10 } = options
-  const isAdmin = useIsAdmin()
+  const {
+    initialPage = 1,
+    initialPageSize = 10,
+    getBillingHistory,
+    forceSelfHistory = false,
+  } = options
+  const userIsAdmin = useIsAdmin()
+  const isAdmin = forceSelfHistory ? false : userIsAdmin
 
   const [records, setRecords] = useState<TopupRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -57,9 +72,11 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
   const fetchBillingHistory = useCallback(async () => {
     setLoading(true)
     try {
-      const response = isAdmin
-        ? await getAllBillingHistory(page, pageSize, keyword)
-        : await getUserBillingHistory(page, pageSize, keyword)
+      const response = getBillingHistory
+        ? await getBillingHistory(page, pageSize, keyword)
+        : isAdmin
+          ? await getAllBillingHistory(page, pageSize, keyword)
+          : await getUserBillingHistory(page, pageSize, keyword)
 
       if (isApiSuccess(response) && response.data) {
         setRecords(response.data.items || [])
@@ -80,7 +97,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [isAdmin, page, pageSize, keyword])
+  }, [getBillingHistory, isAdmin, page, pageSize, keyword])
 
   /**
    * Complete a pending order (admin only)

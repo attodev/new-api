@@ -75,6 +75,28 @@ func TestCreateOrganizationAssignsOwner(t *testing.T) {
 	require.Equal(t, OrganizationRoleOwner, reloaded.OrganizationRole)
 }
 
+func TestCreateOrganizationRejectsUserAlreadyInOrganization(t *testing.T) {
+	setupOrganizationModelTestDB(t)
+
+	owner := User{Username: "owner", Password: "password", DisplayName: "Owner", Role: common.RoleCommonUser, AffCode: "owner"}
+	existingMember := User{
+		Username:         "existing-member",
+		Password:         "password",
+		DisplayName:      "Existing Member",
+		Role:             common.RoleCommonUser,
+		OrganizationId:   7,
+		OrganizationRole: OrganizationRoleMember,
+		AffCode:          "existing-member",
+	}
+	require.NoError(t, DB.Create(&owner).Error)
+	require.NoError(t, DB.Create(&existingMember).Error)
+
+	org, err := CreateOrganization("Acme", "Main customer", existingMember.Id)
+	require.Error(t, err)
+	require.Nil(t, org)
+	require.Contains(t, err.Error(), "user already belongs to an organization")
+}
+
 func TestCanManageOrganizationTargetRejectsGlobalAdmins(t *testing.T) {
 	require.False(t, CanManageOrganizationTarget(
 		User{Id: 1, OrganizationId: 7, OrganizationRole: OrganizationRoleOwner, Role: common.RoleCommonUser},
@@ -183,4 +205,15 @@ func TestGetOrganizationDashboardScopesQuotaDataToOrganization(t *testing.T) {
 		{Model: "gpt-4o", Quota: 100, Requests: 1},
 		{Model: "(unknown)", Quota: 50, Requests: 2},
 	}, dashboard.TopModels)
+
+	require.Equal(t, []OrganizationDashboardModelDailyUsage{
+		{Date: "2026-01-02", Model: "(unknown)", Quota: 50, Requests: 2},
+		{Date: "2026-01-02", Model: "gpt-4o", Quota: 100, Requests: 1},
+		{Date: "2026-01-03", Model: "claude-3-5", Quota: 200, Requests: 3},
+	}, dashboard.ModelUsage)
+
+	require.Equal(t, []OrganizationDashboardUserDailyUsage{
+		{Date: "2026-01-02", UserID: owner.Id, Username: owner.Username, DisplayName: owner.Username, Quota: 150, Requests: 3},
+		{Date: "2026-01-03", UserID: member.Id, Username: member.Username, DisplayName: "Member Display", Quota: 200, Requests: 3},
+	}, dashboard.UserUsage)
 }

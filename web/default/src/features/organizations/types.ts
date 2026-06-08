@@ -86,3 +86,74 @@ export interface OrganizationUpdatePayload {
   quota?: number
   status?: number
 }
+
+export type OrganizationDashboardRangePreset = 'today' | '7d' | '30d' | 'custom'
+
+export interface OrganizationDashboardOrganization {
+  id: number
+  name: string
+  quota: number
+  used_quota: number
+}
+
+export interface OrganizationDashboardSummary {
+  period_quota: number
+  period_requests: number
+  member_count: number
+  active_member_count: number
+}
+
+export interface OrganizationDashboardDailyUsage {
+  date: string
+  quota: number
+  requests: number
+}
+
+export interface OrganizationDashboardTopUser {
+  user_id: number
+  username: string
+  display_name: string
+  quota: number
+  used_quota: number
+  period_quota: number
+  period_requests: number
+}
+
+export interface OrganizationDashboardUserDailyUsage {
+  date: string
+  user_id: number
+  username: string
+  display_name: string
+  quota: number
+  requests: number
+}
+
+export interface OrganizationDashboardTopModel {
+  model: string
+  quota: number
+  requests: number
+}
+
+export interface OrganizationDashboardModelDailyUsage {
+  date: string
+  model: string
+  quota: number
+  requests: number
+}
+
+export interface OrganizationDashboardData {
+  organization: OrganizationDashboardOrganization
+  summary: OrganizationDashboardSummary
+  daily_usage: OrganizationDashboardDailyUsage[]
+  top_users: OrganizationDashboardTopUser[]
+  top_models: OrganizationDashboardTopModel[]
+  model_usage: OrganizationDashboardModelDailyUsage[]
+  user_usage: OrganizationDashboardUserDailyUsage[]
+}
+
+export interface OrganizationDashboardParams {
+  start_timestamp?: number | null
+  end_timestamp?: number | null
+  preset?: OrganizationDashboardRangePreset
+  organization_id?: number | null
+}

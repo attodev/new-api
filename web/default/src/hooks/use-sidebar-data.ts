@@ -122,6 +122,26 @@ export function useSidebarData(): SidebarData {
             url: '/organization',
             icon: Building2,
           },
+          {
+            title: t('Organization Dashboard'),
+            url: '/organization/dashboard',
+            icon: LayoutDashboard,
+          },
+          {
+            title: t('Organization Usage Logs'),
+            url: '/organization/usage-logs/common',
+            icon: FileText,
+          },
+          {
+            title: t('Organization Task Logs'),
+            url: '/organization/usage-logs/task',
+            activeUrls: ['/organization/usage-logs/drawing'],
+            configUrls: [
+              '/organization/usage-logs/drawing',
+              '/organization/usage-logs/task',
+            ],
+            icon: ListTodo,
+          },
         ],
       },
       {

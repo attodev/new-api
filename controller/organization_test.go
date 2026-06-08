@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -37,7 +38,7 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	model.DB = db
 	model.LOG_DB = db
-	require.NoError(t, db.AutoMigrate(&model.Organization{}, &model.User{}))
+	require.NoError(t, db.AutoMigrate(&model.Organization{}, &model.User{}, &model.QuotaData{}, &model.Log{}))
 
 	t.Cleanup(func() {
 		sqlDB, err := db.DB()
@@ -138,6 +139,245 @@ func TestOrganizationAdminCanReadOrganizationProfile(t *testing.T) {
 	body := res.Body.String()
 	require.Contains(t, body, `"quota":1000`)
 	require.Contains(t, body, `"used_quota":25`)
+}
+
+func TestOrganizationOwnerCanReadDashboard(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	otherUser := model.User{Username: "other", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleOwner, AffCode: "other"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, UsedQuota: 25, Status: model.OrganizationStatusEnabled}
+	otherOrg := model.Organization{Id: 2, Name: "Other", OwnerUserId: 3, Quota: 500, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&otherUser).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&otherOrg).Error)
+
+	dayOne := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix()
+	dayTwo := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC).Unix()
+	rows := []model.QuotaData{
+		{UserID: owner.Id, Username: owner.Username, ModelName: "gpt-4o", CreatedAt: dayOne, Count: 2, Quota: 150, TokenUsed: 10},
+		{UserID: member.Id, Username: member.Username, ModelName: "claude-3-5", CreatedAt: dayTwo, Count: 3, Quota: 200, TokenUsed: 20},
+		{UserID: otherUser.Id, Username: otherUser.Username, ModelName: "gpt-4o", CreatedAt: dayOne, Count: 9, Quota: 999, TokenUsed: 90},
+	}
+	require.NoError(t, model.DB.Create(&rows).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		owner,
+		http.MethodGet,
+		fmt.Sprintf("/api/organization/dashboard?start_timestamp=%d&end_timestamp=%d", dayOne, dayTwo),
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"period_quota":350`)
+	require.Contains(t, body, `"period_requests":5`)
+	require.NotContains(t, body, `"period_quota":999`)
+}
+
+func TestOrganizationAdminCanReadDashboard(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		admin,
+		http.MethodGet,
+		"/api/organization/dashboard",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+}
+
+func TestOrganizationRootCanReadSelectedOrganizationDashboard(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	otherUser := model.User{Username: "outsider", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleMember, AffCode: "outsider"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 2, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	otherOrg := model.Organization{Id: 2, Name: "Other", OwnerUserId: 3, Quota: 500, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&otherUser).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&otherOrg).Error)
+
+	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC).Unix()
+	rows := []model.QuotaData{
+		{UserID: member.Id, Username: member.Username, ModelName: "gpt-4o", CreatedAt: now, Count: 2, Quota: 150, TokenUsed: 10},
+		{UserID: otherUser.Id, Username: otherUser.Username, ModelName: "gpt-4o", CreatedAt: now, Count: 9, Quota: 999, TokenUsed: 90},
+	}
+	require.NoError(t, model.DB.Create(&rows).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		root,
+		http.MethodGet,
+		fmt.Sprintf("/api/organization/dashboard?organization_id=%d&start_timestamp=%d&end_timestamp=%d", org.Id, now, now),
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"period_quota":150`)
+	require.NotContains(t, body, `"period_quota":999`)
+}
+
+func TestOrganizationRootDashboardRequiresOrganizationId(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	require.NoError(t, model.DB.Create(&root).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		root,
+		http.MethodGet,
+		"/api/organization/dashboard",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "organization_id is required")
+}
+
+func TestOrganizationRootCanReadSelectedOrganizationLogs(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	otherUser := model.User{Username: "outsider", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleMember, AffCode: "outsider"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 2, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	otherOrg := model.Organization{Id: 2, Name: "Other", OwnerUserId: 3, Quota: 500, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&otherUser).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&otherOrg).Error)
+	logs := []model.Log{
+		{UserId: member.Id, Username: member.Username, Type: model.LogTypeConsume, CreatedAt: time.Now().Unix(), ModelName: "gpt-4o", Quota: 150, Other: "{}"},
+		{UserId: otherUser.Id, Username: otherUser.Username, Type: model.LogTypeConsume, CreatedAt: time.Now().Unix(), ModelName: "claude-3-5", Quota: 999, Other: "{}"},
+	}
+	require.NoError(t, model.LOG_DB.Create(&logs).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationLogs,
+		root,
+		http.MethodGet,
+		fmt.Sprintf("/api/organization/logs?organization_id=%d", org.Id),
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, member.Username)
+	require.NotContains(t, body, otherUser.Username)
+}
+
+func TestOrganizationDashboardAcceptsPresetRanges(t *testing.T) {
+	for _, preset := range []string{"today", "30d"} {
+		t.Run(preset, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+			org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+			require.NoError(t, model.DB.Create(&admin).Error)
+			require.NoError(t, model.DB.Create(&org).Error)
+
+			res := performOrganizationRequest(
+				GetOrganizationDashboard,
+				admin,
+				http.MethodGet,
+				fmt.Sprintf("/api/organization/dashboard?preset=%s", preset),
+				"",
+			)
+
+			require.Equal(t, http.StatusOK, res.Code)
+			require.Contains(t, res.Body.String(), `"success":true`)
+		})
+	}
+}
+
+func TestOrganizationDashboardRejectsInvalidPreset(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		admin,
+		http.MethodGet,
+		"/api/organization/dashboard?preset=quarter",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "invalid preset")
+}
+
+func TestOrganizationDashboardRejectsMalformedStartTimestamp(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		admin,
+		http.MethodGet,
+		"/api/organization/dashboard?start_timestamp=bad",
+		"",
+	)
+
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "invalid start_timestamp")
+}
+
+func TestOrganizationDashboardRejectsMalformedEndTimestamp(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		admin,
+		http.MethodGet,
+		"/api/organization/dashboard?end_timestamp=bad",
+		"",
+	)
+
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "invalid end_timestamp")
+}
+
+func TestOrganizationMemberCannotReadDashboard(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	require.NoError(t, model.DB.Create(&member).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		member,
+		http.MethodGet,
+		"/api/organization/dashboard",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "organization admin permission required")
 }
 
 func TestOrganizationAdminCannotUpdateOutsideOrganization(t *testing.T) {

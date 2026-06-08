@@ -31,6 +31,7 @@ type TaskQueryParams struct {
 	MjID           string
 	StartTimestamp string
 	EndTimestamp   string
+	UserIDs        []int
 }
 
 func GetAllUserTask(userId int, startIdx int, num int, queryParams TaskQueryParams) []*Midjourney {
@@ -73,6 +74,9 @@ func GetAllTasks(startIdx int, num int, queryParams TaskQueryParams) []*Midjourn
 	}
 	if queryParams.MjID != "" {
 		query = query.Where("mj_id = ?", queryParams.MjID)
+	}
+	if len(queryParams.UserIDs) != 0 {
+		query = query.Where("user_id in (?)", queryParams.UserIDs)
 	}
 	if queryParams.StartTimestamp != "" {
 		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
@@ -191,6 +195,9 @@ func CountAllTasks(queryParams TaskQueryParams) int64 {
 	}
 	if queryParams.MjID != "" {
 		query = query.Where("mj_id = ?", queryParams.MjID)
+	}
+	if len(queryParams.UserIDs) != 0 {
+		query = query.Where("user_id in (?)", queryParams.UserIDs)
 	}
 	if queryParams.StartTimestamp != "" {
 		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)

@@ -18,10 +18,29 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 import type {
+  AmountRequest,
+  AmountResponse,
+  ApiResponse as WalletApiResponse,
+  BillingHistoryResponse,
+  CreemPaymentRequest,
+  CreemPaymentResponse,
+  PayPalPaymentRequest,
+  PayPalPaymentResponse,
+  PaymentRequest,
+  PaymentResponse,
+  StripePaymentResponse,
+  WaffoPancakePaymentRequest,
+  WaffoPancakePaymentResponse,
+  WaffoPaymentRequest,
+  WaffoPaymentResponse,
+} from '@/features/wallet/types'
+import type {
   ApiResponse,
   AssignOrganizationUserPayload,
   CreateOrganizationPayload,
   Organization,
+  OrganizationDashboardData,
+  OrganizationDashboardParams,
   OrganizationsPage,
   OrganizationUpdatePayload,
   OrganizationUserUpdatePayload,
@@ -59,6 +78,143 @@ export async function getOrganizationProfile(): Promise<
   ApiResponse<Organization>
 > {
   const res = await api.get('/api/organization/')
+  return res.data
+}
+
+export async function getOrganizationWallet(): Promise<
+  ApiResponse<Organization>
+> {
+  const res = await api.get('/api/organization/wallet')
+  return res.data
+}
+
+export async function getOrganizationDashboard(
+  params: OrganizationDashboardParams
+): Promise<ApiResponse<OrganizationDashboardData>> {
+  const search = new URLSearchParams()
+  if (params.start_timestamp !== undefined && params.start_timestamp !== null) {
+    search.set('start_timestamp', String(params.start_timestamp))
+  }
+  if (params.end_timestamp !== undefined && params.end_timestamp !== null) {
+    search.set('end_timestamp', String(params.end_timestamp))
+  }
+  if (params.preset) {
+    search.set('preset', params.preset)
+  }
+  if (params.organization_id !== undefined && params.organization_id !== null) {
+    search.set('organization_id', String(params.organization_id))
+  }
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.get(`/api/organization/dashboard${suffix}`)
+  return res.data
+}
+
+export async function getOrganizationBillingHistory(
+  page: number,
+  pageSize: number,
+  keyword?: string
+): Promise<WalletApiResponse<BillingHistoryResponse>> {
+  const params = new URLSearchParams({
+    p: page.toString(),
+    page_size: pageSize.toString(),
+  })
+  if (keyword) {
+    params.append('keyword', keyword)
+  }
+  const res = await api.get(`/api/organization/topup/self?${params.toString()}`)
+  return res.data
+}
+
+export async function calculateOrganizationAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function calculateOrganizationStripeAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/stripe/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function calculateOrganizationPayPalAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/paypal/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function calculateOrganizationWaffoPancakeAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/waffo-pancake/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationPayment(
+  request: PaymentRequest
+): Promise<PaymentResponse> {
+  const res = await api.post('/api/organization/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return {
+    ...res.data,
+    url: res.data.url || (res as unknown as { url?: string }).url,
+  }
+}
+
+export async function requestOrganizationStripePayment(
+  request: PaymentRequest
+): Promise<StripePaymentResponse> {
+  const res = await api.post('/api/organization/stripe/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationPayPalPayment(
+  request: PayPalPaymentRequest
+): Promise<PayPalPaymentResponse> {
+  const res = await api.post('/api/organization/paypal/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationCreemPayment(
+  request: CreemPaymentRequest
+): Promise<CreemPaymentResponse> {
+  const res = await api.post('/api/organization/creem/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationWaffoPayment(
+  request: WaffoPaymentRequest
+): Promise<WaffoPaymentResponse> {
+  const res = await api.post('/api/organization/waffo/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationWaffoPancakePayment(
+  request: WaffoPancakePaymentRequest
+): Promise<WaffoPancakePaymentResponse> {
+  const res = await api.post('/api/organization/waffo-pancake/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
   return res.data
 }
 

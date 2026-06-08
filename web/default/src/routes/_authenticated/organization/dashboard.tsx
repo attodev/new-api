@@ -20,16 +20,16 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
 import { hasOrganizationAdminRole } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
-import { OrganizationUsersTable } from '@/features/organizations/components/organization-users-table'
+import { OrganizationDashboard } from '@/features/organizations/components/organization-dashboard'
 
-export const Route = createFileRoute('/_authenticated/organization/')({
+export const Route = createFileRoute('/_authenticated/organization/dashboard')({
   beforeLoad: () => {
     const { auth } = useAuthStore.getState()
 
-    const isRoot = (auth.user?.role ?? 0) >= ROLE.SUPER_ADMIN
     const isOrganizationAdmin = hasOrganizationAdminRole(
       auth.user?.organization_role
     )
+    const isRoot = (auth.user?.role ?? 0) >= ROLE.SUPER_ADMIN
 
     if (!auth.user || (!isRoot && !isOrganizationAdmin)) {
       throw redirect({
@@ -37,13 +37,5 @@ export const Route = createFileRoute('/_authenticated/organization/')({
       })
     }
   },
-  component: OrganizationPage,
+  component: OrganizationDashboard,
 })
-
-function OrganizationPage() {
-  return (
-    <div className='h-full min-h-0 overflow-auto px-3 pt-3 pb-3 sm:px-4 sm:pt-5 sm:pb-4'>
-      <OrganizationUsersTable />
-    </div>
-  )
-}

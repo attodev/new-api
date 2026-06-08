@@ -139,6 +139,46 @@ func TestUpdatePendingTopUpStatus_RejectsMismatchedPaymentProvider(t *testing.T)
 	}
 }
 
+func TestManualCompleteTopUp_CreditsOrganizationWalletTarget(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForPaymentGuardTest(t, 501, 100)
+	org := &Organization{
+		Id:          601,
+		Name:        "Acme",
+		OwnerUserId: 501,
+		Quota:       10,
+		Status:      OrganizationStatusEnabled,
+	}
+	require.NoError(t, DB.Create(org).Error)
+
+	topUp := &TopUp{
+		UserId:          501,
+		Amount:          2,
+		Money:           2,
+		TradeNo:         "org-wallet-manual-complete",
+		PaymentMethod:   PaymentMethodBalance,
+		PaymentProvider: PaymentProviderBalance,
+		TargetType:      TopUpTargetTypeOrganization,
+		TargetId:        org.Id,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      time.Now().Unix(),
+	}
+	require.NoError(t, topUp.Insert())
+
+	err := ManualCompleteTopUp(topUp.TradeNo, "127.0.0.1")
+	require.NoError(t, err)
+
+	reloadedTopUp := GetTopUpByTradeNo(topUp.TradeNo)
+	require.NotNil(t, reloadedTopUp)
+	assert.Equal(t, common.TopUpStatusSuccess, reloadedTopUp.Status)
+	assert.Equal(t, 100, getUserQuotaForPaymentGuardTest(t, 501))
+
+	var reloadedOrg Organization
+	require.NoError(t, DB.First(&reloadedOrg, org.Id).Error)
+	assert.Equal(t, 10+2*int(common.QuotaPerUnit), reloadedOrg.Quota)
+}
+
 func TestCompleteSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) {
 	truncateTables(t)
 

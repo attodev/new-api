@@ -21,10 +21,13 @@ For commercial licensing, please contact support@quantumnous.com
  */
 import {
   getAllLogs,
+  getOrganizationLogs,
   getUserLogs,
   getAllMidjourneyLogs,
+  getOrganizationMidjourneyLogs,
   getUserMidjourneyLogs,
   getAllTaskLogs,
+  getOrganizationTaskLogs,
   getUserTaskLogs,
 } from '../api'
 import {
@@ -145,19 +148,22 @@ export function buildBaseParams(config: {
   page: number
   pageSize: number
   searchParams: Record<string, unknown>
+  organizationId?: number
   useMilliseconds?: boolean
 }): {
   p: number
   page_size: number
+  organization_id?: number
   channel_id?: string
   start_timestamp?: number
   end_timestamp?: number
 } {
-  const { page, pageSize, searchParams, useMilliseconds = false } = config
+  const { page, pageSize, searchParams, organizationId, useMilliseconds = false } = config
 
   return {
     p: page,
     page_size: pageSize,
+    ...(organizationId !== undefined ? { organization_id: organizationId } : {}),
     ...(searchParams.channel
       ? {
           channel_id: String(searchParams.channel),
@@ -176,8 +182,16 @@ export function buildApiParams(config: {
   searchParams: Record<string, unknown>
   columnFilters?: Array<{ id: string; value: unknown }>
   isAdmin: boolean
+  organizationId?: number
 }): GetLogsParams {
-  const { page, pageSize, searchParams, columnFilters = [], isAdmin } = config
+  const {
+    page,
+    pageSize,
+    searchParams,
+    columnFilters = [],
+    isAdmin,
+    organizationId,
+  } = config
 
   // Helper to process type parameter (single value from array)
   const processType = (value: unknown): number | undefined => {
@@ -199,6 +213,7 @@ export function buildApiParams(config: {
   const params: GetLogsParams = {
     p: page,
     page_size: pageSize,
+    ...(organizationId !== undefined ? { organization_id: organizationId } : {}),
     ...(searchParams.type ? { type: processType(searchParams.type) } : {}),
     ...(searchParams.model ? { model_name: String(searchParams.model) } : {}),
     ...(searchParams.token ? { token_name: String(searchParams.token) } : {}),
@@ -259,8 +274,18 @@ export function buildApiParams(config: {
 export async function fetchLogsByCategory(
   config: FetchLogsConfig
 ): Promise<GetLogsResponse> {
-  const { logCategory, isAdmin, page, pageSize, searchParams, columnFilters } =
-    config
+  const {
+    logCategory,
+    scope = 'user',
+    isAdmin,
+    page,
+    pageSize,
+    searchParams,
+    columnFilters,
+    organizationId,
+  } = config
+  const isOrganizationScope = scope === 'organization'
+  const useAdminParams = isAdmin || isOrganizationScope
 
   if (logCategory === 'common') {
     const params = buildApiParams({
@@ -268,8 +293,12 @@ export async function fetchLogsByCategory(
       pageSize,
       searchParams,
       columnFilters,
-      isAdmin,
+      isAdmin: useAdminParams,
+      organizationId,
     })
+    if (isOrganizationScope) {
+      return await getOrganizationLogs(params)
+    }
     return isAdmin ? await getAllLogs(params) : await getUserLogs(params)
   }
 
@@ -278,6 +307,7 @@ export async function fetchLogsByCategory(
     page,
     pageSize,
     searchParams,
+    organizationId,
     useMilliseconds: logCategory === 'drawing',
   })
 
@@ -292,12 +322,20 @@ export async function fetchLogsByCategory(
   }
 
   if (logCategory === 'drawing') {
+    if (isOrganizationScope) {
+      return await getOrganizationMidjourneyLogs(
+        paramsWithFilter as GetMidjourneyLogsParams
+      )
+    }
     return isAdmin
       ? await getAllMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
       : await getUserMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
   }
 
   // task logs
+  if (isOrganizationScope) {
+    return await getOrganizationTaskLogs(paramsWithFilter as GetTaskLogsParams)
+  }
   return isAdmin
     ? await getAllTaskLogs(paramsWithFilter as GetTaskLogsParams)
     : await getUserTaskLogs(paramsWithFilter as GetTaskLogsParams)

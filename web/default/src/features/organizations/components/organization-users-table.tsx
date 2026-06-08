@@ -17,7 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
+  BarChart3,
   Building2,
   Power,
   RefreshCw,
@@ -179,7 +181,11 @@ export function OrganizationUsersTable() {
         ? await getUsers({ p: 1, page_size: 50 })
         : await getAssignableOrganizationUsers({ page: 1, size: 50 })
       if (res.success && res.data?.items) {
-        const items = res.data.items.filter((user) => user.role < ROLE.ADMIN)
+        const items = res.data.items.filter((user) => {
+          if (user.role >= ROLE.ADMIN) return false
+          if (isRoot) return (user.organization_id ?? 0) === 0
+          return true
+        })
         setCandidateUsers(items)
         if (items.length > 0) {
           const firstId = String(items[0].id)
@@ -374,9 +380,7 @@ export function OrganizationUsersTable() {
                   onChange={(event) =>
                     setOrganizationQuotaAmount(event.currentTarget.value)
                   }
-                  type='number'
-                  step={tokensOnly ? 1 : 0.01}
-                  min={0}
+                  inputMode={tokensOnly ? 'numeric' : 'decimal'}
                   placeholder={t('Initial organization quota')}
                 />
               </div>
@@ -484,7 +488,7 @@ export function OrganizationUsersTable() {
       )}
 
       {organizationProfile && (
-        <div className='grid gap-3 rounded-md border p-3 sm:grid-cols-2'>
+        <div className='grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_auto]'>
           <div>
             <div className='flex items-center gap-2 text-sm font-medium'>
               <Wallet className='size-4' />
@@ -494,22 +498,44 @@ export function OrganizationUsersTable() {
               {organizationProfile.name}
             </div>
           </div>
-          <div className='grid gap-2 text-sm sm:grid-cols-2'>
-            <div>
-              <div className='text-muted-foreground text-xs'>
-                {t('Organization quota')}
+          <div className='flex flex-col gap-3 sm:items-end'>
+            <div className='grid gap-2 text-sm sm:grid-cols-2'>
+              <div>
+                <div className='text-muted-foreground text-xs'>
+                  {t('Organization quota')}
+                </div>
+                <div className='font-medium'>
+                  {formatQuota(organizationProfile.quota)}
+                </div>
               </div>
-              <div className='font-medium'>
-                {formatQuota(organizationProfile.quota)}
+              <div>
+                <div className='text-muted-foreground text-xs'>
+                  {t('Organization used quota')}
+                </div>
+                <div className='font-medium'>
+                  {formatQuota(organizationProfile.used_quota)}
+                </div>
               </div>
             </div>
-            <div>
-              <div className='text-muted-foreground text-xs'>
-                {t('Organization used quota')}
-              </div>
-              <div className='font-medium'>
-                {formatQuota(organizationProfile.used_quota)}
-              </div>
+            <div className='flex flex-wrap justify-end gap-2'>
+              <Button
+                variant='outline'
+                size='sm'
+                render={<Link to='/organization/dashboard' />}
+              >
+                <BarChart3 />
+                {t('Usage dashboard')}
+              </Button>
+              {isOrganizationOwner && (
+                <Button
+                  variant='outline'
+                  size='sm'
+                  render={<Link to='/wallet' />}
+                >
+                  <Wallet />
+                  {t('Top up organization wallet')}
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -543,20 +569,19 @@ export function OrganizationUsersTable() {
                 <div className='mt-3 flex items-center gap-2'>
                   <Input
                     className='w-32'
-                    type='number'
-                    step={tokensOnly ? 1 : 0.01}
-                    min={0}
+                    inputMode={tokensOnly ? 'numeric' : 'decimal'}
                     value={
                       organizationQuotaInputs[organization.id] ??
                       String(quotaUnitsToDollars(organization.quota))
                     }
                     placeholder={t('Quota amount')}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const value = event.currentTarget.value
                       setOrganizationQuotaInputs((prev) => ({
                         ...prev,
-                        [organization.id]: event.currentTarget.value,
+                        [organization.id]: value,
                       }))
-                    }
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         void saveOrganizationQuota(organization)

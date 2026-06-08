@@ -53,13 +53,14 @@ export function useSidebarView(): ResolvedSidebarView {
   const rootNavGroups = useMemo<NavGroup[]>(() => {
     const userRole = user?.role
     const isAdmin = userRole !== undefined && userRole >= ROLE.ADMIN
+    const isRoot = userRole !== undefined && userRole >= ROLE.SUPER_ADMIN
     const isOrganizationAdmin = hasOrganizationAdminRole(
       user?.organization_role
     )
 
     return configFilteredRoot.filter((group) => {
       if (group.id === 'admin') return isAdmin
-      if (group.id === 'organization') return isAdmin || isOrganizationAdmin
+      if (group.id === 'organization') return isRoot || isOrganizationAdmin
       return true
     })
   }, [configFilteredRoot, user?.organization_role, user?.role])

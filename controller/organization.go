@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -146,8 +148,322 @@ func GetOrganizationProfile(c *gin.Context) {
 	common.ApiSuccess(c, org)
 }
 
+func GetOrganizationDashboard(c *gin.Context) {
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
+		return
+	}
+
+	var err error
+	var startTimestamp int64
+	startTimestampStr, hasStartTimestamp := c.GetQuery("start_timestamp")
+	if hasStartTimestamp {
+		startTimestamp, err = strconv.ParseInt(startTimestampStr, 10, 64)
+		if err != nil {
+			common.ApiError(c, errors.New("invalid start_timestamp"))
+			return
+		}
+	}
+	var endTimestamp int64
+	endTimestampStr, hasEndTimestamp := c.GetQuery("end_timestamp")
+	if hasEndTimestamp {
+		endTimestamp, err = strconv.ParseInt(endTimestampStr, 10, 64)
+		if err != nil {
+			common.ApiError(c, errors.New("invalid end_timestamp"))
+			return
+		}
+	}
+
+	preset := strings.TrimSpace(c.Query("preset"))
+	if preset != "" && preset != "custom" {
+		if preset != "today" && preset != "7d" && preset != "30d" {
+			common.ApiError(c, errors.New("invalid preset"))
+			return
+		}
+		if !(hasStartTimestamp && hasEndTimestamp) {
+			now := time.Now()
+			endTimestamp = now.Unix()
+			switch preset {
+			case "today":
+				startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				startTimestamp = startOfDay.Unix()
+			case "7d":
+				startTimestamp = now.AddDate(0, 0, -7).Unix()
+			case "30d":
+				startTimestamp = now.AddDate(0, 0, -30).Unix()
+			}
+		}
+	}
+
+	if startTimestamp > 0 && endTimestamp > 0 && startTimestamp > endTimestamp {
+		common.ApiError(c, errors.New("start_timestamp must be before end_timestamp"))
+		return
+	}
+
+	dashboard, err := model.GetOrganizationDashboard(organizationId, startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, dashboard)
+}
+
+func GetOrganizationLogs(c *gin.Context) {
+	_, userIDs, ok := getOrganizationLogActorAndUserIDs(c)
+	if !ok {
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	logType, _ := strconv.Atoi(c.Query("type"))
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	username := c.Query("username")
+	tokenName := c.Query("token_name")
+	modelName := c.Query("model_name")
+	channel, _ := strconv.Atoi(c.Query("channel"))
+	group := c.Query("group")
+	requestId := c.Query("request_id")
+	upstreamRequestId := c.Query("upstream_request_id")
+	logs, total, err := model.GetLogsByUserIDs(userIDs, logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, requestId, upstreamRequestId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(logs)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func GetOrganizationMidjourney(c *gin.Context) {
+	_, userIDs, ok := getOrganizationLogActorAndUserIDs(c)
+	if !ok {
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	queryParams := model.TaskQueryParams{
+		ChannelID:      c.Query("channel_id"),
+		MjID:           c.Query("mj_id"),
+		StartTimestamp: c.Query("start_timestamp"),
+		EndTimestamp:   c.Query("end_timestamp"),
+		UserIDs:        userIDs,
+	}
+
+	items := model.GetAllTasks(pageInfo.GetStartIdx(), pageInfo.GetPageSize(), queryParams)
+	total := model.CountAllTasks(queryParams)
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func GetOrganizationTask(c *gin.Context) {
+	_, userIDs, ok := getOrganizationLogActorAndUserIDs(c)
+	if !ok {
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	queryParams := model.SyncTaskQueryParams{
+		Platform:       constant.TaskPlatform(c.Query("platform")),
+		TaskID:         c.Query("task_id"),
+		Status:         c.Query("status"),
+		Action:         c.Query("action"),
+		StartTimestamp: startTimestamp,
+		EndTimestamp:   endTimestamp,
+		ChannelID:      c.Query("channel_id"),
+		UserIDs:        userIDs,
+	}
+
+	items := model.TaskGetAllTasks(pageInfo.GetStartIdx(), pageInfo.GetPageSize(), queryParams)
+	total := model.TaskCountAllTasks(queryParams)
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(tasksToDto(items, true))
+	common.ApiSuccess(c, pageInfo)
+}
+
+func GetOrganizationWallet(c *gin.Context) {
+	_, org, ok := prepareOrganizationTopUpTarget(c)
+	if !ok {
+		return
+	}
+	common.ApiSuccess(c, org)
+}
+
+func GetOrganizationTopUps(c *gin.Context) {
+	_, org, ok := prepareOrganizationTopUpTarget(c)
+	if !ok {
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	var (
+		topups []*model.TopUp
+		total  int64
+		err    error
+	)
+	if keyword != "" {
+		topups, total, err = model.SearchOrganizationTopUps(org.Id, keyword, pageInfo)
+	} else {
+		topups, total, err = model.GetOrganizationTopUps(org.Id, pageInfo)
+	}
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(topups)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func RequestOrganizationAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestAmount(c)
+}
+
+func RequestOrganizationEpay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestEpay(c)
+}
+
+func RequestOrganizationStripeAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestStripeAmount(c)
+}
+
+func RequestOrganizationStripePay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestStripePay(c)
+}
+
+func RequestOrganizationPayPalAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestPayPalAmount(c)
+}
+
+func RequestOrganizationPayPalPay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestPayPalPay(c)
+}
+
+func RequestOrganizationCreemPay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestCreemPay(c)
+}
+
+func RequestOrganizationWaffoAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestWaffoAmount(c)
+}
+
+func RequestOrganizationWaffoPay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestWaffoPay(c)
+}
+
+func RequestOrganizationWaffoPancakeAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestWaffoPancakeAmount(c)
+}
+
+func RequestOrganizationWaffoPancakePay(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestWaffoPancakePay(c)
+}
+
 func getOrganizationActor(c *gin.Context) (*model.User, error) {
 	return model.GetUserById(c.GetInt("id"), false)
+}
+
+func resolveOrganizationAdminTarget(c *gin.Context) (int, bool) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return 0, false
+	}
+
+	if actor.Role == common.RoleRootUser {
+		organizationId, err := strconv.Atoi(strings.TrimSpace(c.Query("organization_id")))
+		if err != nil || organizationId <= 0 {
+			common.ApiError(c, errors.New("organization_id is required"))
+			return 0, false
+		}
+		var org model.Organization
+		if err := model.DB.First(&org, organizationId).Error; err != nil {
+			common.ApiError(c, err)
+			return 0, false
+		}
+		return organizationId, true
+	}
+
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
+		return 0, false
+	}
+	return actor.OrganizationId, true
+}
+
+func getOrganizationLogActorAndUserIDs(c *gin.Context) (*model.User, []int, bool) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return nil, nil, false
+	}
+
+	organizationId := actor.OrganizationId
+	if actor.Role == common.RoleRootUser {
+		parsedOrganizationId, err := strconv.Atoi(strings.TrimSpace(c.Query("organization_id")))
+		if err != nil || parsedOrganizationId <= 0 {
+			common.ApiError(c, errors.New("organization_id is required"))
+			return nil, nil, false
+		}
+		organizationId = parsedOrganizationId
+		var org model.Organization
+		if err := model.DB.First(&org, organizationId).Error; err != nil {
+			common.ApiError(c, err)
+			return nil, nil, false
+		}
+	} else if organizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
+		return nil, nil, false
+	}
+
+	var users []model.User
+	if err := model.DB.Select("id").Where("organization_id = ?", organizationId).Find(&users).Error; err != nil {
+		common.ApiError(c, err)
+		return nil, nil, false
+	}
+	userIDs := make([]int, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.Id)
+	}
+	return actor, userIDs, true
 }
 
 func ListOrganizationUsers(c *gin.Context) {

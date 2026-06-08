@@ -14,6 +14,8 @@ import (
 type TopUp struct {
 	Id              int     `json:"id"`
 	UserId          int     `json:"user_id" gorm:"index"`
+	TargetType      string  `json:"target_type" gorm:"type:varchar(32);default:'user'"`
+	TargetId        int     `json:"target_id" gorm:"default:0;index"`
 	Amount          int64   `json:"amount"`
 	Money           float64 `json:"money"`
 	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
@@ -24,6 +26,11 @@ type TopUp struct {
 	CompleteTime    int64   `json:"complete_time"`
 	Status          string  `json:"status"`
 }
+
+const (
+	TopUpTargetTypeUser         = "user"
+	TopUpTargetTypeOrganization = "organization"
+)
 
 const (
 	PaymentMethodStripe       = "stripe"
@@ -60,6 +67,47 @@ func (topUp *TopUp) Update() error {
 	var err error
 	err = DB.Save(topUp).Error
 	return err
+}
+
+func (topUp *TopUp) EffectiveTargetType() string {
+	if topUp.TargetType == TopUpTargetTypeOrganization {
+		return TopUpTargetTypeOrganization
+	}
+	return TopUpTargetTypeUser
+}
+
+func (topUp *TopUp) EffectiveTargetId() int {
+	if topUp.TargetId > 0 {
+		return topUp.TargetId
+	}
+	return topUp.UserId
+}
+
+func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int) error {
+	if quota <= 0 {
+		return errors.New("无效的充值额度")
+	}
+	switch topUp.EffectiveTargetType() {
+	case TopUpTargetTypeOrganization:
+		targetId := topUp.EffectiveTargetId()
+		result := tx.Model(&Organization{}).Where("id = ?", targetId).Update("quota", gorm.Expr("quota + ?", quota))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("组织不存在")
+		}
+		return nil
+	default:
+		result := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quota))
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return errors.New("用户不存在")
+		}
+		return nil
+	}
 }
 
 func GetTopUpById(id int) *TopUp {
@@ -114,7 +162,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("未提供支付单号")
 	}
 
-	var quota float64
+	var quota int
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -143,8 +191,13 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return err
 		}
 
-		quota = topUp.Money * common.QuotaPerUnit
-		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(map[string]interface{}{"stripe_customer": customerId, "quota": gorm.Expr("quota + ?", quota)}).Error
+		quota = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		if customerId != "" {
+			if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("stripe_customer", customerId).Error; err != nil {
+				return err
+			}
+		}
+		err = CreditTopUpTarget(tx, topUp, quota)
 		if err != nil {
 			return err
 		}
@@ -157,7 +210,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("充值失败，请稍后重试")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(int(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(quota), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
 	return nil
 }
@@ -203,6 +256,35 @@ func GetUserTopUps(userId int, pageInfo *common.PageInfo) (topups []*TopUp, tota
 		return nil, 0, err
 	}
 
+	return topups, total, nil
+}
+
+func GetOrganizationTopUps(organizationId int, pageInfo *common.PageInfo) (topups []*TopUp, total int64, err error) {
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, 0, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := tx.Model(&TopUp{}).
+		Where("target_type = ? AND target_id = ? AND create_time >= ?", TopUpTargetTypeOrganization, organizationId, topUpQueryCutoff())
+	if err = query.Count(&total).Error; err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+
+	if err = query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		return nil, 0, err
+	}
 	return topups, total, nil
 }
 
@@ -270,6 +352,46 @@ func SearchUserTopUps(userId int, keyword string, pageInfo *common.PageInfo) (to
 	if err = query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
 		tx.Rollback()
 		common.SysError("failed to search topups: " + err.Error())
+		return nil, 0, errors.New("搜索充值记录失败")
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		return nil, 0, err
+	}
+	return topups, total, nil
+}
+
+func SearchOrganizationTopUps(organizationId int, keyword string, pageInfo *common.PageInfo) (topups []*TopUp, total int64, err error) {
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, 0, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := tx.Model(&TopUp{}).
+		Where("target_type = ? AND target_id = ? AND create_time >= ?", TopUpTargetTypeOrganization, organizationId, topUpQueryCutoff())
+	if keyword != "" {
+		pattern, perr := sanitizeLikePattern(keyword)
+		if perr != nil {
+			tx.Rollback()
+			return nil, 0, perr
+		}
+		query = query.Where("trade_no LIKE ? ESCAPE '!'", pattern)
+	}
+
+	if err = query.Limit(searchTopUpCountHardLimit).Count(&total).Error; err != nil {
+		tx.Rollback()
+		common.SysError("failed to count organization search topups: " + err.Error())
+		return nil, 0, errors.New("搜索充值记录失败")
+	}
+
+	if err = query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
+		tx.Rollback()
+		common.SysError("failed to search organization topups: " + err.Error())
 		return nil, 0, errors.New("搜索充值记录失败")
 	}
 
@@ -373,8 +495,8 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
-		// 增加用户额度（立即写库，保持一致性）
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+		// 增加目标钱包额度（立即写库，保持一致性）
+		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
 			return err
 		}
 
@@ -429,11 +551,6 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		// Creem 直接使用 Amount 作为充值额度（整数）
 		quota = topUp.Amount
 
-		// 构建更新字段，优先使用邮箱，如果邮箱为空则使用用户名
-		updateFields := map[string]interface{}{
-			"quota": gorm.Expr("quota + ?", quota),
-		}
-
 		// 如果有客户邮箱，尝试更新用户邮箱（仅当用户邮箱为空时）
 		if customerEmail != "" {
 			// 先检查用户当前邮箱是否为空
@@ -445,11 +562,13 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 			// 如果用户邮箱为空，则更新为支付时使用的邮箱
 			if user.Email == "" {
-				updateFields["email"] = customerEmail
+				if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("email", customerEmail).Error; err != nil {
+					return err
+				}
 			}
 		}
 
-		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Updates(updateFields).Error
+		err = CreditTopUpTarget(tx, topUp, int(quota))
 		if err != nil {
 			return err
 		}
@@ -501,7 +620,7 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 
 		// Use decimal arithmetic to avoid float64 → int type mismatch on PostgreSQL.
 		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
-		return tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error
+		return CreditTopUpTarget(tx, topUp, quotaToAdd)
 	})
 
 	if err != nil {
@@ -558,7 +677,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return err
 		}
 
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
 			return err
 		}
 
@@ -619,7 +738,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
-		if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quotaToAdd)).Error; err != nil {
+		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
 			return err
 		}
 

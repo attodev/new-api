@@ -29,6 +29,7 @@ import type { UsageLog } from './data/schema'
  * Log category for different log types
  */
 export type LogCategory = 'common' | 'drawing' | 'task'
+export type UsageLogsScope = 'user' | 'organization'
 
 // ============================================================================
 // Filter Types
@@ -259,6 +260,7 @@ export interface TaskLog {
 export interface GetLogsParams {
   p?: number
   page_size?: number
+  organization_id?: number
   type?: number
   username?: string
   token_name?: string
@@ -308,6 +310,7 @@ export interface GetLogStatsResponse {
 export interface GetMidjourneyLogsParams {
   p?: number
   page_size?: number
+  organization_id?: number
   channel_id?: string
   mj_id?: string
   start_timestamp?: number
@@ -321,6 +324,7 @@ export interface GetMidjourneyLogsParams {
 export interface GetTaskLogsParams {
   p?: number
   page_size?: number
+  organization_id?: number
   channel_id?: string
   task_id?: string
   start_timestamp?: number
@@ -336,11 +340,13 @@ export interface GetTaskLogsParams {
  */
 export interface FetchLogsConfig {
   logCategory: LogCategory
+  scope?: UsageLogsScope
   isAdmin: boolean
   page: number
   pageSize: number
   searchParams: Record<string, unknown>
   columnFilters: Array<{ id: string; value: unknown }>
+  organizationId?: number
 }
 
 // ============================================================================

@@ -119,6 +119,14 @@ func CreateOrganization(name string, description string, ownerUserId int, quota 
 		return nil, errors.New("quota cannot be negative")
 	}
 
+	var owner User
+	if err := DB.First(&owner, ownerUserId).Error; err != nil {
+		return nil, err
+	}
+	if owner.OrganizationId > 0 {
+		return nil, errors.New("user already belongs to an organization")
+	}
+
 	org := &Organization{
 		Name:        name,
 		Description: description,
