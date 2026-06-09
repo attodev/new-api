@@ -142,6 +142,11 @@ export function useSidebarData(): SidebarData {
             ],
             icon: ListTodo,
           },
+          {
+            title: t('Organization Subscription'),
+            url: '/organization/subscriptions',
+            icon: CreditCard,
+          },
         ],
       },
       {

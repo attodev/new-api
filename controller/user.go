@@ -506,6 +506,16 @@ func generateDefaultSidebarConfig(userRole int) string {
 		"personal": true,
 	}
 
+	// 组织区域 - 实际显示仍由组织角色权限控制
+	defaultConfig["organization"] = map[string]interface{}{
+		"enabled":      true,
+		"users":        true,
+		"dashboard":    true,
+		"subscription": true,
+		"log":          true,
+		"task":         true,
+	}
+
 	// 管理员区域 - 根据角色决定
 	if userRole == common.RoleAdminUser {
 		// 管理员可以访问管理员区域，但不能访问系统设置

@@ -407,14 +407,20 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int, sendEmail bool) (err error) {
 
 	// 1) Consume from wallet quota OR subscription item
-	if relayInfo != nil && relayInfo.BillingSource == BillingSourceSubscription {
+	if relayInfo != nil && (relayInfo.BillingSource == BillingSourceSubscription || relayInfo.BillingSource == BillingSourceOrganizationSubscription) {
 		if relayInfo.SubscriptionId == 0 {
 			return errors.New("subscription id is missing")
 		}
 		delta := int64(quota)
 		if delta != 0 {
-			if err := model.PostConsumeUserSubscriptionDelta(relayInfo.SubscriptionId, delta); err != nil {
-				return err
+			if relayInfo.BillingSource == BillingSourceOrganizationSubscription {
+				if err := model.PostConsumeOrganizationUserSubscriptionDelta(relayInfo.SubscriptionId, delta); err != nil {
+					return err
+				}
+			} else {
+				if err := model.PostConsumeUserSubscriptionDelta(relayInfo.SubscriptionId, delta); err != nil {
+					return err
+				}
 			}
 			relayInfo.SubscriptionPostDelta += delta
 		}

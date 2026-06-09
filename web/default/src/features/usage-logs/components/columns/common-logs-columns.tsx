@@ -720,7 +720,9 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
         const quota = row.getValue('quota') as number
         const other = parseLogOther(log.other)
-        const isSubscription = other?.billing_source === 'subscription'
+        const isSubscription =
+          other?.billing_source === 'subscription' ||
+          other?.billing_source === 'organization_subscription'
 
         if (isSubscription) {
           return (

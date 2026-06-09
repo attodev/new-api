@@ -157,3 +157,74 @@ export interface OrganizationDashboardParams {
   preset?: OrganizationDashboardRangePreset
   organization_id?: number | null
 }
+
+export type OrganizationSubscriptionDurationUnit =
+  | 'year'
+  | 'month'
+  | 'day'
+  | 'hour'
+  | 'custom'
+
+export type OrganizationSubscriptionResetPeriod =
+  | 'never'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'custom'
+
+export interface OrganizationSubscriptionPlan {
+  id: number
+  organization_id: number
+  title: string
+  subtitle: string
+  duration_unit: OrganizationSubscriptionDurationUnit
+  duration_value: number
+  custom_seconds: number
+  enabled: boolean
+  sort_order: number
+  upgrade_group: string
+  total_amount: number
+  quota_reset_period: OrganizationSubscriptionResetPeriod
+  quota_reset_custom_seconds: number
+  created_at: number
+  updated_at: number
+}
+
+export interface OrganizationUserSubscription {
+  id: number
+  organization_id: number
+  user_id: number
+  plan_id: number
+  amount_total: number
+  amount_used: number
+  start_time: number
+  end_time: number
+  status: string
+  last_reset_time: number
+  next_reset_time: number
+  upgrade_group: string
+  prev_user_group: string
+  assigned_by_user_id: number
+  created_at: number
+  updated_at: number
+}
+
+export interface OrganizationUserSubscriptionRecord {
+  subscription: OrganizationUserSubscription
+  user?: OrganizationUser
+  plan?: OrganizationSubscriptionPlan
+}
+
+export interface OrganizationSubscriptionPlanPayload {
+  title: string
+  subtitle?: string
+  duration_unit: OrganizationSubscriptionDurationUnit
+  duration_value: number
+  custom_seconds?: number
+  enabled?: boolean
+  sort_order?: number
+  upgrade_group?: string
+  total_amount: number
+  quota_reset_period: OrganizationSubscriptionResetPeriod
+  quota_reset_custom_seconds?: number
+}

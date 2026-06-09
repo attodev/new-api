@@ -299,6 +299,15 @@ func calcPlanEndTime(start time.Time, plan *SubscriptionPlan) (int64, error) {
 	}
 }
 
+func CalcSubscriptionPlanEndTime(start time.Time, durationUnit string, durationValue int, customSeconds int64) (int64, error) {
+	plan := &SubscriptionPlan{
+		DurationUnit:  durationUnit,
+		DurationValue: durationValue,
+		CustomSeconds: customSeconds,
+	}
+	return calcPlanEndTime(start, plan)
+}
+
 func NormalizeResetPeriod(period string) string {
 	switch strings.TrimSpace(period) {
 	case SubscriptionResetDaily, SubscriptionResetWeekly, SubscriptionResetMonthly, SubscriptionResetCustom:
@@ -347,6 +356,14 @@ func calcNextResetTime(base time.Time, plan *SubscriptionPlan, endUnix int64) in
 		return 0
 	}
 	return next.Unix()
+}
+
+func CalcSubscriptionNextResetTime(base time.Time, resetPeriod string, resetCustomSeconds int64, endUnix int64) int64 {
+	plan := &SubscriptionPlan{
+		QuotaResetPeriod:        resetPeriod,
+		QuotaResetCustomSeconds: resetCustomSeconds,
+	}
+	return calcNextResetTime(base, plan, endUnix)
 }
 
 func GetSubscriptionPlanById(id int) (*SubscriptionPlan, error) {

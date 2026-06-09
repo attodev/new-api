@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { ReactNode } from 'react'
 import { Activity, BarChart3, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { formatQuota } from '@/lib/format'
@@ -25,6 +26,10 @@ import type { UserWalletData } from '../types'
 interface WalletStatsCardProps {
   user: UserWalletData | null
   loading?: boolean
+  balanceDisplay?: {
+    value: ReactNode
+    description?: ReactNode
+  }
 }
 
 export function WalletStatsCard(props: WalletStatsCardProps) {
@@ -48,21 +53,24 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   const stats = [
     {
       label: t('Current Balance'),
-      value: formatQuota(props.user?.quota ?? 0),
-      description: t('Remaining quota'),
+      value: props.balanceDisplay?.value ?? formatQuota(props.user?.quota ?? 0),
+      description: props.balanceDisplay?.description ?? t('Remaining quota'),
       icon: WalletCards,
+      message: Boolean(props.balanceDisplay),
     },
     {
       label: t('Total Usage'),
       value: formatQuota(props.user?.used_quota ?? 0),
       description: t('Total consumed quota'),
       icon: BarChart3,
+      message: false,
     },
     {
       label: t('API Requests'),
       value: (props.user?.request_count ?? 0).toLocaleString(),
       description: t('Total requests made'),
       icon: Activity,
+      message: false,
     },
   ]
 
@@ -78,7 +86,13 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
               </div>
             </div>
 
-            <div className='text-foreground mt-1.5 font-mono text-base font-bold tracking-tight break-all tabular-nums sm:mt-2 sm:text-2xl'>
+            <div
+              className={
+                item.message
+                  ? 'text-foreground mt-1.5 text-sm font-semibold break-words sm:mt-2 sm:text-base'
+                  : 'text-foreground mt-1.5 font-mono text-base font-bold tracking-tight break-all tabular-nums sm:mt-2 sm:text-2xl'
+              }
+            >
               {item.value}
             </div>
             <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>

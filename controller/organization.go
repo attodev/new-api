@@ -467,20 +467,15 @@ func getOrganizationLogActorAndUserIDs(c *gin.Context) (*model.User, []int, bool
 }
 
 func ListOrganizationUsers(c *gin.Context) {
-	actor, err := getOrganizationActor(c)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
 		return
 	}
 
 	pageInfo := common.GetPageQuery(c)
 	var users []model.User
 	query := model.DB.
-		Where("organization_id = ?", actor.OrganizationId).
+		Where("organization_id = ?", organizationId).
 		Where("role < ?", common.RoleAdminUser)
 
 	var total int64

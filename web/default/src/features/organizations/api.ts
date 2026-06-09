@@ -41,6 +41,10 @@ import type {
   Organization,
   OrganizationDashboardData,
   OrganizationDashboardParams,
+  OrganizationSubscriptionPlan,
+  OrganizationSubscriptionPlanPayload,
+  OrganizationUserSubscription,
+  OrganizationUserSubscriptionRecord,
   OrganizationsPage,
   OrganizationUpdatePayload,
   OrganizationUserUpdatePayload,
@@ -221,10 +225,12 @@ export async function requestOrganizationWaffoPancakePayment(
 export async function getOrganizationUsers(params: {
   page?: number
   size?: number
+  organization_id?: number | null
 }): Promise<ApiResponse<OrganizationUsersPage>> {
   const search = new URLSearchParams()
   if (params.page) search.set('p', String(params.page))
   if (params.size) search.set('page_size', String(params.size))
+  appendOrganizationId(search, params.organization_id)
   const suffix = search.toString() ? `?${search.toString()}` : ''
   const res = await api.get(`/api/organization/users${suffix}`)
   return res.data
@@ -258,5 +264,111 @@ export async function assignOrganizationUser(
     `/api/organization/users/${userId}/membership`,
     payload
   )
+  return res.data
+}
+
+function appendOrganizationId(
+  search: URLSearchParams,
+  organizationId?: number | null
+) {
+  if (organizationId !== undefined && organizationId !== null) {
+    search.set('organization_id', String(organizationId))
+  }
+}
+
+export async function getOrganizationSubscriptionPlans(params: {
+  organization_id?: number | null
+} = {}): Promise<ApiResponse<OrganizationSubscriptionPlan[]>> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, params.organization_id)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.get(`/api/organization/subscription/plans${suffix}`)
+  return res.data
+}
+
+export async function createOrganizationSubscriptionPlan(
+  payload: OrganizationSubscriptionPlanPayload,
+  organizationId?: number | null
+): Promise<ApiResponse<OrganizationSubscriptionPlan>> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, organizationId)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.post(
+    `/api/organization/subscription/plans${suffix}`,
+    payload
+  )
+  return res.data
+}
+
+export async function updateOrganizationSubscriptionPlan(
+  planId: number,
+  payload: OrganizationSubscriptionPlanPayload,
+  organizationId?: number | null
+): Promise<ApiResponse> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, organizationId)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.patch(
+    `/api/organization/subscription/plans/${planId}${suffix}`,
+    payload
+  )
+  return res.data
+}
+
+export async function disableOrganizationSubscriptionPlan(
+  planId: number,
+  organizationId?: number | null
+): Promise<ApiResponse> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, organizationId)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.delete(
+    `/api/organization/subscription/plans/${planId}${suffix}`
+  )
+  return res.data
+}
+
+export async function getOrganizationUserSubscriptions(params: {
+  organization_id?: number | null
+} = {}): Promise<ApiResponse<OrganizationUserSubscriptionRecord[]>> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, params.organization_id)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.get(`/api/organization/subscription/users${suffix}`)
+  return res.data
+}
+
+export async function assignOrganizationUserSubscription(
+  userId: number,
+  planId: number,
+  organizationId?: number | null
+): Promise<ApiResponse<OrganizationUserSubscription>> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, organizationId)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.put(
+    `/api/organization/subscription/users/${userId}${suffix}`,
+    { plan_id: planId }
+  )
+  return res.data
+}
+
+export async function cancelOrganizationUserSubscription(
+  userId: number,
+  organizationId?: number | null
+): Promise<ApiResponse> {
+  const search = new URLSearchParams()
+  appendOrganizationId(search, organizationId)
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  const res = await api.delete(
+    `/api/organization/subscription/users/${userId}${suffix}`
+  )
+  return res.data
+}
+
+export async function getMyOrganizationSubscription(): Promise<
+  ApiResponse<OrganizationUserSubscriptionRecord | null>
+> {
+  const res = await api.get('/api/organization/subscription/self')
   return res.data
 }

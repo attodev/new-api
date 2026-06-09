@@ -63,6 +63,14 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     setting: true,
     subscription: true,
   },
+  organization: {
+    enabled: true,
+    users: true,
+    dashboard: true,
+    subscription: true,
+    log: true,
+    task: true,
+  },
 }
 
 const mergeWithDefaultSidebarModules = (
@@ -115,6 +123,18 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/subscriptions': { section: 'admin', module: 'subscription' },
   '/system-settings': { section: 'admin', module: 'setting' },
   '/system-settings/site': { section: 'admin', module: 'setting' },
+  '/organization': { section: 'organization', module: 'users' },
+  '/organization/dashboard': { section: 'organization', module: 'dashboard' },
+  '/organization/subscriptions': {
+    section: 'organization',
+    module: 'subscription',
+  },
+  '/organization/usage-logs/common': { section: 'organization', module: 'log' },
+  '/organization/usage-logs/drawing': {
+    section: 'organization',
+    module: 'task',
+  },
+  '/organization/usage-logs/task': { section: 'organization', module: 'task' },
 }
 
 /**

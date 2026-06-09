@@ -156,3 +156,79 @@ func TestOrganizationWalletBillingRejectsWhenOrganizationWalletInsufficient(t *t
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, 10, org.Quota)
 }
+
+func TestOrganizationSubscriptionBillingPreConsumesSubscriptionAndOrganizationWallet(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	plan := &model.OrganizationSubscriptionPlan{
+		OrganizationId: 1,
+		Title:          "Team Plan",
+		DurationUnit:   model.SubscriptionDurationMonth,
+		DurationValue:  1,
+		TotalAmount:    80,
+		Enabled:        true,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	sub, err := model.CreateOrganizationUserSubscriptionFromPlan(1, 2, plan.Id, 1)
+	require.NoError(t, err)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RequestId:       "org-sub-req-1",
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.NotNil(t, session)
+
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 975, org.Quota)
+
+	var reloaded model.OrganizationUserSubscription
+	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
+	require.Equal(t, int64(25), reloaded.AmountUsed)
+	require.Equal(t, BillingSourceOrganizationSubscription, relayInfo.BillingSource)
+	require.Equal(t, sub.Id, relayInfo.SubscriptionId)
+}
+
+func TestOrganizationSubscriptionBillingRejectsWhenPlanLimitInsufficient(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	plan := &model.OrganizationSubscriptionPlan{
+		OrganizationId: 1,
+		Title:          "Small Plan",
+		DurationUnit:   model.SubscriptionDurationMonth,
+		DurationValue:  1,
+		TotalAmount:    10,
+		Enabled:        true,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	_, err := model.CreateOrganizationUserSubscriptionFromPlan(1, 2, plan.Id, 1)
+	require.NoError(t, err)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RequestId:       "org-sub-req-2",
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, session)
+	require.NotNil(t, apiErr)
+
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 1000, org.Quota)
+}

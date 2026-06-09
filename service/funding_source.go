@@ -216,6 +216,99 @@ func (s *SubscriptionFunding) Refund() error {
 	})
 }
 
+// ---------------------------------------------------------------------------
+// OrganizationSubscriptionFunding — organization subscription + organization wallet
+// ---------------------------------------------------------------------------
+
+type OrganizationSubscriptionFunding struct {
+	requestId                      string
+	organizationId                 int
+	userId                         int
+	modelName                      string
+	amount                         int64
+	organizationUserSubscriptionId int
+	preConsumed                    int64
+	organizationWalletConsumed     int
+	AmountTotal                    int64
+	AmountUsedAfter                int64
+	PlanId                         int
+	PlanTitle                      string
+}
+
+func (o *OrganizationSubscriptionFunding) Source() string {
+	return BillingSourceOrganizationSubscription
+}
+
+func (o *OrganizationSubscriptionFunding) PreConsume(_ int) error {
+	res, err := model.PreConsumeOrganizationUserSubscription(o.requestId, o.organizationId, o.userId, o.modelName, o.amount)
+	if err != nil {
+		return err
+	}
+	o.organizationUserSubscriptionId = res.OrganizationUserSubscriptionId
+	o.preConsumed = res.PreConsumed
+	o.AmountTotal = res.AmountTotal
+	o.AmountUsedAfter = res.AmountUsedAfter
+	o.PlanId = res.PlanId
+	o.PlanTitle = res.PlanTitle
+
+	if o.preConsumed <= 0 {
+		return nil
+	}
+	if err := model.DecreaseOrganizationQuota(o.organizationId, int(o.preConsumed)); err != nil {
+		_ = model.RefundOrganizationSubscriptionPreConsume(o.requestId)
+		o.preConsumed = 0
+		return err
+	}
+	o.organizationWalletConsumed = int(o.preConsumed)
+	return nil
+}
+
+func (o *OrganizationSubscriptionFunding) Settle(delta int) error {
+	if delta == 0 {
+		return nil
+	}
+	if delta > 0 {
+		if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, int64(delta)); err != nil {
+			return err
+		}
+		if err := model.DecreaseOrganizationQuota(o.organizationId, delta); err != nil {
+			_ = model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, -int64(delta))
+			return err
+		}
+		o.organizationWalletConsumed += delta
+		return nil
+	}
+
+	refund := -delta
+	if err := model.IncreaseOrganizationQuota(o.organizationId, refund); err != nil {
+		return err
+	}
+	if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, int64(delta)); err != nil {
+		_ = model.DecreaseOrganizationQuota(o.organizationId, refund)
+		return err
+	}
+	o.organizationWalletConsumed -= refund
+	if o.organizationWalletConsumed < 0 {
+		o.organizationWalletConsumed = 0
+	}
+	return nil
+}
+
+func (o *OrganizationSubscriptionFunding) Refund() error {
+	if o.preConsumed <= 0 {
+		return nil
+	}
+	if err := refundWithRetry(func() error {
+		return model.RefundOrganizationSubscriptionPreConsume(o.requestId)
+	}); err != nil {
+		return err
+	}
+	if o.organizationWalletConsumed > 0 {
+		return model.IncreaseOrganizationQuota(o.organizationId, o.organizationWalletConsumed)
+	}
+	return nil
+}
+
 // refundWithRetry 尝试多次执行退款操作以提高成功率，只能用于基于事务的退款函数！！！！！！
 // try to refund with retries, only for refund functions based on transactions!!!
 func refundWithRetry(fn func() error) error {

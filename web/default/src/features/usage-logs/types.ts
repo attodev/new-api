@@ -185,6 +185,7 @@ export interface LogOtherData {
   subscription_plan_id?: string
   subscription_plan_title?: string
   subscription_id?: string
+  organization_user_subscription_id?: string
   subscription_pre_consumed?: number
   subscription_post_delta?: number
   subscription_consumed?: number

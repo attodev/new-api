@@ -410,7 +410,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const isConsume = props.log.type === 2
   const isTopup = props.log.type === 1
   const isManage = props.log.type === 3
-  const isSubscription = other?.billing_source === 'subscription'
+  const isSubscription =
+    other?.billing_source === 'subscription' ||
+    other?.billing_source === 'organization_subscription'
   const isTieredBilling =
     isConsume &&
     !isViolation &&

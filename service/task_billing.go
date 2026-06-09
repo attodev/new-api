@@ -85,10 +85,41 @@ func taskIsSubscription(task *model.Task) bool {
 	return task.PrivateData.BillingSource == BillingSourceSubscription && task.PrivateData.SubscriptionId > 0
 }
 
+func taskIsOrganizationSubscription(task *model.Task) bool {
+	return task.PrivateData.BillingSource == BillingSourceOrganizationSubscription && task.PrivateData.SubscriptionId > 0
+}
+
 // taskAdjustFunding 调整任务的资金来源（钱包或订阅），delta > 0 表示扣费，delta < 0 表示退还。
 func taskAdjustFunding(task *model.Task, delta int) error {
 	if taskIsSubscription(task) {
 		return model.PostConsumeUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta))
+	}
+	if taskIsOrganizationSubscription(task) {
+		sub, err := model.GetOrganizationUserSubscriptionById(task.PrivateData.SubscriptionId)
+		if err != nil {
+			return err
+		}
+		if delta > 0 {
+			if err := model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta)); err != nil {
+				return err
+			}
+			if err := model.DecreaseOrganizationQuota(sub.OrganizationId, delta); err != nil {
+				_ = model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, -int64(delta))
+				return err
+			}
+			return nil
+		}
+		if delta < 0 {
+			refund := -delta
+			if err := model.IncreaseOrganizationQuota(sub.OrganizationId, refund); err != nil {
+				return err
+			}
+			if err := model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta)); err != nil {
+				_ = model.DecreaseOrganizationQuota(sub.OrganizationId, refund)
+				return err
+			}
+		}
+		return nil
 	}
 	return AdjustWalletQuotaForUser(task.UserId, delta)
 }

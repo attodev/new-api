@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   BarChart3,
@@ -59,11 +59,18 @@ import {
   getAssignableOrganizationUsers,
   getOrganizationProfile,
   getOrganizationUsers,
+  getOrganizationUserSubscriptions,
   getOrganizations,
   updateOrganization,
   updateOrganizationUser,
 } from '../api'
-import type { Organization, OrganizationRole, OrganizationUser } from '../types'
+import { getActiveOrganizationSubscriptionUserIds } from '../lib/organization-subscription-utils'
+import type {
+  Organization,
+  OrganizationRole,
+  OrganizationUser,
+  OrganizationUserSubscriptionRecord,
+} from '../types'
 
 const USER_STATUS_ENABLED = 1
 const USER_STATUS_DISABLED = 2
@@ -78,6 +85,9 @@ export function OrganizationUsersTable() {
   const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.auth.user)
   const [users, setUsers] = useState<OrganizationUser[]>([])
+  const [subscriptionRecords, setSubscriptionRecords] = useState<
+    OrganizationUserSubscriptionRecord[]
+  >([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [organizationProfile, setOrganizationProfile] =
     useState<Organization | null>(null)
@@ -110,19 +120,32 @@ export function OrganizationUsersTable() {
   const tokensOnly = currencyMeta.kind === 'tokens'
   const canManageOrganizationUsers =
     Boolean(currentUser?.organization_id) || isOrganizationOwner
+  const activeSubscriptionUserIds = useMemo(
+    () => getActiveOrganizationSubscriptionUserIds(subscriptionRecords),
+    [subscriptionRecords]
+  )
 
   async function loadUsers() {
     if (!canManageOrganizationUsers) {
       setUsers([])
+      setSubscriptionRecords([])
       return
     }
     setLoading(true)
     try {
-      const res = await getOrganizationUsers({ page: 1, size: 20 })
-      if (res.success && res.data?.items) {
-        setUsers(res.data.items)
+      const [userRes, subscriptionRes] = await Promise.all([
+        getOrganizationUsers({ page: 1, size: 20 }),
+        getOrganizationUserSubscriptions(),
+      ])
+      if (userRes.success && userRes.data?.items) {
+        setUsers(userRes.data.items)
       } else {
-        toast.error(res.message || t('Failed to load organization users'))
+        toast.error(userRes.message || t('Failed to load organization users'))
+      }
+      if (subscriptionRes.success) {
+        setSubscriptionRecords(subscriptionRes.data || [])
+      } else {
+        setSubscriptionRecords([])
       }
     } finally {
       setLoading(false)
@@ -289,6 +312,7 @@ export function OrganizationUsersTable() {
   }
 
   async function saveQuota(user: OrganizationUser, quota: number) {
+    if (activeSubscriptionUserIds.has(user.id)) return
     if (!Number.isFinite(quota) || quota === user.quota) return
     await saveUser(user, { quota })
   }
@@ -623,88 +647,99 @@ export function OrganizationUsersTable() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className='border-t'>
-                <td className='px-3 py-2'>
-                  <div className='font-medium'>{user.username}</div>
-                  {user.display_name && (
-                    <div className='text-muted-foreground text-xs'>
-                      {user.display_name}
-                    </div>
-                  )}
-                </td>
-                <td className='px-3 py-2'>{user.organization_role}</td>
-                <td className='px-3 py-2'>
-                  {user.status === USER_STATUS_ENABLED
-                    ? t('Enabled')
-                    : t('Disabled')}
-                </td>
-                <td className='px-3 py-2'>
-                  <div className='min-w-64 space-y-2'>
-                    <div className='text-muted-foreground text-xs'>
-                      {t('Current quota balance')}: {formatQuota(user.quota)}
-                    </div>
-                    <div className='flex items-center gap-2'>
-                      <Input
-                        key={`${user.id}-${user.quota}`}
-                        className='w-32'
-                        type='number'
-                        step={tokensOnly ? 1 : 0.01}
-                        min={0}
-                        defaultValue={quotaUnitsToDollars(user.quota)}
-                        placeholder={t('Quota amount')}
-                        disabled={savingId === user.id}
-                        onBlur={(event) => {
-                          void saveDisplayQuota(user, event.currentTarget.value)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.currentTarget.blur()
-                          }
-                        }}
-                      />
-                      <span className='text-muted-foreground text-xs'>
-                        {currencyLabel}
-                      </span>
-                    </div>
-                    {!tokensOnly && (
-                      <div className='flex flex-wrap gap-1'>
-                        {QUICK_QUOTA_AMOUNTS.map((amount) => (
-                          <Button
-                            key={amount}
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            disabled={savingId === user.id}
-                            onClick={() =>
-                              void saveQuota(
-                                user,
-                                parseQuotaFromDollars(amount)
-                              )
-                            }
-                          >
-                            {formatQuota(parseQuotaFromDollars(amount))}
-                          </Button>
-                        ))}
+            {users.map((user) => {
+              const hasActivePlan = activeSubscriptionUserIds.has(user.id)
+              return (
+                <tr key={user.id} className='border-t'>
+                  <td className='px-3 py-2'>
+                    <div className='font-medium'>{user.username}</div>
+                    {user.display_name && (
+                      <div className='text-muted-foreground text-xs'>
+                        {user.display_name}
                       </div>
                     )}
-                  </div>
-                </td>
-                <td className='px-3 py-2 text-right'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => void toggleStatus(user)}
-                    disabled={savingId === user.id}
-                  >
-                    <Power />
+                  </td>
+                  <td className='px-3 py-2'>{user.organization_role}</td>
+                  <td className='px-3 py-2'>
                     {user.status === USER_STATUS_ENABLED
-                      ? t('Disable')
-                      : t('Enable')}
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                      ? t('Enabled')
+                      : t('Disabled')}
+                  </td>
+                  <td className='px-3 py-2'>
+                    <div className='min-w-64 space-y-2'>
+                      <div className='text-muted-foreground text-xs'>
+                        {t('Current quota balance')}:{' '}
+                        {hasActivePlan
+                          ? `${formatQuota(0)} (${t('Organization plan in use')})`
+                          : formatQuota(user.quota)}
+                      </div>
+                      <div className='flex items-center gap-2'>
+                        <Input
+                          key={`${user.id}-${user.quota}-${hasActivePlan}`}
+                          className='w-32'
+                          type='number'
+                          step={tokensOnly ? 1 : 0.01}
+                          min={0}
+                          defaultValue={
+                            hasActivePlan ? 0 : quotaUnitsToDollars(user.quota)
+                          }
+                          placeholder={t('Quota amount')}
+                          disabled={savingId === user.id || hasActivePlan}
+                          onBlur={(event) => {
+                            void saveDisplayQuota(
+                              user,
+                              event.currentTarget.value
+                            )
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.currentTarget.blur()
+                            }
+                          }}
+                        />
+                        <span className='text-muted-foreground text-xs'>
+                          {currencyLabel}
+                        </span>
+                      </div>
+                      {!tokensOnly && (
+                        <div className='flex flex-wrap gap-1'>
+                          {QUICK_QUOTA_AMOUNTS.map((amount) => (
+                            <Button
+                              key={amount}
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              disabled={savingId === user.id || hasActivePlan}
+                              onClick={() =>
+                                void saveQuota(
+                                  user,
+                                  parseQuotaFromDollars(amount)
+                                )
+                              }
+                            >
+                              {formatQuota(parseQuotaFromDollars(amount))}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className='px-3 py-2 text-right'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => void toggleStatus(user)}
+                      disabled={savingId === user.id}
+                    >
+                      <Power />
+                      {user.status === USER_STATUS_ENABLED
+                        ? t('Disable')
+                        : t('Enable')}
+                    </Button>
+                  </td>
+                </tr>
+              )
+            })}
             {!loading && users.length === 0 && (
               <tr>
                 <td

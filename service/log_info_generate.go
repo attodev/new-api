@@ -127,9 +127,12 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 	if relayInfo.UserSetting.BillingPreference != "" {
 		other["billing_preference"] = relayInfo.UserSetting.BillingPreference
 	}
-	if relayInfo.BillingSource == "subscription" {
+	if relayInfo.BillingSource == BillingSourceSubscription || relayInfo.BillingSource == BillingSourceOrganizationSubscription {
 		if relayInfo.SubscriptionId != 0 {
 			other["subscription_id"] = relayInfo.SubscriptionId
+			if relayInfo.BillingSource == BillingSourceOrganizationSubscription {
+				other["organization_user_subscription_id"] = relayInfo.SubscriptionId
+			}
 		}
 		if relayInfo.SubscriptionPreConsumed > 0 {
 			other["subscription_pre_consumed"] = relayInfo.SubscriptionPreConsumed

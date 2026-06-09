@@ -45,6 +45,9 @@ func TestMain(m *testing.M) {
 		&model.Channel{},
 		&model.TopUp{},
 		&model.UserSubscription{},
+		&model.OrganizationSubscriptionPlan{},
+		&model.OrganizationUserSubscription{},
+		&model.OrganizationSubscriptionPreConsumeRecord{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -67,6 +70,9 @@ func truncate(t *testing.T) {
 		model.DB.Exec("DELETE FROM channels")
 		model.DB.Exec("DELETE FROM top_ups")
 		model.DB.Exec("DELETE FROM user_subscriptions")
+		model.DB.Exec("DELETE FROM organization_subscription_plans")
+		model.DB.Exec("DELETE FROM organization_user_subscriptions")
+		model.DB.Exec("DELETE FROM organization_subscription_pre_consume_records")
 	})
 }
 
@@ -165,6 +171,13 @@ func getTokenUsedQuota(t *testing.T, id int) int {
 func getSubscriptionUsed(t *testing.T, id int) int64 {
 	t.Helper()
 	var sub model.UserSubscription
+	require.NoError(t, model.DB.Select("amount_used").Where("id = ?", id).First(&sub).Error)
+	return sub.AmountUsed
+}
+
+func getOrganizationSubscriptionUsed(t *testing.T, id int) int64 {
+	t.Helper()
+	var sub model.OrganizationUserSubscription
 	require.NoError(t, model.DB.Select("amount_used").Where("id = ?", id).First(&sub).Error)
 	return sub.AmountUsed
 }
@@ -326,6 +339,46 @@ func TestRecalculate_PositiveDelta(t *testing.T) {
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeConsume, log.Type)
 	assert.Equal(t, actualQuota-preConsumed, log.Quota)
+}
+
+func TestRecalculate_OrganizationSubscriptionPositiveDelta(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const ownerID, userID, tokenID, channelID = 1001, 1002, 1002, 1002
+	const preConsumed = 2000
+	const actualQuota = 3000
+	const tokenRemain = 5000
+
+	seedOrganizationUser(t, ownerID, "org-task-owner", 10000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, userID, "org-task-member", 10000, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, ownerID)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 8000).Error)
+	seedToken(t, tokenID, userID, "sk-org-sub-task", tokenRemain)
+	seedChannel(t, channelID)
+
+	plan := &model.OrganizationSubscriptionPlan{
+		OrganizationId: 1,
+		Title:          "Task Plan",
+		DurationUnit:   model.SubscriptionDurationMonth,
+		DurationValue:  1,
+		TotalAmount:    10000,
+		Enabled:        true,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	sub, err := model.CreateOrganizationUserSubscriptionFromPlan(1, userID, plan.Id, ownerID)
+	require.NoError(t, err)
+	require.NoError(t, model.PostConsumeOrganizationUserSubscriptionDelta(sub.Id, preConsumed))
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceOrganizationSubscription, sub.Id)
+
+	RecalculateTaskQuota(ctx, task, actualQuota, "organization subscription adaptor adjustment")
+
+	assert.Equal(t, 10000, getUserQuota(t, userID))
+	assert.Equal(t, int64(actualQuota), getOrganizationSubscriptionUsed(t, sub.Id))
+	org := getOrganizationForBillingTest(t, 1)
+	assert.Equal(t, 7000, org.Quota)
+	assert.Equal(t, tokenRemain-(actualQuota-preConsumed), getTokenRemainQuota(t, tokenID))
 }
 
 func TestRecalculate_NegativeDelta(t *testing.T) {

@@ -71,7 +71,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		}
 	}
 	// 3) 更新 relayInfo 上的订阅 PostDelta（用于日志）
-	if s.funding.Source() == BillingSourceSubscription {
+	if s.funding.Source() == BillingSourceSubscription || s.funding.Source() == BillingSourceOrganizationSubscription {
 		s.relayInfo.SubscriptionPostDelta += int64(delta)
 	}
 	s.settled = true
@@ -108,9 +108,15 @@ func (s *BillingSession) Refund(c *gin.Context) {
 		if err := funding.Refund(); err != nil {
 			common.SysLog("error refunding billing source: " + err.Error())
 		}
-		if extraReserved > 0 && funding.Source() == BillingSourceSubscription && subscriptionId > 0 {
-			if err := model.PostConsumeUserSubscriptionDelta(subscriptionId, -int64(extraReserved)); err != nil {
-				common.SysLog("error refunding subscription extra reserved quota: " + err.Error())
+		if extraReserved > 0 && subscriptionId > 0 {
+			if funding.Source() == BillingSourceSubscription {
+				if err := model.PostConsumeUserSubscriptionDelta(subscriptionId, -int64(extraReserved)); err != nil {
+					common.SysLog("error refunding subscription extra reserved quota: " + err.Error())
+				}
+			} else if funding.Source() == BillingSourceOrganizationSubscription {
+				if err := model.PostConsumeOrganizationUserSubscriptionDelta(subscriptionId, -int64(extraReserved)); err != nil {
+					common.SysLog("error refunding organization subscription extra reserved quota: " + err.Error())
+				}
 			}
 		}
 		// 2) 退还令牌额度
@@ -139,6 +145,9 @@ func (s *BillingSession) needsRefundLocked() bool {
 	}
 	// 订阅可能在 tokenConsumed=0 时仍预扣了额度
 	if sub, ok := s.funding.(*SubscriptionFunding); ok && sub.preConsumed > 0 {
+		return true
+	}
+	if sub, ok := s.funding.(*OrganizationSubscriptionFunding); ok && sub.preConsumed > 0 {
 		return true
 	}
 	return false
@@ -215,7 +224,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 		}
 		// TODO: model 层应定义哨兵错误（如 ErrNoActiveSubscription），用 errors.Is 替代字符串匹配
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "subscription quota insufficient") {
+		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "no active organization subscription") || strings.Contains(errMsg, "subscription quota insufficient") {
 			return types.NewErrorWithStatusCode(fmt.Errorf("订阅额度不足或未配置订阅: %s", errMsg), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
@@ -248,6 +257,17 @@ func (s *BillingSession) reserveFunding(delta int) error {
 			)
 		}
 		return nil
+	case *OrganizationSubscriptionFunding:
+		if err := funding.Settle(delta); err != nil {
+			return types.NewErrorWithStatusCode(
+				fmt.Errorf("组织订阅额度不足或组织额度不足: %s", err.Error()),
+				types.ErrorCodeInsufficientUserQuota,
+				http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(),
+				types.ErrOptionWithNoRecordErrorLog(),
+			)
+		}
+		return nil
 	default:
 		return types.NewError(fmt.Errorf("unsupported funding source: %s", s.funding.Source()), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 	}
@@ -264,6 +284,10 @@ func (s *BillingSession) rollbackFundingReserve(delta int) {
 	case *SubscriptionFunding:
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta)); err != nil {
 			common.SysLog("error rolling back subscription funding reserve: " + err.Error())
+		}
+	case *OrganizationSubscriptionFunding:
+		if err := funding.Settle(-delta); err != nil {
+			common.SysLog("error rolling back organization subscription funding reserve: " + err.Error())
 		}
 	}
 }
@@ -312,6 +336,8 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 		// 2. SubscriptionFunding.PreConsume 忽略参数，始终用 s.amount 预扣
 		// 3. 若信任旁路将 effectiveQuota 设为 0，会导致 preConsumedQuota 与实际订阅预扣不一致
 		return false
+	case BillingSourceOrganizationSubscription:
+		return false
 	default:
 		return false
 	}
@@ -325,6 +351,14 @@ func (s *BillingSession) syncRelayInfo() {
 
 	if sub, ok := s.funding.(*SubscriptionFunding); ok {
 		info.SubscriptionId = sub.subscriptionId
+		info.SubscriptionPreConsumed = sub.preConsumed + int64(s.extraReserved)
+		info.SubscriptionPostDelta = 0
+		info.SubscriptionAmountTotal = sub.AmountTotal
+		info.SubscriptionAmountUsedAfterPreConsume = sub.AmountUsedAfter + int64(s.extraReserved)
+		info.SubscriptionPlanId = sub.PlanId
+		info.SubscriptionPlanTitle = sub.PlanTitle
+	} else if sub, ok := s.funding.(*OrganizationSubscriptionFunding); ok {
+		info.SubscriptionId = sub.organizationUserSubscriptionId
 		info.SubscriptionPreConsumed = sub.preConsumed + int64(s.extraReserved)
 		info.SubscriptionPostDelta = 0
 		info.SubscriptionAmountTotal = sub.AmountTotal
@@ -348,13 +382,13 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
+	user, userErr := model.GetUserById(relayInfo.UserId, false)
+	if userErr != nil {
+		return nil, types.NewError(userErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+	}
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		user, err := model.GetUserById(relayInfo.UserId, false)
-		if err != nil {
-			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
-		}
 		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
@@ -427,6 +461,54 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			return nil, apiErr
 		}
 		return session, nil
+	}
+
+	tryOrganizationSubscription := func() (*BillingSession, *types.NewAPIError) {
+		subConsume := int64(preConsumedQuota)
+		if subConsume <= 0 {
+			subConsume = 1
+		}
+		organizationQuota, err := model.GetOrganizationQuota(user.OrganizationId)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		if organizationQuota <= 0 {
+			return nil, types.NewErrorWithStatusCode(
+				fmt.Errorf("组织额度不足, 剩余额度: %s", logger.FormatQuota(organizationQuota)),
+				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
+		if organizationQuota-int(subConsume) < 0 {
+			return nil, types.NewErrorWithStatusCode(
+				fmt.Errorf("组织预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(int(subConsume))),
+				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
+		session := &BillingSession{
+			relayInfo: relayInfo,
+			funding: &OrganizationSubscriptionFunding{
+				requestId:      relayInfo.RequestId,
+				organizationId: user.OrganizationId,
+				userId:         relayInfo.UserId,
+				modelName:      relayInfo.OriginModelName,
+				amount:         subConsume,
+			},
+		}
+		if apiErr := session.preConsume(c, int(subConsume)); apiErr != nil {
+			return nil, apiErr
+		}
+		return session, nil
+	}
+
+	if user.OrganizationId > 0 {
+		hasOrgSub, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, relayInfo.UserId)
+		if err != nil {
+			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		if hasOrgSub {
+			return tryOrganizationSubscription()
+		}
+		return tryWallet()
 	}
 
 	switch pref {
