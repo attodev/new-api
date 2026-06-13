@@ -105,11 +105,11 @@ export function UsersImportDialog({
           {result && (
             <div className='rounded-md border p-3 text-sm space-y-1'>
               <p className='text-green-600'>
-                ✓ {result.created}{t(' users created')}
+                ✓ {t('{{count}} users created', { count: result.created })}
               </p>
               {result.skipped > 0 && (
                 <p className='text-amber-600'>
-                  ⚠ {result.skipped}{t(' users skipped (already exist)')}: {result.skipped_usernames.join(', ')}
+                  ⚠ {t('{{count}} users skipped (already exist)', { count: result.skipped })}: {result.skipped_usernames.join(', ')}
                 </p>
               )}
               {result.errors.length > 0 && (
