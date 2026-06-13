@@ -132,3 +132,14 @@ export interface ManageUserQuotaPayload {
 // ============================================================================
 
 export type UsersDialogType = 'create' | 'update' | 'delete'
+
+// ============================================================================
+// Import / Export Types
+// ============================================================================
+
+export interface ImportResult {
+  created: number
+  skipped: number
+  skipped_usernames: string[]
+  errors: string[]
+}
