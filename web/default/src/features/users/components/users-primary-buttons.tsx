@@ -16,26 +16,61 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Download, Plus, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { exportUsers } from '../api'
 import { useUsers } from './users-provider'
+import { UsersImportDialog } from './users-import-dialog'
 
 export function UsersPrimaryButtons() {
   const { t } = useTranslation()
-  const { setOpen, setCurrentRow } = useUsers()
+  const { setOpen, setCurrentRow, triggerRefresh } = useUsers()
+  const [exportLoading, setExportLoading] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const handleCreate = () => {
     setCurrentRow(null)
     setOpen('create')
   }
 
+  const handleExport = async () => {
+    setExportLoading(true)
+    try {
+      await exportUsers()
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
-    <div className='flex gap-2'>
-      <Button size='sm' onClick={handleCreate}>
-        <Plus className='h-4 w-4' />
-        {t('Add User')}
-      </Button>
-    </div>
+    <>
+      <div className='flex gap-2'>
+        <Button variant='outline' size='sm' onClick={() => setImportOpen(true)}>
+          <Upload className='h-4 w-4' />
+          {t('Import')}
+        </Button>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handleExport}
+          disabled={exportLoading}
+        >
+          <Download className='h-4 w-4' />
+          {exportLoading ? t('Exporting...') : t('Export')}
+        </Button>
+        <Button size='sm' onClick={handleCreate}>
+          <Plus className='h-4 w-4' />
+          {t('Add User')}
+        </Button>
+      </div>
+
+      <UsersImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={triggerRefresh}
+      />
+    </>
   )
 }
