@@ -1322,7 +1322,7 @@ func ExportUsers(c *gin.Context) {
 
 	filename := fmt.Sprintf("users-%d.xlsx", time.Now().Unix())
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
 
 	if err := f.Write(c.Writer); err != nil {
 		common.ApiError(c, err)
