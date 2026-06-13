@@ -65,6 +65,11 @@ func BuildExportFile() (*excelize.File, error) {
 		return nil, err
 	}
 
+	const maxExportRows = 10000
+	if len(users) > maxExportRows {
+		return nil, fmt.Errorf("too many users to export: %d (maximum %d)", len(users), maxExportRows)
+	}
+
 	f := excelize.NewFile()
 	sheet := "Users"
 	f.SetSheetName("Sheet1", sheet)
@@ -196,6 +201,7 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 				affQuota = q
 			} else {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid aff_quota value %q", lineNum, username, qs))
+				continue
 			}
 		}
 
@@ -242,9 +248,13 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 		if quota != 0 {
 			delta := quota - int(common.QuotaForNewUser)
 			if delta > 0 {
-				_ = model.IncreaseUserQuota(user.Id, delta, true)
+				if err := model.IncreaseUserQuota(user.Id, delta, true); err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+				}
 			} else if delta < 0 {
-				_ = model.DecreaseUserQuota(user.Id, -delta, true)
+				if err := model.DecreaseUserQuota(user.Id, -delta, true); err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+				}
 			}
 		}
 

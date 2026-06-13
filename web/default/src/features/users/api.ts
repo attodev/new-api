@@ -208,7 +208,7 @@ export async function exportUsers(): Promise<void> {
   const url = window.URL.createObjectURL(new Blob([res.data]))
   const link = document.createElement('a')
   link.href = url
-  const timestamp = Math.floor(Date.now() / 1000)
+  const timestamp = Date.now()
   link.setAttribute('download', `users-${timestamp}.xlsx`)
   document.body.appendChild(link)
   link.click()
