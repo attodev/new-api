@@ -147,6 +147,10 @@ func SetApiRouter(router *gin.Engine) {
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
 				adminRoute.DELETE("/:id/2fa", controller.AdminDisable2FA)
+
+				// User export/import routes
+				adminRoute.GET("/export", controller.ExportUsers)
+				adminRoute.POST("/import", controller.ImportUsers)
 			}
 		}
 
