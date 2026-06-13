@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/xuri/excelize/v2"
 )
@@ -131,6 +132,11 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 		return result, nil
 	}
 
+	const maxImportRows = 1000
+	if len(rows)-1 > maxImportRows {
+		return nil, fmt.Errorf("too many rows: maximum %d, got %d", maxImportRows, len(rows)-1)
+	}
+
 	// Build header index map from first row
 	headerIdx := map[string]int{}
 	for i, h := range rows[0] {
@@ -177,6 +183,9 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 		if qs := getCell(row, "quota"); qs != "" {
 			if q, err := strconv.Atoi(qs); err == nil {
 				quota = q
+			} else {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota value %q", lineNum, username, qs))
+				continue
 			}
 		}
 
@@ -185,6 +194,8 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 		if qs := getCell(row, "aff_quota"); qs != "" {
 			if q, err := strconv.Atoi(qs); err == nil {
 				affQuota = q
+			} else {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid aff_quota value %q", lineNum, username, qs))
 			}
 		}
 
@@ -214,15 +225,27 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 			Role:        stringToRole(getCell(row, "role")),
 			Status:      stringToStatus(getCell(row, "status")),
 			Group:       group,
-			Quota:       quota,
+			Quota:       0, // Insert() will set QuotaForNewUser; we override below if needed
 			AffQuota:    affQuota,
 			InviterId:   inviterId,
 			Remark:      getCell(row, "remark"),
 		}
 
-		if err := user.Insert(inviterId); err != nil {
+		// Pass inviterId=0 to avoid triggering referral reward logic during import.
+		// The InviterId field on the struct is enough to record the relationship.
+		if err := user.Insert(0); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
 			continue
+		}
+
+		// Override quota with imported value if it differs from the default applied by Insert().
+		if quota != 0 {
+			delta := quota - int(common.QuotaForNewUser)
+			if delta > 0 {
+				_ = model.IncreaseUserQuota(user.Id, delta, true)
+			} else if delta < 0 {
+				_ = model.DecreaseUserQuota(user.Id, -delta, true)
+			}
 		}
 
 		result.Created++
