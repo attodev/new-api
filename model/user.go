@@ -1066,3 +1066,11 @@ func RootUserExists() bool {
 	}
 	return true
 }
+
+// GetAllUsersForExport returns all non-deleted users for Excel export.
+// Sensitive fields (Password, AccessToken) are omitted.
+func GetAllUsersForExport() ([]*User, error) {
+	var users []*User
+	err := DB.Omit("password", "access_token").Order("id asc").Find(&users).Error
+	return users, err
+}
