@@ -41,6 +41,7 @@ import type {
   Organization,
   OrganizationDashboardData,
   OrganizationDashboardParams,
+  OrgImportResult,
   OrganizationSubscriptionPlan,
   OrganizationSubscriptionPlanPayload,
   OrganizationUserSubscription,
@@ -80,6 +81,32 @@ export async function updateOrganization(
 
 export async function deleteOrganization(organizationId: number): Promise<void> {
   await api.delete(`/api/organizations/${organizationId}`)
+}
+
+export async function exportOrgUsers(organizationId?: number): Promise<void> {
+  const params = organizationId ? `?organization_id=${organizationId}` : ''
+  const res = await api.get(`/api/organization/users/export${params}`, {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(new Blob([res.data as BlobPart]))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `org-users-${Date.now()}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function importOrgUsers(
+  file: File,
+  organizationId?: number
+): Promise<OrgImportResult> {
+  const params = organizationId ? `?organization_id=${organizationId}` : ''
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post(`/api/organization/users/import${params}`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data.data as OrgImportResult
 }
 
 export async function getOrganizationProfile(): Promise<

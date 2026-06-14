@@ -88,6 +88,14 @@ export interface OrganizationUpdatePayload {
   status?: number
 }
 
+export interface OrgImportResult {
+  assigned: number
+  created: number
+  skipped: number
+  skipped_usernames: string[]
+  errors: string[]
+}
+
 export type OrganizationDashboardRangePreset = 'today' | '7d' | '30d' | 'custom'
 
 export interface OrganizationDashboardOrganization {
