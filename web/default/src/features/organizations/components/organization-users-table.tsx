@@ -173,14 +173,6 @@ export function OrganizationUsersTable() {
       const res = await getOrganizations({ page: 1, size: 50 })
       if (res.success && res.data?.items) {
         setOrganizations(res.data.items)
-        setOrganizationQuotaInputs(
-          Object.fromEntries(
-            res.data.items.map((organization) => [
-              organization.id,
-              String(quotaUnitsToDollars(organization.quota)),
-            ])
-          )
-        )
       } else {
         toast.error(res.message || t('Failed to load organizations'))
       }
