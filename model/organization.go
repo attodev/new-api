@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -166,4 +167,42 @@ func CanManageOrganizationTarget(actor User, target User) bool {
 		return false
 	}
 	return true
+}
+
+func DeleteOrganization(id int) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Check for active members
+		var memberCount int64
+		if err := tx.Model(&User{}).
+			Where("organization_id = ? AND deleted_at IS NULL", id).
+			Count(&memberCount).Error; err != nil {
+			return err
+		}
+		if memberCount > 0 {
+			return fmt.Errorf("organization has %d members, remove them first", memberCount)
+		}
+
+		// 2. Delete user subscriptions
+		if err := tx.Where("organization_id = ?", id).
+			Delete(&OrganizationUserSubscription{}).Error; err != nil {
+			return err
+		}
+
+		// 3. Delete subscription plans
+		if err := tx.Where("organization_id = ?", id).
+			Delete(&OrganizationSubscriptionPlan{}).Error; err != nil {
+			return err
+		}
+
+		// 4. Delete the organization
+		result := tx.Where("id = ?", id).Delete(&Organization{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		return nil
+	})
 }
