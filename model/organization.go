@@ -200,7 +200,14 @@ func DeleteOrganization(id int) error {
 			return err
 		}
 
-		// 4. Delete the organization
+		// 4. Clear org membership from remaining users (owner)
+		if err := tx.Model(&User{}).
+			Where("organization_id = ?", id).
+			Updates(map[string]interface{}{"organization_id": 0, "organization_role": ""}).Error; err != nil {
+			return err
+		}
+
+		// 5. Delete the organization
 		result := tx.Where("id = ?", id).Delete(&Organization{})
 		if result.Error != nil {
 			return result.Error

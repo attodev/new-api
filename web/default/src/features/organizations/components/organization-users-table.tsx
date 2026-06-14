@@ -115,14 +115,8 @@ export function OrganizationUsersTable() {
   const [organizationName, setOrganizationName] = useState('')
   const [organizationDescription, setOrganizationDescription] = useState('')
   const [organizationQuotaAmount, setOrganizationQuotaAmount] = useState('')
-  const [organizationQuotaInputs, setOrganizationQuotaInputs] = useState<
-    Record<number, string>
-  >({})
-  const [organizationNameInputs, setOrganizationNameInputs] = useState<
-    Record<number, string>
-  >({})
-  const [organizationDescriptionInputs, setOrganizationDescriptionInputs] =
-    useState<Record<number, string>>({})
+  const [editingOrganization, setEditingOrganization] =
+    useState<Organization | null>(null)
   const [ownerUserId, setOwnerUserId] = useState('')
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState<OrganizationRole>(
@@ -344,75 +338,58 @@ export function OrganizationUsersTable() {
     await saveQuota(user, parseQuotaFromDollars(value))
   }
 
-  async function saveOrganization(organization: Organization) {
-    const payload: OrganizationUpdatePayload = {}
-
-    const nameInput = organizationNameInputs[organization.id]
-    if (nameInput !== undefined && nameInput !== organization.name) {
-      if (!nameInput.trim()) {
-        toast.error(t('Organization name cannot be empty'))
-        return
-      }
-      payload.name = nameInput.trim()
-    }
-
-    const descInput = organizationDescriptionInputs[organization.id]
-    if (descInput !== undefined && descInput !== (organization.description ?? '')) {
-      payload.description = descInput
-    }
-
-    const amountStr = organizationQuotaInputs[organization.id]
-    if (amountStr !== undefined) {
-      const value = Number(amountStr)
-      if (Number.isFinite(value)) {
-        const quota = parseQuotaFromDollars(value)
-        if (quota !== organization.quota) payload.quota = quota
-      }
-    }
-
-    if (Object.keys(payload).length === 0) return
-
-    try {
-      const res = await updateOrganization(organization.id, payload)
-      if (res.success) {
-        toast.success(t('Organization updated'))
-        await Promise.all([loadOrganizations(), loadOrganizationProfile()])
-      } else {
-        toast.error(res.message || t('Failed to update organization'))
-      }
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t('Failed to update organization')
-      )
-    }
+  function handleStartEditOrganization(organization: Organization) {
+    setEditingOrganization(organization)
+    setOrganizationName(organization.name)
+    setOrganizationDescription(organization.description ?? '')
+    setOrganizationQuotaAmount(String(quotaUnitsToDollars(organization.quota)))
   }
 
-  async function saveOrganizationQuota(organization: Organization) {
-    const amount = organizationQuotaInputs[organization.id] ?? ''
-    if (!amount.trim()) return
+  function handleCancelEditOrganization() {
+    setEditingOrganization(null)
+    setOrganizationName('')
+    setOrganizationDescription('')
+    setOrganizationQuotaAmount('')
+  }
 
-    const value = Number(amount)
-    if (!Number.isFinite(value)) return
+  async function handleSaveOrganization() {
+    if (!editingOrganization) return
+    if (!organizationName.trim()) {
+      toast.error(t('Organization name cannot be empty'))
+      return
+    }
 
-    const quota = parseQuotaFromDollars(value)
-    if (quota === organization.quota) return
+    const payload: OrganizationUpdatePayload = {}
+    if (organizationName.trim() !== editingOrganization.name) {
+      payload.name = organizationName.trim()
+    }
+    if (organizationDescription !== (editingOrganization.description ?? '')) {
+      payload.description = organizationDescription
+    }
+    const newQuota = organizationQuotaAmount.trim()
+      ? parseQuotaFromDollars(Number(organizationQuotaAmount))
+      : editingOrganization.quota
+    if (newQuota !== editingOrganization.quota) {
+      payload.quota = newQuota
+    }
 
+    if (Object.keys(payload).length === 0) {
+      handleCancelEditOrganization()
+      return
+    }
+
+    setCreating(true)
     try {
-      const res = await updateOrganization(organization.id, { quota })
+      const res = await updateOrganization(editingOrganization.id, payload)
       if (res.success) {
-        toast.success(t('Organization quota updated'))
+        toast.success(t('Organization updated'))
+        handleCancelEditOrganization()
         await Promise.all([loadOrganizations(), loadOrganizationProfile()])
       } else {
         toast.error(res.message || t('Failed to update organization'))
       }
-    } catch (error: unknown) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t('Failed to update organization')
-      )
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -455,7 +432,9 @@ export function OrganizationUsersTable() {
             <div className='space-y-3 rounded-md border p-3'>
               <div className='flex items-center gap-2 text-sm font-medium'>
                 <Building2 className='size-4' />
-                {t('Create Organization')}
+                {editingOrganization
+                  ? t('Edit Organization')
+                  : t('Create Organization')}
               </div>
               <div className='grid gap-2 sm:grid-cols-2'>
                 <Input
@@ -482,37 +461,58 @@ export function OrganizationUsersTable() {
                 />
               </div>
               <div className='flex flex-wrap items-center gap-2'>
-                <Select
-                  items={candidateUsers.map((user) => ({
-                    value: String(user.id),
-                    label: user.username,
-                  }))}
-                  value={ownerUserId}
-                  onValueChange={(value) =>
-                    value !== null && setOwnerUserId(value)
-                  }
-                  disabled={loadingCandidates || candidateUsers.length === 0}
-                >
-                  <SelectTrigger className='min-w-56 flex-1'>
-                    <SelectValue placeholder={t('Owner User')} />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {candidateUsers.map((user) => (
-                        <SelectItem key={user.id} value={String(user.id)}>
-                          {user.username} #{user.id}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={() => void handleCreateOrganization()}
-                  disabled={creating || !ownerUserId}
-                >
-                  <Building2 />
-                  {t('Create')}
-                </Button>
+                {!editingOrganization && (
+                  <Select
+                    items={candidateUsers.map((user) => ({
+                      value: String(user.id),
+                      label: user.username,
+                    }))}
+                    value={ownerUserId}
+                    onValueChange={(value) =>
+                      value !== null && setOwnerUserId(value)
+                    }
+                    disabled={loadingCandidates || candidateUsers.length === 0}
+                  >
+                    <SelectTrigger className='min-w-56 flex-1'>
+                      <SelectValue placeholder={t('Owner User')} />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {candidateUsers.map((user) => (
+                          <SelectItem key={user.id} value={String(user.id)}>
+                            {user.username} #{user.id}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                )}
+                {editingOrganization ? (
+                  <>
+                    <Button
+                      onClick={() => void handleSaveOrganization()}
+                      disabled={creating}
+                    >
+                      <Save />
+                      {t('Save')}
+                    </Button>
+                    <Button
+                      variant='outline'
+                      onClick={handleCancelEditOrganization}
+                      disabled={creating}
+                    >
+                      {t('Cancel')}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => void handleCreateOrganization()}
+                    disabled={creating || !ownerUserId}
+                  >
+                    <Building2 />
+                    {t('Create')}
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -648,84 +648,32 @@ export function OrganizationUsersTable() {
             {organizations.map((organization) => (
               <div key={organization.id} className='rounded-md border p-3'>
                 <div className='flex items-start justify-between gap-2'>
-                  <div className='text-muted-foreground text-xs'>
-                    {t('Organization quota')}: {formatQuota(organization.quota)}
-                    {' · '}
-                    {t('Organization used quota')}: {formatQuota(organization.used_quota)}
+                  <div>
+                    <div className='font-medium'>{organization.name}</div>
+                    {organization.description && (
+                      <div className='text-muted-foreground text-xs'>
+                        {organization.description}
+                      </div>
+                    )}
+                    <div className='text-muted-foreground text-xs'>
+                      {t('Organization quota')}: {formatQuota(organization.quota)}
+                      {' · '}
+                      {t('Organization used quota')}: {formatQuota(organization.used_quota)}
+                    </div>
                   </div>
                   <span className='text-muted-foreground text-xs'>
                     #{organization.id}
                   </span>
-                </div>
-                <div className='mt-2 flex flex-col gap-2'>
-                  <Input
-                    value={
-                      organizationNameInputs[organization.id] ??
-                      organization.name
-                    }
-                    placeholder={t('Organization name')}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value
-                      setOrganizationNameInputs((prev) => ({
-                        ...prev,
-                        [organization.id]: value,
-                      }))
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void saveOrganization(organization)
-                    }}
-                  />
-                  <Input
-                    value={
-                      organizationDescriptionInputs[organization.id] ??
-                      (organization.description ?? '')
-                    }
-                    placeholder={t('Description (optional)')}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value
-                      setOrganizationDescriptionInputs((prev) => ({
-                        ...prev,
-                        [organization.id]: value,
-                      }))
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void saveOrganization(organization)
-                    }}
-                  />
-                  <div className='flex items-center gap-2'>
-                    <Input
-                      className='w-32'
-                      inputMode={tokensOnly ? 'numeric' : 'decimal'}
-                      value={
-                        organizationQuotaInputs[organization.id] ??
-                        String(quotaUnitsToDollars(organization.quota))
-                      }
-                      placeholder={t('Quota amount')}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value
-                        setOrganizationQuotaInputs((prev) => ({
-                          ...prev,
-                          [organization.id]: value,
-                        }))
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') void saveOrganization(organization)
-                      }}
-                    />
-                    <span className='text-muted-foreground text-xs'>
-                      {currencyLabel}
-                    </span>
-                  </div>
                 </div>
                 <div className='mt-3 flex items-center gap-2'>
                   <Button
                     type='button'
                     variant='outline'
                     size='sm'
-                    onClick={() => void saveOrganization(organization)}
+                    onClick={() => handleStartEditOrganization(organization)}
                   >
                     <Save />
-                    {t('Save')}
+                    {t('Edit')}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
