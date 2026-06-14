@@ -171,15 +171,21 @@ func CanManageOrganizationTarget(actor User, target User) bool {
 
 func DeleteOrganization(id int) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
-		// 1. Check for active members
+		// 1. Find org to get owner
+		var org Organization
+		if err := tx.Where("id = ?", id).First(&org).Error; err != nil {
+			return err
+		}
+
+		// 2. Check for non-owner active members
 		var memberCount int64
 		if err := tx.Model(&User{}).
-			Where("organization_id = ? AND deleted_at IS NULL", id).
+			Where("organization_id = ? AND deleted_at IS NULL AND id != ?", id, org.OwnerUserId).
 			Count(&memberCount).Error; err != nil {
 			return err
 		}
 		if memberCount > 0 {
-			return fmt.Errorf("organization has %d members, remove them first", memberCount)
+			return fmt.Errorf("organization has %d non-owner members, remove them first", memberCount)
 		}
 
 		// 2. Delete user subscriptions

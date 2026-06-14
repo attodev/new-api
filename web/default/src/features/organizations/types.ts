@@ -82,6 +82,7 @@ export interface AssignOrganizationUserPayload {
 }
 
 export interface OrganizationUpdatePayload {
+  name?: string
   description?: string
   quota?: number
   status?: number

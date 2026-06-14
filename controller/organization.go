@@ -32,6 +32,7 @@ type assignOrganizationUserRequest struct {
 }
 
 type updateOrganizationRequest struct {
+	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Quota       *int    `json:"quota,omitempty"`
 	Status      *int    `json:"status,omitempty"`
@@ -105,6 +106,14 @@ func UpdateOrganization(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			common.ApiError(c, errors.New("organization name cannot be empty"))
+			return
+		}
+		updates["name"] = name
+	}
 	if req.Description != nil {
 		updates["description"] = strings.TrimSpace(*req.Description)
 	}

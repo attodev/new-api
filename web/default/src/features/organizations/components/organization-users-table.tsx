@@ -80,6 +80,7 @@ import { getActiveOrganizationSubscriptionUserIds } from '../lib/organization-su
 import type {
   Organization,
   OrganizationRole,
+  OrganizationUpdatePayload,
   OrganizationUser,
   OrganizationUserSubscriptionRecord,
 } from '../types'
@@ -117,6 +118,11 @@ export function OrganizationUsersTable() {
   const [organizationQuotaInputs, setOrganizationQuotaInputs] = useState<
     Record<number, string>
   >({})
+  const [organizationNameInputs, setOrganizationNameInputs] = useState<
+    Record<number, string>
+  >({})
+  const [organizationDescriptionInputs, setOrganizationDescriptionInputs] =
+    useState<Record<number, string>>({})
   const [ownerUserId, setOwnerUserId] = useState('')
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState<OrganizationRole>(
@@ -336,6 +342,51 @@ export function OrganizationUsersTable() {
     if (!Number.isFinite(value)) return
 
     await saveQuota(user, parseQuotaFromDollars(value))
+  }
+
+  async function saveOrganization(organization: Organization) {
+    const payload: OrganizationUpdatePayload = {}
+
+    const nameInput = organizationNameInputs[organization.id]
+    if (nameInput !== undefined && nameInput !== organization.name) {
+      if (!nameInput.trim()) {
+        toast.error(t('Organization name cannot be empty'))
+        return
+      }
+      payload.name = nameInput.trim()
+    }
+
+    const descInput = organizationDescriptionInputs[organization.id]
+    if (descInput !== undefined && descInput !== (organization.description ?? '')) {
+      payload.description = descInput
+    }
+
+    const amountStr = organizationQuotaInputs[organization.id]
+    if (amountStr !== undefined) {
+      const value = Number(amountStr)
+      if (Number.isFinite(value)) {
+        const quota = parseQuotaFromDollars(value)
+        if (quota !== organization.quota) payload.quota = quota
+      }
+    }
+
+    if (Object.keys(payload).length === 0) return
+
+    try {
+      const res = await updateOrganization(organization.id, payload)
+      if (res.success) {
+        toast.success(t('Organization updated'))
+        await Promise.all([loadOrganizations(), loadOrganizationProfile()])
+      } else {
+        toast.error(res.message || t('Failed to update organization'))
+      }
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to update organization')
+      )
+    }
   }
 
   async function saveOrganizationQuota(organization: Organization) {
@@ -597,51 +648,81 @@ export function OrganizationUsersTable() {
             {organizations.map((organization) => (
               <div key={organization.id} className='rounded-md border p-3'>
                 <div className='flex items-start justify-between gap-2'>
-                  <div>
-                    <div className='font-medium'>{organization.name}</div>
-                    <div className='text-muted-foreground text-xs'>
-                      {t('Organization quota')}:{' '}
-                      {formatQuota(organization.quota)}
-                    </div>
-                    <div className='text-muted-foreground text-xs'>
-                      {t('Organization used quota')}:{' '}
-                      {formatQuota(organization.used_quota)}
-                    </div>
+                  <div className='text-muted-foreground text-xs'>
+                    {t('Organization quota')}: {formatQuota(organization.quota)}
+                    {' · '}
+                    {t('Organization used quota')}: {formatQuota(organization.used_quota)}
                   </div>
                   <span className='text-muted-foreground text-xs'>
                     #{organization.id}
                   </span>
                 </div>
-                <div className='mt-3 flex items-center gap-2'>
+                <div className='mt-2 flex flex-col gap-2'>
                   <Input
-                    className='w-32'
-                    inputMode={tokensOnly ? 'numeric' : 'decimal'}
                     value={
-                      organizationQuotaInputs[organization.id] ??
-                      String(quotaUnitsToDollars(organization.quota))
+                      organizationNameInputs[organization.id] ??
+                      organization.name
                     }
-                    placeholder={t('Quota amount')}
+                    placeholder={t('Organization name')}
                     onChange={(event) => {
                       const value = event.currentTarget.value
-                      setOrganizationQuotaInputs((prev) => ({
+                      setOrganizationNameInputs((prev) => ({
                         ...prev,
                         [organization.id]: value,
                       }))
                     }}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        void saveOrganizationQuota(organization)
-                      }
+                      if (event.key === 'Enter') void saveOrganization(organization)
                     }}
                   />
-                  <span className='text-muted-foreground text-xs'>
-                    {currencyLabel}
-                  </span>
+                  <Input
+                    value={
+                      organizationDescriptionInputs[organization.id] ??
+                      (organization.description ?? '')
+                    }
+                    placeholder={t('Description (optional)')}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value
+                      setOrganizationDescriptionInputs((prev) => ({
+                        ...prev,
+                        [organization.id]: value,
+                      }))
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') void saveOrganization(organization)
+                    }}
+                  />
+                  <div className='flex items-center gap-2'>
+                    <Input
+                      className='w-32'
+                      inputMode={tokensOnly ? 'numeric' : 'decimal'}
+                      value={
+                        organizationQuotaInputs[organization.id] ??
+                        String(quotaUnitsToDollars(organization.quota))
+                      }
+                      placeholder={t('Quota amount')}
+                      onChange={(event) => {
+                        const value = event.currentTarget.value
+                        setOrganizationQuotaInputs((prev) => ({
+                          ...prev,
+                          [organization.id]: value,
+                        }))
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') void saveOrganization(organization)
+                      }}
+                    />
+                    <span className='text-muted-foreground text-xs'>
+                      {currencyLabel}
+                    </span>
+                  </div>
+                </div>
+                <div className='mt-3 flex items-center gap-2'>
                   <Button
                     type='button'
                     variant='outline'
                     size='sm'
-                    onClick={() => void saveOrganizationQuota(organization)}
+                    onClick={() => void saveOrganization(organization)}
                   >
                     <Save />
                     {t('Save')}
