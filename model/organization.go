@@ -200,10 +200,12 @@ func DeleteOrganization(id int) error {
 			return err
 		}
 
-		// 4. Clear org membership from remaining users (owner)
+		// 4. Clear org membership from remaining users (owner).
+		// Use Select to force-update zero-value fields that GORM might otherwise skip.
 		if err := tx.Model(&User{}).
+			Select("organization_id", "organization_role").
 			Where("organization_id = ?", id).
-			Updates(map[string]interface{}{"organization_id": 0, "organization_role": ""}).Error; err != nil {
+			Updates(User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
 			return err
 		}
 

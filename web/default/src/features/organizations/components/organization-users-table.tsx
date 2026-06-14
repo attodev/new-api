@@ -216,7 +216,6 @@ export function OrganizationUsersTable() {
         setCandidateUsers(items)
         if (items.length > 0) {
           const firstId = String(items[0].id)
-          if (isRoot && !ownerUserId) setOwnerUserId(firstId)
           if (isOrganizationOwner && !assignUserId) setAssignUserId(firstId)
         }
       } else {
