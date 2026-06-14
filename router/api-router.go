@@ -172,6 +172,8 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.GET("/mj", controller.GetOrganizationMidjourney)
 			organizationRoute.GET("/task", controller.GetOrganizationTask)
 			organizationRoute.GET("/users", controller.ListOrganizationUsers)
+			organizationRoute.GET("/users/export", controller.ExportOrganizationUsers)
+			organizationRoute.POST("/users/import", controller.ImportOrganizationUsers)
 			organizationRoute.GET("/assignable-users", controller.ListAssignableOrganizationUsers)
 			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
 			organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)

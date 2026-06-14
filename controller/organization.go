@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +11,9 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 )
 
@@ -691,4 +694,61 @@ func DeleteOrganization(c *gin.Context) {
 	}
 
 	common.ApiSuccess(c, nil)
+}
+
+func ExportOrganizationUsers(c *gin.Context) {
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
+		return
+	}
+
+	f, err := service.BuildOrgExportFile(organizationId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	defer f.Close()
+
+	filename := fmt.Sprintf("org-users-%d-%d.xlsx", organizationId, time.Now().Unix())
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	if err := f.Write(c.Writer); err != nil {
+		common.ApiError(c, err)
+	}
+}
+
+func ImportOrganizationUsers(c *gin.Context) {
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
+		return
+	}
+
+	const maxSize = 10 << 20
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
+
+	file, _, err := c.Request.FormFile("file")
+	if err != nil {
+		common.ApiError(c, fmt.Errorf("failed to read file: %w", err))
+		return
+	}
+	defer file.Close()
+
+	f, err := excelize.OpenReader(file)
+	if err != nil {
+		common.ApiError(c, fmt.Errorf("invalid xlsx file: %w", err))
+		return
+	}
+	defer f.Close()
+
+	result, err := service.ImportOrgUsersFromFile(f, organizationId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    result,
+	})
 }
