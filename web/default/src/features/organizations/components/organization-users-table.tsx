@@ -68,6 +68,7 @@ import {
   assignOrganizationUser,
   createOrganization,
   deleteOrganization,
+  exportOrgUsers,
   getAssignableOrganizationUsers,
   getOrganizationProfile,
   getOrganizationUsers,
@@ -77,6 +78,7 @@ import {
   updateOrganizationUser,
 } from '../api'
 import { getActiveOrganizationSubscriptionUserIds } from '../lib/organization-subscription-utils'
+import { OrgUsersImportDialog } from './org-users-import-dialog'
 import type {
   Organization,
   OrganizationRole,
@@ -107,6 +109,8 @@ export function OrganizationUsersTable() {
   const [candidateUsers, setCandidateUsers] = useState<
     Array<User | OrganizationUser>
   >([])
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadingCandidates, setLoadingCandidates] = useState(false)
   const [savingId, setSavingId] = useState<number | null>(null)
@@ -384,6 +388,17 @@ export function OrganizationUsersTable() {
     }
   }
 
+  async function handleExportOrgUsers() {
+    setExporting(true)
+    try {
+      await exportOrgUsers()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? t('Export failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function handleDeleteOrganization(organization: Organization) {
     try {
       await deleteOrganization(organization.id)
@@ -405,16 +420,36 @@ export function OrganizationUsersTable() {
 
   return (
     <div className='space-y-4'>
+      <OrgUsersImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onSuccess={() => void loadUsers()}
+      />
       <div className='flex items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold'>{t('Organization Users')}</h1>
-        <Button
-          variant='outline'
-          onClick={() => void loadUsers()}
-          disabled={loading}
-        >
-          <RefreshCw />
-          {t('Refresh')}
-        </Button>
+        <div className='flex items-center gap-2'>
+          {isOrganizationOwner && (
+            <>
+              <Button
+                variant='outline'
+                onClick={() => void handleExportOrgUsers()}
+                disabled={exporting}
+              >
+                {t('Export')}
+              </Button>
+              <Button
+                variant='outline'
+                onClick={() => setImportDialogOpen(true)}
+              >
+                {t('Import')}
+              </Button>
+            </>
+          )}
+          <Button variant='outline' onClick={() => void loadUsers()} disabled={loading}>
+            <RefreshCw />
+            {t('Refresh')}
+          </Button>
+        </div>
       </div>
 
       {(isRoot || isOrganizationOwner) && (
