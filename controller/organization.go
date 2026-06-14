@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type createOrganizationRequest struct {
@@ -657,4 +658,28 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.SysLog("failed to invalidate organization membership cache: " + err.Error())
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+func DeleteOrganization(c *gin.Context) {
+	if c.GetInt("role") != common.RoleRootUser {
+		common.ApiError(c, errors.New("root permission required"))
+		return
+	}
+
+	organizationId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	if err := model.DeleteOrganization(organizationId); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "organization not found"})
+			return
+		}
+		common.ApiError(c, err)
+		return
+	}
+
+	common.ApiSuccess(c, nil)
 }

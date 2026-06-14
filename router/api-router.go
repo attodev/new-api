@@ -160,6 +160,7 @@ func SetApiRouter(router *gin.Engine) {
 			organizationsRoute.GET("/", controller.ListOrganizations)
 			organizationsRoute.POST("/", controller.CreateOrganization)
 			organizationsRoute.PATCH("/:id", controller.UpdateOrganization)
+			organizationsRoute.DELETE("/:id", controller.DeleteOrganization)
 		}
 
 		organizationRoute := apiRouter.Group("/organization")
