@@ -41,6 +41,17 @@ import {
   hasOrganizationOwnerRole,
 } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -56,6 +67,7 @@ import type { User } from '@/features/users/types'
 import {
   assignOrganizationUser,
   createOrganization,
+  deleteOrganization,
   getAssignableOrganizationUsers,
   getOrganizationProfile,
   getOrganizationUsers,
@@ -353,6 +365,16 @@ export function OrganizationUsersTable() {
     }
   }
 
+  async function handleDeleteOrganization(organization: Organization) {
+    try {
+      await deleteOrganization(organization.id)
+      toast.success(t('Organization deleted'))
+      await loadOrganizations()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? t('Failed to delete organization'))
+    }
+  }
+
   async function toggleStatus(user: OrganizationUser) {
     await saveUser(user, {
       status:
@@ -624,6 +646,27 @@ export function OrganizationUsersTable() {
                     <Save />
                     {t('Save')}
                   </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type='button' variant='destructive' size='sm'>
+                        {t('Delete')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('Delete Organization')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('Are you sure you want to delete organization "{{name}}"? This action cannot be undone.', { name: organization.name })}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('Cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => void handleDeleteOrganization(organization)}>
+                          {t('Delete')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}

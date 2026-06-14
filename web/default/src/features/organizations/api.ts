@@ -78,6 +78,10 @@ export async function updateOrganization(
   return res.data
 }
 
+export async function deleteOrganization(organizationId: number): Promise<void> {
+  await api.delete(`/api/organizations/${organizationId}`)
+}
+
 export async function getOrganizationProfile(): Promise<
   ApiResponse<Organization>
 > {
