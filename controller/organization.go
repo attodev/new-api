@@ -514,17 +514,41 @@ func ListOrganizationUsers(c *gin.Context) {
 	}
 
 	pageInfo := common.GetPageQuery(c)
-	var users []model.User
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	orderBy := c.Query("order_by")
+	orderDir := c.Query("order_dir")
+
+	allowedOrderBy := map[string]bool{
+		"username": true, "display_name": true, "organization_role": true,
+		"quota": true, "used_quota": true, "group": true, "status": true,
+	}
+	if !allowedOrderBy[orderBy] {
+		orderBy = "id"
+	}
+	if orderDir != "desc" {
+		orderDir = "asc"
+	}
+
 	query := model.DB.
 		Where("organization_id = ?", organizationId).
 		Where("role < ?", common.RoleAdminUser)
+
+	if keyword != "" {
+		query = query.Where("username LIKE ? OR display_name LIKE ?",
+			"%"+keyword+"%", "%"+keyword+"%")
+	}
 
 	var total int64
 	if err := query.Model(&model.User{}).Count(&total).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	if err := query.Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&users).Error; err != nil {
+
+	var users []model.User
+	if err := query.Order(orderBy + " " + orderDir).
+		Offset(pageInfo.GetStartIdx()).
+		Limit(pageInfo.GetPageSize()).
+		Find(&users).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
