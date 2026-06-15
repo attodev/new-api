@@ -7,6 +7,10 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "build:check": "tsc -b && rsbuild build",
+    "test": "bun test src",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:install": "playwright install chromium",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "rsbuild preview",
@@ -75,6 +79,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@rsbuild/core": "^2.0.7",
     "@rsbuild/plugin-react": "^2.0.0",
     "@tanstack/eslint-plugin-query": "^5.100.14",
