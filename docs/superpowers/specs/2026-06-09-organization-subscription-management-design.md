@@ -151,6 +151,25 @@
 
 조직 메뉴 아래 API를 추가한다.
 
+### 입력값 검증
+
+조직 subscription 관련 쓰기 API는 서버에서 다음 범위를 강제한다.
+
+요청 body는 strict JSON decoding을 사용한다. 아래 표에 없는 `quota_reset_period`, `quota_reset_custom_seconds`, `upgrade_group`, `enabled` 같은 필드를 보내면 `unsupported field: <field>` 오류가 발생한다.
+
+| 필드 | 허용 범위 |
+| --- | --- |
+| `title` | trim 후 1자 이상 128자 이하 |
+| `subtitle` | trim 후 255자 이하 |
+| `duration_unit` | `year`, `month`, `day`, `hour`, `custom` 중 하나 |
+| `duration_value` | 0 이상 1200 이하. custom이 아니고 0이면 1로 보정 |
+| `custom_seconds` | `duration_unit=custom`일 때 1 이상 31,536,000 이하 |
+| `total_amount` | 0 이상 1,000,000,000 이하 |
+| `sort_order` | -1,000,000 이상 1,000,000 이하 |
+| `plan_id` | 1 이상 1,000,000,000 이하 |
+
+enum 밖의 `duration_unit`, 범위를 벗어난 금액/기간/정렬값, 0 이하 또는 너무 큰 `plan_id`는 요청 단계에서 거부한다. `duration_value` 오류 메시지는 `duration_value must be between 0 and 1200`으로 고정한다.
+
 ### 조직 plan 관리
 
 - `GET /api/organization/subscription/plans`
@@ -273,6 +292,8 @@ relay log의 `other` 정보에 조직 subscription 정보를 추가한다.
 - 조직 일반 사용자 접근 거부
 - 전체 관리자 조직 선택 허용
 - 조직 밖 사용자 배정 거부
+- plan 생성/수정 입력값 범위와 `duration_unit` enum 검증
+- plan 할당 `plan_id` 범위 검증
 
 과금 테스트:
 

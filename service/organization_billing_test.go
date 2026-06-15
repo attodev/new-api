@@ -3,6 +3,7 @@ package service
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -231,4 +232,83 @@ func TestOrganizationSubscriptionBillingRejectsWhenPlanLimitInsufficient(t *test
 	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, 1000, org.Quota)
+}
+
+func TestOrganizationSubscriptionBillingSettlesRefundToSubscriptionAndOrganizationWallet(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	plan := &model.OrganizationSubscriptionPlan{
+		OrganizationId: 1,
+		Title:          "Team Plan",
+		DurationUnit:   model.SubscriptionDurationMonth,
+		DurationValue:  1,
+		TotalAmount:    80,
+		Enabled:        true,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	sub, err := model.CreateOrganizationUserSubscriptionFromPlan(1, 2, plan.Id, 1)
+	require.NoError(t, err)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RequestId:       "org-sub-settle-refund-req",
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.NoError(t, session.Settle(10))
+
+	var reloaded model.OrganizationUserSubscription
+	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
+	require.Equal(t, int64(10), reloaded.AmountUsed)
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, 990, org.Quota)
+}
+
+func TestOrganizationSubscriptionBillingRefundRestoresSubscriptionAndOrganizationWallet(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	plan := &model.OrganizationSubscriptionPlan{
+		OrganizationId: 1,
+		Title:          "Team Plan",
+		DurationUnit:   model.SubscriptionDurationMonth,
+		DurationValue:  1,
+		TotalAmount:    80,
+		Enabled:        true,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	sub, err := model.CreateOrganizationUserSubscriptionFromPlan(1, 2, plan.Id, 1)
+	require.NoError(t, err)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RequestId:       "org-sub-refund-req",
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	session.Refund(newOrganizationBillingContext())
+
+	require.Eventually(t, func() bool {
+		var reloaded model.OrganizationUserSubscription
+		if err := model.DB.First(&reloaded, sub.Id).Error; err != nil {
+			return false
+		}
+		org := getOrganizationForBillingTest(t, 1)
+		return reloaded.AmountUsed == 0 && org.Quota == 1000
+	}, time.Second, 10*time.Millisecond)
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
 }

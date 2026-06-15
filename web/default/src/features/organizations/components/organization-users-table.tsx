@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   BarChart3,
@@ -77,7 +77,11 @@ import {
   updateOrganization,
   updateOrganizationUser,
 } from '../api'
-import { getActiveOrganizationSubscriptionUserIds } from '../lib/organization-subscription-utils'
+import {
+  getActiveOrganizationSubscriptionUserIds,
+  getOrganizationQuotaControlState,
+  shouldDisableQuotaForOrganizationSubscription,
+} from '../lib/organization-subscription-utils'
 import { OrgUsersImportDialog } from './org-users-import-dialog'
 import type {
   Organization,
@@ -136,11 +140,6 @@ export function OrganizationUsersTable() {
   const tokensOnly = currencyMeta.kind === 'tokens'
   const canManageOrganizationUsers =
     Boolean(currentUser?.organization_id) || isOrganizationOwner
-  const activeSubscriptionUserIds = useMemo(
-    () => getActiveOrganizationSubscriptionUserIds(subscriptionRecords),
-    [subscriptionRecords]
-  )
-
   async function loadUsers() {
     if (!canManageOrganizationUsers) {
       setUsers([])
@@ -319,7 +318,13 @@ export function OrganizationUsersTable() {
   }
 
   async function saveQuota(user: OrganizationUser, quota: number) {
-    if (activeSubscriptionUserIds.has(user.id)) return
+    if (
+      shouldDisableQuotaForOrganizationSubscription(
+        user.id,
+        subscriptionRecords
+      )
+    )
+      return
     if (!Number.isFinite(quota) || quota === user.quota) return
     await saveUser(user, { quota })
   }
@@ -746,7 +751,12 @@ export function OrganizationUsersTable() {
           </thead>
           <tbody>
             {users.map((user) => {
-              const hasActivePlan = activeSubscriptionUserIds.has(user.id)
+              const quotaControlState = getOrganizationQuotaControlState(
+                user.id,
+                user.quota,
+                subscriptionRecords
+              )
+              const hasActivePlan = quotaControlState.hasActivePlan
               return (
                 <tr key={user.id} className='border-t'>
                   <td className='px-3 py-2'>
@@ -769,7 +779,7 @@ export function OrganizationUsersTable() {
                         {t('Current quota balance')}:{' '}
                         {hasActivePlan
                           ? `${formatQuota(0)} (${t('Organization plan in use')})`
-                          : formatQuota(user.quota)}
+                          : formatQuota(quotaControlState.displayQuota)}
                       </div>
                       <div className='flex items-center gap-2'>
                         <Input
@@ -779,10 +789,14 @@ export function OrganizationUsersTable() {
                           step={tokensOnly ? 1 : 0.01}
                           min={0}
                           defaultValue={
-                            hasActivePlan ? 0 : quotaUnitsToDollars(user.quota)
+                            quotaUnitsToDollars(
+                              quotaControlState.displayQuota
+                            )
                           }
                           placeholder={t('Quota amount')}
-                          disabled={savingId === user.id || hasActivePlan}
+                          disabled={
+                            savingId === user.id || quotaControlState.disabled
+                          }
                           onBlur={(event) => {
                             void saveDisplayQuota(
                               user,
@@ -807,7 +821,10 @@ export function OrganizationUsersTable() {
                               type='button'
                               variant='outline'
                               size='sm'
-                              disabled={savingId === user.id || hasActivePlan}
+                              disabled={
+                                savingId === user.id ||
+                                quotaControlState.disabled
+                              }
                               onClick={() =>
                                 void saveQuota(
                                   user,

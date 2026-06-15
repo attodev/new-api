@@ -68,6 +68,18 @@ func performOrganizationRequest(handler gin.HandlerFunc, actor model.User, metho
 	return recorder
 }
 
+func requireOrganizationApiError(t *testing.T, res *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	require.Equal(t, http.StatusOK, res.Code)
+	var payload struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.False(t, payload.Success)
+	require.Equal(t, message, payload.Message)
+}
+
 func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
@@ -96,6 +108,123 @@ func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 	require.Equal(t, 500, org.Quota)
 }
 
+func TestOrganizationRootAcceptsCreateBoundaryInput(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		orgName     string
+		description string
+		quota       int
+		ownerId     int
+	}{
+		{
+			name:        "minimum quota and shortest name",
+			orgName:     "A",
+			description: "",
+			quota:       0,
+			ownerId:     1,
+		},
+		{
+			name:        "maximum lengths quota and owner id",
+			orgName:     strings.Repeat("가", MaxOrganizationNameLength),
+			description: strings.Repeat("나", MaxOrganizationDescriptionLength),
+			quota:       MaxOrganizationQuota,
+			ownerId:     MaxOrganizationReferenceId,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			root := model.User{Id: 10, Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-boundary-" + tc.name}
+			owner := model.User{Id: tc.ownerId, Username: "owner", Password: "password", Role: common.RoleCommonUser, AffCode: "owner-boundary-" + tc.name}
+			require.NoError(t, model.DB.Create(&root).Error)
+			require.NoError(t, model.DB.Create(&owner).Error)
+
+			res := performOrganizationRequest(
+				CreateOrganization,
+				root,
+				http.MethodPost,
+				"/api/organizations",
+				fmt.Sprintf(`{"name":%q,"description":%q,"owner_user_id":%d,"quota":%d}`, tc.orgName, tc.description, tc.ownerId, tc.quota),
+			)
+
+			require.Equal(t, http.StatusOK, res.Code)
+			require.Contains(t, res.Body.String(), `"success":true`)
+
+			var org model.Organization
+			require.NoError(t, model.DB.First(&org, "owner_user_id = ?", tc.ownerId).Error)
+			require.Equal(t, tc.orgName, org.Name)
+			require.Equal(t, tc.description, org.Description)
+			require.Equal(t, tc.quota, org.Quota)
+		})
+	}
+}
+
+func TestOrganizationRootRejectsInvalidCreateInput(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		message string
+	}{
+		{
+			name:    "name too long",
+			body:    fmt.Sprintf(`{"name":%q,"owner_user_id":1}`, strings.Repeat("a", MaxOrganizationNameLength+1)),
+			message: "name must be at most 64 characters",
+		},
+		{
+			name:    "name empty",
+			body:    `{"name":"   ","owner_user_id":1}`,
+			message: "name is required",
+		},
+		{
+			name:    "description too long",
+			body:    fmt.Sprintf(`{"name":"Acme","description":%q,"owner_user_id":1}`, strings.Repeat("a", MaxOrganizationDescriptionLength+1)),
+			message: "description must be at most 255 characters",
+		},
+		{
+			name:    "owner id below minimum",
+			body:    `{"name":"Acme","owner_user_id":0}`,
+			message: "owner_user_id must be greater than 0",
+		},
+		{
+			name:    "owner id above maximum",
+			body:    fmt.Sprintf(`{"name":"Acme","owner_user_id":%d}`, MaxOrganizationReferenceId+1),
+			message: "owner_user_id must be at most 1000000000",
+		},
+		{
+			name:    "quota below minimum",
+			body:    `{"name":"Acme","owner_user_id":1,"quota":-1}`,
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "quota too large",
+			body:    fmt.Sprintf(`{"name":"Acme","owner_user_id":1,"quota":%d}`, MaxOrganizationQuota+1),
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "unsupported field",
+			body:    `{"name":"Acme","owner_user_id":1,"external_id":"x"}`,
+			message: "unsupported field: external_id",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			root := model.User{Id: 10, Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-" + tc.name}
+			owner := model.User{Id: 1, Username: "owner", Password: "password", Role: common.RoleCommonUser, AffCode: "owner-" + tc.name}
+			require.NoError(t, model.DB.Create(&root).Error)
+			require.NoError(t, model.DB.Create(&owner).Error)
+
+			res := performOrganizationRequest(
+				CreateOrganization,
+				root,
+				http.MethodPost,
+				"/api/organizations",
+				tc.body,
+			)
+
+			requireOrganizationApiError(t, res, tc.message)
+		})
+	}
+}
+
 func TestOrganizationRootCanUpdateOrganizationQuota(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
@@ -118,6 +247,115 @@ func TestOrganizationRootCanUpdateOrganizationQuota(t *testing.T) {
 	var reloaded model.Organization
 	require.NoError(t, model.DB.First(&reloaded, org.Id).Error)
 	require.Equal(t, 750, reloaded.Quota)
+}
+
+func TestOrganizationRootAcceptsUpdateBoundaryInput(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		body        string
+		wantQuota   int
+		wantStatus  int
+		wantComment string
+	}{
+		{
+			name:        "minimum quota and enabled status",
+			body:        `{"description":"","quota":0,"status":1}`,
+			wantQuota:   0,
+			wantStatus:  model.OrganizationStatusEnabled,
+			wantComment: "",
+		},
+		{
+			name:        "maximum description quota and disabled status",
+			body:        fmt.Sprintf(`{"description":%q,"quota":%d,"status":2}`, strings.Repeat("다", MaxOrganizationDescriptionLength), MaxOrganizationQuota),
+			wantQuota:   MaxOrganizationQuota,
+			wantStatus:  model.OrganizationStatusDisabled,
+			wantComment: strings.Repeat("다", MaxOrganizationDescriptionLength),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-update-boundary-" + tc.name}
+			org := model.Organization{Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+			require.NoError(t, model.DB.Create(&root).Error)
+			require.NoError(t, model.DB.Create(&org).Error)
+
+			res := performOrganizationRequest(
+				UpdateOrganization,
+				root,
+				http.MethodPatch,
+				fmt.Sprintf("/api/organizations/%d", org.Id),
+				tc.body,
+				gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+			)
+
+			require.Equal(t, http.StatusOK, res.Code)
+			require.Contains(t, res.Body.String(), `"success":true`)
+
+			var reloaded model.Organization
+			require.NoError(t, model.DB.First(&reloaded, org.Id).Error)
+			require.Equal(t, tc.wantQuota, reloaded.Quota)
+			require.Equal(t, tc.wantStatus, reloaded.Status)
+			require.Equal(t, tc.wantComment, reloaded.Description)
+		})
+	}
+}
+
+func TestOrganizationRootRejectsInvalidUpdateInput(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		message string
+	}{
+		{
+			name:    "description too long",
+			body:    fmt.Sprintf(`{"description":%q}`, strings.Repeat("a", MaxOrganizationDescriptionLength+1)),
+			message: "description must be at most 255 characters",
+		},
+		{
+			name:    "quota below minimum",
+			body:    `{"quota":-1}`,
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "quota too large",
+			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "status below enum",
+			body:    `{"status":0}`,
+			message: "status must be one of: 1, 2",
+		},
+		{
+			name:    "invalid status",
+			body:    `{"status":99}`,
+			message: "status must be one of: 1, 2",
+		},
+		{
+			name:    "unsupported field",
+			body:    `{"quota":0,"name":"Acme"}`,
+			message: "unsupported field: name",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-update-" + tc.name}
+			org := model.Organization{Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+			require.NoError(t, model.DB.Create(&root).Error)
+			require.NoError(t, model.DB.Create(&org).Error)
+
+			res := performOrganizationRequest(
+				UpdateOrganization,
+				root,
+				http.MethodPatch,
+				fmt.Sprintf("/api/organizations/%d", org.Id),
+				tc.body,
+				gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+			)
+
+			requireOrganizationApiError(t, res, tc.message)
+		})
+	}
 }
 
 func TestOrganizationAdminCanReadOrganizationProfile(t *testing.T) {
@@ -281,6 +519,44 @@ func TestOrganizationRootCanReadSelectedOrganizationLogs(t *testing.T) {
 	require.NotContains(t, body, otherUser.Username)
 }
 
+func TestOrganizationAdminLogsStayWithinOrganizationAndApplyFilters(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-logs"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-logs"}
+	otherUser := model.User{Username: "outsider", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleMember, AffCode: "outsider-logs"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	otherOrg := model.Organization{Id: 2, Name: "Other", OwnerUserId: 3, Quota: 500, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&otherUser).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&otherOrg).Error)
+	now := time.Now().Unix()
+	logs := []model.Log{
+		{UserId: member.Id, Username: member.Username, Type: model.LogTypeConsume, CreatedAt: now, ModelName: "gpt-4o", Quota: 150, Other: "{}"},
+		{UserId: member.Id, Username: member.Username, Type: model.LogTypeConsume, CreatedAt: now, ModelName: "claude-3-5", Quota: 90, Other: "{}"},
+		{UserId: otherUser.Id, Username: otherUser.Username, Type: model.LogTypeConsume, CreatedAt: now, ModelName: "gpt-4o", Quota: 999, Other: "{}"},
+	}
+	require.NoError(t, model.LOG_DB.Create(&logs).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationLogs,
+		admin,
+		http.MethodGet,
+		"/api/organization/logs?model_name=gpt-4o",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"success":true`)
+	require.Contains(t, body, member.Username)
+	require.Contains(t, body, `"model_name":"gpt-4o"`)
+	require.Contains(t, body, `"total":1`)
+	require.NotContains(t, body, "claude-3-5")
+	require.NotContains(t, body, otherUser.Username)
+}
+
 func TestOrganizationDashboardAcceptsPresetRanges(t *testing.T) {
 	for _, preset := range []string{"today", "30d"} {
 		t.Run(preset, func(t *testing.T) {
@@ -427,6 +703,115 @@ func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
 	require.Equal(t, 100, reloaded.Quota)
 	require.Equal(t, "reviewed", reloaded.Remark)
+}
+
+func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		body       string
+		wantQuota  int
+		wantStatus int
+		wantRemark string
+	}{
+		{
+			name:       "minimum quota and enabled status",
+			body:       `{"quota":0,"status":1,"remark":""}`,
+			wantQuota:  0,
+			wantStatus: common.UserStatusEnabled,
+			wantRemark: "",
+		},
+		{
+			name:       "maximum quota remark and disabled status",
+			body:       fmt.Sprintf(`{"quota":%d,"status":2,"remark":%q}`, MaxOrganizationQuota, strings.Repeat("라", MaxOrganizationRemarkLength)),
+			wantQuota:  MaxOrganizationQuota,
+			wantStatus: common.UserStatusDisabled,
+			wantRemark: strings.Repeat("라", MaxOrganizationRemarkLength),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-user-boundary-" + tc.name}
+			target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, Quota: 10, Status: common.UserStatusEnabled, AffCode: "target-user-boundary-" + tc.name}
+			require.NoError(t, model.DB.Create(&admin).Error)
+			require.NoError(t, model.DB.Create(&target).Error)
+
+			res := performOrganizationRequest(
+				UpdateOrganizationUser,
+				admin,
+				http.MethodPatch,
+				fmt.Sprintf("/api/organization/users/%d", target.Id),
+				tc.body,
+				gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+			)
+
+			require.Equal(t, http.StatusOK, res.Code)
+			require.Contains(t, res.Body.String(), `"success":true`)
+
+			var reloaded model.User
+			require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
+			require.Equal(t, tc.wantQuota, reloaded.Quota)
+			require.Equal(t, tc.wantStatus, reloaded.Status)
+			require.Equal(t, tc.wantRemark, reloaded.Remark)
+		})
+	}
+}
+
+func TestOrganizationAdminRejectsInvalidUserUpdateInput(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		message string
+	}{
+		{
+			name:    "negative quota",
+			body:    `{"quota":-1}`,
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "quota too large",
+			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
+			message: "quota must be between 0 and 1000000000",
+		},
+		{
+			name:    "invalid status",
+			body:    `{"status":99}`,
+			message: "status must be one of: 1, 2",
+		},
+		{
+			name:    "status below enum",
+			body:    `{"status":0}`,
+			message: "status must be one of: 1, 2",
+		},
+		{
+			name:    "remark too long",
+			body:    fmt.Sprintf(`{"remark":%q}`, strings.Repeat("a", MaxOrganizationRemarkLength+1)),
+			message: "remark must be at most 255 characters",
+		},
+		{
+			name:    "unsupported field",
+			body:    `{"quota":0,"role":100}`,
+			message: "unsupported field: role",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOrganizationControllerTestDB(t)
+			admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-invalid-" + tc.name}
+			target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, Quota: 10, AffCode: "target-invalid-" + tc.name}
+			require.NoError(t, model.DB.Create(&admin).Error)
+			require.NoError(t, model.DB.Create(&target).Error)
+
+			res := performOrganizationRequest(
+				UpdateOrganizationUser,
+				admin,
+				http.MethodPatch,
+				fmt.Sprintf("/api/organization/users/%d", target.Id),
+				tc.body,
+				gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+			)
+
+			requireOrganizationApiError(t, res, tc.message)
+		})
+	}
 }
 
 func TestOrganizationAdminCannotUpdateGlobalAdmin(t *testing.T) {

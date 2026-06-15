@@ -18,6 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { OrganizationUserSubscriptionRecord } from '../types'
 
+type UserLike = {
+  id: number
+}
+
 export function getActiveOrganizationSubscriptionUserIds(
   records: OrganizationUserSubscriptionRecord[]
 ): Set<number> {
@@ -33,4 +37,42 @@ export function hasActiveOrganizationSubscription(
   records: OrganizationUserSubscriptionRecord[]
 ): boolean {
   return getActiveOrganizationSubscriptionUserIds(records).has(userId)
+}
+
+export function shouldDisableQuotaForOrganizationSubscription(
+  userId: number,
+  records: OrganizationUserSubscriptionRecord[]
+): boolean {
+  return hasActiveOrganizationSubscription(userId, records)
+}
+
+export function getOrganizationQuotaControlState(
+  userId: number,
+  quota: number,
+  records: OrganizationUserSubscriptionRecord[]
+): {
+  disabled: boolean
+  displayQuota: number
+  hasActivePlan: boolean
+} {
+  const hasActivePlan = hasActiveOrganizationSubscription(userId, records)
+  return {
+    disabled: hasActivePlan,
+    displayQuota: hasActivePlan ? 0 : quota,
+    hasActivePlan,
+  }
+}
+
+export function getAssignableOrganizationSubscriptionUsers<T extends UserLike>(
+  users: T[],
+  records: OrganizationUserSubscriptionRecord[]
+): T[] {
+  const activeUserIds = getActiveOrganizationSubscriptionUserIds(records)
+  return users.filter((user) => !activeUserIds.has(user.id))
+}
+
+export function getVisibleActiveOrganizationSubscriptionRecords(
+  records: OrganizationUserSubscriptionRecord[]
+): OrganizationUserSubscriptionRecord[] {
+  return records.filter((record) => record.subscription.status === 'active')
 }

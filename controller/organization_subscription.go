@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,17 +14,13 @@ import (
 )
 
 type organizationSubscriptionPlanRequest struct {
-	Title                   string `json:"title"`
-	Subtitle                string `json:"subtitle"`
-	DurationUnit            string `json:"duration_unit"`
-	DurationValue           int    `json:"duration_value"`
-	CustomSeconds           int64  `json:"custom_seconds"`
-	Enabled                 *bool  `json:"enabled,omitempty"`
-	SortOrder               int    `json:"sort_order"`
-	UpgradeGroup            string `json:"upgrade_group"`
-	TotalAmount             int64  `json:"total_amount"`
-	QuotaResetPeriod        string `json:"quota_reset_period"`
-	QuotaResetCustomSeconds int64  `json:"quota_reset_custom_seconds"`
+	Title         string `json:"title"`
+	Subtitle      string `json:"subtitle"`
+	DurationUnit  string `json:"duration_unit"`
+	DurationValue int    `json:"duration_value"`
+	CustomSeconds int64  `json:"custom_seconds"`
+	SortOrder     int    `json:"sort_order"`
+	TotalAmount   int64  `json:"total_amount"`
 }
 
 type assignOrganizationSubscriptionRequest struct {
@@ -49,7 +46,7 @@ func CreateOrganizationSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	var req organizationSubscriptionPlanRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -76,7 +73,7 @@ func UpdateOrganizationSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	var req organizationSubscriptionPlanRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -164,7 +161,11 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 	}
 
 	var req assignOrganizationSubscriptionRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := validatePositiveReferenceId("plan_id", req.PlanId); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -234,13 +235,9 @@ func buildOrganizationSubscriptionPlan(organizationId int, req organizationSubsc
 	if err != nil {
 		return nil, err
 	}
-	enabled := true
-	if req.Enabled != nil {
-		enabled = *req.Enabled
-	}
 	plan := &model.OrganizationSubscriptionPlan{
 		OrganizationId: organizationId,
-		Enabled:        enabled,
+		Enabled:        true,
 		DurationUnit:   model.SubscriptionDurationMonth,
 		DurationValue:  1,
 	}
@@ -274,27 +271,50 @@ func buildOrganizationSubscriptionPlan(organizationId int, req organizationSubsc
 }
 
 func buildOrganizationSubscriptionPlanUpdates(req organizationSubscriptionPlanRequest) (map[string]interface{}, error) {
-	title := strings.TrimSpace(req.Title)
-	if title == "" {
-		return nil, errors.New("title is required")
+	title, err := trimAndValidateText("title", req.Title, MaxOrganizationSubscriptionPlanTitleLength, true)
+	if err != nil {
+		return nil, err
 	}
-	if req.TotalAmount < 0 {
-		return nil, errors.New("total_amount cannot be negative")
+	subtitle, err := trimAndValidateText("subtitle", req.Subtitle, MaxOrganizationSubscriptionPlanSubtitleLength, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateInt64Range("total_amount", req.TotalAmount, 0, int64(MaxOrganizationQuota)); err != nil {
+		return nil, err
 	}
 	durationUnit := strings.TrimSpace(req.DurationUnit)
 	if durationUnit == "" {
 		durationUnit = model.SubscriptionDurationMonth
 	}
+	if err := validateOrganizationDurationUnit(durationUnit); err != nil {
+		return nil, err
+	}
 	durationValue := req.DurationValue
-	if durationValue <= 0 && durationUnit != model.SubscriptionDurationCustom {
+	if durationValue < 0 {
+		return nil, errors.New(OrganizationDurationValueRangeError)
+	}
+	if durationValue > MaxOrganizationSubscriptionDurationValue {
+		return nil, errors.New(OrganizationDurationValueRangeError)
+	}
+	if durationValue == 0 && durationUnit != model.SubscriptionDurationCustom {
 		durationValue = 1
+	}
+	if durationUnit == model.SubscriptionDurationCustom {
+		if err := validateInt64Range("custom_seconds", req.CustomSeconds, 1, MaxOrganizationSubscriptionCustomSeconds); err != nil {
+			return nil, err
+		}
+	} else if req.CustomSeconds < 0 || req.CustomSeconds > MaxOrganizationSubscriptionCustomSeconds {
+		return nil, fmt.Errorf("custom_seconds must be between 0 and %d", MaxOrganizationSubscriptionCustomSeconds)
+	}
+	if err := validateIntRange("sort_order", req.SortOrder, -MaxOrganizationSubscriptionSortOrder, MaxOrganizationSubscriptionSortOrder); err != nil {
+		return nil, err
 	}
 	if _, err := model.CalcSubscriptionPlanEndTime(time.Now(), durationUnit, durationValue, req.CustomSeconds); err != nil {
 		return nil, err
 	}
 	updates := map[string]interface{}{
 		"title":                      title,
-		"subtitle":                   strings.TrimSpace(req.Subtitle),
+		"subtitle":                   subtitle,
 		"duration_unit":              durationUnit,
 		"duration_value":             durationValue,
 		"custom_seconds":             req.CustomSeconds,
@@ -303,9 +323,6 @@ func buildOrganizationSubscriptionPlanUpdates(req organizationSubscriptionPlanRe
 		"total_amount":               req.TotalAmount,
 		"quota_reset_period":         model.SubscriptionResetNever,
 		"quota_reset_custom_seconds": int64(0),
-	}
-	if req.Enabled != nil {
-		updates["enabled"] = *req.Enabled
 	}
 	return updates, nil
 }

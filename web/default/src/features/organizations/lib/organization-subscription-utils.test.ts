@@ -20,8 +20,12 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import type { OrganizationUserSubscriptionRecord } from '../types'
 import {
+  getAssignableOrganizationSubscriptionUsers,
   getActiveOrganizationSubscriptionUserIds,
+  getOrganizationQuotaControlState,
+  getVisibleActiveOrganizationSubscriptionRecords,
   hasActiveOrganizationSubscription,
+  shouldDisableQuotaForOrganizationSubscription,
 } from './organization-subscription-utils'
 
 function subscriptionRecord(
@@ -65,5 +69,96 @@ describe('organization subscription utils', () => {
     assert.equal(hasActiveOrganizationSubscription(11, records), true)
     assert.equal(hasActiveOrganizationSubscription(12, records), false)
     assert.equal(hasActiveOrganizationSubscription(13, records), false)
+  })
+
+  test('filters active plan users out of assignable plan users', () => {
+    const records = [
+      subscriptionRecord(11, 'active'),
+      subscriptionRecord(12, 'cancelled'),
+    ]
+    const users = [
+      { id: 11, username: 'active-user' },
+      { id: 12, username: 'cancelled-user' },
+      { id: 13, username: 'plain-user' },
+    ]
+
+    assert.deepEqual(
+      getAssignableOrganizationSubscriptionUsers(users, records).map(
+        (user) => user.id
+      ),
+      [12, 13]
+    )
+  })
+
+  test('marks quota controls disabled only for active organization plan users', () => {
+    const records = [
+      subscriptionRecord(11, 'active'),
+      subscriptionRecord(12, 'cancelled'),
+    ]
+
+    assert.equal(
+      shouldDisableQuotaForOrganizationSubscription(11, records),
+      true
+    )
+    assert.equal(
+      shouldDisableQuotaForOrganizationSubscription(12, records),
+      false
+    )
+    assert.equal(
+      shouldDisableQuotaForOrganizationSubscription(13, records),
+      false
+    )
+  })
+
+  test('shows only active subscriptions in the assignment table after cancellation', () => {
+    const records = [
+      subscriptionRecord(11, 'active'),
+      subscriptionRecord(12, 'cancelled'),
+      subscriptionRecord(13, 'expired'),
+    ]
+
+    assert.deepEqual(
+      getVisibleActiveOrganizationSubscriptionRecords(records).map(
+        (record) => record.subscription.user_id
+      ),
+      [11]
+    )
+  })
+
+  test('returns cancelled plan users to assignable users after cancellation', () => {
+    const records = [
+      subscriptionRecord(11, 'active'),
+      subscriptionRecord(12, 'cancelled'),
+    ]
+    const users = [
+      { id: 11, username: 'active-user' },
+      { id: 12, username: 'cancelled-user' },
+      { id: 13, username: 'plain-user' },
+    ]
+
+    assert.deepEqual(
+      getAssignableOrganizationSubscriptionUsers(users, records).map(
+        (user) => user.username
+      ),
+      ['cancelled-user', 'plain-user']
+    )
+  })
+
+  test('derives quota input disabled state and display balance for active plan users', () => {
+    const records = [
+      subscriptionRecord(11, 'active'),
+      subscriptionRecord(12, 'cancelled'),
+    ]
+
+    assert.deepEqual(getOrganizationQuotaControlState(11, 500, records), {
+      disabled: true,
+      displayQuota: 0,
+      hasActivePlan: true,
+    })
+    assert.deepEqual(getOrganizationQuotaControlState(12, 500, records), {
+      disabled: false,
+      displayQuota: 500,
+      hasActivePlan: false,
+    })
   })
 })

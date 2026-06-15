@@ -3,7 +3,9 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 )
 
 func Unmarshal(data []byte, v any) error {
@@ -16,6 +18,20 @@ func UnmarshalJsonStr(data string, v any) error {
 
 func DecodeJson(reader io.Reader, v any) error {
 	return json.NewDecoder(reader).Decode(v)
+}
+
+func DecodeJsonStrict(reader io.Reader, v any) error {
+	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(v); err != nil {
+		const unknownFieldPrefix = "json: unknown field "
+		if strings.HasPrefix(err.Error(), unknownFieldPrefix) {
+			field := strings.Trim(strings.TrimPrefix(err.Error(), unknownFieldPrefix), `"`)
+			return fmt.Errorf("unsupported field: %s", field)
+		}
+		return err
+	}
+	return nil
 }
 
 func Marshal(v any) ([]byte, error) {

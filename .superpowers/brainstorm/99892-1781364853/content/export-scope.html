@@ -1,0 +1,29 @@
+<h2>Export 범위 — 어떤 필드를 포함할까요?</h2>
+<p class="subtitle">민감한 데이터(비밀번호, 토큰)는 항상 제외됩니다. 그 외 범위를 선택해주세요.</p>
+
+<div class="options">
+  <div class="option" data-choice="basic" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>기본 정보만</h3>
+      <p>ID, Username, DisplayName, Email, Role, Status, Group, Quota, CreatedAt, LastLoginAt</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">가장 안전하고 단순. import 시 새 계정 생성/업데이트에 충분한 정보.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="full" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>전체 관리 정보</h3>
+      <p>기본 정보 + Remark, AffCode, AffQuota, InviterId, OrganizationId, OrganizationRole, UsedQuota, RequestCount</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">백업/마이그레이션 목적에 적합. 더 많은 데이터를 보존.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="custom" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>사용자 지정 (선택 가능)</h3>
+      <p>Export 시 포함할 컬럼을 체크박스로 선택</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">유연하지만 UI가 복잡해짐. 필요한 경우에만 권장.</p>
+    </div>
+  </div>
+</div>

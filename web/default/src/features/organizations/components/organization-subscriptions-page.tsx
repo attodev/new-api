@@ -61,6 +61,10 @@ import {
   getOrganizations,
   updateOrganizationSubscriptionPlan,
 } from '../api'
+import {
+  getAssignableOrganizationSubscriptionUsers,
+  getVisibleActiveOrganizationSubscriptionRecords,
+} from '../lib/organization-subscription-utils'
 import type {
   Organization,
   OrganizationSubscriptionDurationUnit,
@@ -163,16 +167,12 @@ export function OrganizationSubscriptionsPage() {
     [plans]
   )
   const activeRecords = useMemo(
-    () => records.filter((record) => record.subscription.status === 'active'),
+    () => getVisibleActiveOrganizationSubscriptionRecords(records),
     [records]
   )
-  const assignedUserIds = useMemo(
-    () => new Set(activeRecords.map((record) => record.subscription.user_id)),
-    [activeRecords]
-  )
   const assignableUsers = useMemo(
-    () => users.filter((member) => !assignedUserIds.has(member.id)),
-    [assignedUserIds, users]
+    () => getAssignableOrganizationSubscriptionUsers(users, records),
+    [records, users]
   )
 
   const loadOrganizations = useCallback(async () => {

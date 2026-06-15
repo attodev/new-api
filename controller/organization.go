@@ -48,13 +48,32 @@ func CreateOrganization(c *gin.Context) {
 	}
 
 	var req createOrganizationRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
 
+	var err error
+	req.Name, err = trimAndValidateText("name", req.Name, MaxOrganizationNameLength, true)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	req.Description, err = trimAndValidateText("description", req.Description, MaxOrganizationDescriptionLength, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := validatePositiveReferenceId("owner_user_id", req.OwnerUserId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	initialQuota := 0
 	if req.Quota != nil {
+		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		initialQuota = *req.Quota
 	}
 	org, err := model.CreateOrganization(req.Name, req.Description, req.OwnerUserId, initialQuota)
@@ -103,7 +122,7 @@ func UpdateOrganization(c *gin.Context) {
 	}
 
 	var req updateOrganizationRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -118,16 +137,25 @@ func UpdateOrganization(c *gin.Context) {
 		updates["name"] = name
 	}
 	if req.Description != nil {
-		updates["description"] = strings.TrimSpace(*req.Description)
+		description, err := trimAndValidateText("description", *req.Description, MaxOrganizationDescriptionLength, false)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		updates["description"] = description
 	}
 	if req.Quota != nil {
-		if *req.Quota < 0 {
-			common.ApiError(c, errors.New("quota cannot be negative"))
+		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+			common.ApiError(c, err)
 			return
 		}
 		updates["quota"] = *req.Quota
 	}
 	if req.Status != nil {
+		if err := validateOrganizationStatus(*req.Status); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		updates["status"] = *req.Status
 	}
 	if len(updates) == 0 {
@@ -589,20 +617,33 @@ func UpdateOrganizationUser(c *gin.Context) {
 	}
 
 	var req updateOrganizationUserRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
 
 	updates := map[string]interface{}{}
 	if req.Status != nil {
+		if err := validateUserStatus(*req.Status); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		updates["status"] = *req.Status
 	}
 	if req.Quota != nil {
+		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		updates["quota"] = *req.Quota
 	}
 	if req.Remark != nil {
-		updates["remark"] = strings.TrimSpace(*req.Remark)
+		remark, err := trimAndValidateText("remark", *req.Remark, MaxOrganizationRemarkLength, false)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		updates["remark"] = remark
 	}
 	if len(updates) == 0 {
 		common.ApiError(c, errors.New("no organization user fields to update"))
