@@ -140,6 +140,13 @@ export function OrganizationUsersTable() {
   const tokensOnly = currencyMeta.kind === 'tokens'
   const canManageOrganizationUsers =
     Boolean(currentUser?.organization_id) || isOrganizationOwner
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [keyword, setKeyword] = useState('')
+  const [orderBy, setOrderBy] = useState('id')
+  const [orderDir, setOrderDir] = useState<'asc' | 'desc'>('asc')
+  const [keywordInput, setKeywordInput] = useState('')
+
   async function loadUsers() {
     if (!canManageOrganizationUsers) {
       setUsers([])
@@ -149,11 +156,18 @@ export function OrganizationUsersTable() {
     setLoading(true)
     try {
       const [userRes, subscriptionRes] = await Promise.all([
-        getOrganizationUsers({ page: 1, size: 20 }),
+        getOrganizationUsers({
+          page: currentPage,
+          size: 20,
+          keyword: keyword || undefined,
+          order_by: orderBy,
+          order_dir: orderDir,
+        }),
         getOrganizationUserSubscriptions(),
       ])
       if (userRes.success && userRes.data?.items) {
         setUsers(userRes.data.items)
+        setTotalUsers(userRes.data.total)
       } else {
         toast.error(userRes.message || t('Failed to load organization users'))
       }
@@ -231,7 +245,15 @@ export function OrganizationUsersTable() {
 
   useEffect(() => {
     void loadUsers()
-  }, [canManageOrganizationUsers])
+  }, [canManageOrganizationUsers, currentPage, keyword, orderBy, orderDir])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setKeyword(keywordInput)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [keywordInput])
 
   useEffect(() => {
     void loadOrganizations()
@@ -421,6 +443,21 @@ export function OrganizationUsersTable() {
           ? USER_STATUS_DISABLED
           : USER_STATUS_ENABLED,
     })
+  }
+
+  function handleSort(col: string) {
+    if (orderBy === col) {
+      setOrderDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setOrderBy(col)
+      setOrderDir('asc')
+    }
+    setCurrentPage(1)
+  }
+
+  function SortIcon({ col }: { col: string }) {
+    if (orderBy !== col) return <span className='ml-1 text-muted-foreground opacity-40'>↕</span>
+    return <span className='ml-1'>{orderDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   return (
@@ -734,16 +771,52 @@ export function OrganizationUsersTable() {
         </div>
       )}
 
+      <div className='flex items-center gap-2'>
+        <Input
+          value={keywordInput}
+          onChange={(e) => setKeywordInput(e.target.value)}
+          placeholder={t('Search by username or display name')}
+          className='max-w-xs'
+        />
+        {keywordInput && (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => { setKeywordInput(''); setKeyword(''); setCurrentPage(1) }}
+          >
+            ✕
+          </Button>
+        )}
+      </div>
+
       <div className='overflow-x-auto rounded-md border'>
         <table className='w-full min-w-[720px] text-sm'>
           <thead className='bg-muted/50'>
             <tr>
-              <th className='px-3 py-2 text-left font-medium'>
-                {t('Username')}
+              <th
+                className='px-3 py-2 text-left font-medium cursor-pointer select-none'
+                onClick={() => handleSort('username')}
+              >
+                {t('Username')}<SortIcon col='username' />
               </th>
-              <th className='px-3 py-2 text-left font-medium'>{t('Role')}</th>
-              <th className='px-3 py-2 text-left font-medium'>{t('Status')}</th>
-              <th className='px-3 py-2 text-left font-medium'>{t('Quota')}</th>
+              <th
+                className='px-3 py-2 text-left font-medium cursor-pointer select-none'
+                onClick={() => handleSort('organization_role')}
+              >
+                {t('Role')}<SortIcon col='organization_role' />
+              </th>
+              <th
+                className='px-3 py-2 text-left font-medium cursor-pointer select-none'
+                onClick={() => handleSort('status')}
+              >
+                {t('Status')}<SortIcon col='status' />
+              </th>
+              <th
+                className='px-3 py-2 text-left font-medium cursor-pointer select-none'
+                onClick={() => handleSort('quota')}
+              >
+                {t('Quota')}<SortIcon col='quota' />
+              </th>
               <th className='px-3 py-2 text-right font-medium'>
                 {t('Actions')}
               </th>
@@ -868,6 +941,35 @@ export function OrganizationUsersTable() {
           </tbody>
         </table>
       </div>
+      {totalUsers > 20 && (
+        <div className='flex items-center justify-between text-sm text-muted-foreground'>
+          <span>
+            {t('Page {{current}} of {{total}}', {
+              current: currentPage,
+              total: Math.ceil(totalUsers / 20),
+            })}
+            {' '}({t('{{count}} users total', { count: totalUsers })})
+          </span>
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => setCurrentPage(p => p - 1)}
+              disabled={currentPage <= 1 || loading}
+            >
+              {t('Previous')}
+            </Button>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={currentPage >= Math.ceil(totalUsers / 20) || loading}
+            >
+              {t('Next')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
