@@ -4627,6 +4627,8 @@
     "{{count}} members removed from org": "{{count}} members removed from org",
     "Errors": "Errors",
     "Uploading...": "Uploading...",
-    "Import failed": "Import failed"
+    "Import failed": "Import failed",
+    "Search by username or display name": "Search by username or display name",
+    "{{count}} users total": "{{count}} users total"
   }
 }

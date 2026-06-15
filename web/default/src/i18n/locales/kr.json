@@ -4627,6 +4627,8 @@
     "{{count}} members removed from org": "{{count}}명 조직에서 제거됨",
     "Errors": "오류",
     "Uploading...": "업로드 중...",
-    "Import failed": "가져오기 실패"
+    "Import failed": "가져오기 실패",
+    "Search by username or display name": "사용자명 또는 표시 이름으로 검색",
+    "{{count}} users total": "총 {{count}}명"
   }
 }
