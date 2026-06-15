@@ -48,6 +48,7 @@ export function OrgUsersImportDialog({
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<OrgImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [removeAbsent, setRemoveAbsent] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -63,7 +64,7 @@ export function OrgUsersImportDialog({
     setLoading(true)
     setError(null)
     try {
-      const res = await importOrgUsers(file, organizationId)
+      const res = await importOrgUsers(file, organizationId, removeAbsent)
       setResult(res)
     } catch (e: any) {
       setError(e?.response?.data?.message ?? t('Import failed'))
@@ -77,6 +78,7 @@ export function OrgUsersImportDialog({
     setFile(null)
     setResult(null)
     setError(null)
+    setRemoveAbsent(false)
     onOpenChange(false)
   }
 
@@ -104,6 +106,17 @@ export function OrgUsersImportDialog({
             {file ? file.name : t('Select .xlsx file')}
           </Button>
 
+          <label className='flex items-center gap-2 text-sm cursor-pointer'>
+            <input
+              type='checkbox'
+              checked={removeAbsent}
+              onChange={(e) => setRemoveAbsent(e.target.checked)}
+              disabled={loading}
+              className='h-4 w-4'
+            />
+            {t('Remove members not in file')}
+          </label>
+
           {result && (
             <div className='rounded-md border p-3 text-sm space-y-1'>
               {result.assigned > 0 && (
@@ -116,9 +129,14 @@ export function OrgUsersImportDialog({
                   ✓ {t('{{count}} members created', { count: result.created })}
                 </p>
               )}
-              {result.skipped > 0 && (
+              {result.updated > 0 && (
+                <p className='text-blue-600'>
+                  ✓ {t('{{count}} members updated', { count: result.updated })}
+                </p>
+              )}
+              {result.removed > 0 && (
                 <p className='text-amber-600'>
-                  ⚠ {t('{{count}} members skipped (already in org)', { count: result.skipped })}: {result.skipped_usernames.join(', ')}
+                  ✓ {t('{{count}} members removed from org', { count: result.removed })}: {result.removed_usernames.join(', ')}
                 </p>
               )}
               {result.errors.length > 0 && (
