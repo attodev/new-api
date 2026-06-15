@@ -741,7 +741,7 @@ func ImportOrganizationUsers(c *gin.Context) {
 	}
 	defer f.Close()
 
-	result, err := service.ImportOrgUsersFromFile(f, organizationId)
+	result, err := service.ImportOrgUsersFromFile(f, organizationId, false)
 	if err != nil {
 		common.ApiError(c, err)
 		return

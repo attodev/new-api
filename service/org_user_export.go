@@ -85,17 +85,21 @@ func BuildOrgExportFile(organizationId int) (*excelize.File, error) {
 type OrgImportResult struct {
 	Assigned         int      `json:"assigned"`
 	Created          int      `json:"created"`
-	Skipped          int      `json:"skipped"`
-	SkippedUsernames []string `json:"skipped_usernames"`
+	Updated          int      `json:"updated"`
+	UpdatedUsernames []string `json:"updated_usernames"`
+	Removed          int      `json:"removed"`
+	RemovedUsernames []string `json:"removed_usernames"`
 	Errors           []string `json:"errors"`
 }
 
 // ImportOrgUsersFromFile parses an Excel file and assigns/creates users for an org.
-func ImportOrgUsersFromFile(f *excelize.File, organizationId int) (*OrgImportResult, error) {
+func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent bool) (*OrgImportResult, error) {
 	result := &OrgImportResult{
-		SkippedUsernames: []string{},
+		UpdatedUsernames: []string{},
+		RemovedUsernames: []string{},
 		Errors:           []string{},
 	}
+	presentUsernames := map[string]bool{}
 
 	sheetName := f.GetSheetName(0)
 	rows, err := f.GetRows(sheetName)
@@ -153,8 +157,43 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int) (*OrgImportRes
 
 		if userExists {
 			if existingUser.OrganizationId == organizationId {
-				result.Skipped++
-				result.SkippedUsernames = append(result.SkippedUsernames, username)
+				updates := map[string]interface{}{}
+				if dn := getCell(row, "display_name"); dn != "" {
+					updates["display_name"] = dn
+				}
+				if orgRole != "" && orgRole != existingUser.OrganizationRole {
+					updates["organization_role"] = orgRole
+				}
+				if grp := getCell(row, "group"); grp != "" {
+					updates["group"] = grp
+				}
+				if st := getCell(row, "status"); st != "" {
+					updates["status"] = stringToStatus(st)
+				}
+				updates["remark"] = getCell(row, "remark")
+				if len(updates) > 0 {
+					if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
+						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
+						presentUsernames[username] = true
+						continue
+					}
+				}
+				if qs := getCell(row, "quota"); qs != "" {
+					if newQuota, err := strconv.Atoi(qs); err == nil {
+						delta := newQuota - int(existingUser.Quota)
+						if delta > 0 {
+							_ = model.IncreaseUserQuota(existingUser.Id, delta, true)
+						} else if delta < 0 {
+							_ = model.DecreaseUserQuota(existingUser.Id, -delta, true)
+						}
+					}
+				}
+				if err := model.InvalidateUserCache(existingUser.Id); err != nil {
+					common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
+				}
+				presentUsernames[username] = true
+				result.Updated++
+				result.UpdatedUsernames = append(result.UpdatedUsernames, username)
 				continue
 			}
 			if existingUser.OrganizationId > 0 {
@@ -174,6 +213,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int) (*OrgImportRes
 			if err := model.InvalidateUserCache(existingUser.Id); err != nil {
 				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
 			}
+			presentUsernames[username] = true
 			result.Assigned++
 			continue
 		}
@@ -243,7 +283,35 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int) (*OrgImportRes
 			}
 		}
 
+		presentUsernames[username] = true
 		result.Created++
+	}
+
+	if removeAbsent {
+		var currentMembers []model.User
+		if err := model.DB.
+			Where("organization_id = ? AND organization_role != ?", organizationId, "owner").
+			Find(&currentMembers).Error; err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("remove-absent: failed to query members: %v", err))
+		} else {
+			for _, member := range currentMembers {
+				if presentUsernames[member.Username] {
+					continue
+				}
+				if err := model.DB.Model(&model.User{}).
+					Select("organization_id", "organization_role").
+					Where("id = ?", member.Id).
+					Updates(model.User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("remove-absent (%s): failed to remove: %v", member.Username, err))
+					continue
+				}
+				if err := model.InvalidateUserCache(member.Id); err != nil {
+					common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + member.Username)
+				}
+				result.Removed++
+				result.RemovedUsernames = append(result.RemovedUsernames, member.Username)
+			}
+		}
 	}
 
 	return result, nil
