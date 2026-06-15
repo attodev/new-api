@@ -4617,6 +4617,16 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Import Organization Members": "Import Organization Members",
+    "Select .xlsx file": "Select .xlsx file",
+    "Remove members not in file": "Remove members not in file",
+    "{{count}} members assigned": "{{count}} members assigned",
+    "{{count}} members created": "{{count}} members created",
+    "{{count}} members updated": "{{count}} members updated",
+    "{{count}} members removed from org": "{{count}} members removed from org",
+    "Errors": "Errors",
+    "Uploading...": "Uploading...",
+    "Import failed": "Import failed"
   }
 }
