@@ -65,8 +65,8 @@ func BuildOrgExportFile(organizationId int) (*excelize.File, error) {
 			u.Username,
 			u.DisplayName,
 			u.OrganizationRole,
-			u.Quota,
-			u.UsedQuota,
+			float64(u.Quota) / common.QuotaPerUnit,
+			float64(u.UsedQuota) / common.QuotaPerUnit,
 			u.Group,
 			statusToString(u.Status),
 			u.Remark,
@@ -176,7 +176,8 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 					continue
 				}
 				if qs := getCell(row, "quota"); qs != "" {
-					if newQuota, err := strconv.Atoi(qs); err == nil {
+					if usd, err := strconv.ParseFloat(qs, 64); err == nil {
+						newQuota := int(usd * common.QuotaPerUnit)
 						delta := newQuota - int(existingUser.Quota)
 						if delta > 0 {
 							_ = model.IncreaseUserQuota(existingUser.Id, delta, true)
@@ -224,8 +225,8 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 
 		quota := 0
 		if qs := getCell(row, "quota"); qs != "" {
-			if q, err := strconv.Atoi(qs); err == nil {
-				quota = q
+			if usd, err := strconv.ParseFloat(qs, 64); err == nil {
+				quota = int(usd * common.QuotaPerUnit)
 			} else {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q", lineNum, username, qs))
 				continue
