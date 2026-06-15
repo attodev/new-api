@@ -161,7 +161,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 				if dn := getCell(row, "display_name"); dn != "" {
 					updates["display_name"] = dn
 				}
-				if orgRole != "" && orgRole != existingUser.OrganizationRole {
+				if orgRole != existingUser.OrganizationRole {
 					updates["organization_role"] = orgRole
 				}
 				if grp := getCell(row, "group"); grp != "" {
@@ -171,12 +171,9 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 					updates["status"] = stringToStatus(st)
 				}
 				updates["remark"] = getCell(row, "remark")
-				if len(updates) > 0 {
-					if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
-						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
-						presentUsernames[username] = true
-						continue
-					}
+				if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
+					continue
 				}
 				if qs := getCell(row, "quota"); qs != "" {
 					if newQuota, err := strconv.Atoi(qs); err == nil {
