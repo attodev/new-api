@@ -259,11 +259,17 @@ export async function getOrganizationUsers(params: {
   page?: number
   size?: number
   organization_id?: number | null
+  keyword?: string
+  order_by?: string
+  order_dir?: 'asc' | 'desc'
 }): Promise<ApiResponse<OrganizationUsersPage>> {
   const search = new URLSearchParams()
   if (params.page) search.set('p', String(params.page))
   if (params.size) search.set('page_size', String(params.size))
   appendOrganizationId(search, params.organization_id)
+  if (params.keyword) search.set('keyword', params.keyword)
+  if (params.order_by) search.set('order_by', params.order_by)
+  if (params.order_dir) search.set('order_dir', params.order_dir)
   const suffix = search.toString() ? `?${search.toString()}` : ''
   const res = await api.get(`/api/organization/users${suffix}`)
   return res.data
