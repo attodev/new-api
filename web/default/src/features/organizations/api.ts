@@ -98,11 +98,13 @@ export async function exportOrgUsers(organizationId?: number): Promise<void> {
 
 export async function importOrgUsers(
   file: File,
-  organizationId?: number
+  organizationId?: number,
+  removeAbsent?: boolean
 ): Promise<OrgImportResult> {
   const params = organizationId ? `?organization_id=${organizationId}` : ''
   const form = new FormData()
   form.append('file', file)
+  if (removeAbsent) form.append('remove_absent', 'true')
   const res = await api.post(`/api/organization/users/import${params}`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })

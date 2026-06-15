@@ -91,8 +91,10 @@ export interface OrganizationUpdatePayload {
 export interface OrgImportResult {
   assigned: number
   created: number
-  skipped: number
-  skipped_usernames: string[]
+  updated: number
+  updated_usernames: string[]
+  removed: number
+  removed_usernames: string[]
   errors: string[]
 }
 
