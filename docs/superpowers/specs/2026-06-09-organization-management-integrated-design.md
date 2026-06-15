@@ -238,6 +238,46 @@
 
 ## 9. API 설계
 
+### 9.0 입력값 검증 정책
+
+조직 관련 `POST`, `PUT`, `PATCH` API는 서버에서 입력값의 최소값, 최대값, enum 범위를 강제한다. 프론트엔드에서 같은 제한을 안내하더라도 최종 기준은 백엔드 검증이다.
+
+쓰기 API body는 strict JSON decoding을 사용한다. 각 API가 문서화한 필드 외의 값을 보내면 무시하지 않고 `unsupported field: <field>` 오류를 반환한다.
+
+공통 제한:
+
+| 항목 | 허용 범위 |
+| --- | --- |
+| 조직 이름 | trim 후 1자 이상 64자 이하 |
+| 조직 설명 | trim 후 255자 이하 |
+| 조직 사용자 remark | trim 후 255자 이하 |
+| 조직 quota | 0 이상 1,000,000,000 이하 |
+| 조직/사용자/플랜 참조 ID | 1 이상 1,000,000,000 이하 |
+| 조직 상태 | `1` enabled, `2` disabled |
+| 사용자 상태 | `1` enabled, `2` disabled |
+| 조직 구독 플랜 제목 | trim 후 1자 이상 128자 이하 |
+| 조직 구독 플랜 부제목 | trim 후 255자 이하 |
+| 조직 구독 플랜 금액 `total_amount` | 0 이상 1,000,000,000 이하 |
+| 구독 기간 단위 `duration_unit` | `year`, `month`, `day`, `hour`, `custom` 중 하나 |
+| 구독 기간 값 `duration_value` | 0 이상 1200 이하. custom이 아니고 0이면 1로 보정 |
+| 사용자 지정 기간 초 `custom_seconds` | custom일 때 1 이상 31,536,000 이하 |
+| 플랜 정렬값 `sort_order` | -1,000,000 이상 1,000,000 이하 |
+
+조직 충전 금액은 결제 provider별 기존 정책을 따르되 비정상적으로 큰 값을 막는다. Epay, Waffo, Waffo Pancake 계열은 1,000,000,000 이하를 허용하고, Stripe와 PayPal 계산 API는 10,000 이하를 허용한다.
+
+대표 오류 메시지:
+
+| 상황 | 메시지 |
+| --- | --- |
+| 허용되지 않은 body 필드 | `unsupported field: <field>` |
+| 필수 문자열 누락 | `<field> is required` |
+| 문자열 길이 초과 | `<field> must be at most N characters` |
+| 숫자 범위 초과 | `<field> must be between min and max` |
+| 참조 ID가 0 이하 | `<field> must be greater than 0` |
+| 참조 ID가 최대값 초과 | `<field> must be at most 1000000000` |
+| status enum 오류 | `status must be one of: 1, 2` |
+| duration_unit enum 오류 | `duration_unit must be one of: year, month, day, hour, custom` |
+
 ### 9.1 조직 관리
 
 대표 API:
@@ -438,6 +478,7 @@
 백엔드 테스트:
 
 - 조직 생성과 조직 소유자 지정
+- 조직 생성/수정, 조직 사용자 수정, 조직 구독 플랜 생성/수정, 구독 할당 API의 입력값 범위와 enum 검증
 - 조직과 무관한 사용자만 조직 소유자로 선택 가능
 - 조직 admin/owner 권한 검증
 - 조직 밖 사용자 관리 차단
@@ -462,6 +503,7 @@
 - active 플랜 사용자는 플랜 할당 드롭다운에서 제외됨
 - 플랜 취소 후 목록에서 사라지고 다시 할당 가능해짐
 - 한국어 UI에서 지갑 화면의 주요 문구가 번역됨
+- UI 언어 선택지는 영어와 한국어만 제공하고 제거된 언어 값은 영어로 fallback됨
 
 ## 16. 운영 및 수동 테스트 시나리오
 
