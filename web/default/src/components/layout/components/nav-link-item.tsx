@@ -50,6 +50,14 @@ export function NavLinkItem({ link, className }: NavLinkItemProps) {
     )
   }
 
+  if (link.forceReload) {
+    return (
+      <a href={link.href} className={linkClassName} aria-disabled={link.disabled}>
+        {link.title}
+      </a>
+    )
+  }
+
   return (
     <Link to={link.href} className={linkClassName} disabled={link.disabled}>
       {link.title}

@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useStatus } from '@/hooks/use-status'
@@ -56,8 +55,8 @@ export function SystemBrand(props: SystemBrandProps) {
 
   if (variant === 'inline') {
     return (
-      <Link
-        to='/'
+      <a
+        href='/'
         aria-label={t('Go to home')}
         className={cn(
           'text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors outline-none select-none',
@@ -72,7 +71,7 @@ export function SystemBrand(props: SystemBrandProps) {
           />
         </div>
         <span className='max-w-[12rem] truncate'>{name}</span>
-      </Link>
+      </a>
     )
   }
 

@@ -196,8 +196,8 @@ export function PublicHeader(props: PublicHeaderProps) {
             )}
           >
             {/* Logo */}
-            <Link
-              to={homeUrl}
+            <a
+              href={homeUrl}
               className='group flex shrink-0 items-center gap-2.5'
             >
               <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
@@ -217,7 +217,7 @@ export function PublicHeader(props: PublicHeaderProps) {
               <span className='text-sm font-semibold tracking-tight'>
                 {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
               </span>
-            </Link>
+            </a>
 
             {/* Desktop nav */}
             <div className='hidden items-center gap-0.5 sm:flex'>
@@ -235,6 +235,25 @@ export function PublicHeader(props: PublicHeaderProps) {
                       onClick={(event) => handleNavLinkClick(event, link)}
                       className={cn(
                         'text-muted-foreground hover:text-foreground rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-200',
+                        link.disabled && 'pointer-events-none opacity-50'
+                      )}
+                    >
+                      {t(link.title)}
+                    </a>
+                  )
+                }
+                if (link.forceReload) {
+                  return (
+                    <a
+                      key={i}
+                      href={link.href}
+                      aria-disabled={link.disabled}
+                      tabIndex={link.disabled ? -1 : undefined}
+                      className={cn(
+                        'rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-200',
+                        isActive
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
@@ -376,6 +395,20 @@ export function PublicHeader(props: PublicHeaderProps) {
                     aria-disabled={link.disabled}
                     tabIndex={link.disabled ? -1 : undefined}
                     onClick={(event) => handleNavLinkClick(event, link, true)}
+                    className={linkClassName}
+                    style={transitionStyle}
+                  >
+                    {t(link.title)}
+                  </a>
+                )
+              }
+              if (link.forceReload) {
+                return (
+                  <a
+                    key={i}
+                    href={link.href}
+                    aria-disabled={link.disabled}
+                    tabIndex={link.disabled ? -1 : undefined}
                     className={linkClassName}
                     style={transitionStyle}
                   >

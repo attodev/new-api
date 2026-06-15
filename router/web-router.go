@@ -19,6 +19,9 @@ type ThemeAssets struct {
 	DefaultIndexPage []byte
 	ClassicBuildFS   embed.FS
 	ClassicIndexPage []byte
+	LandingPageKo    []byte
+	LandingPageEn    []byte
+	LandingLogoSVG   []byte
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
@@ -29,6 +32,28 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
 	router.Use(middleware.Cache())
+
+	// Landing page routes — served before the SPA static handler
+	router.GET("/", func(c *gin.Context) {
+		acceptLang := c.GetHeader("Accept-Language")
+		if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageEn)
+		} else {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageKo)
+		}
+	})
+	router.GET("/index.html", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageKo)
+	})
+	router.GET("/index_en.html", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageEn)
+	})
+	if len(assets.LandingLogoSVG) > 0 {
+		router.GET("/logo.svg", func(c *gin.Context) {
+			c.Data(http.StatusOK, "image/svg+xml", assets.LandingLogoSVG)
+		})
+	}
+
 	router.Use(static.Serve("/", themeFS))
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
