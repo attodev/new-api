@@ -4617,6 +4617,16 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu AI",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "확대/축소"
+    "Zoom": "확대/축소",
+    "Import Organization Members": "조직 멤버 가져오기",
+    "Select .xlsx file": ".xlsx 파일 선택",
+    "Remove members not in file": "파일에 없는 멤버 조직에서 제거",
+    "{{count}} members assigned": "{{count}}명 배정됨",
+    "{{count}} members created": "{{count}}명 생성됨",
+    "{{count}} members updated": "{{count}}명 업데이트됨",
+    "{{count}} members removed from org": "{{count}}명 조직에서 제거됨",
+    "Errors": "오류",
+    "Uploading...": "업로드 중...",
+    "Import failed": "가져오기 실패"
   }
 }
