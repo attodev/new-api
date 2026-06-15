@@ -635,20 +635,24 @@ func PostConsumeOrganizationUserSubscriptionDelta(organizationUserSubscriptionId
 		return nil
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		var sub OrganizationUserSubscription
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", organizationUserSubscriptionId).First(&sub).Error; err != nil {
-			return err
-		}
-		newUsed := sub.AmountUsed + delta
-		if newUsed < 0 {
-			newUsed = 0
-		}
-		if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
-			return fmt.Errorf("organization subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
-		}
-		sub.AmountUsed = newUsed
-		return tx.Save(&sub).Error
+		return postConsumeOrganizationUserSubscriptionDeltaTx(tx, organizationUserSubscriptionId, delta)
 	})
+}
+
+func postConsumeOrganizationUserSubscriptionDeltaTx(tx *gorm.DB, organizationUserSubscriptionId int, delta int64) error {
+	var sub OrganizationUserSubscription
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", organizationUserSubscriptionId).First(&sub).Error; err != nil {
+		return err
+	}
+	newUsed := sub.AmountUsed + delta
+	if newUsed < 0 {
+		newUsed = 0
+	}
+	if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
+		return fmt.Errorf("organization subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
+	}
+	sub.AmountUsed = newUsed
+	return tx.Save(&sub).Error
 }
 
 func RefundOrganizationSubscriptionPreConsume(requestId string) error {
@@ -664,7 +668,7 @@ func RefundOrganizationSubscriptionPreConsume(requestId string) error {
 			return nil
 		}
 		if record.PreConsumed > 0 {
-			if err := PostConsumeOrganizationUserSubscriptionDelta(record.OrganizationUserSubscriptionId, -record.PreConsumed); err != nil {
+			if err := postConsumeOrganizationUserSubscriptionDeltaTx(tx, record.OrganizationUserSubscriptionId, -record.PreConsumed); err != nil {
 				return err
 			}
 		}

@@ -30,6 +30,8 @@ import type { UserWalletData } from '@/features/wallet/types'
 import { getMyOrganizationSubscription } from '../api'
 import type { OrganizationUserSubscriptionRecord } from '../types'
 
+type OrganizationWalletTranslate = (key: string) => string
+
 function getSubscriptionStatusKey(status: string): string {
   switch (status) {
     case 'active':
@@ -40,6 +42,18 @@ function getSubscriptionStatusKey(status: string): string {
       return 'Subscription status expired'
     default:
       return status
+  }
+}
+
+export function getOrganizationMemberWalletBalanceDisplay(
+  subscription: OrganizationUserSubscriptionRecord | null,
+  t: OrganizationWalletTranslate
+) {
+  if (subscription?.subscription?.status !== 'active') return undefined
+
+  return {
+    value: t('Organization plan in use'),
+    description: t('Balance is managed by the assigned organization plan'),
   }
 }
 
@@ -78,7 +92,10 @@ export function OrganizationMemberWalletSummary() {
     void fetchUser()
   }, [fetchUser])
 
-  const hasActivePlan = subscription?.subscription?.status === 'active'
+  const balanceDisplay = getOrganizationMemberWalletBalanceDisplay(
+    subscription,
+    t
+  )
 
   return (
     <SectionPageLayout>
@@ -88,16 +105,7 @@ export function OrganizationMemberWalletSummary() {
           <WalletStatsCard
             user={user}
             loading={loading}
-            balanceDisplay={
-              hasActivePlan
-                ? {
-                    value: t('Organization plan in use'),
-                    description: t(
-                      'Balance is managed by the assigned organization plan'
-                    ),
-                  }
-                : undefined
-            }
+            balanceDisplay={balanceDisplay}
           />
 
           <TitledCard
