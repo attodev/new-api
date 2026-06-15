@@ -38,7 +38,14 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	model.DB = db
 	model.LOG_DB = db
-	require.NoError(t, db.AutoMigrate(&model.Organization{}, &model.User{}, &model.QuotaData{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(
+		&model.Organization{},
+		&model.User{},
+		&model.QuotaData{},
+		&model.Log{},
+		&model.OrganizationSubscriptionPlan{},
+		&model.OrganizationUserSubscription{},
+	))
 
 	t.Cleanup(func() {
 		sqlDB, err := db.DB()
@@ -995,4 +1002,252 @@ func TestOrganizationOwnerCannotAssignInvalidRole(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, res.Code)
 	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// ListOrganizations
+// ---------------------------------------------------------------------------
+
+func TestOrganizationRootCanListOrganizations(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	org1 := model.Organization{Name: "Alpha", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+	org2 := model.Organization{Name: "Beta", OwnerUserId: 1, Quota: 200, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&org1).Error)
+	require.NoError(t, model.DB.Create(&org2).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizations,
+		root,
+		http.MethodGet,
+		"/api/organizations",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"success":true`)
+	require.Contains(t, body, `"Alpha"`)
+	require.Contains(t, body, `"Beta"`)
+}
+
+func TestOrganizationNonRootCannotListOrganizations(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizations,
+		owner,
+		http.MethodGet,
+		"/api/organizations",
+		"",
+	)
+
+	requireOrganizationApiError(t, res, "root permission required")
+}
+
+// ---------------------------------------------------------------------------
+// DeleteOrganization
+// ---------------------------------------------------------------------------
+
+func TestOrganizationRootCanDeleteOrganization(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	org := model.Organization{Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		DeleteOrganization,
+		root,
+		http.MethodDelete,
+		fmt.Sprintf("/api/organizations/%d", org.Id),
+		"",
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+
+	var count int64
+	model.DB.Model(&model.Organization{}).Where("id = ?", org.Id).Count(&count)
+	require.Equal(t, int64(0), count)
+}
+
+func TestOrganizationRootDeleteNotFound(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root"}
+	require.NoError(t, model.DB.Create(&root).Error)
+
+	res := performOrganizationRequest(
+		DeleteOrganization,
+		root,
+		http.MethodDelete,
+		"/api/organizations/99999",
+		"",
+		gin.Param{Key: "id", Value: "99999"},
+	)
+
+	require.Equal(t, http.StatusNotFound, res.Code)
+	require.Contains(t, res.Body.String(), "organization not found")
+}
+
+func TestOrganizationNonRootCannotDeleteOrganization(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		DeleteOrganization,
+		owner,
+		http.MethodDelete,
+		fmt.Sprintf("/api/organizations/%d", org.Id),
+		"",
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+	)
+
+	requireOrganizationApiError(t, res, "root permission required")
+}
+
+// ---------------------------------------------------------------------------
+// GetOrganizationProfile — missing branch: member (non-admin) is rejected
+// ---------------------------------------------------------------------------
+
+func TestOrganizationMemberCannotReadProfile(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationProfile,
+		member,
+		http.MethodGet,
+		"/api/organization",
+		"",
+	)
+
+	requireOrganizationApiError(t, res, "organization admin permission required")
+}
+
+// ---------------------------------------------------------------------------
+// ListOrganizationUsers — search / sort / pagination
+// ---------------------------------------------------------------------------
+
+func TestOrganizationAdminCanListOrganizationUsers(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	member := model.User{Username: "alice", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "alice"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizationUsers,
+		owner,
+		http.MethodGet,
+		"/api/organization/users",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"success":true`)
+	require.Contains(t, body, `"alice"`)
+}
+
+func TestOrganizationUsersKeywordSearch(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	alice := model.User{Username: "alice", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "alice"}
+	bob := model.User{Username: "bob", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "bob"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&alice).Error)
+	require.NoError(t, model.DB.Create(&bob).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizationUsers,
+		owner,
+		http.MethodGet,
+		"/api/organization/users?keyword=ali",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"alice"`)
+	require.NotContains(t, body, `"bob"`)
+}
+
+func TestOrganizationUsersSort(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	alice := model.User{Username: "alice", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, Quota: 100, AffCode: "alice"}
+	bob := model.User{Username: "bob", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, Quota: 200, AffCode: "bob"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&alice).Error)
+	require.NoError(t, model.DB.Create(&bob).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	// sort by quota desc — bob (200) should appear before alice (100)
+	res := performOrganizationRequest(
+		ListOrganizationUsers,
+		owner,
+		http.MethodGet,
+		"/api/organization/users?order_by=quota&order_dir=desc",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	bobPos := strings.Index(body, `"bob"`)
+	alicePos := strings.Index(body, `"alice"`)
+	require.True(t, bobPos < alicePos, "bob (higher quota) should appear before alice in desc order")
+}
+
+func TestOrganizationUsersInvalidOrderByFallsBackToId(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	// unknown order_by must not cause an error
+	res := performOrganizationRequest(
+		ListOrganizationUsers,
+		owner,
+		http.MethodGet,
+		"/api/organization/users?order_by=injected;DROP+TABLE+users--&order_dir=asc",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+}
+
+func TestOrganizationUsersMemberCannotList(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizationUsers,
+		member,
+		http.MethodGet,
+		"/api/organization/users",
+		"",
+	)
+
+	requireOrganizationApiError(t, res, "organization admin permission required")
 }

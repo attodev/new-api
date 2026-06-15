@@ -502,3 +502,255 @@ func TestOrganizationAdminCanCancelAndReassignSubscription(t *testing.T) {
 	require.NoError(t, model.DB.First(&cancelledSub, previousSub.Id).Error)
 	require.Equal(t, "cancelled", cancelledSub.Status)
 }
+
+// ---------------------------------------------------------------------------
+// ListOrganizationSubscriptionPlans — success path with plans present
+// ---------------------------------------------------------------------------
+
+func TestOrganizationAdminCanListSubscriptionPlans(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-list-plans"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	plan1 := model.OrganizationSubscriptionPlan{OrganizationId: 1, Title: "Starter", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 500, Enabled: true}
+	plan2 := model.OrganizationSubscriptionPlan{OrganizationId: 1, Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 1000, Enabled: true}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&plan1).Error)
+	require.NoError(t, model.DB.Create(&plan2).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizationSubscriptionPlans,
+		owner,
+		http.MethodGet,
+		"/api/organization/subscription/plans",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"success":true`)
+	require.Contains(t, body, `"Starter"`)
+	require.Contains(t, body, `"Pro"`)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateOrganization — missing branches
+// ---------------------------------------------------------------------------
+
+func TestOrganizationUpdateRejectsNoFields(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-update-no-fields"}
+	org := model.Organization{Name: "Acme", OwnerUserId: 1, Quota: 100, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganization,
+		root,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organizations/%d", org.Id),
+		`{}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", org.Id)},
+	)
+
+	requireOrganizationApiError(t, res, "no organization fields to update")
+}
+
+func TestOrganizationUpdateRejectsInvalidId(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-update-bad-id"}
+	require.NoError(t, model.DB.Create(&root).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganization,
+		root,
+		http.MethodPatch,
+		"/api/organizations/not-a-number",
+		`{"quota":100}`,
+		gin.Param{Key: "id", Value: "not-a-number"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateOrganizationUser — missing branches
+// ---------------------------------------------------------------------------
+
+func TestOrganizationAdminUpdateUserRejectsNoFields(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-update-no-fields"}
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-update-no-fields"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganizationUser,
+		admin,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organization/users/%d", member.Id),
+		`{}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", member.Id)},
+	)
+
+	requireOrganizationApiError(t, res, "no organization user fields to update")
+}
+
+func TestOrganizationAdminUpdateUserRejectsOutsideOrg(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-cross-org"}
+	outsider := model.User{Username: "outsider", Password: "password", Role: common.RoleCommonUser, OrganizationId: 2, OrganizationRole: model.OrganizationRoleMember, AffCode: "outsider-cross-org"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&outsider).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganizationUser,
+		admin,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organization/users/%d", outsider.Id),
+		`{"quota":100}`,
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", outsider.Id)},
+	)
+
+	requireOrganizationApiError(t, res, "organization target permission denied")
+}
+
+func TestOrganizationAdminUpdateUserRejectsNonExistentUser(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-ghost-user"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganizationUser,
+		admin,
+		http.MethodPatch,
+		"/api/organization/users/99999",
+		`{"quota":100}`,
+		gin.Param{Key: "id", Value: "99999"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// DeleteOrganization — invalid param
+// ---------------------------------------------------------------------------
+
+func TestOrganizationDeleteRejectsInvalidId(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-delete-bad-id"}
+	require.NoError(t, model.DB.Create(&root).Error)
+
+	res := performOrganizationRequest(
+		DeleteOrganization,
+		root,
+		http.MethodDelete,
+		"/api/organizations/not-a-number",
+		"",
+		gin.Param{Key: "id", Value: "not-a-number"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// AssignOrganizationUser — non-existent target
+// ---------------------------------------------------------------------------
+
+func TestOrganizationOwnerAssignNonExistentUser(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-assign-ghost"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		AssignOrganizationUser,
+		owner,
+		http.MethodPut,
+		"/api/organization/users/99999/membership",
+		`{"organization_role":"member"}`,
+		gin.Param{Key: "id", Value: "99999"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// UpdateOrganizationSubscriptionPlan — missing branches
+// ---------------------------------------------------------------------------
+
+func TestOrganizationSubscriptionPlanUpdateRejectsInvalidId(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-update-plan-bad-id"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganizationSubscriptionPlan,
+		owner,
+		http.MethodPatch,
+		"/api/organization/subscription/plans/not-a-number",
+		`{"title":"X","duration_unit":"month","duration_value":1,"total_amount":100}`,
+		gin.Param{Key: "id", Value: "not-a-number"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
+
+// ---------------------------------------------------------------------------
+// CancelOrganizationUserSubscription — non-admin path and invalid param
+// ---------------------------------------------------------------------------
+
+func TestOrganizationMemberCannotCancelSubscription(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-cancel-sub"}
+	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "target-cancel-sub"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		CancelOrganizationUserSubscription,
+		member,
+		http.MethodDelete,
+		fmt.Sprintf("/api/organization/subscription/users/%d", target.Id),
+		"",
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
+	)
+
+	requireOrganizationApiError(t, res, "organization admin permission required")
+}
+
+func TestOrganizationCancelSubscriptionRejectsInvalidId(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-cancel-bad-id"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		CancelOrganizationUserSubscription,
+		admin,
+		http.MethodDelete,
+		"/api/organization/subscription/users/not-a-number",
+		"",
+		gin.Param{Key: "id", Value: "not-a-number"},
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+}
