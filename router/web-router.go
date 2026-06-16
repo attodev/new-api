@@ -19,15 +19,17 @@ type ThemeAssets struct {
 	DefaultIndexPage []byte
 	ClassicBuildFS   embed.FS
 	ClassicIndexPage []byte
-	LandingPageKo    []byte
-	LandingPageEn    []byte
-	LandingLogoSVG   []byte
+	PublicFS         embed.FS
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
 	classicFS := common.EmbedFolder(assets.ClassicBuildFS, "web/classic/dist")
 	themeFS := common.NewThemeAwareFS(defaultFS, classicFS)
+	publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
+
+	landingKo, _ := assets.PublicFS.ReadFile("web/default/public/index.html")
+	landingEn, _ := assets.PublicFS.ReadFile("web/default/public/index_en.html")
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
@@ -37,23 +39,20 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	router.GET("/", func(c *gin.Context) {
 		acceptLang := c.GetHeader("Accept-Language")
 		if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageEn)
+			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
 		} else {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageKo)
+			c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
 		}
 	})
 	router.GET("/index.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageKo)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
 	})
 	router.GET("/index_en.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.LandingPageEn)
+		c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
 	})
-	if len(assets.LandingLogoSVG) > 0 {
-		router.GET("/logo.svg", func(c *gin.Context) {
-			c.Data(http.StatusOK, "image/svg+xml", assets.LandingLogoSVG)
-		})
-	}
 
+	// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
+	router.Use(static.Serve("/", publicFS))
 	router.Use(static.Serve("/", themeFS))
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")

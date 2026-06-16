@@ -47,14 +47,8 @@ var classicBuildFS embed.FS
 //go:embed web/classic/dist/index.html
 var classicIndexPage []byte
 
-//go:embed web/default/public/index.html
-var landingPageKo []byte
-
-//go:embed web/default/public/index_en.html
-var landingPageEn []byte
-
-//go:embed web/default/public/logo.svg
-var landingLogoSVG []byte
+//go:embed web/default/public
+var publicFS embed.FS
 
 func main() {
 	startTime := time.Now()
@@ -204,9 +198,7 @@ func main() {
 		DefaultIndexPage: indexPage,
 		ClassicBuildFS:   classicBuildFS,
 		ClassicIndexPage: classicIndexPage,
-		LandingPageKo:    landingPageKo,
-		LandingPageEn:    landingPageEn,
-		LandingLogoSVG:   landingLogoSVG,
+		PublicFS:         publicFS,
 	})
 	var port = os.Getenv("PORT")
 	if port == "" {
