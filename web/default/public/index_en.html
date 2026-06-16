@@ -1109,7 +1109,7 @@ const S2_IMG_SWITCH_MS = 1350;
 
 const scenes = Array.from(document.querySelectorAll('.anim-scene'));
 const dots   = Array.from(document.querySelectorAll('.anim-dot'));
-let current = 0, advanceTimer = null, mergeTimer1 = null;
+let current = 0, prevScene = -1, advanceTimer = null, mergeTimer1 = null;
 let bubbleTimers = [], s1BubbleTimer = null, sceneStartedAt = 0, exitCleanupTimer = null;
 
 function showScene(idx) {
@@ -1147,7 +1147,8 @@ function showScene(idx) {
     }, 1050);
   } else { resetBubbles(); }
 
-  if (idx === 3) { playMerge(); } else { cancelMerge(); resetMergeInstant(); }
+  if (idx === 3) { playMerge(); } else { cancelMerge(); if (prevScene !== 3) { resetMergeInstant(); } }
+  prevScene = idx;
 }
 
 function scheduleNext(delay) {
