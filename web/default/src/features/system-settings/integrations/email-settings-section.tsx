@@ -328,7 +328,7 @@ export function EmailSettingsSection({
                   <Input
                     autoComplete='off'
                     type='email'
-                    placeholder='contact@yourcompany.com'
+                    placeholder={t('contact@yourcompany.com')}
                     {...field}
                     onChange={(event) => field.onChange(event.target.value)}
                   />
