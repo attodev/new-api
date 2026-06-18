@@ -91,9 +91,6 @@
   .lang-dropdown a:hover { background: #374151; color: #f9fafb; }
   .lang-dropdown a .check { color: #f9fafb; font-size: 12px; }
   .btn-login {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
     font-size: 13px;
     color: #9ca3af;
     cursor: pointer;
@@ -103,9 +100,6 @@
   }
   .btn-login:hover { color: #f9fafb; }
   .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
     background: linear-gradient(135deg, #0EA5E9, #EC4899);
     color: white;
     border: none;
@@ -168,9 +162,6 @@
   }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
   .btn-hero-primary {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
     background: linear-gradient(135deg, #0EA5E9, #EC4899);
     color: white;
     border: none;
@@ -504,10 +495,6 @@
   .cta-box h3 { font-size: 22px; font-weight: 800; margin-bottom: 10px; color: #f9fafb; }
   .cta-box p { font-size: 14px; color: #9ca3af; line-height: 1.7; margin-bottom: 28px; }
   .btn-cta-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
     background: linear-gradient(135deg, #0EA5E9, #EC4899);
     color: white; border: none; padding: 14px 32px;
     border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
@@ -539,6 +526,49 @@
     border-top: 1px solid #1f2937; font-size: 12px; color: #4b5563;
     display: flex; justify-content: space-between;
   }
+
+/* ── Popup ── */
+.popup-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center; }
+.popup-overlay.open { display:flex; }
+.popup-modal { background:#1f2937; border:1px solid #374151; border-radius:16px; width:min(640px,92vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,0.6); }
+.popup-modal.wide { width:min(1100px,96vw); height:94vh; }
+.popup-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #374151; flex-shrink:0; }
+.popup-title { font-size:16px; font-weight:700; color:#f9fafb; }
+.popup-close { background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; transition:color 0.2s,background 0.2s; }
+.popup-close:hover { color:#f9fafb; background:#374151; }
+.popup-body { overflow-y:auto; padding:24px; color:#d1d5db; font-size:14px; line-height:1.8; flex:1; }
+.popup-body::-webkit-scrollbar { width:6px; }
+.popup-body::-webkit-scrollbar-track { background:#111827; border-radius:3px; }
+.popup-body::-webkit-scrollbar-thumb { background:#4b5563; border-radius:3px; }
+.popup-modal.wide .popup-body { padding:0; display:flex; flex-direction:column; min-height:0; }
+.popup-iframe { width:100%; height:100%; flex:1; border:none; border-radius:0 0 16px 16px; min-height:0; }
+
+/* ── Contact Form ── */
+.contact-form { display:flex; flex-direction:column; gap:18px; }
+.cf-group { display:flex; flex-direction:column; gap:6px; }
+.cf-group label { font-size:13px; font-weight:600; color:#d1d5db; }
+.cf-required { color:#EC4899; margin-left:2px; }
+.cf-optional { font-size:11px; font-weight:400; color:#6b7280; margin-left:4px; }
+.cf-group input, .cf-group textarea {
+  background:#111827; border:1px solid #374151; border-radius:8px;
+  padding:10px 14px; color:#f9fafb; font-size:14px; font-family:inherit;
+  transition:border-color 0.2s, box-shadow 0.2s; outline:none; resize:vertical;
+}
+.cf-group input::placeholder, .cf-group textarea::placeholder { color:#4b5563; }
+.cf-group input:focus, .cf-group textarea:focus {
+  border-color:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,0.15);
+}
+.cf-group textarea { min-height:120px; }
+.cf-submit {
+  margin-top:4px; padding:12px 24px; background:#0EA5E9; color:#fff;
+  border:none; border-radius:8px; font-size:15px; font-weight:700;
+  cursor:pointer; transition:opacity 0.2s, transform 0.15s;
+}
+.cf-submit:hover { opacity:0.88; transform:translateY(-1px); }
+.cf-submit:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.cf-result { padding:12px 16px; border-radius:8px; font-size:13px; line-height:1.6; }
+.cf-result.cf-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
+.cf-result.cf-error   { background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
 
 /* ── 애니메이션 ── */
 .anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 941/1672; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #c8a882; }
@@ -590,7 +620,7 @@
   </div>
   <ul class="gnb-menu">
     <li><a href="#">About</a></li>
-    <li><a href="#">Models & Pricing</a></li>
+    <li><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">Models & Pricing</a></li>
   </ul>
   <div class="gnb-right">
     <button class="lang-switch" onclick="this.classList.toggle('open')"><i data-lucide="languages"></i><div class="lang-dropdown"><a href="./index_en.html">English<span class="check">✓</span></a><a href="./index.html">한국어</a></div></button>
@@ -613,7 +643,7 @@
       </p>
       <div class="hero-cta">
         <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
-        <button class="btn-hero-secondary">Contact Sales</button>
+        <button class="btn-hero-secondary" onclick="document.getElementById('contactOverlay').classList.add('open')">Contact Sales</button>
       </div>
       <div class="hero-stats">
         <div class="stat-item">
@@ -664,10 +694,10 @@
           </div>
           <div class="anim-scene" id="anim-s6">
             <img src="cut06.png" class="anim-scene-bg" alt="">
-            <div class="anim-cta-overlay">
+            <a href="/sign-in" class="anim-cta-overlay">
               <img src="logo.svg" alt="AlRouter" class="anim-cta-logo">
               <div class="anim-cta-btn-text">Try it now →</div>
-            </div>
+            </a>
             <div class="anim-caption">Start your trial today</div>
           </div>
           <div class="anim-dots" id="anim-dotsWrap">
@@ -1025,7 +1055,7 @@
         <div class="price-row"><span class="label">Output</span><span><span class="strike">$12.00</span> → <span class="new-price">$9.60</span> /1M</span></div>
       </div>
     </div>
-    <div class="pricing-cta"><a href="#">View Full Pricing →</a></div>
+    <div class="pricing-cta"><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">View Full Pricing →</a></div>
   </div>
 </div>
 
@@ -1042,7 +1072,7 @@
       <div class="cta-icon" style="color:#EC4899; margin-bottom:16px;"><i data-lucide="building-2"></i></div>
       <h3>Talk to Our Team</h3>
       <p>Our experts will walk you through usage planning, model selection, and cost simulations.</p>
-      <button class="btn-cta-secondary">Contact Sales →</button>
+      <button class="btn-cta-secondary" onclick="document.getElementById('contactOverlay').classList.add('open')">Contact Sales →</button>
     </div>
   </div>
 </div>
@@ -1065,23 +1095,22 @@
       <h4>Product</h4>
       <ul>
         <li><a href="#">About</a></li>
-        <li><a href="#">Models & Pricing</a></li>
-        <li><a href="#">Changelog</a></li>
+        <li><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">Models & Pricing</a></li>
+        <li><a href="#" style="display:none">Changelog</a></li>
       </ul>
     </div>
     <div class="footer-col">
       <h4>Company</h4>
       <ul>
-        <li><a href="#">About ATTO Research</a></li>
-        <li><a href="#">Contact</a></li>
+        <li><a href="https://www.atto-research.com/eng/main/main.html" target="_blank" rel="noopener">About ATTO Research</a></li>
+        <li><a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;">Contact</a></li>
       </ul>
     </div>
     <div class="footer-col">
       <h4>Legal</h4>
       <ul>
-        <li><a href="#">Terms of Service</a></li>
-        <li><a href="#">Privacy Policy</a></li>
-        <li><a href="#">LLM Router Terms</a></li>
+        <li><a href="#" onclick="openPopup('Terms of Service','terms');return false;">Terms of Service</a></li>
+        <li><a href="#" onclick="openPopup('Privacy Policy','privacy');return false;">Privacy Policy</a></li>
       </ul>
     </div>
   </div>
@@ -1089,6 +1118,136 @@
     <span>© 2026 ATTO Research. All rights reserved.</span>
   </div>
 </footer>
+
+<!-- Contact Modal -->
+<div class="popup-overlay" id="contactOverlay">
+  <div class="popup-modal">
+    <div class="popup-header">
+      <h3 class="popup-title">Enterprise Inquiry</h3>
+      <button class="popup-close" id="contactClose">✕</button>
+    </div>
+    <div class="popup-body">
+      <form id="contactForm" class="contact-form">
+        <div class="cf-group">
+          <label>Organization<span class="cf-required">*</span></label>
+          <input type="text" name="org" placeholder="Company or organization name" required>
+        </div>
+        <div class="cf-group">
+          <label>Email<span class="cf-required">*</span></label>
+          <input type="email" name="email" placeholder="example@company.com" required>
+        </div>
+        <div class="cf-group">
+          <label>Phone<span class="cf-optional">(optional)</span></label>
+          <input type="tel" name="phone" placeholder="+1 000-000-0000">
+        </div>
+        <div class="cf-group">
+          <label>Message<span class="cf-required">*</span></label>
+          <textarea name="message" placeholder="Tell us about your team size, use case, or anything else you'd like to discuss." required></textarea>
+        </div>
+        <div id="contactResult" class="cf-result" style="display:none;"></div>
+        <button type="submit" class="cf-submit">Submit →</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup-modal">
+    <div class="popup-header">
+      <h3 class="popup-title" id="popupTitle"></h3>
+      <button class="popup-close" id="popupClose">✕</button>
+    </div>
+    <div class="popup-body" id="popupBody"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const overlay = document.getElementById('contactOverlay');
+  const form    = document.getElementById('contactForm');
+  const result  = document.getElementById('contactResult');
+
+  document.getElementById('contactClose').addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.remove('open'); });
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = form.querySelector('.cf-submit');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    result.style.display = 'none';
+
+    const data = Object.fromEntries(new FormData(form));
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error();
+      result.className = 'cf-result cf-success';
+      result.textContent = 'Your inquiry has been received. We\'ll be in touch shortly.';
+      result.style.display = 'block';
+      form.reset();
+    } catch {
+      result.className = 'cf-result cf-error';
+      result.textContent = 'Something went wrong. Please try again later.';
+      result.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Submit →';
+    }
+  });
+})();
+</script>
+
+<script>
+const POPUP_CONTENTS = {
+  terms:   { title: 'Terms of Service', iframe: '/terms_en.html' },
+  privacy: { title: 'Privacy Policy',   iframe: '/privacy_en.html' },
+  pricing: { title: 'Full Model & Pricing', body: '', wide: true },
+};
+
+function openPopup(title, key) {
+  const overlay = document.getElementById('popupOverlay');
+  const modal   = overlay.querySelector('.popup-modal');
+  const body    = document.getElementById('popupBody');
+  const item    = POPUP_CONTENTS[key] || {};
+
+  document.getElementById('popupTitle').textContent = item.title || title;
+
+  if (item.iframe) {
+    modal.classList.add('wide');
+    body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
+  } else if (item.wide) {
+    modal.classList.add('wide');
+    body.innerHTML = item.body || '';
+  } else {
+    modal.classList.remove('wide');
+    body.innerHTML = item.body || '';
+  }
+
+  overlay.classList.add('open');
+}
+
+function closePopup() {
+  const overlay = document.getElementById('popupOverlay');
+  overlay.classList.remove('open');
+  overlay.querySelector('.popup-modal').classList.remove('wide');
+  document.getElementById('popupBody').innerHTML = '';
+}
+
+document.getElementById('popupClose').addEventListener('click', closePopup);
+document.getElementById('popupOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closePopup();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closePopup();
+});
+</script>
 
 <script>
 (function() {
