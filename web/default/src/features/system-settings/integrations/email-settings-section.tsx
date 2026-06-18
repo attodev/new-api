@@ -17,9 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import * as z from 'zod'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   Form,
   FormControl,
@@ -31,6 +34,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -40,6 +44,7 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useResetForm } from '../hooks/use-reset-form'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { sendTestEmail } from '../api'
 
 const createEmailSchema = (t: (key: string) => string) =>
   z.object({
@@ -77,6 +82,21 @@ export function EmailSettingsSection({
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const emailSchema = createEmailSchema(t)
+  const [testTo, setTestTo] = useState('')
+
+  const testEmailMutation = useMutation({
+    mutationFn: () => sendTestEmail(testTo.trim()),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(t('Test email sent successfully'))
+      } else {
+        toast.error(data.message || t('Failed to send test email'))
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || t('Failed to send test email'))
+    },
+  })
 
   const form = useForm<EmailFormValues>({
     resolver: zodResolver(emailSchema),
@@ -340,6 +360,32 @@ export function EmailSettingsSection({
               </FormItem>
             )}
           />
+
+          <FormItem>
+            <FormLabel>{t('Send Test Email')}</FormLabel>
+            <div className='flex gap-2'>
+              <FormControl>
+                <Input
+                  autoComplete='off'
+                  type='email'
+                  placeholder={t('Enter recipient address')}
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                />
+              </FormControl>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={!testTo.trim() || testEmailMutation.isPending}
+                onClick={() => testEmailMutation.mutate()}
+              >
+                {testEmailMutation.isPending ? t('Sending...') : t('Send')}
+              </Button>
+            </div>
+            <FormDescription>
+              {t('Send a test message to verify your SMTP configuration')}
+            </FormDescription>
+          </FormItem>
         </SettingsForm>
       </Form>
     </SettingsSection>
