@@ -76,6 +76,7 @@ const OPERATIONS_SECTIONS = [
           SMTPToken: settings.SMTPToken,
           SMTPSSLEnabled: settings.SMTPSSLEnabled,
           SMTPForceAuthLogin: settings.SMTPForceAuthLogin,
+          ContactEmail: settings.ContactEmail,
         }}
       />
     ),

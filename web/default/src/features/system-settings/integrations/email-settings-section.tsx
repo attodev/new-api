@@ -58,6 +58,11 @@ const createEmailSchema = (t: (key: string) => string) =>
     SMTPToken: z.string(),
     SMTPSSLEnabled: z.boolean(),
     SMTPForceAuthLogin: z.boolean(),
+    ContactEmail: z.string().refine((value) => {
+      const trimmed = value.trim()
+      if (!trimmed) return true
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+    }, t('Enter a valid email or leave blank')),
   })
 
 type EmailFormValues = z.infer<ReturnType<typeof createEmailSchema>>
@@ -89,6 +94,7 @@ export function EmailSettingsSection({
       SMTPToken: values.SMTPToken.trim(),
       SMTPSSLEnabled: values.SMTPSSLEnabled,
       SMTPForceAuthLogin: values.SMTPForceAuthLogin,
+      ContactEmail: values.ContactEmail.trim(),
     }
 
     const initial = {
@@ -99,6 +105,7 @@ export function EmailSettingsSection({
       SMTPToken: defaultValues.SMTPToken.trim(),
       SMTPSSLEnabled: defaultValues.SMTPSSLEnabled,
       SMTPForceAuthLogin: defaultValues.SMTPForceAuthLogin,
+      ContactEmail: defaultValues.ContactEmail.trim(),
     }
 
     const updates: Array<{ key: string; value: string | boolean }> = []
@@ -135,6 +142,10 @@ export function EmailSettingsSection({
         key: 'SMTPForceAuthLogin',
         value: sanitized.SMTPForceAuthLogin,
       })
+    }
+
+    if (sanitized.ContactEmail !== initial.ContactEmail) {
+      updates.push({ key: 'ContactEmail', value: sanitized.ContactEmail })
     }
 
     for (const update of updates) {
@@ -301,6 +312,29 @@ export function EmailSettingsSection({
                 </FormControl>
                 <FormDescription>
                   {t('Leave blank to keep the existing credential')}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='ContactEmail'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Contact Recipient Email')}</FormLabel>
+                <FormControl>
+                  <Input
+                    autoComplete='off'
+                    type='email'
+                    placeholder='contact@yourcompany.com'
+                    {...field}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t('Inquiry emails from the landing page will be sent to this address')}
                 </FormDescription>
                 <FormMessage />
               </FormItem>
