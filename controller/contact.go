@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
@@ -18,17 +19,17 @@ type contactRequest struct {
 func Contact(c *gin.Context) {
 	var req contactRequest
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "잘못된 요청입니다."})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "잘못된 요청입니다."})
 		return
 	}
 
 	if req.Org == "" || req.Email == "" || req.Message == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "회사명, 이메일, 문의내용은 필수입니다."})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "회사명, 이메일, 문의내용은 필수입니다."})
 		return
 	}
 
 	if common.ContactEmail == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "문의 수신 이메일이 설정되지 않았습니다."})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "문의 수신 이메일이 설정되지 않았습니다."})
 		return
 	}
 
@@ -42,14 +43,17 @@ func Contact(c *gin.Context) {
 <tr><td style="padding:8px 12px;font-weight:700;background:#f3f4f6;">문의내용</td><td style="padding:8px 12px;white-space:pre-wrap;">%s</td></tr>
 </table>
 </body></html>`,
-		req.Org, req.Email, req.Phone, req.Message,
+		html.EscapeString(req.Org),
+		html.EscapeString(req.Email),
+		html.EscapeString(req.Phone),
+		html.EscapeString(req.Message),
 	)
 
 	if err := common.SendEmail(subject, common.ContactEmail, body); err != nil {
 		common.SysError(fmt.Sprintf("contact email send failed: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "이메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요."})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "이메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요."})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
