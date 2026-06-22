@@ -117,7 +117,7 @@ func DiscordOAuth(c *gin.Context) {
 	if !system_setting.GetDiscordSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 Discord 登录以及注册",
+			"message": "Discord login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -162,7 +162,7 @@ func DiscordOAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "管理员关闭了新用户注册",
+				"message": "new user registration is disabled by admin",
 			})
 			return
 		}
@@ -170,7 +170,7 @@ func DiscordOAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "用户已被封禁",
+			"message": "user has been banned",
 			"success": false,
 		})
 		return
@@ -182,7 +182,7 @@ func DiscordBind(c *gin.Context) {
 	if !system_setting.GetDiscordSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 Discord 登录以及注册",
+			"message": "Discord login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -198,7 +198,7 @@ func DiscordBind(c *gin.Context) {
 	if model.IsDiscordIdAlreadyTaken(user.DiscordId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "该 Discord 账户已被绑定",
+			"message": "this Discord account is already bound",
 		})
 		return
 	}

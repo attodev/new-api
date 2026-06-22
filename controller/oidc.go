@@ -119,7 +119,7 @@ func OidcAuth(c *gin.Context) {
 	if !system_setting.GetOIDCSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 OIDC 登录以及注册",
+			"message": "OIDC login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -165,7 +165,7 @@ func OidcAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "管理员关闭了新用户注册",
+				"message": "new user registration is disabled by admin",
 			})
 			return
 		}
@@ -173,7 +173,7 @@ func OidcAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "用户已被封禁",
+			"message": "user has been banned",
 			"success": false,
 		})
 		return
@@ -185,7 +185,7 @@ func OidcBind(c *gin.Context) {
 	if !system_setting.GetOIDCSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 OIDC 登录以及注册",
+			"message": "OIDC login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -201,7 +201,7 @@ func OidcBind(c *gin.Context) {
 	if model.IsOidcIdAlreadyTaken(user.OidcId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "该 OIDC 账户已被绑定",
+			"message": "this OIDC account is already bound",
 		})
 		return
 	}

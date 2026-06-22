@@ -98,7 +98,7 @@ func GitHubOAuth(c *gin.Context) {
 	if !common.GitHubOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 GitHub 登录以及注册",
+			"message": "GitHub login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -126,7 +126,7 @@ func GitHubOAuth(c *gin.Context) {
 		if user.Id == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "用户已注销",
+				"message": "user has been deactivated",
 			})
 			return
 		}
@@ -157,7 +157,7 @@ func GitHubOAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "管理员关闭了新用户注册",
+				"message": "new user registration is disabled by admin",
 			})
 			return
 		}
@@ -165,7 +165,7 @@ func GitHubOAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "用户已被封禁",
+			"message": "user has been banned",
 			"success": false,
 		})
 		return
@@ -177,7 +177,7 @@ func GitHubBind(c *gin.Context) {
 	if !common.GitHubOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未开启通过 GitHub 登录以及注册",
+			"message": "GitHub login and registration is not enabled by admin",
 		})
 		return
 	}
@@ -193,7 +193,7 @@ func GitHubBind(c *gin.Context) {
 	if model.IsGitHubIdAlreadyTaken(user.GitHubId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "该 GitHub 账户已被绑定",
+			"message": "this GitHub account is already bound",
 		})
 		return
 	}
