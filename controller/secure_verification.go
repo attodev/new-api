@@ -43,7 +43,7 @@ func UniversalVerify(c *gin.Context) {
 	if userId == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"message": "未登录",
+			"message": "not logged in",
 		})
 		return
 	}
@@ -135,7 +135,7 @@ func UniversalVerify(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "验证成功",
+		"message": "verification successful",
 		"data": gin.H{
 			"verified":   true,
 			"expires_at": now + SecureVerificationTimeout,

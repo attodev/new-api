@@ -23,7 +23,7 @@ func PasskeyRegisterBegin(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -87,7 +87,7 @@ func PasskeyRegisterFinish(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -146,7 +146,7 @@ func PasskeyRegisterFinish(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Passkey 注册成功",
+		"message": "Passkey registered successfully",
 	})
 }
 
@@ -171,7 +171,7 @@ func PasskeyDelete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Passkey 已解绑",
+		"message": "Passkey unbound successfully",
 	})
 }
 
@@ -217,7 +217,7 @@ func PasskeyLoginBegin(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -252,7 +252,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -360,7 +360,7 @@ func AdminResetPasskey(c *gin.Context) {
 		if errors.Is(err, model.ErrPasskeyNotFound) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "该用户尚未绑定 Passkey",
+				"message": "user has not bound a Passkey",
 			})
 			return
 		}
@@ -375,7 +375,7 @@ func AdminResetPasskey(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Passkey 已重置",
+		"message": "Passkey reset successfully",
 	})
 }
 
@@ -383,7 +383,7 @@ func PasskeyVerifyBegin(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -401,7 +401,7 @@ func PasskeyVerifyBegin(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "该用户尚未绑定 Passkey",
+			"message": "user has not bound a Passkey",
 		})
 		return
 	}
@@ -437,7 +437,7 @@ func PasskeyVerifyFinish(c *gin.Context) {
 	if !system_setting.GetPasskeySettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "管理员未启用 Passkey 登录",
+			"message": "Passkey login is not enabled by admin",
 		})
 		return
 	}
@@ -461,7 +461,7 @@ func PasskeyVerifyFinish(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "该用户尚未绑定 Passkey",
+			"message": "user has not bound a Passkey",
 		})
 		return
 	}
@@ -499,7 +499,7 @@ func PasskeyVerifyFinish(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "Passkey 验证成功",
+		"message": "Passkey verification successful",
 	})
 }
 
@@ -550,7 +550,7 @@ func requirePasskeyDeleteVerification(c *gin.Context, userID int) bool {
 		if errors.Is(err, model.ErrPasskeyNotFound) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "该用户尚未绑定 Passkey",
+				"message": "user has not bound a Passkey",
 			})
 			return false
 		}

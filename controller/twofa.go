@@ -42,7 +42,7 @@ func Setup2FA(c *gin.Context) {
 	if existing != nil && existing.IsEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户已启用2FA，请先禁用后重新设置",
+			"message": "user has already enabled 2FA, please disable it first",
 		})
 		return
 	}
@@ -68,7 +68,7 @@ func Setup2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "生成2FA密钥失败",
+			"message": "failed to generate 2FA key",
 		})
 		common.SysLog("failed to generate TOTP key: " + err.Error())
 		return
@@ -79,7 +79,7 @@ func Setup2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "生成备用码失败",
+			"message": "failed to generate backup code",
 		})
 		common.SysLog("failed to generate backup code: " + err.Error())
 		return
@@ -113,7 +113,7 @@ func Setup2FA(c *gin.Context) {
 	if err := model.CreateBackupCodes(userId, backupCodes); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "保存备用码失败",
+			"message": "failed to save backup code",
 		})
 		common.SysLog("failed to save backup code: " + err.Error())
 		return
@@ -124,7 +124,7 @@ func Setup2FA(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "2FA设置初始化成功，请使用认证器扫描二维码并输入验证码完成设置",
+		"message": "2FA setup initialized, please scan the QR code with your authenticator and enter the verification code",
 		"data": Setup2FAResponse{
 			Secret:      key.Secret(),
 			QRCodeData:  qrCodeData,
@@ -139,7 +139,7 @@ func Enable2FA(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "参数错误",
+			"message": "invalid parameters",
 		})
 		return
 	}
@@ -155,14 +155,14 @@ func Enable2FA(c *gin.Context) {
 	if twoFA == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "请先完成2FA初始化设置",
+			"message": "please complete 2FA initialization first",
 		})
 		return
 	}
 	if twoFA.IsEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "2FA已经启用",
+			"message": "2FA is already enabled",
 		})
 		return
 	}
@@ -180,7 +180,7 @@ func Enable2FA(c *gin.Context) {
 	if !common.ValidateTOTPCode(twoFA.Secret, cleanCode) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "验证码或备用码错误，请重试",
+			"message": "incorrect code or backup code, please retry",
 		})
 		return
 	}
@@ -196,7 +196,7 @@ func Enable2FA(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "两步验证启用成功",
+		"message": "two-factor authentication enabled successfully",
 	})
 }
 
@@ -206,7 +206,7 @@ func Disable2FA(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "参数错误",
+			"message": "invalid parameters",
 		})
 		return
 	}
@@ -222,7 +222,7 @@ func Disable2FA(c *gin.Context) {
 	if twoFA == nil || !twoFA.IsEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户未启用2FA",
+			"message": "user has not enabled 2FA",
 		})
 		return
 	}
@@ -252,7 +252,7 @@ func Disable2FA(c *gin.Context) {
 	if !isValidTOTP && !isValidBackup {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "验证码或备用码错误，请重试",
+			"message": "incorrect code or backup code, please retry",
 		})
 		return
 	}
@@ -268,7 +268,7 @@ func Disable2FA(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "两步验证已禁用",
+		"message": "two-factor authentication disabled",
 	})
 }
 
@@ -314,7 +314,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "参数错误",
+			"message": "invalid parameters",
 		})
 		return
 	}
@@ -330,7 +330,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	if twoFA == nil || !twoFA.IsEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户未启用2FA",
+			"message": "user has not enabled 2FA",
 		})
 		return
 	}
@@ -356,7 +356,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	if !valid {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "验证码或备用码错误，请重试",
+			"message": "incorrect code or backup code, please retry",
 		})
 		return
 	}
@@ -366,7 +366,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "生成备用码失败",
+			"message": "failed to generate backup code",
 		})
 		common.SysLog("failed to generate backup code: " + err.Error())
 		return
@@ -376,7 +376,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	if err := model.CreateBackupCodes(userId, backupCodes); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "保存备用码失败",
+			"message": "failed to save backup code",
 		})
 		common.SysLog("failed to save backup code: " + err.Error())
 		return
@@ -387,7 +387,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "备用码重新生成成功",
+		"message": "backup codes regenerated successfully",
 		"data": map[string]interface{}{
 			"backup_codes": backupCodes,
 		},
@@ -400,7 +400,7 @@ func Verify2FALogin(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "参数错误",
+			"message": "invalid parameters",
 		})
 		return
 	}
@@ -411,7 +411,7 @@ func Verify2FALogin(c *gin.Context) {
 	if pendingUserId == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "会话已过期，请重新登录",
+			"message": "session expired, please log in again",
 		})
 		return
 	}
@@ -419,7 +419,7 @@ func Verify2FALogin(c *gin.Context) {
 	if !ok {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "会话数据无效，请重新登录",
+			"message": "session data invalid, please log in again",
 		})
 		return
 	}
@@ -428,7 +428,7 @@ func Verify2FALogin(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户不存在",
+			"message": "user not found",
 		})
 		return
 	}
@@ -442,7 +442,7 @@ func Verify2FALogin(c *gin.Context) {
 	if twoFA == nil || !twoFA.IsEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户未启用2FA",
+			"message": "user has not enabled 2FA",
 		})
 		return
 	}
@@ -472,7 +472,7 @@ func Verify2FALogin(c *gin.Context) {
 	if !isValidTOTP && !isValidBackup {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "验证码或备用码错误，请重试",
+			"message": "incorrect code or backup code, please retry",
 		})
 		return
 	}
@@ -507,7 +507,7 @@ func AdminDisable2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "用户ID格式错误",
+			"message": "invalid user ID format",
 		})
 		return
 	}
@@ -523,7 +523,7 @@ func AdminDisable2FA(c *gin.Context) {
 	if !canManageTargetRole(myRole, targetUser.Role) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "无权操作同级或更高级用户的2FA设置",
+			"message": "cannot modify 2FA settings of a user with equal or higher privilege",
 		})
 		return
 	}
@@ -533,7 +533,7 @@ func AdminDisable2FA(c *gin.Context) {
 		if errors.Is(err, model.ErrTwoFANotEnabled) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "用户未启用2FA",
+				"message": "user has not enabled 2FA",
 			})
 			return
 		}
@@ -549,10 +549,10 @@ func AdminDisable2FA(c *gin.Context) {
 		"admin_username": adminName,
 	}
 	model.RecordLogWithAdminInfo(userId, model.LogTypeManage,
-		"管理员强制禁用了用户的两步验证", adminInfo)
+		"admin force-disabled user's two-factor authentication", adminInfo)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "用户2FA已被强制禁用",
+		"message": "user's 2FA has been force-disabled",
 	})
 }
