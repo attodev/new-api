@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
@@ -130,7 +131,7 @@ func getPayPalAccessToken(ctx context.Context) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("PayPal token 获取失败: status=%d body=%s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("PayPal token fetch failed: status=%d body=%s", resp.StatusCode, string(body))
 	}
 
 	var tokenResp paypalTokenResponse
@@ -139,7 +140,7 @@ func getPayPalAccessToken(ctx context.Context) (string, error) {
 	}
 
 	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("PayPal token 响应缺少 access_token")
+		return "", fmt.Errorf("PayPal token response missing access_token")
 	}
 
 	expiresIn := tokenResp.ExpiresIn
@@ -156,7 +157,7 @@ func getPayPalAccessToken(ctx context.Context) (string, error) {
 func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float64, returnURL string, cancelURL string) (string, string, error) {
 	token, err := getPayPalAccessToken(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("获取PayPal token失败: %w", err)
+		return "", "", fmt.Errorf("Get PayPal token failed: %w", err)
 	}
 
 	// Append ref to return URL so we can identify the order on capture
@@ -217,7 +218,7 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 
 	// Standard order creation returns 201 Created.
 	if resp.StatusCode != http.StatusCreated {
-		return "", "", fmt.Errorf("PayPal 주문 생성 실패: status=%d body=%s", resp.StatusCode, string(respBody))
+		return "", "", fmt.Errorf("PayPal create order failed: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	var order paypalOrderResponse
@@ -232,14 +233,14 @@ func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float6
 		}
 	}
 
-	return "", "", fmt.Errorf("PayPal 주문 응답에 결제 링크 없음 order_id=%s status=%s", order.ID, order.Status)
+	return "", "", fmt.Errorf("PayPal order response missing payment link order_id=%s status=%s", order.ID, order.Status)
 }
 
 // capturePayPalOrder captures a PayPal order by its PayPal order ID.
 func capturePayPalOrder(ctx context.Context, paypalOrderId string) (*paypalOrderResponse, error) {
 	token, err := getPayPalAccessToken(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("获取PayPal token失败: %w", err)
+		return nil, fmt.Errorf("Get PayPal token failed: %w", err)
 	}
 
 	baseURL := getPayPalBaseURL()
@@ -263,7 +264,7 @@ func capturePayPalOrder(ctx context.Context, paypalOrderId string) (*paypalOrder
 	}
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("PayPal 捕获订单失败: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("PayPal capture order failed: status=%d body=%s", resp.StatusCode, string(respBody))
 	}
 
 	var order paypalOrderResponse
@@ -277,33 +278,33 @@ func capturePayPalOrder(ctx context.Context, paypalOrderId string) (*paypalOrder
 func RequestPayPalPay(c *gin.Context) {
 	var req PayPalPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
 
 	if req.PaymentMethod != model.PaymentMethodPayPal {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "不支持的支付渠道"})
+		common.ApiErrorI18n(c, i18n.MsgTopupUnsupportedProvider)
 		return
 	}
 
 	minTopup := getPayPalMinTopup()
 	if req.Amount < minTopup {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": minTopup})
 		return
 	}
 
 	if req.Amount > 10000 {
-		c.JSON(http.StatusOK, gin.H{"message": "充值数量不能大于 10000", "data": 10})
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLarge)
 		return
 	}
 
 	if req.SuccessURL != "" && common.ValidateRedirectURL(req.SuccessURL) != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "支付成功重定向URL不在可信任域名列表中", "data": ""})
+		common.ApiErrorI18n(c, i18n.MsgTopupRedirectNotTrusted)
 		return
 	}
 
 	if req.CancelURL != "" && common.ValidateRedirectURL(req.CancelURL) != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "支付取消重定向URL不在可信任域名列表中", "data": ""})
+		common.ApiErrorI18n(c, i18n.MsgTopupCancelRedirectBad)
 		return
 	}
 
@@ -315,7 +316,7 @@ func RequestPayPalPay(c *gin.Context) {
 
 	chargedMoney := getPayPalPayMoney(float64(req.Amount), user.Group)
 	if chargedMoney <= 0.01 {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值金额过低"})
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
 
@@ -327,8 +328,8 @@ func RequestPayPalPay(c *gin.Context) {
 
 	paypalOrderId, approvalURL, err := createPayPalOrder(c.Request.Context(), referenceId, chargedMoney, captureURL, cancelURL)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal 创建订单失败 user_id=%d trade_no=%s amount=%d error=%q", id, referenceId, req.Amount, err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
+		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal create order failed user_id=%d trade_no=%s amount=%d error=%q", id, referenceId, req.Amount, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentStartFailed)
 		return
 	}
 
@@ -346,12 +347,12 @@ func RequestPayPalPay(c *gin.Context) {
 		Status:          common.TopUpStatusPending,
 	}
 	if err = topUp.Insert(); err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal 创建充值订单失败 user_id=%d trade_no=%s paypal_order=%s error=%q", id, referenceId, paypalOrderId, err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
+		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal create topup order failed user_id=%d trade_no=%s paypal_order=%s error=%q", id, referenceId, paypalOrderId, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
 		return
 	}
 
-	logger.LogInfo(c.Request.Context(), fmt.Sprintf("PayPal 충전 주문 생성 성공 user_id=%d trade_no=%s paypal_order=%s amount=%d money=%.2f capture_url=%q approval_url=%q", id, referenceId, paypalOrderId, req.Amount, chargedMoney, captureURL, approvalURL))
+	logger.LogInfo(c.Request.Context(), fmt.Sprintf("PayPal topup order created user_id=%d trade_no=%s paypal_order=%s amount=%d money=%.2f capture_url=%q approval_url=%q", id, referenceId, paypalOrderId, req.Amount, chargedMoney, captureURL, approvalURL))
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
@@ -381,7 +382,7 @@ func PayPalCapture(c *gin.Context) {
 	referenceID := c.Query("ref")
 	paypalOrderID := c.Query("token")
 	if referenceID == "" || paypalOrderID == "" {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 파라미터 누락 ref=%q token=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture missing params ref=%q token=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
@@ -391,12 +392,12 @@ func PayPalCapture(c *gin.Context) {
 
 	topUp := model.GetTopUpByTradeNo(referenceID)
 	if topUp == nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 로컬 주문 없음 ref=%q order_id=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture local order not found ref=%q order_id=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
 	if err := validatePayPalTopUpOrder(topUp, paypalOrderID, referenceID); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 주문 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture order validation failed error=%q client_ip=%s", err.Error(), c.ClientIP()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
@@ -406,14 +407,14 @@ func PayPalCapture(c *gin.Context) {
 		return
 	}
 	if topUp.Status != common.TopUpStatusPending {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 주문 상태 이상 ref=%q status=%q client_ip=%s", referenceID, topUp.Status, c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture abnormal order status ref=%q status=%q client_ip=%s", referenceID, topUp.Status, c.ClientIP()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
 
 	captureResult, err := capturePayPalOrder(ctx, paypalOrderID)
 	if err != nil {
-		logger.LogError(ctx, fmt.Sprintf("PayPal capture API 실패 ref=%q order_id=%q client_ip=%s error=%q", referenceID, paypalOrderID, c.ClientIP(), err.Error()))
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture API failed ref=%q order_id=%q client_ip=%s error=%q", referenceID, paypalOrderID, c.ClientIP(), err.Error()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
@@ -435,7 +436,7 @@ func PayPalCapture(c *gin.Context) {
 
 	// Full validation: order COMPLETED, capture COMPLETED, amount/currency match.
 	if err := validatePayPalCapturedOrderResponse(topUp, paypalOrderID, captureResult); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture 검증 실패 error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture validation failed error=%q client_ip=%s", err.Error(), c.ClientIP()))
 		paypalRedirect(c, "/wallet")
 		return
 	}
@@ -444,7 +445,7 @@ func PayPalCapture(c *gin.Context) {
 	// fulfillPayPalOrder is idempotent — a subsequent PAYMENT.CAPTURE.COMPLETED
 	// webhook will be a no-op if the order was already credited here.
 	if err := fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), "browser-capture"); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("PayPal capture 충전 실패 ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture recharge failed ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
 		// Don't block redirect — webhook will retry.
 	}
 	paypalRedirect(c, "/usage-logs")
@@ -555,7 +556,7 @@ func getPayPalOrder(ctx context.Context, orderID string) (*paypalOrderResponse, 
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("PayPal 주문 조회 실패: status=%d body=%s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("PayPal order lookup failed: status=%d body=%s", resp.StatusCode, string(body))
 	}
 
 	var order paypalOrderResponse
@@ -563,7 +564,7 @@ func getPayPalOrder(ctx context.Context, orderID string) (*paypalOrderResponse, 
 		return nil, err
 	}
 	if len(order.PurchaseUnits) == 0 {
-		return nil, fmt.Errorf("PayPal 주문에 purchase_units 없음 order_id=%s", orderID)
+		return nil, fmt.Errorf("PayPal order missing purchase_units order_id=%s", orderID)
 	}
 	return &order, nil
 }
@@ -577,16 +578,16 @@ func getPayPalOrderReferenceID(order *paypalOrderResponse) string {
 
 func validatePayPalTopUpOrder(topUp *model.TopUp, orderID string, referenceID string) error {
 	if topUp == nil {
-		return fmt.Errorf("PayPal 로컬 주문 없음")
+		return fmt.Errorf("PayPal local order not found")
 	}
 	if topUp.PaymentProvider != model.PaymentProviderPayPal {
-		return fmt.Errorf("PayPal 주문 provider 불일치 ref=%s provider=%s", topUp.TradeNo, topUp.PaymentProvider)
+		return fmt.Errorf("PayPal order provider mismatch ref=%s provider=%s", topUp.TradeNo, topUp.PaymentProvider)
 	}
 	if topUp.ProviderOrderId == "" || topUp.ProviderOrderId != orderID {
-		return fmt.Errorf("PayPal order id 불일치 ref=%s expected=%s actual=%s", topUp.TradeNo, topUp.ProviderOrderId, orderID)
+		return fmt.Errorf("PayPal order id mismatch ref=%s expected=%s actual=%s", topUp.TradeNo, topUp.ProviderOrderId, orderID)
 	}
 	if referenceID == "" || referenceID != topUp.TradeNo {
-		return fmt.Errorf("PayPal reference_id 불일치 expected=%s actual=%s", topUp.TradeNo, referenceID)
+		return fmt.Errorf("PayPal reference_id mismatch expected=%s actual=%s", topUp.TradeNo, referenceID)
 	}
 	return nil
 }
@@ -596,30 +597,30 @@ func validatePayPalCaptureForTopUp(topUp *model.TopUp, orderID string, reference
 		return err
 	}
 	if captureStatus != "COMPLETED" {
-		return fmt.Errorf("PayPal capture 상태 불일치 ref=%s status=%s", topUp.TradeNo, captureStatus)
+		return fmt.Errorf("PayPal capture status mismatch ref=%s status=%s", topUp.TradeNo, captureStatus)
 	}
 	if strings.ToUpper(currency) != "USD" {
-		return fmt.Errorf("PayPal capture 통화 불일치 ref=%s currency=%s", topUp.TradeNo, currency)
+		return fmt.Errorf("PayPal capture currency mismatch ref=%s currency=%s", topUp.TradeNo, currency)
 	}
 	expectedValue := fmt.Sprintf("%.2f", topUp.Money)
 	if value != expectedValue {
-		return fmt.Errorf("PayPal capture 금액 불일치 ref=%s expected=%s actual=%s", topUp.TradeNo, expectedValue, value)
+		return fmt.Errorf("PayPal capture amount mismatch ref=%s expected=%s actual=%s", topUp.TradeNo, expectedValue, value)
 	}
 	return nil
 }
 
 func validatePayPalCapturedOrderResponse(topUp *model.TopUp, orderID string, order *paypalOrderResponse) error {
 	if order == nil {
-		return fmt.Errorf("PayPal capture 응답이 비어있음")
+		return fmt.Errorf("PayPal capture response is empty")
 	}
 	if order.ID != "" && order.ID != orderID {
-		return fmt.Errorf("PayPal capture order id 불일치 expected=%s actual=%s", orderID, order.ID)
+		return fmt.Errorf("PayPal capture order id mismatch expected=%s actual=%s", orderID, order.ID)
 	}
 	if order.Status != "COMPLETED" {
-		return fmt.Errorf("PayPal capture order 상태 불일치 order_id=%s status=%s", orderID, order.Status)
+		return fmt.Errorf("PayPal capture order status mismatch order_id=%s status=%s", orderID, order.Status)
 	}
 	if len(order.PurchaseUnits) == 0 || len(order.PurchaseUnits[0].Payments.Captures) == 0 {
-		return fmt.Errorf("PayPal capture 응답에 capture 명세 없음 order_id=%s", orderID)
+		return fmt.Errorf("PayPal capture response missing capture details order_id=%s", orderID)
 	}
 	referenceID := getPayPalOrderReferenceID(order)
 	capture := order.PurchaseUnits[0].Payments.Captures[0]
@@ -634,22 +635,22 @@ func validatePayPalCapturedOrderResponse(topUp *model.TopUp, orderID string, ord
 func fulfillPayPalOrder(ctx context.Context, referenceID string, clientIP string, eventType string) error {
 	topUp := model.GetTopUpByTradeNo(referenceID)
 	if topUp == nil {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 주문 없음 ref=%q event=%s", referenceID, eventType))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook order not found ref=%q event=%s", referenceID, eventType))
 		return nil // permanent — no retry needed
 	}
 	if topUp.Status == common.TopUpStatusSuccess {
-		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 이미 처리됨 ref=%q event=%s", referenceID, eventType))
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook already processed ref=%q event=%s", referenceID, eventType))
 		return nil // idempotent — already done
 	}
 	if topUp.Status != common.TopUpStatusPending {
-		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 상태 이상 ref=%q status=%q event=%s", referenceID, topUp.Status, eventType))
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook abnormal status ref=%q status=%q event=%s", referenceID, topUp.Status, eventType))
 		return nil // permanent — no retry needed
 	}
 	if err := model.RechargePayPal(referenceID, clientIP); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("PayPal webhook 충전 실패 ref=%q event=%s error=%q", referenceID, eventType, err.Error()))
+		logger.LogError(ctx, fmt.Sprintf("PayPal webhook recharge failed ref=%q event=%s error=%q", referenceID, eventType, err.Error()))
 		return err // transient — caller should return 5xx
 	}
-	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 충전 성공 ref=%q event=%s", referenceID, eventType))
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook recharge succeeded ref=%q event=%s", referenceID, eventType))
 	return nil
 }
 
@@ -663,14 +664,14 @@ func PayPalWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	if strings.TrimSpace(setting.PayPalWebhookID) == "" {
-		logger.LogWarn(ctx, "PayPal webhook 비활성화됨 (WebhookID 미설정)")
+		logger.LogWarn(ctx, "PayPal webhook disabled (WebhookID not set)")
 		c.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		logger.LogError(ctx, "PayPal webhook body 읽기 실패: "+err.Error())
+		logger.LogError(ctx, "PayPal webhook body read failed: "+err.Error())
 		c.AbortWithStatus(http.StatusServiceUnavailable)
 		return
 	}
@@ -692,25 +693,25 @@ func PayPalWebhook(c *gin.Context) {
 			WebhookEvent:     json.RawMessage(body),
 		})
 		if err != nil || !verified {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook 서명 검증 실패 client_ip=%s webhook_id=%q transmission_id=%q error=%v",
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook signature verification failed client_ip=%s webhook_id=%q transmission_id=%q error=%v",
 				c.ClientIP(), setting.PayPalWebhookID, c.GetHeader("PAYPAL-TRANSMISSION-ID"), err))
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 	} else {
-		logger.LogInfo(ctx, fmt.Sprintf("PayPal sandbox webhook 수신 (서명 검증 생략) client_ip=%s transmission_id=%q",
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal sandbox webhook received (signature verification skipped) client_ip=%s transmission_id=%q",
 			c.ClientIP(), c.GetHeader("PAYPAL-TRANSMISSION-ID")))
 	}
 
 	// Parse event envelope
 	var event paypalWebhookEvent
 	if err := common.Unmarshal(body, &event); err != nil {
-		logger.LogError(ctx, "PayPal webhook 파싱 실패: "+err.Error())
+		logger.LogError(ctx, "PayPal webhook parse failed: "+err.Error())
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
-	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 수신 event=%s client_ip=%s", event.EventType, c.ClientIP()))
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook received event=%s client_ip=%s", event.EventType, c.ClientIP()))
 
 	switch event.EventType {
 
@@ -719,7 +720,7 @@ func PayPalWebhook(c *gin.Context) {
 		// Acknowledge this event so PayPal stops retrying it.
 		paypalOrderID := event.Resource.ID
 		if paypalOrderID == "" {
-			logger.LogWarn(ctx, "PayPal CHECKOUT.ORDER.APPROVED: resource.id 없음")
+			logger.LogWarn(ctx, "PayPal CHECKOUT.ORDER.APPROVED: resource.id missing")
 			c.Status(http.StatusOK)
 			return
 		}
@@ -733,48 +734,48 @@ func PayPalWebhook(c *gin.Context) {
 			// Fallback: fetch order details
 			order, err = getPayPalOrder(ctx, paypalOrderID)
 			if err != nil {
-				logger.LogError(ctx, fmt.Sprintf("PayPal APPROVED: 주문 조회 실패 order_id=%s error=%q", paypalOrderID, err.Error()))
+				logger.LogError(ctx, fmt.Sprintf("PayPal APPROVED: order lookup failed order_id=%s error=%q", paypalOrderID, err.Error()))
 				c.Status(http.StatusServiceUnavailable) // 503 → PayPal 재시도
 				return
 			}
 			referenceID = getPayPalOrderReferenceID(order)
 		}
 		if referenceID == "" {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: reference_id 없음 order_id=%s", paypalOrderID))
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: reference_id missing order_id=%s", paypalOrderID))
 			c.Status(http.StatusOK)
 			return
 		}
 		topUp := model.GetTopUpByTradeNo(referenceID)
 		if topUp == nil {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: 로컬 주문 없음 ref=%q order_id=%s", referenceID, paypalOrderID))
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: local order not found ref=%q order_id=%s", referenceID, paypalOrderID))
 			c.Status(http.StatusOK)
 			return
 		}
 		if err := validatePayPalTopUpOrder(topUp, paypalOrderID, referenceID); err != nil {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: 주문 검증 실패 error=%q", err.Error()))
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: order validation failed error=%q", err.Error()))
 			c.Status(http.StatusOK)
 			return
 		}
-		logger.LogInfo(ctx, fmt.Sprintf("PayPal APPROVED: browser return capture 대기 ref=%q order_id=%s", referenceID, paypalOrderID))
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal APPROVED: waiting for browser return capture ref=%q order_id=%s", referenceID, paypalOrderID))
 
 	case "PAYMENT.CAPTURE.COMPLETED":
 		// Capture is confirmed. Credit the user after validating the event and order.
 		orderID := event.Resource.SupplementaryData.RelatedIDs.OrderID
 		if orderID == "" {
-			logger.LogWarn(ctx, "PayPal PAYMENT.CAPTURE.COMPLETED: order_id 없음")
+			logger.LogWarn(ctx, "PayPal PAYMENT.CAPTURE.COMPLETED: order_id missing")
 			c.Status(http.StatusOK)
 			return
 		}
 
 		order, err := getPayPalOrder(ctx, orderID)
 		if err != nil {
-			logger.LogError(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: 주문 조회 실패 order_id=%s error=%q", orderID, err.Error()))
+			logger.LogError(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: order lookup failed order_id=%s error=%q", orderID, err.Error()))
 			c.Status(http.StatusServiceUnavailable) // 503 → PayPal 재시도
 			return
 		}
 		referenceID := getPayPalOrderReferenceID(order)
 		if referenceID == "" {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: reference_id 없음 order_id=%s", orderID))
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: reference_id missing order_id=%s", orderID))
 			c.Status(http.StatusOK)
 			return
 		}
@@ -784,7 +785,7 @@ func PayPalWebhook(c *gin.Context) {
 
 		topUp := model.GetTopUpByTradeNo(referenceID)
 		if err := validatePayPalCapturedOrderResponse(topUp, orderID, order); err != nil {
-			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: 검증 실패 error=%q", err.Error()))
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: validation failed error=%q", err.Error()))
 			c.Status(http.StatusOK)
 			return
 		}
@@ -795,7 +796,7 @@ func PayPalWebhook(c *gin.Context) {
 
 	default:
 		// Unrelated event; acknowledge so PayPal stops retrying.
-		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook 무시 event=%s", event.EventType))
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook ignored event=%s", event.EventType))
 	}
 
 	c.Status(http.StatusOK)
@@ -804,16 +805,16 @@ func PayPalWebhook(c *gin.Context) {
 func RequestPayPalAmount(c *gin.Context) {
 	var req PayPalPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
 	minTopup := getPayPalMinTopup()
 	if req.Amount < minTopup {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", minTopup)})
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": minTopup})
 		return
 	}
 	if req.Amount > 10000 {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值数量不能大于 10000"})
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLarge)
 		return
 	}
 	id := c.GetInt("id")
