@@ -491,7 +491,7 @@ func GetUserOAuthBindingsByAdmin(c *gin.Context) {
 	userIdStr := c.Param("id")
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
-		common.ApiErrorMsg(c, "invalid user id")
+		common.ApiErrorI18n(c, i18n.MsgCustomOAuthInvalidId)
 		return
 	}
 
@@ -503,7 +503,7 @@ func GetUserOAuthBindingsByAdmin(c *gin.Context) {
 
 	myRole := c.GetInt("role")
 	if !canManageTargetRole(myRole, targetUser.Role) {
-		common.ApiErrorMsg(c, "no permission")
+		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
 		return
 	}
 
@@ -550,7 +550,7 @@ func UnbindCustomOAuthByAdmin(c *gin.Context) {
 	userIdStr := c.Param("id")
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
-		common.ApiErrorMsg(c, "invalid user id")
+		common.ApiErrorI18n(c, i18n.MsgCustomOAuthInvalidId)
 		return
 	}
 
@@ -562,14 +562,14 @@ func UnbindCustomOAuthByAdmin(c *gin.Context) {
 
 	myRole := c.GetInt("role")
 	if !canManageTargetRole(myRole, targetUser.Role) {
-		common.ApiErrorMsg(c, "no permission")
+		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
 		return
 	}
 
 	providerIdStr := c.Param("provider_id")
 	providerId, err := strconv.Atoi(providerIdStr)
 	if err != nil {
-		common.ApiErrorMsg(c, "invalid provider id")
+		common.ApiErrorI18n(c, i18n.MsgCustomOAuthInvalidProviderId)
 		return
 	}
 

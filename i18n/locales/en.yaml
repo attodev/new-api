@@ -386,3 +386,19 @@ console.get_config_failed: "Failed to get config, please try again later"
 prefill_group.name_type_empty: "Group name and type cannot be empty"
 prefill_group.name_exists: "Group name already exists"
 prefill_group.id_missing: "Group ID is missing"
+
+# Contact messages
+contact.invalid_request: "Invalid request"
+contact.required_fields: "Company name, email, and inquiry content are required"
+contact.invalid_email: "Invalid email format"
+contact.send_failed: "Failed to send inquiry, please try again later"
+contact.success: "Inquiry submitted successfully"
+
+# API deprecated / log messages
+common.api_deprecated: "This API is deprecated"
+
+# Usedata messages
+usedata.time_range_exceeded: "Time range cannot exceed 1 month"
+
+# Ratio config messages
+ratio_config.disabled: "Ratio config API is not enabled"

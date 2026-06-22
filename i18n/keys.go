@@ -471,3 +471,27 @@ const (
 	MsgPrefillGroupNameExists    = "prefill_group.name_exists"
 	MsgPrefillGroupIdMissing     = "prefill_group.id_missing"
 )
+
+// Contact messages
+const (
+	MsgContactInvalidRequest = "contact.invalid_request"
+	MsgContactRequiredFields = "contact.required_fields"
+	MsgContactInvalidEmail   = "contact.invalid_email"
+	MsgContactSendFailed     = "contact.send_failed"
+	MsgContactSuccess        = "contact.success"
+)
+
+// API deprecation / log messages
+const (
+	MsgApiDeprecated = "common.api_deprecated"
+)
+
+// Usedata messages
+const (
+	MsgUsedataTimeRangeExceeded = "usedata.time_range_exceeded"
+)
+
+// Ratio config messages
+const (
+	MsgRatioConfigDisabled = "ratio_config.disabled"
+)

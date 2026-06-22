@@ -387,3 +387,19 @@ console.get_config_failed: "获取配置失败，请稍后重试"
 prefill_group.name_type_empty: "组名称和类型不能为空"
 prefill_group.name_exists: "组名称已存在"
 prefill_group.id_missing: "缺少组 ID"
+
+# Contact messages
+contact.invalid_request: "無效的請求"
+contact.required_fields: "公司名稱、信箱和問題描述均為必填"
+contact.invalid_email: "信箱格式不正確"
+contact.send_failed: "發送失敗，請稍後重試"
+contact.success: "提交成功"
+
+# API deprecated / log messages
+common.api_deprecated: "此接口已廢棄"
+
+# Usedata messages
+usedata.time_range_exceeded: "時間跨度不能超過 1 個月"
+
+# Ratio config messages
+ratio_config.disabled: "倍率配置接口未啟用"

@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
@@ -62,7 +63,7 @@ func CreateVendorMeta(c *gin.Context) {
 		return
 	}
 	if v.Name == "" {
-		common.ApiErrorMsg(c, "vendor name cannot be empty")
+		common.ApiErrorI18n(c, i18n.MsgVendorNameEmpty)
 		return
 	}
 	// check name conflict before create
@@ -70,7 +71,7 @@ func CreateVendorMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	} else if dup {
-		common.ApiErrorMsg(c, "vendor name already exists")
+		common.ApiErrorI18n(c, i18n.MsgVendorNameExists)
 		return
 	}
 
@@ -89,7 +90,7 @@ func UpdateVendorMeta(c *gin.Context) {
 		return
 	}
 	if v.Id == 0 {
-		common.ApiErrorMsg(c, "vendor ID is missing")
+		common.ApiErrorI18n(c, i18n.MsgVendorIdMissing)
 		return
 	}
 	// check name conflict
@@ -97,7 +98,7 @@ func UpdateVendorMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	} else if dup {
-		common.ApiErrorMsg(c, "vendor name already exists")
+		common.ApiErrorI18n(c, i18n.MsgVendorNameExists)
 		return
 	}
 

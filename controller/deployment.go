@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/pkg/ionet"
 	"github.com/gin-gonic/gin"
 )
@@ -19,7 +20,7 @@ func getIoAPIKey(c *gin.Context) (string, bool) {
 	apiKey := common.OptionMap["model_deployment.ionet.api_key"]
 	common.OptionMapRWMutex.RUnlock()
 	if !enabled || strings.TrimSpace(apiKey) == "" {
-		common.ApiErrorMsg(c, "io.net model deployment is not enabled or api key missing")
+		common.ApiErrorI18n(c, i18n.MsgDeploymentNotEnabled)
 		return "", false
 	}
 	return apiKey, true
