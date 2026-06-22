@@ -444,7 +444,7 @@ func SearchAllTopUps(keyword string, pageInfo *common.PageInfo) (topups []*TopUp
 // ManualCompleteTopUp allows admin to manually complete an order and credit the user
 func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	if tradeNo == "" {
-		return errors.New("未提供订单号")
+		return errors.New("order number is missing")
 	}
 
 	refCol := "`trade_no`"

@@ -336,7 +336,7 @@ func PullOllamaModel(baseURL, apiKey, modelName string) error {
 	}
 	request, err := http.NewRequest("POST", url, strings.NewReader(string(requestBody)))
 	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
+		return fmt.Errorf("failed to create request: %v", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -346,7 +346,7 @@ func PullOllamaModel(baseURL, apiKey, modelName string) error {
 
 	response, err := client.Do(request)
 	if err != nil {
-		return fmt.Errorf("请求失败: %v", err)
+		return fmt.Errorf("request failed: %v", err)
 	}
 	defer response.Body.Close()
 
@@ -377,7 +377,7 @@ func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback f
 	}
 	request, err := http.NewRequest("POST", url, strings.NewReader(string(requestBody)))
 	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
+		return fmt.Errorf("failed to create request: %v", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -387,7 +387,7 @@ func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback f
 
 	response, err := client.Do(request)
 	if err != nil {
-		return fmt.Errorf("请求失败: %v", err)
+		return fmt.Errorf("request failed: %v", err)
 	}
 	defer response.Body.Close()
 
@@ -451,7 +451,7 @@ func DeleteOllamaModel(baseURL, apiKey, modelName string) error {
 	client := &http.Client{}
 	request, err := http.NewRequest("DELETE", url, strings.NewReader(string(requestBody)))
 	if err != nil {
-		return fmt.Errorf("创建请求失败: %v", err)
+		return fmt.Errorf("failed to create request: %v", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -461,7 +461,7 @@ func DeleteOllamaModel(baseURL, apiKey, modelName string) error {
 
 	response, err := client.Do(request)
 	if err != nil {
-		return fmt.Errorf("请求失败: %v", err)
+		return fmt.Errorf("request failed: %v", err)
 	}
 	defer response.Body.Close()
 
@@ -484,7 +484,7 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", fmt.Errorf("创建请求失败: %v", err)
+		return "", fmt.Errorf("failed to create request: %v", err)
 	}
 
 	if apiKey != "" {
@@ -493,13 +493,13 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 
 	response, err := client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("请求失败: %v", err)
+		return "", fmt.Errorf("request failed: %v", err)
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("读取响应失败: %v", err)
+		return "", fmt.Errorf("failed to read response: %v", err)
 	}
 
 	if response.StatusCode != http.StatusOK {
@@ -511,7 +511,7 @@ func FetchOllamaVersion(baseURL, apiKey string) (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &versionResp); err != nil {
-		return "", fmt.Errorf("解析响应失败: %v", err)
+		return "", fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	if versionResp.Version == "" {
