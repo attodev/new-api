@@ -35,7 +35,7 @@ type DiscordUser struct {
 
 func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	if code == "" {
-		return nil, errors.New("无效的参数")
+		return nil, errors.New("invalid parameters")
 	}
 
 	values := url.Values{}
@@ -57,7 +57,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	res, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("无法连接至 Discord 服务器，请稍后重试！")
+		return nil, errors.New("unable to connect to Discord server, please try again later")
 	}
 	defer res.Body.Close()
 	var discordResponse DiscordResponse
@@ -67,8 +67,8 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	}
 
 	if discordResponse.AccessToken == "" {
-		common.SysError("Discord 获取 Token 失败，请检查设置！")
-		return nil, errors.New("Discord 获取 Token 失败，请检查设置！")
+		common.SysError("failed to get Discord token, please check settings")
+		return nil, errors.New("failed to get Discord token, please check settings")
 	}
 
 	req, err = http.NewRequest("GET", "https://discord.com/api/v10/users/@me", nil)
@@ -79,12 +79,12 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	res2, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("无法连接至 Discord 服务器，请稍后重试！")
+		return nil, errors.New("unable to connect to Discord server, please try again later")
 	}
 	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {
-		common.SysError("Discord 获取用户信息失败！请检查设置！")
-		return nil, errors.New("Discord 获取用户信息失败！请检查设置！")
+		common.SysError("failed to get Discord user info, please check settings")
+		return nil, errors.New("failed to get Discord user info, please check settings")
 	}
 
 	var discordUser DiscordUser
@@ -93,8 +93,8 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 		return nil, err
 	}
 	if discordUser.UID == "" || discordUser.ID == "" {
-		common.SysError("Discord 获取用户信息为空！请检查设置！")
-		return nil, errors.New("Discord 获取用户信息为空！请检查设置！")
+		common.SysError("Discord returned empty user info, please check settings")
+		return nil, errors.New("Discord returned empty user info, please check settings")
 	}
 	return &discordUser, nil
 }

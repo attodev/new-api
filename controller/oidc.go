@@ -37,7 +37,7 @@ type OidcUser struct {
 
 func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	if code == "" {
-		return nil, errors.New("无效的参数")
+		return nil, errors.New("invalid parameters")
 	}
 
 	values := url.Values{}
@@ -59,7 +59,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	res, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("无法连接至 OIDC 服务器，请稍后重试！")
+		return nil, errors.New("unable to connect to OIDC server, please try again later")
 	}
 	defer res.Body.Close()
 	var oidcResponse OidcResponse
@@ -69,8 +69,8 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 
 	if oidcResponse.AccessToken == "" {
-		common.SysLog("OIDC 获取 Token 失败，请检查设置！")
-		return nil, errors.New("OIDC 获取 Token 失败，请检查设置！")
+		common.SysLog("failed to get OIDC token, please check settings")
+		return nil, errors.New("failed to get OIDC token, please check settings")
 	}
 
 	req, err = http.NewRequest("GET", system_setting.GetOIDCSettings().UserInfoEndpoint, nil)
@@ -81,12 +81,12 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	res2, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("无法连接至 OIDC 服务器，请稍后重试！")
+		return nil, errors.New("unable to connect to OIDC server, please try again later")
 	}
 	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {
-		common.SysLog("OIDC 获取用户信息失败！请检查设置！")
-		return nil, errors.New("OIDC 获取用户信息失败！请检查设置！")
+		common.SysLog("failed to get OIDC user info, please check settings")
+		return nil, errors.New("failed to get OIDC user info, please check settings")
 	}
 
 	var oidcUser OidcUser
@@ -95,8 +95,8 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 		return nil, err
 	}
 	if oidcUser.OpenID == "" || oidcUser.Email == "" {
-		common.SysLog("OIDC 获取用户信息为空！请检查设置！")
-		return nil, errors.New("OIDC 获取用户信息为空！请检查设置！")
+		common.SysLog("OIDC returned empty user info, please check settings")
+		return nil, errors.New("OIDC returned empty user info, please check settings")
 	}
 	return &oidcUser, nil
 }
