@@ -68,7 +68,7 @@ func UpdateMidjourneyTaskBulk() {
 			if err != nil {
 				logger.LogError(ctx, fmt.Sprintf("CacheGetChannel: %v", err))
 				err := model.MjBulkUpdate(taskIds, map[string]any{
-					"fail_reason": fmt.Sprintf("获取渠道信息失败，请联系管理员，渠道ID：%d", channelId),
+					"fail_reason": fmt.Sprintf("failed to get channel info, please contact admin, channel ID: %d", channelId),
 					"status":      "FAILURE",
 					"progress":    "100%",
 				})
@@ -124,7 +124,7 @@ func UpdateMidjourneyTaskBulk() {
 				useTime := (time.Now().UnixNano() / int64(time.Millisecond)) - task.SubmitTime
 				// 如果时间超过一小时，且进度不是100%，则认为任务失败
 				if useTime > 3600000 && task.Progress != "100%" {
-					responseItem.FailReason = "上游任务超时（超过1小时）"
+					responseItem.FailReason = "upstream task timed out (exceeded 1 hour)"
 					responseItem.Status = "FAILURE"
 				}
 				if !checkMjTaskNeedUpdate(task, responseItem) {
@@ -190,7 +190,7 @@ func UpdateMidjourneyTaskBulk() {
 						Quota:     task.Quota,
 						Other: map[string]interface{}{
 							"task_id": task.MjId,
-							"reason":  "构图失败",
+							"reason":  "composition failed",
 						},
 					})
 				}
