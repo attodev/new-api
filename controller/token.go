@@ -197,7 +197,7 @@ func AddToken(c *gin.Context) {
 	if int(count) >= maxTokens {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("已达到最大令牌数量限制 (%d)", maxTokens),
+			"message": fmt.Sprintf("maximum token count limit reached (%d)", maxTokens),
 		})
 		return
 	}

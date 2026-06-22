@@ -262,7 +262,7 @@ func CreateCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "创建成功",
+		"message": "created successfully",
 		"data":    toCustomOAuthProviderResponse(provider),
 	})
 }
@@ -395,7 +395,7 @@ func UpdateCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "更新成功",
+		"message": "updated successfully",
 		"data":    toCustomOAuthProviderResponse(provider),
 	})
 }
@@ -438,7 +438,7 @@ func DeleteCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "删除成功",
+		"message": "deleted successfully",
 	})
 }
 
@@ -542,7 +542,7 @@ func UnbindCustomOAuth(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "解绑成功",
+		"message": "unbound successfully",
 	})
 }
 

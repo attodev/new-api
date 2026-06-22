@@ -151,7 +151,7 @@ func ClearDiskCache(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "不活跃的磁盘缓存已清理",
+		"message": "inactive disk cache cleared",
 	})
 }
 
@@ -161,7 +161,7 @@ func ResetPerformanceStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "统计信息已重置",
+		"message": "statistics reset",
 	})
 }
 
@@ -171,7 +171,7 @@ func ForceGC(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "GC 已执行",
+		"message": "GC executed",
 	})
 }
 
@@ -339,7 +339,7 @@ func CleanupLogFiles(c *gin.Context) {
 	if len(failedFiles) > 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("部分文件删除失败（%d/%d）", len(failedFiles), len(toDelete)),
+			"message": fmt.Sprintf("some files failed to delete (%d/%d)", len(failedFiles), len(toDelete)),
 			"data":    result,
 		})
 		return
