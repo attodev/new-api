@@ -1,0 +1,616 @@
+# Backend Chinese Messages NOT covered by i18n
+# Total missing: 467 entries across 62 files
+# (Covered: 237, Total unique: 704)
+
+========================================================================
+# common/
+========================================================================
+
+## common/email.go  (1개)
+  [REST] L  45  SMTP 服务器未配置
+
+## common/init.go  (1개)
+  [LOG ] L  53  警告：SESSION_SECRET被设置为默认值'random_string'，请修改为随机字符串。
+
+## common/pprof.go  (3개)
+  [LOG ] L  25  创建pprof文件夹失败 
+  [LOG ] L  31  创建pprof文件失败 
+  [LOG ] L  36  启动pprof失败 
+
+## common/totp.go  (2개)
+  [REST] L 133  验证码必须是6位数字
+  [REST] L 138  验证码只能包含数字
+========================================================================
+# controller/
+========================================================================
+
+## controller/channel-billing.go  (2개)
+  [REST] L 370  尚未实现
+  [REST] L 390  尚未实现
+
+## controller/channel-test.go  (2개)
+  [REST] L 905  测试已在运行中
+  [REST] L 945  响应时间 %.2fs 超过阈值 %.2fs
+
+## controller/channel.go  (10개)
+  [REST] L 417  获取渠道信息失败: %v
+  [LOG ] L 427  查看渠道密钥信息 (渠道ID: %d)
+  [REST] L 460  渠道额外设置[channel setting] 格式错误：%s
+  [REST] L 472  模型名称过长: %s
+  [REST] L 480  部署地区不能为空
+  [REST] L 485  部署地区必须是标准的Json格式，例如{\
+  [REST] L 489  部署地区必须包含default字段
+  [REST] L 562  批量添加 Vertex AI 必须使用标准的JsonArray格式，例如[{key1}, {key2}...]，请检查输入: %w
+  [REST] L 573  Vertex AI key JSON 编码失败: %w
+  [REST] L 582  批量添加 Vertex AI 的 keys 不能为空
+
+## controller/checkin.go  (1개)
+  [LOG ] L  64  用户签到，获得额度 %s
+
+## controller/codex_oauth.go  (2개)
+  [REST] L 136  解析授权信息失败，请检查输入格式
+  [REST] L 184  授权码交换失败，请重试
+
+## controller/codex_usage.go  (1개)
+  [REST] L  48  解析凭证失败，请检查渠道配置
+
+## controller/custom_oauth.go  (18개)
+  [REST] L  97  无效的 ID
+  [REST] L 145  无效的请求参数: 
+  [REST] L 153  请先填写 Discovery URL 或 Issuer URL
+  [REST] L 165  Discovery URL 无效，仅支持 http/https
+  [REST] L 174  创建 Discovery 请求失败: 
+  [REST] L 182  获取 Discovery 配置失败: 
+  [REST] L 193  获取 Discovery 配置失败: 
+  [REST] L 199  解析 Discovery 配置失败: 
+  [REST] L 217  无效的请求参数: 
+  [REST] L 223  该 Slug 已被使用
+  [REST] L 229  该 Slug 与内置 OAuth 提供商冲突
+  [REST] L 296  无效的 ID
+  [REST] L 302  无效的请求参数: 
+  [REST] L 318  该 Slug 已被使用
+  [REST] L 323  该 Slug 与内置 OAuth 提供商冲突
+  [REST] L 407  无效的 ID
+  [REST] L 426  该 OAuth 提供商还有用户绑定，无法删除。请先解除所有用户绑定。
+  [REST] L 533  无效的提供商 ID
+
+## controller/discord.go  (2개)
+  [LOG ] L  96  Discord 获取用户信息为空！请检查设置！
+  [REST] L  97  Discord 获取用户信息为空！请检查设置！
+
+## controller/midjourney.go  (4개)
+  [LOG ] L  34  检测到未完成的任务数有: %v
+  [LOG ] L  63  渠道 #%d 未完成的任务有: %d
+  [LOG ] L 159  序列化 VideoUrls 失败: %v
+  [LOG ] L 170   构建失败，
+
+## controller/oidc.go  (2개)
+  [LOG ] L  98  OIDC 获取用户信息为空！请检查设置！
+  [REST] L  99  OIDC 获取用户信息为空！请检查设置！
+
+## controller/option.go  (1개)
+  [REST] L 148  合规确认字段不允许通过通用设置接口修改
+
+## controller/passkey.go  (6개)
+  [REST] L 281  用户信息获取失败: %w
+  [REST] L 294  用户句柄与凭证不匹配
+  [REST] L 496  保存验证状态失败: %v
+  [REST] L 514  无效的会话信息
+  [REST] L 571  请先完成安全验证
+  [REST] L 576  请先完成对应的安全验证
+
+## controller/payment_compliance.go  (2개)
+  [REST] L  41  参数错误
+  [REST] L  45  请确认合规声明
+
+## controller/playground.go  (1개)
+  [REST] L  28  暂不支持使用 access token
+
+## controller/ratio_sync.go  (1개)
+  [REST] L 146  请求参数格式错误
+
+## controller/relay.go  (1개)
+  [LOG ] L 162  模型 %s 免费，跳过预扣费
+
+## controller/secure_verification.go  (10개)
+  [REST] L  52  参数错误: %v
+  [REST] L  92  验证码不能为空
+  [REST] L 100  用户未启用Passkey
+  [REST] L 106  Passkey 验证状态异常: %v
+  [REST] L 110  请先完成 Passkey 验证
+  [REST] L 116  不支持的验证方式: %s
+  [REST] L 121  验证失败，请检查验证码
+  [REST] L 128  保存验证状态失败: %v
+  [LOG ] L 133  通用安全验证成功 (验证方式: %s)
+  [REST] L 168  无效的 Passkey 验证状态
+
+## controller/subscription.go  (7개)
+  [REST] L  79  参数错误
+  [REST] L 107  参数错误
+  [REST] L 146  参数错误
+  [REST] L 213  参数错误
+  [REST] L 311  参数错误
+  [REST] L 334  参数错误
+  [REST] L 382  参数错误
+
+## controller/subscription_payment_creem.go  (2개)
+  [LOG ] L  33  Creem 订阅支付请求读取失败 error=%q
+  [REST] L  40  参数错误
+
+## controller/subscription_payment_epay.go  (1개)
+  [REST] L  31  参数错误
+
+## controller/subscription_payment_stripe.go  (1개)
+  [REST] L  30  参数错误
+
+## controller/subscription_payment_waffo_pancake.go  (3개)
+  [REST] L  30  参数错误
+  [REST] L  44  该套餐未配置 WaffoPancakeProductId
+  [REST] L  51  Waffo Pancake 未配置或密钥无效
+
+## controller/task_video.go  (5개)
+  [LOG ] L 190  视频任务 %s 预扣费后补扣费：%s（实际消耗：%s，预扣费：%s，tokens：%d）
+  [LOG ] L 198  补扣费失败: %s
+  [LOG ] L 213  视频任务 %s 预扣费后返还：%s（实际消耗：%s，预扣费：%s，tokens：%d）
+  [LOG ] L 221  退还预扣费失败: %s
+  [LOG ] L 233  视频任务 %s 预扣费准确（%s，tokens：%d）
+
+## controller/topup.go  (28개)
+  [REST] L 216  参数错误
+  [REST] L 220  充值数量不能小于 %d
+  [REST] L 231  获取用户分组失败
+  [REST] L 236  充值金额过低
+  [LOG ] L 289  易支付 创建充值订单失败 user_id=%d trade_no=%s payment_method=%s amount=%d error=%q
+  [LOG ] L 341  易支付 webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s
+  [LOG ] L 351  易支付 webhook POST 表单解析失败 path=%q client_ip=%s error=%q
+  [LOG ] L 366  易支付 webhook 收到请求 path=%q client_ip=%s method=%s params=%q
+  [LOG ] L 369  易支付 webhook 参数为空 path=%q client_ip=%s
+  [LOG ] L 375  易支付 client 未初始化 path=%q client_ip=%s
+  [LOG ] L 378  易支付 webhook 响应写入失败 path=%q client_ip=%s error=%q
+  [LOG ] L 384  易支付 webhook 验签成功 trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q
+  [LOG ] L 387  易支付 webhook 响应写入失败 trade_no=%s client_ip=%s error=%q
+  [LOG ] L 392  易支付 webhook 响应写入失败 path=%q client_ip=%s error=%q
+  [LOG ] L 395  易支付 webhook 验签失败 path=%q client_ip=%s verify_error=%q
+  [LOG ] L 397  易支付 webhook 验签失败 path=%q client_ip=%s verify_status=false
+  [LOG ] L 407  易支付 回调订单不存在 trade_no=%s callback_type=%s client_ip=%s verify_info=%q
+  [LOG ] L 411  易支付 订单支付网关不匹配 trade_no=%s order_provider=%s callback_type=%s client_ip=%s
+  [LOG ] L 416  易支付 实际支付方式与订单不同 trade_no=%s order_payment_method=%s actual_type=%s client_ip=%s
+  [LOG ] L 422  易支付 更新充值订单失败 trade_no=%s user_id=%d client_ip=%s error=%q topup=%q
+  [LOG ] L 432  易支付 更新目标钱包额度失败 trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s quota_to_add=%d error=%q topup=%q
+  [LOG ] L 435  易支付 充值成功 trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q
+  [LOG ] L 439  易支付 webhook 忽略事件 trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q
+  [REST] L 447  参数错误
+  [REST] L 452  充值数量不能小于 %d
+  [REST] L 462  获取用户分组失败
+  [REST] L 467  充值金额过低
+  [REST] L 531  参数错误
+
+## controller/topup_creem.go  (41개)
+  [LOG ] L  38  Creem webhook secret 未配置 test_mode=%t signature=%q body=%q
+  [LOG ] L  40  Creem webhook 验签已跳过 reason=test_mode signature=%q body=%q
+  [REST] L  68  不支持的支付渠道
+  [REST] L  73  请选择产品
+  [LOG ] L  81  Creem 产品配置解析失败 user_id=%d error=%q
+  [REST] L  82  产品配置错误
+  [REST] L  96  产品不存在
+  [LOG ] L 122  Creem 创建充值订单失败 user_id=%d trade_no=%s product_id=%s error=%q
+  [LOG ] L 130  Creem 创建支付链接失败 user_id=%d trade_no=%s product_id=%s error=%q
+  [LOG ] L 152  Creem 支付请求读取失败 error=%q
+  [LOG ] L 157  Creem 支付请求已收到 user_id=%d body=%q
+  [REST] L 164  参数错误
+  [LOG ] L 233  Creem webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s
+  [LOG ] L 241  Creem webhook 读取请求体失败 path=%q client_ip=%s error=%q
+  [LOG ] L 248  Creem webhook 收到请求 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 250  Creem webhook 缺少签名 path=%q client_ip=%s body=%q
+  [LOG ] L 257  Creem webhook 验签失败 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 262  Creem webhook 验签成功 path=%q client_ip=%s
+  [LOG ] L 270  Creem webhook 解析失败 path=%q client_ip=%s error=%q body=%q
+  [LOG ] L 275  Creem webhook 解析成功 event_type=%s event_id=%s request_id=%s order_id=%s order_status=%s
+  [LOG ] L 282  Creem webhook 忽略事件 event_type=%s event_id=%s
+  [LOG ] L 291  Creem 订单状态未支付，忽略处理 request_id=%s order_id=%s order_status=%s
+  [LOG ] L 299  Creem webhook 缺少 request_id event_id=%s order_id=%s
+  [LOG ] L 308  Creem 订阅订单处理成功 trade_no=%s creem_order_id=%s
+  [LOG ] L 312  Creem 订阅订单处理失败 trade_no=%s creem_order_id=%s error=%q
+  [LOG ] L 319  Creem 暂不支持该订单类型，忽略处理 request_id=%s creem_order_id=%s order_type=%s
+  [LOG ] L 324  Creem 支付完成回调 trade_no=%s creem_order_id=%s amount_paid=%d currency=%s product_name=%q customer_email=%q customer_name=%q
+  [LOG ] L 335  Creem 充值订单状态非 pending，忽略处理 trade_no=%s status=%s creem_order_id=%s
+  [LOG ] L 346  Creem 回调客户邮箱为空 trade_no=%s creem_order_id=%s
+  [LOG ] L 349  Creem 回调客户姓名为空 trade_no=%s creem_order_id=%s
+  [LOG ] L 354  Creem 充值处理失败 trade_no=%s creem_order_id=%s client_ip=%s error=%q
+  [LOG ] L 359  Creem 充值成功 trade_no=%s creem_order_id=%s quota=%d money=%.2f client_ip=%s
+  [REST] L 379  未配置Creem API密钥
+  [LOG ] L 386  Creem 使用测试环境 api_url=%s
+  [REST] L 409  序列化请求数据失败: %v
+  [REST] L 415  创建HTTP请求失败: %v
+  [LOG ] L 422  Creem 支付请求已发送 api_url=%s product_id=%s email=%q trade_no=%s
+  [REST] L 430  发送HTTP请求失败: %v
+  [REST] L 437  读取响应失败: %v
+  [LOG ] L 440  Creem API 响应已收到 trade_no=%s status_code=%d body=%q
+  [REST] L 450  解析响应失败: %v
+
+## controller/topup_paypal.go  (16개)
+  [REST] L 133  PayPal token 获取失败: status=%d body=%s
+  [REST] L 142  PayPal token 响应缺少 access_token
+  [REST] L 159  获取PayPal token失败: %w
+  [REST] L 242  获取PayPal token失败: %w
+  [REST] L 266  PayPal 捕获订单失败: status=%d body=%s
+  [REST] L 280  参数错误
+  [REST] L 285  不支持的支付渠道
+  [REST] L 291  充值数量不能小于 %d
+  [REST] L 296  充值数量不能大于 10000
+  [REST] L 301  支付成功重定向URL不在可信任域名列表中
+  [REST] L 306  支付取消重定向URL不在可信任域名列表中
+  [REST] L 318  充值金额过低
+  [LOG ] L 349  PayPal 创建充值订单失败 user_id=%d trade_no=%s paypal_order=%s error=%q
+  [REST] L 807  参数错误
+  [REST] L 812  充值数量不能小于 %d
+  [REST] L 816  充值数量不能大于 10000
+
+## controller/topup_stripe.go  (41개)
+  [REST] L  47  充值数量不能小于 %d
+  [REST] L  51  充值数量不能大于 10000
+  [REST] L  57  获取用户分组失败
+  [REST] L  62  充值金额过低
+  [REST] L  70  不支持的支付渠道
+  [REST] L  74  充值数量不能小于 %d
+  [REST] L  78  充值数量不能大于 10000
+  [REST] L  83  支付成功重定向URL不在可信任域名列表中
+  [REST] L  88  支付取消重定向URL不在可信任域名列表中
+  [LOG ] L 101  Stripe 创建 Checkout Session 失败 user_id=%d trade_no=%s amount=%d error=%q
+  [LOG ] L 120  Stripe 创建充值订单失败 user_id=%d trade_no=%s amount=%d error=%q
+  [REST] L 137  参数错误
+  [REST] L 147  参数错误
+  [LOG ] L 156  Stripe webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s
+  [LOG ] L 163  Stripe webhook 读取请求体失败 path=%q client_ip=%s error=%q
+  [LOG ] L 169  Stripe webhook 收到请求 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 175  Stripe webhook 验签失败 path=%q client_ip=%s error=%q
+  [LOG ] L 181  Stripe webhook 验签成功 event_type=%s client_ip=%s path=%q
+  [LOG ] L 192  Stripe webhook 忽略事件 event_type=%s client_ip=%s
+  [LOG ] L 203  Stripe checkout.completed 状态异常，忽略处理 trade_no=%s status=%s client_ip=%s
+  [LOG ] L 209  Stripe Checkout 支付未完成，等待异步结果 trade_no=%s payment_status=%s client_ip=%s
+  [LOG ] L 221  Stripe 异步支付成功 trade_no=%s client_ip=%s
+  [LOG ] L 230  Stripe 异步支付失败 trade_no=%s client_ip=%s
+  [LOG ] L 233  Stripe 异步支付失败事件缺少订单号 client_ip=%s
+  [LOG ] L 242  Stripe 异步支付失败但本地订单不存在 trade_no=%s client_ip=%s
+  [LOG ] L 247  Stripe 异步支付失败但订单支付网关不匹配 trade_no=%s payment_provider=%s client_ip=%s
+  [LOG ] L 252  Stripe 异步支付失败但订单状态非 pending，忽略处理 trade_no=%s status=%s client_ip=%s
+  [LOG ] L 258  Stripe 标记充值订单失败状态失败 trade_no=%s client_ip=%s error=%q
+  [LOG ] L 261  Stripe 充值订单已标记为失败 trade_no=%s client_ip=%s
+  [LOG ] L 267  Stripe 完成订单时缺少订单号 client_ip=%s
+  [LOG ] L 280  Stripe 订阅订单处理成功 trade_no=%s event_type=%s client_ip=%s
+  [LOG ] L 283  Stripe 订阅订单处理失败 trade_no=%s event_type=%s client_ip=%s error=%q
+  [LOG ] L 289  Stripe 充值处理失败 trade_no=%s event_type=%s client_ip=%s error=%q
+  [LOG ] L 295  Stripe 充值成功 trade_no=%s amount_total=%.2f currency=%s event_type=%s client_ip=%s
+  [LOG ] L 302  Stripe checkout.expired 状态异常，忽略处理 trade_no=%s status=%s
+  [LOG ] L 307  Stripe checkout.expired 缺少订单号
+  [LOG ] L 315  Stripe 订阅订单已过期 trade_no=%s
+  [LOG ] L 318  Stripe 订阅订单过期处理失败 trade_no=%s error=%q
+  [LOG ] L 328  Stripe 充值订单过期处理失败 trade_no=%s error=%q
+  [LOG ] L 332  Stripe 充值订单已过期 trade_no=%s
+  [REST] L 349  无效的Stripe API密钥
+
+## controller/topup_waffo.go  (29개)
+  [REST] L 105  参数错误
+  [REST] L 111  充值数量不能小于 %d
+  [REST] L 122  获取用户分组失败
+  [REST] L 128  充值金额过低
+  [REST] L 138  Waffo 支付未启用
+  [REST] L 144  参数错误
+  [REST] L 149  充值数量不能小于 %d
+  [LOG ] L 171  Waffo 支付方式索引无效 user_id=%d pay_method_index=%d method_count=%d
+  [REST] L 172  不支持的支付方式
+  [LOG ] L 189  Waffo 支付方式无效 user_id=%d pay_method_type=%s pay_method_name=%q
+  [REST] L 190  不支持的支付方式
+  [REST] L 199  充值金额过低
+  [LOG ] L 230  Waffo 创建充值订单失败 user_id=%d trade_no=%s amount=%d error=%q
+  [LOG ] L 237  Waffo SDK 初始化失败 user_id=%d trade_no=%s error=%q
+  [REST] L 240  支付配置错误
+  [LOG ] L 288  Waffo 创建订单业务失败 user_id=%d trade_no=%s code=%s message=%q response=%q
+  [LOG ] L 331  Waffo webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s
+  [LOG ] L 338  Waffo webhook 读取请求体失败 path=%q client_ip=%s error=%q
+  [LOG ] L 345  Waffo webhook SDK 初始化失败 path=%q client_ip=%s error=%q
+  [LOG ] L 353  Waffo webhook 收到请求 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 357  Waffo webhook 验签失败 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 364  Waffo webhook 解析失败 path=%q client_ip=%s error=%q body=%q
+  [LOG ] L 374  Waffo 支付回调载荷解析失败 event_type=%s client_ip=%s error=%q body=%q
+  [LOG ] L 378  Waffo webhook 验签并解析成功 event_type=%s merchant_order_id=%s order_status=%s client_ip=%s
+  [LOG ] L 381  Waffo webhook 忽略事件 event_type=%s client_ip=%s
+  [LOG ] L 389  Waffo 订单状态非成功，忽略充值 trade_no=%s order_status=%s client_ip=%s
+  [LOG ] L 395  Waffo 标记失败订单状态失败 trade_no=%s error=%q
+  [LOG ] L 408  Waffo 充值处理失败 trade_no=%s client_ip=%s error=%q
+  [LOG ] L 413  Waffo 充值成功 trade_no=%s client_ip=%s
+
+## controller/topup_waffo_pancake.go  (33개)
+  [REST] L  28  参数错误
+  [REST] L  33  充值数量不能小于 %d
+  [REST] L  44  获取用户分组失败
+  [REST] L  50  充值金额过低
+  [REST] L 134  参数错误
+  [REST] L 149  保存配置失败
+  [REST] L 181  参数错误
+  [REST] L 187  Waffo Pancake 凭证未配置
+  [REST] L 232  参数错误
+  [REST] L 238  Waffo Pancake 凭证未配置
+  [REST] L 246  拉取目录失败
+  [REST] L 266  参数错误
+  [REST] L 275  套餐价格不能为空
+  [REST] L 281  Waffo Pancake 未完成配置，请先在支付设置中完成网关绑定
+  [REST] L 298  创建套餐产品失败
+  [REST] L 318  Waffo Pancake 未完成配置，请先在支付设置中完成网关绑定
+  [REST] L 326  拉取产品列表失败
+  [REST] L 354  Waffo Pancake 配置不完整
+  [REST] L 360  参数错误
+  [REST] L 364  充值数量不能小于 %d
+  [REST] L 381  获取用户分组失败
+  [REST] L 387  充值金额过低
+  [LOG ] L 405  Waffo Pancake 创建充值订单失败 user_id=%d trade_no=%s amount=%d error=%q
+  [LOG ] L 423  Waffo Pancake 创建结账会话失败 user_id=%d trade_no=%s error=%q
+  [LOG ] L 446  Waffo Pancake webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s
+  [LOG ] L 466  Waffo Pancake webhook 读取请求体失败 path=%q client_ip=%s error=%q
+  [LOG ] L 472  Waffo Pancake webhook 收到请求 path=%q client_ip=%s signature=%q body=%q
+  [LOG ] L 476  Waffo Pancake webhook 验签失败 path=%q client_ip=%s signature=%q body=%q error=%q
+  [LOG ] L 490  Waffo Pancake webhook 验签成功 event_type=%s event_id=%s order_id=%s client_ip=%s
+  [LOG ] L 514  Waffo Pancake 订阅完成失败 trade_no=%s event_id=%s order_id=%s client_ip=%s error=%q
+  [LOG ] L 518  Waffo Pancake 订阅完成 trade_no=%s event_id=%s order_id=%s client_ip=%s
+  [LOG ] L 540  Waffo Pancake 充值处理失败 trade_no=%s event_id=%s order_id=%s client_ip=%s error=%q
+  [LOG ] L 545  Waffo Pancake 充值成功 trade_no=%s event_id=%s order_id=%s client_ip=%s
+
+## controller/twofa.go  (10개)
+  [LOG ] L  73  生成TOTP密钥失败: 
+  [LOG ] L  84  生成备用码失败: 
+  [LOG ] L 118  保存备用码失败: 
+  [LOG ] L 123  开始设置两步验证
+  [LOG ] L 195  成功启用两步验证
+  [LOG ] L 267  禁用两步验证
+  [LOG ] L 297  获取备用码数量失败: 
+  [LOG ] L 371  生成备用码失败: 
+  [LOG ] L 381  保存备用码失败: 
+  [LOG ] L 386  重新生成两步验证备用码
+
+## controller/user.go  (1개)
+  [LOG ] L 548  生成默认边栏配置失败: 
+========================================================================
+# model/
+========================================================================
+
+## model/channel_cache.go  (5개)
+  [REST] L 123  数据库一致性错误，渠道# %d 不存在，请联系管理员修复
+  [REST] L 131  数据库一致性错误，渠道# %d 不存在，请联系管理员修复
+  [REST] L 155  数据库一致性错误，渠道# %d 不存在，请联系管理员修复
+  [REST] L 203  渠道# %d，已不存在
+  [REST] L 221  渠道# %d，已不存在
+
+## model/log.go  (4개)
+  [REST] L 528  查询日志失败
+  [REST] L 533  查询日志失败
+  [REST] L 592  查询统计数据失败
+  [REST] L 596  查询统计数据失败
+
+## model/main.go  (3개)
+  [REST] L 606  读取当前库默认字符集/排序规则失败 / Failed to read schema default charset/collation: %v
+  [REST] L 638  当前库默认字符集/排序规则不支持中文：schema(%s/%s)。请将库设置为 utf8mb4/utf8/gbk/big5/gb18030 / Schema default charset/collation is not Chinese-capable: schema(%s/%s). Please set to utf8mb4/utf8/gbk/big5/gb18030
+  [REST] L 649  读取表排序规则失败 / Failed to read table collations: %v
+
+## model/passkey.go  (3개)
+  [REST] L 183  Passkey 保存失败，请重试
+  [REST] L 189  Passkey 保存失败，请重试
+  [REST] L 193  Passkey 保存失败，请重试
+
+## model/redemption.go  (2개)
+  [REST] L 120  无效的 user id
+  [LOG ] L 154  通过兑换码充值 %s，兑换码ID %d
+
+## model/subscription.go  (2개)
+  [REST] L 691  额度单位配置错误
+  [REST] L 732  余额不足
+
+## model/token.go  (13개)
+  [REST] L 103  搜索模式中不允许包含连续的 % 通配符
+  [REST] L 109  搜索模式中最多允许包含 2 个 % 通配符
+  [REST] L 116  使用模糊搜索时，关键词长度至少为 2 个字符
+  [REST] L 147  获取令牌数量失败
+  [REST] L 150  令牌数量超过上限，仅允许精确搜索，请勿使用 % 通配符
+  [REST] L 176  搜索令牌失败
+  [REST] L 183  搜索令牌失败
+  [REST] L 230  id 或 userId 为空！
+  [REST] L 365  id 或 userId 为空！
+  [REST] L 377  quota 不能为负数！
+  [REST] L 407  quota 不能为负数！
+  [REST] L 445  ids 不能为空！
+  [REST] L 492  userId 无效
+
+## model/topup.go  (10개)
+  [REST] L  98  组织不存在
+  [REST] L 349  搜索充值记录失败
+  [REST] L 355  搜索充值记录失败
+  [REST] L 389  搜索充值记录失败
+  [REST] L 395  搜索充值记录失败
+  [REST] L 429  搜索充值记录失败
+  [REST] L 435  搜索充值记录失败
+  [REST] L 447  未提供订单号
+  [REST] L 473  订单状态不是待支付，无法补单
+  [LOG ] L 754  Waffo Pancake充值成功，充值额度: %v，支付金额: %.2f
+
+## model/twofa.go  (6개)
+  [REST] L 238  账户已被锁定，请在%v后重试
+  [LOG ] L 245  更新2FA失败次数失败: 
+  [LOG ] L 257  更新2FA使用记录失败: 
+  [REST] L 267  账户已被锁定，请在%v后重试
+  [LOG ] L 279  更新2FA失败次数失败: 
+  [LOG ] L 291  更新2FA使用记录失败: 
+
+## model/usedata.go  (2개)
+  [LOG ] L  27  正在更新数据看板数据...
+  [LOG ] L  89  保存数据看板数据成功，共保存%d条数据
+
+## model/user.go  (11개)
+  [LOG ] L 171  生成默认边栏配置失败: 
+  [LOG ] L 428  为新用户 %s (角色: %d) 初始化边栏配置
+  [LOG ] L 433  新用户注册赠送 %s
+  [LOG ] L 438  使用邀请码赠送 %s
+  [LOG ] L 442  邀请用户赠送 %s
+  [LOG ] L 489  为新用户 %s (角色: %d) 初始化边栏配置
+  [LOG ] L 494  新用户注册赠送 %s
+  [LOG ] L 499  使用邀请码赠送 %s
+  [LOG ] L 502  邀请用户赠送 %s
+  [REST] L 899  quota 不能为负数！
+  [REST] L 924  quota 不能为负数！
+========================================================================
+# service/
+========================================================================
+
+## service/billing.go  (3개)
+  [LOG ] L  41  预扣费后补扣费：%s（实际消耗：%s，预扣费：%s）
+  [LOG ] L  47  预扣费后返还扣费：%s（实际消耗：%s，预扣费：%s）
+  [LOG ] L  53  预扣费与实际消耗一致，无需调整：%s（按次计费）
+
+## service/billing_session.go  (6개)
+  [LOG ] L  91  用户 %d 请求失败, 返还预扣费（token_quota=%s, funding=%s）
+  [LOG ] L 202  用户 %d 额度充足, 信任且不需要预扣费 (funding=%s)
+  [LOG ] L 204  用户 %d 需要预扣费 %s (funding=%s)
+  [REST] L 404  预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s
+  [REST] L 424  组织预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s
+  [REST] L 483  组织预扣费额度失败, 剩余额度: %s, 需要预扣费额度: %s
+
+## service/channel.go  (2개)
+  [LOG ] L  20  通道「%s」（#%d）发生错误，准备禁用，原因：%s
+  [LOG ] L  24  通道「%s」（#%d）未启用自动禁用功能，跳过禁用操作
+
+## service/channel_affinity.go  (4개)
+  [REST] L 216  rule_name 不能为空
+  [REST] L 221  channel_affinity_setting 未初始化
+  [REST] L 234  未知规则名称
+  [REST] L 237  该规则未启用 include_rule_name，无法按规则清空缓存
+
+## service/passkey/service.go  (5개)
+  [REST] L  93  Passkey 不允许使用不安全的 Origin: %s
+  [REST] L 107  Passkey 仅支持 HTTPS，当前访问: %s://%s，请在 Passkey 设置中允许不安全 Origin 或配置 HTTPS
+  [REST] L 122  无法确定 Passkey 的 Origin，请在系统设置或 Passkey 设置中指定。当前 Host: '%s', ServerAddress: '%s'
+  [REST] L 137  Passkey 未配置 Origin，无法推导 RPID
+  [REST] L 141  无法解析 Passkey Origin: %w
+
+## service/passkey/session.go  (2개)
+  [REST] L  12  Passkey 会话不存在或已过期
+  [REST] L  47  Passkey 会话格式无效
+
+## service/pre_consume_quota.go  (5개)
+  [LOG ] L  19  用户 %d 请求失败, 返还预扣费额度 %s
+  [REST] L  42  预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s
+  [LOG ] L  56  用户 %d 剩余额度 %s 且令牌 %d 额度 %d 充足, 信任且不需要预扣费
+  [LOG ] L  62  用户 %d 额度充足且为无限额度令牌, 信任且不需要预扣费
+  [LOG ] L  75  用户 %d 预扣费 %s, 预扣费后剩余额度: %s
+
+## service/quota.go  (1개)
+  [REST] L 385  quota 不能为负数！
+
+## service/task_billing.go  (6개)
+  [LOG ] L  77  获取令牌 key 失败 (tokenId=%d, task=%s): %s
+  [LOG ] L 144  调整令牌额度失败 (delta=%d, task=%s): %s
+  [LOG ] L 189  退还资金来源失败 task %s: %s
+  [LOG ] L 224  任务 %s 预扣费准确（%s，%s）
+  [LOG ] L 229  任务 %s 差额结算：delta=%s（实际：%s，预扣：%s，%s）
+  [LOG ] L 239  差额结算资金调整失败 task %s: %s
+
+## service/task_polling.go  (7개)
+  [LOG ] L  94  任务进度轮询开始
+  [LOG ] L 136  任务进度轮询完成
+  [LOG ] L 159  渠道 #%d 更新异步任务失败: %s
+  [LOG ] L 166  渠道 #%d 未完成的任务有: %d
+  [LOG ] L 219  渠道 #%d 未完成的任务有: %d, 成功获取到任务数: %s
+  [LOG ] L 235   构建失败，
+  [LOG ] L 546  任务 %s 按次计费，跳过差额结算
+========================================================================
+# relay/
+========================================================================
+
+## relay/channel/gemini/relay-gemini.go  (6개)
+  [REST] L1686  创建HTTP客户端失败: %v
+  [REST] L1703  创建请求失败: %v
+  [REST] L1711  请求失败: %v
+  [REST] L1718  服务器返回错误 %d: %s
+  [REST] L1725  读取响应失败: %v
+  [REST] L1730  解析响应失败: %v
+
+## relay/channel/ollama/relay-ollama.go  (27개)
+  [REST] L 287  创建请求失败: %v
+  [REST] L 297  请求失败: %v
+  [REST] L 303  服务器返回错误 %d: %s
+  [REST] L 309  读取响应失败: %v
+  [REST] L 314  解析响应失败: %v
+  [REST] L 331  序列化请求失败: %v
+  [REST] L 339  创建请求失败: %v
+  [REST] L 349  请求失败: %v
+  [REST] L 355  拉取模型失败 %d: %s
+  [REST] L 372  序列化请求失败: %v
+  [REST] L 380  创建请求失败: %v
+  [REST] L 390  请求失败: %v
+  [REST] L 396  拉取模型失败 %d: %s
+  [REST] L 419  拉取模型失败: %s
+  [REST] L 428  读取流式响应失败: %v
+  [REST] L 432  拉取模型未完成: 未收到成功状态
+  [REST] L 448  序列化请求失败: %v
+  [REST] L 454  创建请求失败: %v
+  [REST] L 464  请求失败: %v
+  [REST] L 470  删除模型失败 %d: %s
+  [REST] L 479  baseURL 为空
+  [REST] L 487  创建请求失败: %v
+  [REST] L 496  请求失败: %v
+  [REST] L 502  读取响应失败: %v
+  [REST] L 506  查询版本失败 %d: %s
+  [REST] L 514  解析响应失败: %v
+  [REST] L 518  未返回版本信息
+
+## relay/channel/task/jimeng/adaptor.go  (1개)
+  [REST] L 148  文件 %s 大小超过限制，最大允许 %d MB
+========================================================================
+# setting/
+========================================================================
+
+## setting/console_setting/validation.go  (37개)
+  [REST] L  28  %s格式错误：%s
+  [REST] L  35  第%d个%s的URL格式不正确
+  [REST] L  38  第%d个%s的URL无法解析：%s
+  [REST] L  47  第%d个%s包含不允许的内容
+  [REST] L  77  未知的设置类型：%s
+  [REST] L  88  API信息数量不能超过50个
+  [REST] L  94  第%d个API信息缺少URL字段
+  [REST] L  98  第%d个API信息缺少线路描述字段
+  [REST] L 102  第%d个API信息缺少说明字段
+  [REST] L 106  第%d个API信息缺少颜色字段
+  [REST] L 114  第%d个API信息的URL长度不能超过500字符
+  [REST] L 117  第%d个API信息的线路描述长度不能超过100字符
+  [REST] L 120  第%d个API信息的说明长度不能超过200字符
+  [REST] L 124  第%d个API信息的颜色值不合法
+  [REST] L 147  系统公告数量不能超过100个
+  [REST] L 155  第%d个公告缺少内容字段
+  [REST] L 159  第%d个公告缺少发布日期字段
+  [REST] L 163  第%d个公告的发布日期不能为空
+  [REST] L 166  第%d个公告的发布日期格式错误
+  [REST] L 171  第%d个公告的类型值不合法
+  [REST] L 176  第%d个公告的内容长度不能超过500字符
+  [REST] L 180  第%d个公告的说明长度不能超过200字符
+  [REST] L 193  FAQ数量不能超过100个
+  [REST] L 198  第%d个FAQ缺少问题字段
+  [REST] L 202  第%d个FAQ缺少答案字段
+  [REST] L 205  第%d个FAQ的问题长度不能超过200字符
+  [REST] L 208  第%d个FAQ的答案长度不能超过1000字符
+  [REST] L 244  Uptime Kuma分组数量不能超过20个
+  [REST] L 252  第%d个分组缺少分类名称字段
+  [REST] L 255  第%d个分组的分类名称与其他分组重复
+  [REST] L 260  第%d个分组缺少URL字段
+  [REST] L 264  第%d个分组缺少Slug字段
+  [REST] L 276  第%d个分组的分类名称长度不能超过50字符
+  [REST] L 279  第%d个分组的URL长度不能超过500字符
+  [REST] L 282  第%d个分组的Slug长度不能超过100字符
+  [REST] L 285  第%d个分组的描述长度不能超过200字符
+  [REST] L 289  第%d个分组的Slug只能包含字母、数字、下划线和连字符
+========================================================================
+# middleware/
+========================================================================
+
+## middleware/auth.go  (1개)
+  [REST] L 435  普通用户不支持指定渠道
+
+## middleware/model-rate-limit.go  (2개)
+  [LOG ] L  88  检查成功请求数限制失败:
+  [LOG ] L 111  检查总请求数限制失败:

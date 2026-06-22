@@ -1,6 +1,7 @@
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http  = require('http');
+const https = require('https');
+const fs    = require('fs');
+const path  = require('path');
 const nodemailer = require('nodemailer');
 
 const PORT = 4000;
@@ -38,13 +39,32 @@ const MIME = {
 };
 
 const server = http.createServer(async (req, res) => {
+  // GET /api/pricing  — proxy to alrouter.ai (avoids browser CORS)
+  if (req.method === 'GET' && req.url === '/api/pricing') {
+    https.get('https://alrouter.ai/api/pricing', upstream => {
+      res.writeHead(upstream.statusCode, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      upstream.pipe(res);
+    }).on('error', () => {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, data: [] }));
+    });
+    return;
+  }
+
   // POST /api/contact
   if (req.method === 'POST' && req.url === '/api/contact') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { org, email, phone, message } = JSON.parse(body);
+        const { org, email, phone, scale_type, headcount, input_tokens, output_tokens, features, notes } = JSON.parse(body);
+        const featureList = Array.isArray(features) && features.length ? features.join(', ') : '미선택';
+        const scaleText = scale_type === 'token'
+          ? `입력 ${input_tokens || 0}M / 출력 ${output_tokens || 0}M 토큰/월`
+          : (headcount ? headcount + '명' : '미입력');
         const mailOptions = {
           from: `"AlRouter 문의" <noreply@alrouter.io>`,
           to: TO_EMAIL,
@@ -54,9 +74,11 @@ const server = http.createServer(async (req, res) => {
             `기관명: ${org}`,
             `이메일: ${email}`,
             `전화번호: ${phone || '미입력'}`,
+            `도입 규모: ${scaleText}`,
+            `필요 기능: ${featureList}`,
             '',
-            `[문의사항]`,
-            message,
+            `[기타 의견]`,
+            notes || '없음',
           ].join('\n'),
           html: `
             <h2 style="color:#0EA5E9">기업 도입 문의</h2>
@@ -64,9 +86,11 @@ const server = http.createServer(async (req, res) => {
               <tr><td style="padding:6px 12px;font-weight:bold">기관명</td><td style="padding:6px 12px">${org}</td></tr>
               <tr><td style="padding:6px 12px;font-weight:bold">이메일</td><td style="padding:6px 12px">${email}</td></tr>
               <tr><td style="padding:6px 12px;font-weight:bold">전화번호</td><td style="padding:6px 12px">${phone || '미입력'}</td></tr>
+              <tr><td style="padding:6px 12px;font-weight:bold">도입 규모</td><td style="padding:6px 12px">${scaleText}</td></tr>
+              <tr><td style="padding:6px 12px;font-weight:bold">필요 기능</td><td style="padding:6px 12px">${featureList}</td></tr>
             </table>
-            <h3>문의사항</h3>
-            <p style="white-space:pre-wrap">${message}</p>
+            <h3>기타 의견</h3>
+            <p style="white-space:pre-wrap">${notes || '없음'}</p>
           `,
         };
 
@@ -88,7 +112,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static file serving
-  let filePath = path.join(STATIC_DIR, req.url === '/' ? 'index.html' : req.url);
+  const urlPath = req.url.split('?')[0];
+  let filePath = path.join(STATIC_DIR, urlPath === '/' ? 'index.html' : urlPath);
   if (!fs.existsSync(filePath)) {
     res.writeHead(404); res.end('Not found'); return;
   }

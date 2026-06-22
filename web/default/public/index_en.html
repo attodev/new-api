@@ -393,6 +393,53 @@
   }
   .feature-visual-title:hover { color: #0EA5E9; }
 
+  /* ── AI Cost Calculator ── */
+  .calc-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .calc-card-title { font-size:14px; font-weight:700; color:#f9fafb; }
+  .calc-card-link { font-size:11px; color:#6b7280; text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.2s; white-space:nowrap; }
+  .calc-card-link:hover { color:#0EA5E9; }
+  .calc-body { display:flex; gap:16px; align-items:stretch; }
+  .calc-form { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .calc-group { display:flex; flex-direction:column; gap:5px; }
+  .calc-group label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; }
+  .calc-select {
+    background:#111827; border:1px solid #374151; border-radius:8px;
+    color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 32px 8px 12px;
+    outline:none; transition:border-color 0.2s; width:100%;
+    appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center;
+    cursor:pointer;
+  }
+  .calc-select:focus { border-color:#0EA5E9; }
+  .calc-input-wrap { position:relative; display:flex; align-items:center; }
+  .calc-input-wrap input {
+    background:#111827; border:1px solid #374151; border-radius:8px;
+    color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 80px 8px 12px;
+    outline:none; transition:border-color 0.2s; width:100%;
+    -moz-appearance:textfield;
+  }
+  .calc-input-wrap input::-webkit-inner-spin-button,
+  .calc-input-wrap input::-webkit-outer-spin-button { -webkit-appearance:none; }
+  .calc-input-wrap input:focus { border-color:#0EA5E9; }
+  .calc-input-suffix { position:absolute; right:12px; font-size:11px; color:#6b7280; pointer-events:none; white-space:nowrap; }
+  .calc-btn {
+    margin-top:2px; padding:9px 16px; background:#0EA5E9; color:#fff;
+    border:none; border-radius:8px; font-size:13px; font-weight:700;
+    cursor:pointer; transition:opacity 0.2s, transform 0.15s; width:100%;
+  }
+  .calc-btn:hover { opacity:0.88; transform:translateY(-1px); }
+  .calc-result {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#111827; border-radius:12px; padding:20px 16px; min-width:0;
+    border:1px solid #1f2937;
+  }
+  .calc-result-hint { font-size:15px; color:#7dd3fc; text-align:center; line-height:1.8; font-weight:500; }
+  .calc-result-label { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
+  .calc-result-price { font-size:34px; font-weight:800; color:#0EA5E9; line-height:1; margin-bottom:14px; }
+  .calc-breakdown { display:flex; flex-direction:column; gap:5px; width:100%; }
+  .calc-breakdown-row { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; }
+
   /* ── 7. FEATURE: GOVERNANCE ── */
   .gov-points { display: flex; flex-direction: column; gap: 20px; }
   .gov-point { display: flex; gap: 14px; align-items: flex-start; }
@@ -532,8 +579,10 @@
 .popup-overlay.open { display:flex; }
 .popup-modal { background:#1f2937; border:1px solid #374151; border-radius:16px; width:min(640px,92vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,0.6); }
 .popup-modal.wide { width:min(1100px,96vw); height:94vh; }
-.popup-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #374151; flex-shrink:0; }
+.popup-header { display:flex; align-items:flex-start; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #374151; flex-shrink:0; }
+.popup-header-left { display:flex; flex-direction:column; gap:4px; }
 .popup-title { font-size:16px; font-weight:700; color:#f9fafb; }
+.popup-note { font-size:11px; font-weight:600; color:#fbbf24; }
 .popup-close { background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; transition:color 0.2s,background 0.2s; }
 .popup-close:hover { color:#f9fafb; background:#374151; }
 .popup-body { overflow-y:auto; padding:24px; color:#d1d5db; font-size:14px; line-height:1.8; flex:1; }
@@ -541,11 +590,12 @@
 .popup-body::-webkit-scrollbar-track { background:#111827; border-radius:3px; }
 .popup-body::-webkit-scrollbar-thumb { background:#4b5563; border-radius:3px; }
 .popup-modal.wide .popup-body { padding:0; display:flex; flex-direction:column; min-height:0; }
+.popup-footer { padding: 16px 24px; border-top: 1px solid #374151; flex-shrink: 0; }
 .popup-iframe { width:100%; height:100%; flex:1; border:none; border-radius:0 0 16px 16px; min-height:0; }
 
 /* ── Contact Form ── */
-.contact-form { display:flex; flex-direction:column; gap:18px; }
-.cf-group { display:flex; flex-direction:column; gap:6px; }
+.contact-form { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+.cf-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
 .cf-group label { font-size:13px; font-weight:600; color:#d1d5db; }
 .cf-required { color:#EC4899; margin-left:2px; }
 .cf-optional { font-size:11px; font-weight:400; color:#6b7280; margin-left:4px; }
@@ -558,8 +608,35 @@
 .cf-group input:focus, .cf-group textarea:focus {
   border-color:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,0.15);
 }
-.cf-group textarea { min-height:120px; }
+.cf-group textarea { min-height:100px; }
+.cf-num-wrap { position:relative; display:flex; align-items:center; }
+.cf-num-wrap input[type="number"] { padding-right:60px; width:100%; -moz-appearance:textfield; }
+.cf-num-wrap input[type="number"]::-webkit-inner-spin-button,
+.cf-num-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; }
+.cf-num-suffix { position:absolute; right:14px; color:#9ca3af; font-size:14px; pointer-events:none; }
+.cf-scale-tabs { display:flex; gap:0; margin-bottom:10px; border-radius:8px; overflow:hidden; border:1px solid #374151; width:fit-content; }
+.cf-scale-tab { position:relative; }
+.cf-scale-tab input[type="radio"] { display:none; }
+.cf-scale-tab label { display:block; padding:6px 16px; font-size:12px; font-weight:600; color:#9ca3af; cursor:pointer; background:#1f2937; transition:background 0.15s, color 0.15s; white-space:nowrap; }
+.cf-scale-tab input[type="radio"]:checked + label { background:#0EA5E9; color:#fff; }
+.cf-token-row { display:flex; gap:10px; }
+.cf-token-row .cf-num-wrap { flex:1; }
+.cf-scale-hint { margin-top:6px; font-size:11px; color:#6b7280; }
+.cf-checks { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 16px; }
+.cf-check { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+.cf-check input[type="checkbox"] { display:none; }
+.cf-check-box {
+  width:18px; height:18px; flex-shrink:0; border-radius:4px;
+  border:1.5px solid #374151; background:#111827;
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color 0.15s, background 0.15s;
+}
+.cf-check input[type="checkbox"]:checked ~ .cf-check-box { background:#0EA5E9; border-color:#0EA5E9; }
+.cf-check-box svg { display:none; }
+.cf-check input[type="checkbox"]:checked ~ .cf-check-box svg { display:block; }
+.cf-check-label { font-size:13px; color:#d1d5db; }
 .cf-submit {
+  display:block; margin-left:auto;
   margin-top:4px; padding:12px 24px; background:#0EA5E9; color:#fff;
   border:none; border-radius:8px; font-size:15px; font-weight:700;
   cursor:pointer; transition:opacity 0.2s, transform 0.15s;
@@ -570,40 +647,72 @@
 .cf-result.cf-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
 .cf-result.cf-error   { background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
 
-/* ── 애니메이션 ── */
-.anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 941/1672; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #c8a882; }
-.anim-scene { position: absolute; inset: 0; opacity: 0; z-index: 0; transition: opacity 0.9s ease-in-out; }
-.anim-scene.active { opacity: 1; z-index: 1; }
-.anim-scene.exiting { opacity: 1; z-index: 0; transition: none; pointer-events: none; }
-.anim-scene-bg { width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; }
-.anim-caption { position: absolute; left: 4%; right: 4%; bottom: 5.5%; background: rgba(8,8,20,0.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff; text-align: center; padding: 10px 16px; border-radius: 12px; font-size: clamp(10px,3.2vw,14px); font-weight: 700; line-height: 1.5; letter-spacing: -0.02em; opacity: 0; transform: translateY(8px); transition: opacity 0.45s 0.45s ease, transform 0.45s 0.45s ease; }
-.anim-scene.active .anim-caption { opacity: 1; transform: translateY(0); }
-.anim-bubbles-layer { position: absolute; inset: 0; pointer-events: none; }
-.anim-speech-bubble { position: absolute; background: #fff; border-radius: 16px; padding: 6px 12px; font-size: clamp(9px,2.4vw,12px); font-weight: 700; color: #1a1a2e; box-shadow: 0 3px 12px rgba(0,0,0,0.18); white-space: normal; max-width: 44%; line-height: 1.35; opacity: 0; transform: scale(0.72) translateY(6px); transition: opacity 0.3s ease, transform 0.38s cubic-bezier(0.34,1.56,0.64,1); }
-.anim-speech-bubble.show { opacity: 1; transform: scale(1) translateY(0); }
-.anim-speech-bubble.tail-r::after { content: ''; position: absolute; bottom: -7px; right: 16px; border-left: 7px solid transparent; border-right: 0 solid transparent; border-top: 8px solid #fff; }
-.anim-speech-bubble.tail-l::after { content: ''; position: absolute; bottom: -7px; left: 16px; border-left: 0 solid transparent; border-right: 7px solid transparent; border-top: 8px solid #fff; }
-#anim-s2-img2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.7s ease; }
-#anim-s2-img2.show { opacity: 1; }
-.anim-merge-overlay { position: absolute; inset: 0; pointer-events: none; }
-.anim-logo-chip { position: absolute; background: #fff; border-radius: 18%; box-shadow: 0 2px 10px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; width: 15%; aspect-ratio: 1; will-change: transform, opacity; transition: transform 0.75s cubic-bezier(0.4,0,0.2,1), opacity 0.45s ease; }
-.anim-logo-chip img { width: 64%; height: 64%; object-fit: contain; pointer-events: none; }
-.anim-chip-openai { top: 4%; left: 7%; }
-.anim-chip-gemini { top: 4%; right: 7%; }
-.anim-chip-anthropic { top: 4%; left: 50%; transform: translateX(-50%); }
-.anim-chip-alrouter { width: 20%; aspect-ratio: 1; top: 26%; left: 50%; transform: translateX(-50%) scale(1); opacity: 1; background: #fff; border-radius: 18%; box-shadow: none; transition: transform 0.6s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.5s 0.3s ease; }
-.anim-chip-alrouter img { width: 70%; height: 70%; object-fit: contain; }
-.anim-chip-alrouter.revealed { transform: translateX(-50%) scale(1.35); box-shadow: 0 0 20px rgba(14,165,233,0.75), 0 0 50px rgba(14,165,233,0.35), 0 0 80px rgba(236,72,153,0.25); }
-.anim-cta-overlay { position: absolute; top: 27%; left: 52%; right: 5%; display: flex; flex-direction: column; align-items: center; gap: 5px; background: linear-gradient(135deg,#0ea5e9 0%,#7c3aed 60%,#ec4899 100%); border-radius: 14px; padding: 10px 10px 12px; opacity: 0; cursor: pointer; transition: opacity 0.5s 0.5s ease, transform 0.2s ease; }
-.anim-scene.active .anim-cta-overlay { opacity: 1; }
+/* ── 비디오 플레이어 ── */
+.anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 9/16; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #000; cursor: pointer; }
+.anim-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.anim-play-overlay {
+  position: absolute; inset: 0; z-index: 30; border-radius: 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.45); cursor: pointer; gap: 12px;
+  transition: background 0.2s;
+}
+.anim-play-overlay:hover { background: rgba(0,0,0,0.55); }
+.anim-play-btn {
+  width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; pointer-events: none;
+  background: rgba(14,165,233,0.9); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 8px rgba(14,165,233,0.2); transition: transform 0.15s, box-shadow 0.2s;
+}
+.anim-play-overlay:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
+.anim-play-btn svg { width: 32px; height: 32px; margin-left: 5px; }
+.anim-play-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.05em; }
+.anim-hover-overlay {
+  position: absolute; inset: 0; z-index: 20; border-radius: 24px;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.42); gap: 12px;
+  transition: background 0.2s;
+}
+.anim-hover-overlay:hover { background: rgba(0,0,0,0.55); }
+.anim-hover-state {
+  display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer;
+}
+.anim-hover-state:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
+.anim-pause-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.anim-pause-icon span { display: block; width: 8px; height: 28px; background: #fff; border-radius: 3px; }
+.anim-cta-wrap {
+  position: absolute; top: 27%; left: 52%; right: 5%;
+  display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+  z-index: 10;
+}
+.anim-cta-overlay {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 60%, #ec4899 100%);
+  border-radius: 14px; padding: 10px 10px 12px;
+  cursor: pointer; text-decoration: none;
+  transition: transform 0.2s ease;
+}
 .anim-cta-logo { width: 55%; height: auto; object-fit: contain; filter: brightness(0) invert(1); }
 .anim-cta-btn-text { color: #fff; font-size: clamp(7px,2vw,10px); font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
-@keyframes anim-pulse-glow { 0%,100% { box-shadow: 0 0 12px rgba(14,165,233,0.9),0 0 30px rgba(14,165,233,0.6),0 0 60px rgba(124,58,237,0.45),0 0 100px rgba(236,72,153,0.2); } 50% { box-shadow: 0 0 20px rgba(14,165,233,1),0 0 55px rgba(14,165,233,0.8),0 0 100px rgba(124,58,237,0.65),0 0 160px rgba(236,72,153,0.4); } }
+@keyframes anim-pulse-glow {
+  0%,100% { box-shadow: 0 0 12px rgba(14,165,233,0.9), 0 0 30px rgba(14,165,233,0.6), 0 0 60px rgba(124,58,237,0.45), 0 0 100px rgba(236,72,153,0.2); }
+  50%     { box-shadow: 0 0 20px rgba(14,165,233,1),   0 0 55px rgba(14,165,233,0.8), 0 0 100px rgba(124,58,237,0.65), 0 0 160px rgba(236,72,153,0.4); }
+}
 @keyframes anim-cta-scale-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-.anim-scene.active .anim-cta-overlay { animation: anim-pulse-glow 1.8s 0.8s ease-in-out infinite, anim-cta-scale-pulse 2s 0.8s ease-in-out infinite; }
-.anim-dots { position: absolute; bottom: 2.2%; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 10; }
-.anim-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.28); transition: background 0.3s, transform 0.3s; }
-.anim-dot.active { background: #fff; transform: scale(1.4); }
+.anim-cta-overlay.active {
+  animation: anim-pulse-glow 1.8s 0.3s ease-in-out infinite, anim-cta-scale-pulse 2s 0.3s ease-in-out infinite;
+}
+.anim-end-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 24px; border-radius: 8px; font-size: 14px; font-weight: 700;
+  cursor: pointer; text-decoration: none; border: none; min-width: 180px;
+  box-sizing: border-box; transition: opacity 0.15s, transform 0.15s;
+}
+.anim-end-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.anim-end-replay {
+  background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.85); width: 100%; min-width: unset;
+  backdrop-filter: blur(6px); white-space: nowrap;
+}
+.anim-end-replay svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
@@ -663,50 +772,42 @@
     <div class="hero-right">
       <div class="billing-before" style="display:flex; justify-content:center; align-items:center;">
         <div class="anim-wrap" id="anim">
-          <div class="anim-scene" id="anim-s1">
-            <img src="cut01.png" class="anim-scene-bg" alt="">
-            <div class="anim-speech-bubble tail-l" id="anim-s1-bubble" style="top:10%;right:4%">Just handle it.<br>We need AI tools.</div>
-            <div class="anim-caption">AI adoption looked simple at first</div>
-          </div>
-          <div class="anim-scene" id="anim-s2">
-            <img src="cut02-1.png" class="anim-scene-bg" id="anim-s2-img1" alt="">
-            <img src="cut02-2.png" class="anim-scene-bg" id="anim-s2-img2" alt="">
-            <div class="anim-bubbles-layer" id="anim-s2-bubbles"></div>
-            <div class="anim-caption">Requests from the team never stop</div>
-          </div>
-          <div class="anim-scene" id="anim-s3">
-            <img src="cut03.png" class="anim-scene-bg" alt="">
-            <div class="anim-caption">Billed separately per service —<br>no idea what the total is</div>
-          </div>
-          <div class="anim-scene" id="anim-s4">
-            <img src="cut04.png" class="anim-scene-bg" alt="">
-            <div class="anim-merge-overlay" id="anim-mergeOverlay">
-              <div class="anim-logo-chip anim-chip-openai" id="anim-chipOpenAI"><img src="logo_openai.svg" alt="OpenAI"></div>
-              <div class="anim-logo-chip anim-chip-gemini" id="anim-chipGemini"><img src="logo_gemini.svg" alt="Gemini"></div>
-              <div class="anim-logo-chip anim-chip-anthropic" id="anim-chipAnthropic"><img src="logo_anthropic.svg" alt="Anthropic"></div>
-              <div class="anim-logo-chip anim-chip-alrouter" id="anim-chipAlrouter"><img src="logo.svg" alt="AlRouter"></div>
+          <video id="animVideo" src="alrouter_en.mp4" playsinline preload="auto"></video>
+          <div class="anim-hover-overlay" id="animHoverOverlay">
+            <div class="anim-hover-state" id="animPauseState">
+              <div class="anim-play-btn">
+                <div class="anim-pause-icon"><span></span><span></span></div>
+              </div>
+              <span class="anim-play-label">Pause</span>
             </div>
-            <div class="anim-caption">AlRouter handles it all</div>
+            <div class="anim-hover-state" id="animResumeState" style="display:none">
+              <div class="anim-play-btn">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="6,3 20,12 6,21"/>
+                </svg>
+              </div>
+              <span class="anim-play-label">Continue</span>
+            </div>
           </div>
-          <div class="anim-scene" id="anim-s5">
-            <img src="cut05.png" class="anim-scene-bg" alt="">
-            <div class="anim-caption">Add models, set permissions — all in one place</div>
+          <div class="anim-play-overlay" id="animPlayOverlay">
+            <div class="anim-play-btn">
+              <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="6,3 20,12 6,21"/>
+              </svg>
+            </div>
+            <span class="anim-play-label">Tap to Start</span>
           </div>
-          <div class="anim-scene" id="anim-s6">
-            <img src="cut06.png" class="anim-scene-bg" alt="">
-            <a href="/sign-in" class="anim-cta-overlay">
+          <div class="anim-cta-wrap" id="animCtaWrap" style="display:none">
+            <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
               <img src="logo.svg" alt="AlRouter" class="anim-cta-logo">
-              <div class="anim-cta-btn-text">Try it now →</div>
+              <div class="anim-cta-btn-text">Get Started →</div>
             </a>
-            <div class="anim-caption">Start your trial today</div>
-          </div>
-          <div class="anim-dots" id="anim-dotsWrap">
-            <div class="anim-dot active"></div>
-            <div class="anim-dot"></div>
-            <div class="anim-dot"></div>
-            <div class="anim-dot"></div>
-            <div class="anim-dot"></div>
-            <div class="anim-dot"></div>
+            <button class="anim-end-btn anim-end-replay" id="animReplayBtn" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
+              </svg>
+              Watch Again
+            </button>
           </div>
         </div>
       </div>
@@ -897,27 +998,46 @@
       <div class="payg-badge">💳 Pay-as-you-go — Only pay for what you use. No minimum commitment.</div>
     </div>
     <div class="feature-visual">
-      <div class="feature-visual-title">View All Model Prices →</div>
-      <div style="background:#111827; border-radius:10px; padding:20px;">
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1f2937;">
-            <span style="color:#d1d5db; font-size:13px;"><i data-lucide="bot"></i> gpt-5.4</span>
-            <span><del style="color:#4b5563; font-size:12px;">$2.50</del> <strong style="color:#0EA5E9">$1.75</strong></span>
+      <div class="calc-card-header">
+        <span class="calc-card-title">AI Cost Calculator</span>
+        <a href="#" class="calc-card-link" onclick="openPopup('Models &amp; Pricing','pricing');return false;">View All Model Prices →</a>
+      </div>
+      <div class="calc-body">
+        <div class="calc-form">
+          <div class="calc-group">
+            <label>Select Model</label>
+            <select class="calc-select" id="calcModel">
+              <option value="">Loading models…</option>
+            </select>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1f2937;">
-            <span style="color:#d1d5db; font-size:13px;"><i data-lucide="sparkles"></i> claude-opus-4.6</span>
-            <span><del style="color:#4b5563; font-size:12px;">$5.00</del> <strong style="color:#0EA5E9">$4.00</strong></span>
+          <div class="calc-group">
+            <label>Input Tokens</label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calcInputTokens" placeholder="0" min="0" step="0.1">
+              <span class="calc-input-suffix">M tokens</span>
+            </div>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #1f2937;">
-            <span style="color:#d1d5db; font-size:13px;"><i data-lucide="gem"></i> gemini-3.1-pro</span>
-            <span><del style="color:#4b5563; font-size:12px;">$2.00</del> <strong style="color:#0EA5E9">$1.60</strong></span>
+          <div class="calc-group">
+            <label>Output Tokens</label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calcOutputTokens" placeholder="0" min="0" step="0.1">
+              <span class="calc-input-suffix">M tokens</span>
+            </div>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
-            <span style="color:#d1d5db; font-size:13px;"><i data-lucide="video"></i> Veo-3.1 (Video)</span>
-            <span><del style="color:#4b5563; font-size:12px;">$0.40</del> <strong style="color:#0EA5E9">$0.32</strong></span>
-          </div>
+          <button class="calc-btn" onclick="runCalc()">Calculate</button>
+        </div>
+        <div class="calc-result" id="calcResult">
+          <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
+          <div class="calc-result-label" id="calcLabel" style="display:none">Estimated Cost</div>
+          <div class="calc-result-price" id="calcPrice" style="display:none"></div>
+          <div class="calc-breakdown" id="calcBreakdown"></div>
         </div>
       </div>
+      <p style="margin-top:14px; font-size:11px; color:#EC4899; line-height:1.6;">
+        Prices shown are estimates based on public rates.<br>
+        Actual costs may vary depending on usage patterns.
+        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+      </p>
     </div>
   </div>
 </div>
@@ -1092,18 +1212,17 @@
       <p>Smart AI cost management.<br>LLM Gateway service by ATTO Research.</p>
     </div>
     <div class="footer-col">
+      <h4>Company</h4>
+      <ul>
+        <li><a href="https://www.atto-research.com/eng/main/main.html" target="_blank" rel="noopener">About ATTO Research</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
       <h4>Product</h4>
       <ul>
         <li><a href="#">About</a></li>
         <li><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">Models & Pricing</a></li>
         <li><a href="#" style="display:none">Changelog</a></li>
-      </ul>
-    </div>
-    <div class="footer-col">
-      <h4>Company</h4>
-      <ul>
-        <li><a href="https://www.atto-research.com/eng/main/main.html" target="_blank" rel="noopener">About ATTO Research</a></li>
-        <li><a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;">Contact</a></li>
       </ul>
     </div>
     <div class="footer-col">
@@ -1126,8 +1245,8 @@
       <h3 class="popup-title">Enterprise Inquiry</h3>
       <button class="popup-close" id="contactClose">✕</button>
     </div>
+    <form id="contactForm" class="contact-form">
     <div class="popup-body">
-      <form id="contactForm" class="contact-form">
         <div class="cf-group">
           <label>Organization<span class="cf-required">*</span></label>
           <input type="text" name="org" placeholder="Company or organization name" required>
@@ -1141,13 +1260,58 @@
           <input type="tel" name="phone" placeholder="+1 000-000-0000">
         </div>
         <div class="cf-group">
-          <label>Message<span class="cf-required">*</span></label>
-          <textarea name="message" placeholder="Tell us about your team size, use case, or anything else you'd like to discuss." required></textarea>
+          <label>Team Size<span class="cf-required">*</span></label>
+          <div class="cf-scale-tabs">
+            <div class="cf-scale-tab">
+              <input type="radio" name="scale_type" id="scaleTypeToken" value="token" checked>
+              <label for="scaleTypeToken">Token Usage</label>
+            </div>
+            <div class="cf-scale-tab">
+              <input type="radio" name="scale_type" id="scaleTypeHead" value="headcount">
+              <label for="scaleTypeHead">Headcount</label>
+            </div>
+          </div>
+          <div id="scaleHeadField" style="display:none">
+            <div class="cf-num-wrap">
+              <input type="number" name="headcount" placeholder="0" min="1">
+              <span class="cf-num-suffix">people</span>
+            </div>
+          </div>
+          <div id="scaleTokenField">
+            <div class="cf-token-row">
+              <div class="cf-num-wrap">
+                <input type="number" name="input_tokens" placeholder="0" min="0" step="0.1">
+                <span class="cf-num-suffix">M input</span>
+              </div>
+              <div class="cf-num-wrap">
+                <input type="number" name="output_tokens" placeholder="0" min="0" step="0.1">
+                <span class="cf-num-suffix">M output</span>
+              </div>
+            </div>
+            <p class="cf-scale-hint">Enter your estimated monthly token usage from the calculator.</p>
+          </div>
         </div>
-        <div id="contactResult" class="cf-result" style="display:none;"></div>
-        <button type="submit" class="cf-submit">Submit →</button>
-      </form>
+        <div class="cf-group">
+          <label>Features Needed<span class="cf-optional">(optional)</span></label>
+          <div class="cf-checks">
+            <label class="cf-check"><input type="checkbox" name="features" value="Image Generation"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Image Generation</span></label>
+            <label class="cf-check"><input type="checkbox" name="features" value="Video Generation"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Video Generation</span></label>
+            <label class="cf-check"><input type="checkbox" name="features" value="Agent Builder"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Agent Builder</span></label>
+            <label class="cf-check"><input type="checkbox" name="features" value="Document Analysis"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Document Analysis</span></label>
+            <label class="cf-check"><input type="checkbox" name="features" value="Deep Research"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Deep Research</span></label>
+            <label class="cf-check"><input type="checkbox" name="features" value="AI Transformation (AX)"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">AI Transformation (AX)</span></label>
+          </div>
+        </div>
+        <div class="cf-group">
+          <label>Additional Comments<span class="cf-optional">(optional)</span></label>
+          <textarea name="notes" placeholder="Anything else you'd like to share with us."></textarea>
+        </div>
+    </div><!-- /.popup-body -->
+    <div class="popup-footer">
+      <div id="contactResult" class="cf-result" style="display:none;"></div>
+      <button type="submit" class="cf-submit">Submit →</button>
     </div>
+    </form>
   </div>
 </div>
 
@@ -1155,7 +1319,10 @@
 <div class="popup-overlay" id="popupOverlay">
   <div class="popup-modal">
     <div class="popup-header">
-      <h3 class="popup-title" id="popupTitle"></h3>
+      <div class="popup-header-left">
+        <h3 class="popup-title" id="popupTitle"></h3>
+        <p class="popup-note" id="popupNote" style="display:none"></p>
+      </div>
       <button class="popup-close" id="popupClose">✕</button>
     </div>
     <div class="popup-body" id="popupBody"></div>
@@ -1168,9 +1335,23 @@
   const form    = document.getElementById('contactForm');
   const result  = document.getElementById('contactResult');
 
-  document.getElementById('contactClose').addEventListener('click', () => overlay.classList.remove('open'));
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.remove('open'); });
+  function closeContact() { overlay.classList.remove('open'); }
+  document.getElementById('contactClose').addEventListener('click', closeContact);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeContact(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeContact(); });
+  new MutationObserver(() => {
+    document.body.style.overflow = overlay.classList.contains('open') ? 'hidden' : '';
+  }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+
+  // Scale type toggle
+  document.querySelectorAll('input[name="scale_type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const isToken = radio.value === 'token';
+      document.getElementById('scaleHeadField').style.display = isToken ? 'none' : '';
+      document.getElementById('scaleTokenField').style.display = isToken ? '' : 'none';
+      document.querySelector('[name="headcount"]').required = !isToken;
+    });
+  });
 
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -1179,7 +1360,15 @@
     btn.textContent = 'Sending...';
     result.style.display = 'none';
 
-    const data = Object.fromEntries(new FormData(form));
+    const fd = new FormData(form);
+    const data = Object.fromEntries(fd);
+    data.features = fd.getAll('features');
+    if (data.scale_type === 'token') {
+      delete data.headcount;
+    } else {
+      delete data.input_tokens;
+      delete data.output_tokens;
+    }
 
     try {
       const res = await fetch('/api/contact', {
@@ -1208,7 +1397,7 @@
 const POPUP_CONTENTS = {
   terms:   { title: 'Terms of Service', iframe: '/terms_en.html' },
   privacy: { title: 'Privacy Policy',   iframe: '/privacy_en.html' },
-  pricing: { title: 'Full Model & Pricing', body: '', wide: true },
+  pricing: { title: 'Full Model & Pricing', wide: true, dynamic: true },
 };
 
 function openPopup(title, key) {
@@ -1222,6 +1411,9 @@ function openPopup(title, key) {
   if (item.iframe) {
     modal.classList.add('wide');
     body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
+  } else if (item.dynamic && key === 'pricing') {
+    modal.classList.add('wide');
+    renderPricingTable(body);
   } else if (item.wide) {
     modal.classList.add('wide');
     body.innerHTML = item.body || '';
@@ -1231,6 +1423,78 @@ function openPopup(title, key) {
   }
 
   overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+async function renderPricingTable(body) {
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
+  document.getElementById('popupTitle').innerHTML =
+    `Full Model & Pricing (as of ${dateStr}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`;
+
+  body.innerHTML = '<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">Loading…</p>';
+
+  try {
+    const res  = await fetch('/api/pricing');
+    const json = await res.json();
+    const groupRatio = json.group_ratio?.default ?? 1;
+
+    function getProvider(name) {
+      if (name.startsWith('claude'))  return 'Anthropic';
+      if (name.startsWith('gemini'))  return 'Google';
+      if (name.startsWith('gpt') || name.startsWith('o1') || name.startsWith('o3') || name.startsWith('o4')) return 'OpenAI';
+      return 'Other';
+    }
+
+    function getTier(name) {
+      if (name.includes('haiku') || name.includes('flash-lite')) return 1;
+      if (name.includes('sonnet') || (name.includes('flash') && !name.includes('lite'))) return 2;
+      if (name.includes('opus') || name.includes('pro')) return 3;
+      return 2;
+    }
+
+    const sorted = [...json.data].sort((a, b) => {
+      const pa = getProvider(a.model_name), pb = getProvider(b.model_name);
+      if (pa !== pb) return pa.localeCompare(pb);
+      const ta = getTier(a.model_name), tb = getTier(b.model_name);
+      if (ta !== tb) return ta - tb;
+      return a.model_name.localeCompare(b.model_name);
+    });
+
+    let lastProvider = '';
+    const rows = sorted.map(m => {
+      const inputPrice  = (m.model_ratio * groupRatio).toFixed(4);
+      const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio).toFixed(4);
+      const provider = getProvider(m.model_name);
+      const providerRow = provider !== lastProvider
+        ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
+        : '';
+      lastProvider = provider;
+      return providerRow + `
+        <tr>
+          <td style="padding:10px 14px;color:#f9fafb;font-size:13px;border-bottom:1px solid #1f2937;">${m.model_name}</td>
+          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${inputPrice}</td>
+          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${outputPrice}</td>
+        </tr>`;
+    }).join('');
+
+    body.innerHTML = `
+      <div style="padding:20px 24px 0;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead style="position:sticky;top:0;z-index:1;">
+            <tr style="background:#1f2937;">
+              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:left;border-bottom:1px solid #374151;">Model</th>
+              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Input ($/M)</th>
+              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Output ($/M)</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      `;
+  } catch (e) {
+    body.innerHTML = '<p style="color:#f87171;font-size:13px;text-align:center;padding:24px 0;">Failed to load pricing data.</p>';
+  }
 }
 
 function closePopup() {
@@ -1238,6 +1502,7 @@ function closePopup() {
   overlay.classList.remove('open');
   overlay.querySelector('.popup-modal').classList.remove('wide');
   document.getElementById('popupBody').innerHTML = '';
+  document.body.style.overflow = '';
 }
 
 document.getElementById('popupClose').addEventListener('click', closePopup);
@@ -1251,134 +1516,115 @@ document.addEventListener('keydown', function(e) {
 
 <script>
 (function() {
-const SCENE_DURATIONS = [5000, 8000, 5000, 5000, 5000, 8000];
-const SCENE2_BUBBLES = [
-  { text: 'Can you create an OpenAI account?',           top: '15%', left:  '8%',  tail: 'r' },
-  { text: 'How do I get an Anthropic API key?',          top: '13%', left:  '40%', tail: 'r' },
-  { text: 'Need to update the ChatGPT billing card',     top: '15%', right: '7%',  tail: 'l' },
-  { text: 'How do I sign up for Claude?',                top: '30%', left:  '2%',  tail: 'r' },
-  { text: 'Please raise my Gemini API limit',            top: '43%', left:  '2%',  tail: 'r' },
-  { text: "What's our total AI spend this month?",       top: '30%', right: '2%',  tail: 'l' },
-  { text: "Why can I use Claude but not GPT?",           top: '43%', right: '2%',  tail: 'l' },
-  { text: 'Why did the OpenAI bill spike?',              top: '55%', left:  '2%',  tail: 'r' },
-  { text: "Ex-employee's account — can you remove it?", top: '55%', right: '2%',  tail: 'l' },
-  { text: 'Is GPT-4o available for us now?',             top: '24%', left:  '22%', tail: 'r' },
-];
-const S2_IMG_SWITCH_MS = 1350;
+  const video       = document.getElementById('animVideo');
+  const playOverlay = document.getElementById('animPlayOverlay');
+  const hoverOverlay= document.getElementById('animHoverOverlay');
+  const pauseState  = document.getElementById('animPauseState');
+  const resumeState = document.getElementById('animResumeState');
+  const ctaWrap     = document.getElementById('animCtaWrap');
+  const ctaBtn      = document.getElementById('animCtaBtn');
+  const replayBtn   = document.getElementById('animReplayBtn');
+  const animWrap    = document.getElementById('anim');
+  const CTA_TIME    = 18;
 
-const scenes = Array.from(document.querySelectorAll('.anim-scene'));
-const dots   = Array.from(document.querySelectorAll('.anim-dot'));
-let current = 0, prevScene = -1, advanceTimer = null, mergeTimer1 = null;
-let bubbleTimers = [], s1BubbleTimer = null, sceneStartedAt = 0, exitCleanupTimer = null;
-
-function showScene(idx) {
-  clearTimeout(exitCleanupTimer);
-  scenes.forEach((s, i) => {
-    if (i === idx) { s.classList.remove('exiting'); s.classList.add('active'); }
-    else if (s.classList.contains('active')) { s.classList.remove('active'); s.classList.add('exiting'); }
-    else { s.classList.remove('exiting'); }
+  playOverlay.addEventListener('click', () => {
+    playOverlay.style.display = 'none';
+    video.currentTime = 0;
+    video.play();
   });
-  exitCleanupTimer = setTimeout(() => {
-    scenes.forEach(s => {
-      if (s.classList.contains('exiting')) {
-        s.style.transition = 'none'; s.classList.remove('exiting');
-        s.getBoundingClientRect(); s.style.transition = '';
-      }
-    });
-  }, 1000);
 
-  dots.forEach((d, i) => d.classList.toggle('active', i === idx));
-
-  clearTimeout(s1BubbleTimer);
-  const s1b = document.getElementById('anim-s1-bubble');
-  s1b.style.transition = 'none'; s1b.classList.remove('show');
-  s1b.getBoundingClientRect(); s1b.style.transition = '';
-  if (idx === 0) s1BubbleTimer = setTimeout(() => s1b.classList.add('show'), 1200);
-
-  if (idx === 1) { resetBubbles(); playBubbles(); }
-  else if (current === 1) {
-    bubbleTimers.forEach(clearTimeout); bubbleTimers = [];
-    document.getElementById('anim-s2-bubbles').innerHTML = '';
-    exitCleanupTimer = setTimeout(() => {
-      const img2 = document.getElementById('anim-s2-img2');
-      img2.style.transition = 'none'; img2.classList.remove('show');
-      img2.getBoundingClientRect(); img2.style.transition = '';
-    }, 1050);
-  } else { resetBubbles(); }
-
-  if (idx === 3) { playMerge(); } else { cancelMerge(); if (prevScene !== 3) { resetMergeInstant(); } }
-  prevScene = idx;
-}
-
-function scheduleNext(delay) {
-  clearTimeout(advanceTimer);
-  const d = delay !== undefined ? delay : SCENE_DURATIONS[current];
-  sceneStartedAt = performance.now() - (SCENE_DURATIONS[current] - d);
-  advanceTimer = setTimeout(() => { current = (current + 1) % scenes.length; showScene(current); scheduleNext(); }, d);
-}
-
-const ctaOverlay = document.querySelector('.anim-cta-overlay');
-ctaOverlay.addEventListener('mouseenter', () => {
-  const elapsed = performance.now() - sceneStartedAt;
-  clearTimeout(advanceTimer); ctaOverlay._pausedRemaining = Math.max(500, SCENE_DURATIONS[current] - elapsed);
-});
-ctaOverlay.addEventListener('mouseleave', () => {
-  scheduleNext(ctaOverlay._pausedRemaining ?? SCENE_DURATIONS[current]);
-});
-
-function playBubbles() {
-  const layer = document.getElementById('anim-s2-bubbles');
-  SCENE2_BUBBLES.forEach((b, i) => {
-    const el = document.createElement('div');
-    el.className = `anim-speech-bubble tail-${b.tail}`;
-    el.textContent = b.text;
-    Object.assign(el.style, { top: b.top||'', left: b.left||'', right: b.right||'' });
-    layer.appendChild(el);
-    bubbleTimers.push(setTimeout(() => el.classList.add('show'), 300 + i * 250));
+  video.addEventListener('timeupdate', () => {
+    if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
+      ctaWrap.style.display = 'flex';
+      setTimeout(() => ctaBtn.classList.add('active'), 50);
+    }
   });
-  bubbleTimers.push(setTimeout(() => document.getElementById('anim-s2-img2').classList.add('show'), S2_IMG_SWITCH_MS));
-}
 
-function resetBubbles() {
-  bubbleTimers.forEach(clearTimeout); bubbleTimers = [];
-  document.getElementById('anim-s2-bubbles').innerHTML = '';
-  const img2 = document.getElementById('anim-s2-img2');
-  img2.style.transition = 'none'; img2.classList.remove('show');
-  img2.getBoundingClientRect(); img2.style.transition = '';
-}
+  video.addEventListener('ended', () => {
+    hoverOverlay.style.display = 'none';
+    replayBtn.style.display = 'flex';
+  });
 
-function playMerge() {
-  cancelMerge(); resetMergeInstant();
-  const chips = ['anim-chipOpenAI','anim-chipGemini','anim-chipAnthropic'].map(id => document.getElementById(id));
-  const alrouter = document.getElementById('anim-chipAlrouter');
-  mergeTimer1 = setTimeout(() => {
-    const arRect = alrouter.getBoundingClientRect();
-    const arCX = arRect.left + arRect.width/2, arCY = arRect.top + arRect.height/2;
-    chips.forEach(chip => {
-      const r = chip.getBoundingClientRect();
-      chip.style.transform = `translate(${arCX-(r.left+r.width/2)}px,${arCY-(r.top+r.height/2)}px) scale(0.1)`;
-      chip.style.opacity = '0';
-    });
-    alrouter.classList.add('revealed');
-  }, 1200);
-}
+  replayBtn.addEventListener('click', () => {
+    ctaBtn.classList.remove('active');
+    ctaWrap.style.display = 'none';
+    replayBtn.style.display = 'none';
+    video.currentTime = 0;
+    video.play();
+  });
 
-function cancelMerge() { clearTimeout(mergeTimer1); }
+  animWrap.addEventListener('mouseenter', () => {
+    if (playOverlay.style.display !== 'none') return;
+    if (video.ended) return;
+    pauseState.style.display  = video.paused ? 'none' : 'flex';
+    resumeState.style.display = video.paused ? 'flex' : 'none';
+    hoverOverlay.style.display = 'flex';
+  });
+  animWrap.addEventListener('mouseleave', () => {
+    hoverOverlay.style.display = 'none';
+  });
 
-function resetMergeInstant() {
-  const chips = ['anim-chipOpenAI','anim-chipGemini','anim-chipAnthropic'].map(id => document.getElementById(id));
-  const alrouter = document.getElementById('anim-chipAlrouter');
-  chips.forEach(chip => { chip.style.transition = 'none'; chip.style.transform = ''; chip.style.opacity = '1'; });
-  alrouter.style.transition = 'none'; alrouter.classList.remove('revealed');
-  document.getElementById('anim-mergeOverlay').getBoundingClientRect();
-  chips.forEach(chip => { chip.style.transition = ''; }); alrouter.style.transition = '';
-}
+  pauseState.addEventListener('click', () => {
+    video.pause();
+    pauseState.style.display  = 'none';
+    resumeState.style.display = 'flex';
+  });
 
-showScene(0); scheduleNext();
+  resumeState.addEventListener('click', () => {
+    video.play();
+    hoverOverlay.style.display = 'none';
+  });
 })();
 </script>
 </body>
 </html>
+<script>
+// TODO: model list and prices will be fetched from API
+let _calcPricing = {};
+let _calcGroupRatio = 1;
+
+async function loadCalcModels() {
+  const sel = document.getElementById('calcModel');
+  try {
+    const res  = await fetch('/api/pricing');
+    const json = await res.json();
+    _calcGroupRatio = json.group_ratio?.default ?? 1;
+    json.data.forEach(m => {
+      _calcPricing[m.model_name] = {
+        input:  m.model_ratio * _calcGroupRatio,
+        output: m.model_ratio * m.completion_ratio * _calcGroupRatio,
+      };
+    });
+    sel.innerHTML = json.data
+      .map(m => `<option value="${m.model_name}">${m.model_name}</option>`)
+      .join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Failed to load models</option>';
+  }
+}
+loadCalcModels();
+
+function runCalc() {
+  const model   = document.getElementById('calcModel').value;
+  const inputM  = parseFloat(document.getElementById('calcInputTokens').value)  || 0;
+  const outputM = parseFloat(document.getElementById('calcOutputTokens').value) || 0;
+  const prices  = _calcPricing[model] || { input: 0, output: 0 };
+  const inputCost  = inputM  * prices.input;
+  const outputCost = outputM * prices.output;
+  const total      = inputCost + outputCost;
+  const fmt = v => '$' + v.toFixed(4);
+  document.getElementById('calcHint').style.display = 'none';
+  document.getElementById('calcLabel').style.display = '';
+  const priceEl = document.getElementById('calcPrice');
+  priceEl.style.display = '';
+  priceEl.textContent = '$' + total.toFixed(2);
+  document.getElementById('calcBreakdown').innerHTML =
+    `<div class="calc-breakdown-row"><span>Input tokens (${inputM}M)</span><span>${fmt(inputCost)}</span></div>` +
+    `<div class="calc-breakdown-row"><span>Output tokens (${outputM}M)</span><span>${fmt(outputCost)}</span></div>` +
+    `<div class="calc-breakdown-row" style="display:none;margin-top:4px;padding-top:4px;border-top:1px solid #374151;color:#9ca3af"><span>Input rate</span><span>$${prices.input.toFixed(4)}/M</span></div>` +
+    `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>Output rate</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
+}
+</script>
 <script>
   lucide.createIcons();
   document.addEventListener('click', function(e) {
