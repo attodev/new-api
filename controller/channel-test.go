@@ -506,9 +506,9 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
 		ModelName:        info.OriginModelName,
-		TokenName:        "模型测试",
+		TokenName:        "model test",
 		Quota:            quota,
-		Content:          "模型测试",
+		Content:          "model test",
 		UseTimeSeconds:   int(consumedTime),
 		IsStream:         info.IsStream,
 		Group:            info.UsingGroup,
@@ -963,7 +963,7 @@ func testAllChannels(notify bool) error {
 		}
 
 		if notify {
-			service.NotifyRootUser(dto.NotifyTypeChannelTest, "通道测试完成", "所有通道测试已完成")
+			service.NotifyRootUser(dto.NotifyTypeChannelTest, "channel test completed", "all channel tests completed")
 		}
 	})
 	return nil

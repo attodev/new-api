@@ -36,10 +36,10 @@ const (
 	maxRatioConfigBytes         = 10 << 20 // 10MB
 	floatEpsilon                = 1e-9
 	officialRatioPresetID       = -100
-	officialRatioPresetName     = "官方倍率预设"
+	officialRatioPresetName     = "Official Ratio Preset"
 	officialRatioPresetBaseURL  = "https://basellm.github.io"
 	modelsDevPresetID           = -101
-	modelsDevPresetName         = "models.dev 价格预设"
+	modelsDevPresetName         = "models.dev Price Preset"
 	modelsDevPresetBaseURL      = "https://models.dev"
 	modelsDevHost               = "models.dev"
 	modelsDevPath               = "/api.json"
@@ -395,7 +395,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 			}
 			if err := common.Unmarshal(body.Data, &pricingItems); err != nil {
 				logger.LogWarn(c.Request.Context(), "unrecognized data format from "+chItem.Name+": "+err.Error())
-				ch <- upstreamResult{Name: uniqueName, Err: "无法解析上游返回数据"}
+				ch <- upstreamResult{Name: uniqueName, Err: "failed to parse upstream response data"}
 				return
 			}
 
