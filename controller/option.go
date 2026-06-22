@@ -145,7 +145,7 @@ func UpdateOption(c *gin.Context) {
 		}
 	default:
 		if isPaymentComplianceOptionKey(option.Key) {
-			common.ApiErrorMsg(c, "合规确认字段不允许通过通用设置接口修改")
+			common.ApiErrorI18n(c, i18n.MsgOptionComplianceFieldRestricted)
 			return
 		}
 	}

@@ -31,7 +31,7 @@ func UpdateMidjourneyTaskBulk() {
 			continue
 		}
 
-		logger.LogInfo(ctx, fmt.Sprintf("检测到未完成的任务数有: %v", len(tasks)))
+		logger.LogInfo(ctx, fmt.Sprintf("detected %v pending tasks", len(tasks)))
 		taskChannelM := make(map[int][]string)
 		taskM := make(map[string]*model.Midjourney)
 		nullTaskIds := make([]int, 0)
@@ -60,7 +60,7 @@ func UpdateMidjourneyTaskBulk() {
 		}
 
 		for channelId, taskIds := range taskChannelM {
-			logger.LogInfo(ctx, fmt.Sprintf("渠道 #%d 未完成的任务有: %d", channelId, len(taskIds)))
+			logger.LogInfo(ctx, fmt.Sprintf("channel #%d pending tasks: %d", channelId, len(taskIds)))
 			if len(taskIds) == 0 {
 				continue
 			}
@@ -156,7 +156,7 @@ func UpdateMidjourneyTaskBulk() {
 				if responseItem.VideoUrls != nil && len(responseItem.VideoUrls) > 0 {
 					videoUrlsStr, err := json.Marshal(responseItem.VideoUrls)
 					if err != nil {
-						logger.LogError(ctx, fmt.Sprintf("序列化 VideoUrls 失败: %v", err))
+						logger.LogError(ctx, fmt.Sprintf("failed to serialize VideoUrls: %v", err))
 						task.VideoUrls = "[]" // 失败时设置为空数组
 					} else {
 						task.VideoUrls = string(videoUrlsStr)
@@ -167,7 +167,7 @@ func UpdateMidjourneyTaskBulk() {
 
 				shouldReturnQuota := false
 				if (task.Progress != "100%" && responseItem.FailReason != "") || (task.Progress == "100%" && task.Status == "FAILURE") {
-					logger.LogInfo(ctx, task.MjId+" 构建失败，"+task.FailReason)
+					logger.LogInfo(ctx, task.MjId+" build failed: "+task.FailReason)
 					task.Progress = "100%"
 					if task.Quota != 0 {
 						shouldReturnQuota = true
