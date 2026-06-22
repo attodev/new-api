@@ -79,7 +79,7 @@ func ValidateConsoleSettings(settingsStr string, settingType string) error {
 }
 
 func validateApiInfo(apiInfoStr string) error {
-	apiInfoList, err := parseJSONArray(apiInfoStr, "API信息")
+	apiInfoList, err := parseJSONArray(apiInfoStr, "API info")
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func validateApiInfo(apiInfoStr string) error {
 			return fmt.Errorf("API info item %d is missing color field", i+1)
 		}
 
-		if err := validateURL(urlStr, i+1, "API信息"); err != nil {
+		if err := validateURL(urlStr, i+1, "API info"); err != nil {
 			return err
 		}
 
@@ -124,10 +124,10 @@ func validateApiInfo(apiInfoStr string) error {
 			return fmt.Errorf("API info item %d has invalid color value", i+1)
 		}
 
-		if err := checkDangerousContent(description, i+1, "API信息"); err != nil {
+		if err := checkDangerousContent(description, i+1, "API info"); err != nil {
 			return err
 		}
-		if err := checkDangerousContent(route, i+1, "API信息"); err != nil {
+		if err := checkDangerousContent(route, i+1, "API info"); err != nil {
 			return err
 		}
 	}
@@ -139,7 +139,7 @@ func GetApiInfo() []map[string]interface{} {
 }
 
 func validateAnnouncements(announcementsStr string) error {
-	list, err := parseJSONArray(announcementsStr, "系统公告")
+	list, err := parseJSONArray(announcementsStr, "system announcements")
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func validateAnnouncements(announcementsStr string) error {
 }
 
 func validateFAQ(faqStr string) error {
-	list, err := parseJSONArray(faqStr, "FAQ信息")
+	list, err := parseJSONArray(faqStr, "FAQ")
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func GetFAQ() []map[string]interface{} {
 }
 
 func validateUptimeKumaGroups(groupsStr string) error {
-	groups, err := parseJSONArray(groupsStr, "Uptime Kuma分组配置")
+	groups, err := parseJSONArray(groupsStr, "Uptime Kuma group config")
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func validateUptimeKumaGroups(groupsStr string) error {
 			description = ""
 		}
 
-		if err := validateURL(urlStr, i+1, "分组"); err != nil {
+		if err := validateURL(urlStr, i+1, "group"); err != nil {
 			return err
 		}
 
@@ -289,10 +289,10 @@ func validateUptimeKumaGroups(groupsStr string) error {
 			return fmt.Errorf("group %d Slug can only contain letters, numbers, underscores, and hyphens", i+1)
 		}
 
-		if err := checkDangerousContent(description, i+1, "分组"); err != nil {
+		if err := checkDangerousContent(description, i+1, "group"); err != nil {
 			return err
 		}
-		if err := checkDangerousContent(categoryName, i+1, "分组"); err != nil {
+		if err := checkDangerousContent(categoryName, i+1, "group"); err != nil {
 			return err
 		}
 	}

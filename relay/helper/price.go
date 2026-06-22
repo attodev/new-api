@@ -20,14 +20,12 @@ import (
 func modelPriceNotConfiguredError(modelName string, userId int) error {
 	if model.IsAdmin(userId) {
 		return fmt.Errorf(
-			"模型 %s 的价格未配置。请前往「系统设置 → 运营设置」开启自用模式，或在「系统设置 → 分组与模型定价设置」中为该模型配置价格；"+
-				"Model %s price not configured. Go to System Settings → Operation Settings to enable self-use mode, or configure the model price in System Settings → Group & Model Pricing.",
+			"Model %s price is not configured. Please go to [System Settings → Operation Settings] to enable self-use mode, or configure the price for this model in [System Settings → Group & Model Pricing Settings];",
 			modelName, modelName,
 		)
 	}
 	return fmt.Errorf(
-		"模型 %s 的价格尚未由管理员配置，暂时无法使用，请联系站点管理员开启该模型；"+
-			"Model %s has not been priced by the administrator yet. Please contact the site administrator to enable this model.",
+		"Model %s price has not been configured by the admin and is temporarily unavailable. Please contact the site admin to enable this model;",
 		modelName, modelName,
 	)
 }
