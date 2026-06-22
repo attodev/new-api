@@ -18,10 +18,10 @@ import (
 // 实际扣费已由 BillingSession（PreConsumeBilling + SettleBilling）完成。
 func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	tokenName := c.GetString("token_name")
-	logContent := fmt.Sprintf("操作 %s", info.Action)
-	// 支持任务仅按次计费
+	logContent := fmt.Sprintf("action %s", info.Action)
+	// support per-call billing for tasks
 	if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
-		logContent = fmt.Sprintf("%s，按次计费", logContent)
+		logContent = fmt.Sprintf("%s, per-call billing", logContent)
 	} else {
 		if len(info.PriceData.OtherRatios) > 0 {
 			var contents []string
@@ -31,7 +31,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 				}
 			}
 			if len(contents) > 0 {
-				logContent = fmt.Sprintf("%s, 计算参数：%s", logContent, strings.Join(contents, ", "))
+				logContent = fmt.Sprintf("%s, calc params: %s", logContent, strings.Join(contents, ", "))
 			}
 		}
 	}
@@ -74,7 +74,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 func resolveTokenKey(ctx context.Context, tokenId int, taskID string) string {
 	token, err := model.GetTokenById(tokenId)
 	if err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("获取令牌 key 失败 (tokenId=%d, task=%s): %s", tokenId, taskID, err.Error()))
+		logger.LogWarn(ctx, fmt.Sprintf("failed to get token key (tokenId=%d, task=%s): %s", tokenId, taskID, err.Error()))
 		return ""
 	}
 	return token.Key
@@ -141,7 +141,7 @@ func taskAdjustTokenQuota(ctx context.Context, task *model.Task, delta int) {
 		err = model.IncreaseTokenQuota(task.PrivateData.TokenId, tokenKey, -delta)
 	}
 	if err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("调整令牌额度失败 (delta=%d, task=%s): %s", delta, task.TaskID, err.Error()))
+		logger.LogWarn(ctx, fmt.Sprintf("failed to adjust token quota (delta=%d, task=%s): %s", delta, task.TaskID, err.Error()))
 	}
 }
 
@@ -186,7 +186,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 
 	// 1. 退还资金来源（钱包或订阅）
 	if err := taskAdjustFunding(task, -quota); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("退还资金来源失败 task %s: %s", task.TaskID, err.Error()))
+		logger.LogWarn(ctx, fmt.Sprintf("failed to refund funding source for task %s: %s", task.TaskID, err.Error()))
 		return
 	}
 
@@ -221,12 +221,12 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	quotaDelta := actualQuota - preConsumedQuota
 
 	if quotaDelta == 0 {
-		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 预扣费准确（%s，%s）",
+		logger.LogInfo(ctx, fmt.Sprintf("task %s pre-charge accurate (%s, %s)",
 			task.TaskID, logger.LogQuota(actualQuota), reason))
 		return
 	}
 
-	logger.LogInfo(ctx, fmt.Sprintf("任务 %s 差额结算：delta=%s（实际：%s，预扣：%s，%s）",
+	logger.LogInfo(ctx, fmt.Sprintf("task %s settlement delta: delta=%s (actual: %s, pre-charged: %s, %s)",
 		task.TaskID,
 		logger.LogQuota(quotaDelta),
 		logger.LogQuota(actualQuota),
@@ -234,9 +234,9 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		reason,
 	))
 
-	// 调整资金来源
+	// adjust funding source
 	if err := taskAdjustFunding(task, quotaDelta); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("差额结算资金调整失败 task %s: %s", task.TaskID, err.Error()))
+		logger.LogError(ctx, fmt.Sprintf("settlement funding adjustment failed for task %s: %s", task.TaskID, err.Error()))
 		return
 	}
 
@@ -326,6 +326,6 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * otherMultiplier
 	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
 
-	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
+	reason := fmt.Sprintf("token recalc: tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason)
 }
