@@ -278,3 +278,112 @@ custom_oauth.name_empty: "供應者名稱不能為空"
 custom_oauth.has_bindings: "無法刪除已有使用者綁定的供應者"
 custom_oauth.binding_not_found: "OAuth 綁定不存在"
 custom_oauth.provider_id_field_invalid: "無法從供應者響應中提取使用者 ID"
+
+# TOTP messages
+totp.code_must_be_6_digits: "验证码必须是6位数字"
+totp.code_digits_only: "验证码只能包含数字"
+
+# Channel extended messages
+channel.get_info_failed: "获取渠道信息失败: {{.Error}}"
+channel.setting_format_error: "渠道额外设置格式错误：{{.Error}}"
+channel.model_name_too_long: "模型名称过长: {{.Name}}"
+channel.region_empty: "部署地区不能为空"
+channel.region_invalid_json: '部署地区必须是标准的Json格式，例如{"default": "us-central1"}'
+channel.region_missing_default: "部署地区必须包含default字段"
+channel.vertexai_invalid_json: "批量添加 Vertex AI 必须使用标准的JsonArray格式，例如[{key1}, {key2}...]"
+channel.vertexai_keys_empty: "批量添加 Vertex AI 的 keys 不能为空"
+channel.test_running: "测试已在运行中"
+channel.response_timeout: "响应时间 {{.Seconds}}s 超过阈值 {{.Threshold}}s"
+channel.refresh_failed: "刷新凭证失败，请稍后重试"
+channel.copy_failed: "复制渠道失败，请稍后重试"
+channel.get_count_failed: "获取渠道数量失败，请稍后重试"
+channel.get_type_failed: "获取渠道类型统计失败，请稍后重试"
+channel.get_tag_channel_failed: "获取标签渠道失败，请稍后重试"
+
+# Codex messages
+codex.parse_auth_failed: "解析授权信息失败，请检查输入格式"
+codex.exchange_failed: "授权码交换失败，请重试"
+codex.parse_cred_failed: "解析凭证失败，请检查渠道配置"
+codex.get_usage_failed: "获取用量信息失败，请稍后重试"
+
+# Custom OAuth extended messages
+custom_oauth.invalid_id: "无效的 ID"
+custom_oauth.invalid_params: "无效的请求参数: {{.Error}}"
+custom_oauth.discovery_url_empty: "请先填写 Discovery URL 或 Issuer URL"
+custom_oauth.discovery_url_invalid: "Discovery URL 无效，仅支持 http/https"
+custom_oauth.discovery_fetch_failed: "获取 Discovery 配置失败: {{.Error}}"
+custom_oauth.discovery_parse_failed: "解析 Discovery 配置失败: {{.Error}}"
+custom_oauth.slug_conflict: "该 Slug 与内置 OAuth 提供商冲突"
+custom_oauth.invalid_provider_id: "无效的提供商 ID"
+custom_oauth.check_binding_failed: "检查用户绑定时发生错误，请稍后重试"
+custom_oauth.delete_has_bindings: "该 OAuth 提供商还有用户绑定，无法删除。请先解除所有用户绑定。"
+custom_oauth.not_logged_in: "未登录"
+
+# Passkey extended messages
+passkey.user_info_failed: "用户信息获取失败: {{.Error}}"
+passkey.handle_mismatch: "用户句柄与凭证不匹配"
+passkey.save_state_failed: "保存验证状态失败: {{.Error}}"
+passkey.invalid_session: "无效的会话信息"
+passkey.need_verification: "请先完成安全验证"
+passkey.need_specific_verification: "请先完成对应的安全验证"
+passkey.invalid_state: "无效的 Passkey 验证状态"
+
+# Secure verification messages
+verify.invalid_params: "参数错误: {{.Error}}"
+verify.get_user_failed: "获取用户信息失败: {{.Error}}"
+verify.user_disabled: "该用户已被禁用"
+verify.need_2fa_or_passkey: "用户未启用2FA或Passkey"
+verify.2fa_not_enabled: "用户未启用2FA"
+verify.code_empty: "验证码不能为空"
+verify.passkey_not_enabled: "用户未启用Passkey"
+verify.passkey_state_error: "Passkey 验证状态异常: {{.Error}}"
+verify.passkey_not_done: "请先完成 Passkey 验证"
+verify.unsupported_method: "不支持的验证方式: {{.Method}}"
+verify.failed: "验证失败，请检查验证码"
+verify.save_state_failed: "保存验证状态失败: {{.Error}}"
+
+# Topup extended messages
+topup.amount_too_small: "充值数量不能小于 {{.Min}}"
+topup.amount_too_large: "充值数量不能大于 10000"
+topup.get_group_failed: "获取用户分组失败"
+topup.amount_too_low: "充值金额过低"
+topup.unsupported_provider: "不支持的支付渠道"
+topup.redirect_not_trusted: "支付成功重定向URL不在可信任域名列表中"
+topup.cancel_redirect_not_trusted: "支付取消重定向URL不在可信任域名列表中"
+topup.waffo_pancake_not_configured: "Waffo Pancake 未配置或密钥无效"
+topup.waffo_not_configured: "Waffo 未配置或密钥无效"
+
+# Subscription payment messages
+subscription_payment.invalid_params: "参数错误"
+
+# Playground messages
+playground.no_access_token: "暂不支持使用 access token"
+
+# Option messages
+option.compliance_field_restricted: "合规确认字段不允许通过通用设置接口修改"
+
+# Ratio sync messages
+ratio_sync.invalid_params: "请求参数格式错误"
+
+# Task video messages
+task_video.get_channel_failed: "获取渠道失败"
+task_video.get_model_failed: "获取模型失败"
+task_video.upstream_failed: "上游请求失败"
+
+# 2FA extended messages
+twofa.generate_key_failed: "生成TOTP密钥失败: {{.Error}}"
+twofa.generate_code_failed: "生成备用码失败: {{.Error}}"
+twofa.save_code_failed: "保存备用码失败: {{.Error}}"
+twofa.get_count_failed: "获取备用码数量失败: {{.Error}}"
+
+# Model sync messages
+model_sync.get_failed: "获取模型列表失败，请稍后重试"
+model_sync.get_upstream_failed: "获取上游模型失败: {{.Error}}"
+
+# Console messages
+console.get_config_failed: "获取配置失败，请稍后重试"
+
+# Prefill group messages
+prefill_group.name_type_empty: "组名称和类型不能为空"
+prefill_group.name_exists: "组名称已存在"
+prefill_group.id_missing: "缺少组 ID"

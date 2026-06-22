@@ -330,3 +330,144 @@ const (
 	MsgCustomOAuthBindingNotFound   = "custom_oauth.binding_not_found"
 	MsgCustomOAuthProviderIdInvalid = "custom_oauth.provider_id_field_invalid"
 )
+
+// TOTP messages
+const (
+	MsgTotpCodeMustBe6Digits = "totp.code_must_be_6_digits"
+	MsgTotpCodeDigitsOnly    = "totp.code_digits_only"
+)
+
+// Channel extended messages
+const (
+	MsgChannelGetInfoFailed        = "channel.get_info_failed"
+	MsgChannelSettingFormatError   = "channel.setting_format_error"
+	MsgChannelModelNameTooLong     = "channel.model_name_too_long"
+	MsgChannelRegionEmpty          = "channel.region_empty"
+	MsgChannelRegionInvalidJson    = "channel.region_invalid_json"
+	MsgChannelRegionMissingDefault = "channel.region_missing_default"
+	MsgChannelVertexAIInvalidJson  = "channel.vertexai_invalid_json"
+	MsgChannelVertexAIKeysEmpty    = "channel.vertexai_keys_empty"
+	MsgChannelTestRunning          = "channel.test_running"
+	MsgChannelResponseTimeout      = "channel.response_timeout"
+	MsgChannelRefreshFailed        = "channel.refresh_failed"
+	MsgChannelCopyFailed           = "channel.copy_failed"
+	MsgChannelGetCountFailed       = "channel.get_count_failed"
+	MsgChannelGetTypeFailed        = "channel.get_type_failed"
+	MsgChannelGetTagChannelFailed  = "channel.get_tag_channel_failed"
+)
+
+// Codex messages
+const (
+	MsgCodexParseAuthFailed = "codex.parse_auth_failed"
+	MsgCodexExchangeFailed  = "codex.exchange_failed"
+	MsgCodexParseCredFailed = "codex.parse_cred_failed"
+	MsgCodexGetUsageFailed  = "codex.get_usage_failed"
+)
+
+// Custom OAuth extended messages
+const (
+	MsgCustomOAuthInvalidId          = "custom_oauth.invalid_id"
+	MsgCustomOAuthInvalidParams      = "custom_oauth.invalid_params"
+	MsgCustomOAuthDiscoveryEmpty     = "custom_oauth.discovery_url_empty"
+	MsgCustomOAuthDiscoveryInvalid   = "custom_oauth.discovery_url_invalid"
+	MsgCustomOAuthDiscoveryFailed    = "custom_oauth.discovery_fetch_failed"
+	MsgCustomOAuthDiscoveryParseFail = "custom_oauth.discovery_parse_failed"
+	MsgCustomOAuthSlugConflict       = "custom_oauth.slug_conflict"
+	MsgCustomOAuthInvalidProviderId  = "custom_oauth.invalid_provider_id"
+	MsgCustomOAuthCheckBindingFailed = "custom_oauth.check_binding_failed"
+	MsgCustomOAuthDeleteHasBindings  = "custom_oauth.delete_has_bindings"
+	MsgCustomOAuthNotLoggedIn        = "custom_oauth.not_logged_in"
+)
+
+// Passkey extended messages
+const (
+	MsgPasskeyUserInfoFailed     = "passkey.user_info_failed"
+	MsgPasskeyHandleMismatch     = "passkey.handle_mismatch"
+	MsgPasskeySaveStateFailed    = "passkey.save_state_failed"
+	MsgPasskeyInvalidSession     = "passkey.invalid_session"
+	MsgPasskeyNeedVerification   = "passkey.need_verification"
+	MsgPasskeyNeedSpecificVerify = "passkey.need_specific_verification"
+	MsgPasskeyInvalidState       = "passkey.invalid_state"
+)
+
+// Secure verification messages
+const (
+	MsgVerifyInvalidParams     = "verify.invalid_params"
+	MsgVerifyGetUserFailed     = "verify.get_user_failed"
+	MsgVerifyUserDisabled      = "verify.user_disabled"
+	MsgVerify2FAOrPasskey      = "verify.need_2fa_or_passkey"
+	MsgVerify2FANotEnabled     = "verify.2fa_not_enabled"
+	MsgVerifyCodeEmpty         = "verify.code_empty"
+	MsgVerifyPasskeyNotEnabled = "verify.passkey_not_enabled"
+	MsgVerifyPasskeyStateError = "verify.passkey_state_error"
+	MsgVerifyPasskeyNotDone    = "verify.passkey_not_done"
+	MsgVerifyUnsupportedMethod = "verify.unsupported_method"
+	MsgVerifyFailed            = "verify.failed"
+	MsgVerifySaveStateFailed   = "verify.save_state_failed"
+)
+
+// Topup extended messages
+const (
+	MsgTopupAmountTooSmall        = "topup.amount_too_small"
+	MsgTopupAmountTooLarge        = "topup.amount_too_large"
+	MsgTopupGetGroupFailed        = "topup.get_group_failed"
+	MsgTopupAmountTooLow2         = "topup.amount_too_low"
+	MsgTopupUnsupportedProvider   = "topup.unsupported_provider"
+	MsgTopupRedirectNotTrusted    = "topup.redirect_not_trusted"
+	MsgTopupCancelRedirectBad     = "topup.cancel_redirect_not_trusted"
+	MsgTopupWaffoPancakeNotConfig = "topup.waffo_pancake_not_configured"
+	MsgTopupWaffoNotConfig        = "topup.waffo_not_configured"
+)
+
+// Subscription payment messages
+const (
+	MsgSubPaymentInvalidParams = "subscription_payment.invalid_params"
+)
+
+// Playground messages
+const (
+	MsgPlaygroundNoAccessToken = "playground.no_access_token"
+)
+
+// Option messages
+const (
+	MsgOptionComplianceFieldRestricted = "option.compliance_field_restricted"
+)
+
+// Ratio sync messages
+const (
+	MsgRatioSyncInvalidParams = "ratio_sync.invalid_params"
+)
+
+// Task video messages
+const (
+	MsgTaskVideoGetChannelFailed = "task_video.get_channel_failed"
+	MsgTaskVideoGetModelFailed   = "task_video.get_model_failed"
+	MsgTaskVideoUpstreamFailed   = "task_video.upstream_failed"
+)
+
+// 2FA extended messages
+const (
+	MsgTwoFAGenerateKeyFailed  = "twofa.generate_key_failed"
+	MsgTwoFAGenerateCodeFailed = "twofa.generate_code_failed"
+	MsgTwoFASaveCodeFailed     = "twofa.save_code_failed"
+	MsgTwoFAGetCountFailed     = "twofa.get_count_failed"
+)
+
+// Model sync messages
+const (
+	MsgModelSyncGetFailed         = "model_sync.get_failed"
+	MsgModelSyncGetUpstreamFailed = "model_sync.get_upstream_failed"
+)
+
+// Console config messages
+const (
+	MsgConsoleGetConfigFailed = "console.get_config_failed"
+)
+
+// Prefill group messages
+const (
+	MsgPrefillGroupNameTypeEmpty = "prefill_group.name_type_empty"
+	MsgPrefillGroupNameExists    = "prefill_group.name_exists"
+	MsgPrefillGroupIdMissing     = "prefill_group.id_missing"
+)

@@ -277,3 +277,112 @@ custom_oauth.name_empty: "Provider name cannot be empty"
 custom_oauth.has_bindings: "Cannot delete provider with existing user bindings"
 custom_oauth.binding_not_found: "OAuth binding not found"
 custom_oauth.provider_id_field_invalid: "Could not extract user ID from provider response"
+
+# TOTP messages
+totp.code_must_be_6_digits: "Verification code must be 6 digits"
+totp.code_digits_only: "Verification code can only contain digits"
+
+# Channel extended messages
+channel.get_info_failed: "Failed to get channel info: {{.Error}}"
+channel.setting_format_error: "Channel setting format error: {{.Error}}"
+channel.model_name_too_long: "Model name is too long: {{.Name}}"
+channel.region_empty: "Deployment region cannot be empty"
+channel.region_invalid_json: 'Deployment region must be valid JSON, e.g. {"default": "us-central1"}'
+channel.region_missing_default: "Deployment region must contain a 'default' field"
+channel.vertexai_invalid_json: "Batch add Vertex AI must use JsonArray format, e.g. [{key1}, {key2}...]"
+channel.vertexai_keys_empty: "Keys for batch Vertex AI add cannot be empty"
+channel.test_running: "Test is already running"
+channel.response_timeout: "Response time {{.Seconds}}s exceeded threshold {{.Threshold}}s"
+channel.refresh_failed: "Failed to refresh credentials, please try again later"
+channel.copy_failed: "Failed to copy channel, please try again later"
+channel.get_count_failed: "Failed to get channel count, please try again later"
+channel.get_type_failed: "Failed to get channel type statistics, please try again later"
+channel.get_tag_channel_failed: "Failed to get tag channels, please try again later"
+
+# Codex messages
+codex.parse_auth_failed: "Failed to parse authorization info, please check input format"
+codex.exchange_failed: "Authorization code exchange failed, please retry"
+codex.parse_cred_failed: "Failed to parse credentials, please check channel config"
+codex.get_usage_failed: "Failed to get usage info, please try again later"
+
+# Custom OAuth extended messages
+custom_oauth.invalid_id: "Invalid ID"
+custom_oauth.invalid_params: "Invalid parameters: {{.Error}}"
+custom_oauth.discovery_url_empty: "Please fill in Discovery URL or Issuer URL first"
+custom_oauth.discovery_url_invalid: "Discovery URL is invalid, only http/https is supported"
+custom_oauth.discovery_fetch_failed: "Failed to fetch Discovery config: {{.Error}}"
+custom_oauth.discovery_parse_failed: "Failed to parse Discovery config: {{.Error}}"
+custom_oauth.slug_conflict: "This Slug conflicts with a built-in OAuth provider"
+custom_oauth.invalid_provider_id: "Invalid provider ID"
+custom_oauth.check_binding_failed: "Error checking user bindings, please try again later"
+custom_oauth.delete_has_bindings: "This OAuth provider has user bindings and cannot be deleted. Please remove all bindings first."
+custom_oauth.not_logged_in: "Not logged in"
+
+# Passkey extended messages
+passkey.user_info_failed: "Failed to get user info: {{.Error}}"
+passkey.handle_mismatch: "User handle does not match credential"
+passkey.save_state_failed: "Failed to save verification state: {{.Error}}"
+passkey.invalid_session: "Invalid session info"
+passkey.need_verification: "Please complete security verification first"
+passkey.need_specific_verification: "Please complete the required security verification first"
+passkey.invalid_state: "Invalid Passkey verification state"
+
+# Secure verification messages
+verify.invalid_params: "Invalid parameters: {{.Error}}"
+verify.get_user_failed: "Failed to get user info: {{.Error}}"
+verify.user_disabled: "This user has been disabled"
+verify.need_2fa_or_passkey: "User has not enabled 2FA or Passkey"
+verify.2fa_not_enabled: "User has not enabled 2FA"
+verify.code_empty: "Verification code cannot be empty"
+verify.passkey_not_enabled: "User has not enabled Passkey"
+verify.passkey_state_error: "Passkey verification state error: {{.Error}}"
+verify.passkey_not_done: "Please complete Passkey verification first"
+verify.unsupported_method: "Unsupported verification method: {{.Method}}"
+verify.failed: "Verification failed, please check your code"
+verify.save_state_failed: "Failed to save verification state: {{.Error}}"
+
+# Topup extended messages
+topup.amount_too_small: "Top-up amount cannot be less than {{.Min}}"
+topup.amount_too_large: "Top-up amount cannot exceed 10000"
+topup.get_group_failed: "Failed to get user group"
+topup.amount_too_low: "Top-up amount is too low"
+topup.unsupported_provider: "Unsupported payment provider"
+topup.redirect_not_trusted: "Payment success redirect URL is not in the trusted domain list"
+topup.cancel_redirect_not_trusted: "Payment cancel redirect URL is not in the trusted domain list"
+topup.waffo_pancake_not_configured: "Waffo Pancake is not configured or key is invalid"
+topup.waffo_not_configured: "Waffo is not configured or key is invalid"
+
+# Subscription payment messages
+subscription_payment.invalid_params: "Invalid parameters"
+
+# Playground messages
+playground.no_access_token: "Access token is not supported for playground"
+
+# Option messages
+option.compliance_field_restricted: "Compliance confirmation field cannot be modified via general settings API"
+
+# Ratio sync messages
+ratio_sync.invalid_params: "Invalid request parameters"
+
+# Task video messages
+task_video.get_channel_failed: "Failed to get channel"
+task_video.get_model_failed: "Failed to get model"
+task_video.upstream_failed: "Upstream request failed"
+
+# 2FA extended messages
+twofa.generate_key_failed: "Failed to generate TOTP key: {{.Error}}"
+twofa.generate_code_failed: "Failed to generate backup code: {{.Error}}"
+twofa.save_code_failed: "Failed to save backup code: {{.Error}}"
+twofa.get_count_failed: "Failed to get backup code count: {{.Error}}"
+
+# Model sync messages
+model_sync.get_failed: "Failed to get model list, please try again later"
+model_sync.get_upstream_failed: "Failed to get upstream models: {{.Error}}"
+
+# Console messages
+console.get_config_failed: "Failed to get config, please try again later"
+
+# Prefill group messages
+prefill_group.name_type_empty: "Group name and type cannot be empty"
+prefill_group.name_exists: "Group name already exists"
+prefill_group.id_missing: "Group ID is missing"
