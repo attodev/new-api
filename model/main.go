@@ -48,7 +48,7 @@ func initCol() {
 			logKeyCol = commonKeyCol
 		}
 	} else {
-		// LOG_SQL_DSN 为空时，日志数据库与主数据库相同
+		// when LOG_SQL_DSN is empty, log database is the same as the main database
 		if common.UsingPostgreSQL {
 			logGroupCol = `"group"`
 			logKeyCol = `"key"`
@@ -339,7 +339,7 @@ func migrateDBFast() error {
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 		{&PerfMetric{}, "PerfMetric"},
 	}
-	// 动态计算migration数量，确保errChan缓冲区足够大
+	// dynamically compute migration count to ensure errChan buffer is large enough
 	errChan := make(chan error, len(migrations))
 
 	for _, m := range migrations {
@@ -597,13 +597,13 @@ func CloseDB() error {
 // default charset/collation can store Chinese characters. It allows common
 // Chinese-capable charsets (utf8mb4, utf8, gbk, big5, gb18030) and panics otherwise.
 func checkMySQLChineseSupport(db *gorm.DB) error {
-	// 仅检测：当前库默认字符集/排序规则 + 各表的排序规则（隐含字符集）
+	// check: schema default charset/collation + per-table collations (implied charset)
 
 	// Read current schema defaults
 	var schemaCharset, schemaCollation string
 	err := db.Raw("SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()").Row().Scan(&schemaCharset, &schemaCollation)
 	if err != nil {
-		return fmt.Errorf("读取当前库默认字符集/排序规则失败 / Failed to read schema default charset/collation: %v", err)
+		return fmt.Errorf("failed to read schema default charset/collation: %v", err)
 	}
 
 	toLower := func(s string) string { return strings.ToLower(s) }
@@ -624,7 +624,7 @@ func checkMySQLChineseSupport(db *gorm.DB) error {
 			}
 			return strings.HasPrefix(clLower, prefix)
 		}
-		// 如果仅提供了排序规则，尝试按排序规则前缀判断
+		// if only collation is provided, try to determine by collation prefix
 		for _, prefix := range allowedCharsets {
 			if strings.HasPrefix(clLower, prefix) {
 				return true
@@ -633,30 +633,30 @@ func checkMySQLChineseSupport(db *gorm.DB) error {
 		return false
 	}
 
-	// 1) 当前库默认值必须支持中文
+	// 1) schema default must support Chinese characters
 	if !isChineseCapable(schemaCharset, schemaCollation) {
-		return fmt.Errorf("当前库默认字符集/排序规则不支持中文：schema(%s/%s)。请将库设置为 utf8mb4/utf8/gbk/big5/gb18030 / Schema default charset/collation is not Chinese-capable: schema(%s/%s). Please set to utf8mb4/utf8/gbk/big5/gb18030",
-			schemaCharset, schemaCollation, schemaCharset, schemaCollation)
+		return fmt.Errorf("schema default charset/collation is not Chinese-capable: schema(%s/%s). Please set to utf8mb4/utf8/gbk/big5/gb18030",
+			schemaCharset, schemaCollation)
 	}
 
-	// 2) 所有物理表的排序规则（隐含字符集）必须支持中文
+	// 2) all physical table collations (implied charset) must support Chinese characters
 	type tableInfo struct {
 		Name      string
 		Collation *string
 	}
 	var tables []tableInfo
 	if err := db.Raw("SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'").Scan(&tables).Error; err != nil {
-		return fmt.Errorf("读取表排序规则失败 / Failed to read table collations: %v", err)
+		return fmt.Errorf("failed to read table collations: %v", err)
 	}
 
 	var badTables []string
 	for _, t := range tables {
-		// NULL 或空表示继承库默认设置，已在上面校验库默认，视为通过
+		// NULL or empty means inheriting schema default, already validated above — treat as pass
 		if t.Collation == nil || *t.Collation == "" {
 			continue
 		}
 		cl := *t.Collation
-		// 仅凭排序规则判断是否中文可用
+		// determine Chinese capability from collation alone
 		ok := false
 		lower := strings.ToLower(cl)
 		for _, prefix := range allowedCharsets {
@@ -671,15 +671,15 @@ func checkMySQLChineseSupport(db *gorm.DB) error {
 	}
 
 	if len(badTables) > 0 {
-		// 限制输出数量以避免日志过长
+		// limit output count to avoid overly long log messages
 		maxShow := 20
 		shown := badTables
 		if len(shown) > maxShow {
 			shown = shown[:maxShow]
 		}
 		return fmt.Errorf(
-			"存在不支持中文的表，请修复其排序规则/字符集。示例（最多展示 %d 项）：%v / Found tables not Chinese-capable. Please fix their collation/charset. Examples (showing up to %d): %v",
-			maxShow, shown, maxShow, shown,
+			"found tables not Chinese-capable. Please fix their collation/charset. Examples (showing up to %d): %v",
+			maxShow, shown,
 		)
 	}
 	return nil
