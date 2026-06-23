@@ -749,6 +749,10 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if target.Role >= common.RoleAdminUser {
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		return
+	}
 	if target.OrganizationId != actor.OrganizationId {
 		common.ApiError(c, errors.New("user does not belong to your organization"))
 		return
@@ -758,10 +762,10 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.User{}).
-		Select("organization_id", "organization_role").
-		Where("id = ?", target.Id).
-		Updates(model.User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
+	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
+		"organization_id":   0,
+		"organization_role": "",
+	}).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
