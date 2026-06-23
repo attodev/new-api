@@ -1,6 +1,7 @@
 # 조직 관련 Backend REST API 명세
 
-작성일: 2026-06-15
+작성일: 2026-06-15  
+최종 수정: 2026-06-23 (멤버십 API 권한 확대, DELETE /membership 추가, 역할 변경 기능 추가)
 
 ## 1. 문서 범위
 
@@ -42,11 +43,11 @@
 | 권한 | 의미 | 주요 접근 범위 |
 | --- | --- | --- |
 | 전체 관리자 | `role = root` | `/api/organizations/*`, 선택 조직 대상 `/api/organization/*` |
-| 조직 소유자 | `organization_role = owner` | 자기 조직 관리, 조직 지갑 충전, 멤버 추가 |
-| 조직 관리자 | `organization_role = admin` | 자기 조직 사용자 관리, 대시보드/로그/구독 관리 |
+| 조직 소유자 | `organization_role = owner` | 자기 조직 모든 관리, 조직 지갑 충전, owner 역할 부여 |
+| 조직 관리자 | `organization_role = admin` | 멤버 추가/역할변경(member↔admin)/제거, 사용자 관리, 대시보드/로그/구독 관리 |
 | 조직 일반 사용자 | `organization_role = member` | 자기 활성 조직 구독 조회 등 제한된 API |
 
-조직 관리자 권한은 `admin` 또는 `owner`다. 조직 소유자 전용 권한은 `owner`만 해당한다.
+조직 관리자 권한은 `admin` 또는 `owner`다. 조직 소유자 전용 권한은 `owner`만 해당한다 (조직 지갑 충전, `owner` 역할 부여).
 
 전체 관리자가 `/api/organization/*` 계열의 조직별 화면 API를 호출할 때는 대부분 `organization_id` query가 필수다. 조직 소유자/관리자는 자신의 `organization_id`가 자동으로 사용된다.
 
@@ -398,11 +399,11 @@ Body:
 - 이 API는 `quota`를 `0`-`1,000,000,000` 범위로 강제한다.
 - active 조직 구독이 있는 사용자는 quota 방식이 아니라 plan 방식으로 관리하므로 클라이언트에서 quota 입력을 비활성화해야 한다.
 
-### 5.5 사용자 조직 멤버십 할당
+### 5.5 사용자 조직 멤버십 할당/역할 변경
 
 `PUT /api/organization/users/:id/membership`
 
-조직 소유자 전용이다.
+조직 admin 이상 권한이 필요하다 (admin, owner).
 
 Path:
 
@@ -426,10 +427,40 @@ Body:
 
 처리 규칙:
 
-- 조직 소유자 본인은 재할당할 수 없다.
-- 전역 관리자 사용자는 조직 소유자가 관리할 수 없다.
+- 조직 admin 이상이면 호출 가능하다.
+- `owner` 역할 부여는 조직 소유자(owner)만 가능하다. 조직 관리자(admin)가 `owner` 역할을 부여하려 하면 오류가 반환된다.
+- 전역 관리자 사용자는 조직에서 관리할 수 없다.
 - 역할 값이 `member`, `admin`, `owner`가 아니면 오류다.
 - 현재 구현은 대상 사용자가 이미 다른 조직에 속해 있는지 이 API 내부에서 직접 차단하지 않는다. 프론트의 할당 후보 목록에서 조직 미소속 사용자만 선택하도록 제한해야 한다.
+- 이미 조직 구성원인 경우 이 API로 역할을 변경할 수 있다.
+
+### 5.6 사용자 조직 멤버십 제거
+
+`DELETE /api/organization/users/:id/membership`
+
+조직 admin 이상 권한이 필요하다 (admin, owner).
+
+Path:
+
+| 이름 | 타입 | 필수 | 범위/값 | 설명 |
+| --- | --- | --- | --- | --- |
+| `id` | integer | 필수 | 양의 정수 | 제거할 사용자 ID |
+
+처리 규칙:
+
+- 조직 admin 이상이면 호출 가능하다.
+- 대상 사용자가 같은 조직 소속이 아니면 403을 반환한다.
+- 대상 사용자가 owner이면 403을 반환한다 (owner는 제거 불가).
+- 성공 시 해당 사용자의 `organization_id = 0`, `organization_role = ""`으로 업데이트된다.
+
+응답:
+
+```json
+{
+  "success": true,
+  "message": "ok"
+}
+```
 
 ## 6. 조직 구독 API
 

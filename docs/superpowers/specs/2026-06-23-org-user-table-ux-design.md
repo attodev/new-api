@@ -56,6 +56,7 @@ type PendingChange =
   | { type: 'quota'; userId: number; newQuota: number; originalQuota: number }
   | { type: 'status'; userId: number; newStatus: number }  // 0=비활성, 1=활성
   | { type: 'remove'; userId: number }
+  | { type: 'role'; userId: number; newRole: OrganizationRole }
 ```
 
 ### 저장/취소 배너
@@ -103,9 +104,47 @@ type PendingChange =
 
 제거 예정인 사용자의 Quota 인풋은 `disabled`.
 
+### 멤버 추가 UI
+
+드롭다운 선택 방식 대신 username 텍스트 입력 방식으로 변경:
+
+- `Username` 입력 필드 + `추가` 버튼
+- 입력한 username이 assignable user 목록에 없으면 "User not found" 오류
+- 항상 `member` 역할로 추가 (역할은 테이블 Role 컬럼에서 변경)
+- Enter 키로도 추가 가능
+
+### 역할 변경 (Role 컬럼 인라인 편집)
+
+테이블의 Role 컬럼에서 직접 역할을 변경할 수 있다:
+
+- owner 행: 텍스트만 표시, 변경 불가
+- 그 외 행: `<Select>` 컴포넌트로 `member` / `admin` 선택 가능
+- 변경 시 pending 상태로 추가 (`type: 'role'`)
+- 저장 배너에서 일괄 저장
+
 ### 행별 버튼 없음
 
 기존의 행별 "비활성화", "제거" 버튼 추가 안 함. 모든 상태 변경은 체크박스 선택 후 상단 툴바로만 수행.
+
+---
+
+## 관리 권한 범위 변경
+
+이번 변경에서 조직 사용자 관리 권한이 `owner` 전용에서 `admin` 이상으로 확대되었다.
+
+| 기능 | 변경 전 | 변경 후 |
+|---|---|---|
+| 멤버 추가 (`PUT /membership`) | owner 전용 | admin 이상 |
+| 멤버 제거 (`DELETE /membership`) | owner 전용 | admin 이상 |
+| 역할 변경 | owner 전용 | admin 이상 (owner 역할 부여는 owner만) |
+| Export/Import 버튼 표시 | owner만 표시 | admin 이상 표시 |
+| 조직 지갑 링크 | owner만 표시 | admin 이상 표시 |
+| candidate user 로드 | owner만 | admin 이상 |
+
+백엔드 변경:
+- `AssignOrganizationUser`: `HasOrganizationOwnerRole` → `HasOrganizationAdminRole`
+  - 단, `owner` 역할 부여는 여전히 owner만 가능 (별도 guard)
+- `RemoveOrganizationUserMembership`: `HasOrganizationOwnerRole` → `HasOrganizationAdminRole`
 
 ---
 
