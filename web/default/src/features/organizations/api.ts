@@ -306,6 +306,15 @@ export async function assignOrganizationUser(
   return res.data
 }
 
+export async function removeOrganizationUserMembership(
+  userId: number
+): Promise<ApiResponse> {
+  const res = await api.delete(
+    `/api/organization/users/${userId}/membership`
+  )
+  return res.data
+}
+
 function appendOrganizationId(
   search: URLSearchParams,
   organizationId?: number | null
