@@ -728,6 +728,49 @@ func AssignOrganizationUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
+func RemoveOrganizationUserMembership(c *gin.Context) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization owner permission required"))
+		return
+	}
+
+	targetId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	target, err := model.GetUserById(targetId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if target.OrganizationId != actor.OrganizationId {
+		common.ApiError(c, errors.New("user does not belong to your organization"))
+		return
+	}
+	if model.HasOrganizationOwnerRole(target.OrganizationRole) {
+		common.ApiError(c, errors.New("organization owner cannot be removed"))
+		return
+	}
+
+	if err := model.DB.Model(&model.User{}).
+		Select("organization_id", "organization_role").
+		Where("id = ?", target.Id).
+		Updates(model.User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.InvalidateUserCache(target.Id); err != nil {
+		common.SysLog("failed to invalidate cache after membership removal: " + err.Error())
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
 func DeleteOrganization(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
 		common.ApiError(c, errors.New("root permission required"))
