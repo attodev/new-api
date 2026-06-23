@@ -1023,7 +1023,7 @@ export function OrganizationUsersTable() {
                       </div>
                       <div className='flex items-center gap-2'>
                         <Input
-                          key={`${user.id}-${user.quota}-${hasActivePlan}`}
+                          key={`${user.id}-${user.quota}-${hasActivePlan}-${pendingQuota?.newQuota ?? ''}`}
                           className={`w-32${pendingQuota ? ' border-amber-500' : ''}`}
                           type='number'
                           step={tokensOnly ? 1 : 0.01}
