@@ -1,9 +1,9 @@
 {
-  "base": "en.json",
+  "base": "kr.json",
   "locales": {
     "en": {
       "file": "en.json",
-      "missingCount": 0,
+      "missingCount": 6,
       "extrasCount": 0,
       "untranslatedCount": 0
     },
@@ -11,7 +11,7 @@
       "file": "kr.json",
       "missingCount": 0,
       "extrasCount": 0,
-      "untranslatedCount": 653
+      "untranslatedCount": 0
     }
   }
 }
