@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1250,4 +1251,110 @@ func TestOrganizationUsersMemberCannotList(t *testing.T) {
 	)
 
 	requireOrganizationApiError(t, res, "organization admin permission required")
+}
+
+func TestRemoveOrganizationUserMembershipSuccess(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+
+	owner := model.User{Username: "owner", Password: "x", Role: common.RoleCommonUser, AffCode: "o", OrganizationId: 1, OrganizationRole: "owner"}
+	member := model.User{Username: "member", Password: "x", Role: common.RoleCommonUser, AffCode: "m", OrganizationId: 1, OrganizationRole: "member"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+
+	res := performOrganizationRequest(
+		RemoveOrganizationUserMembership,
+		owner,
+		http.MethodDelete,
+		"/organization/users/"+strconv.Itoa(member.Id)+"/membership",
+		"",
+		gin.Param{Key: "id", Value: strconv.Itoa(member.Id)},
+	)
+	require.Equal(t, http.StatusOK, res.Code)
+	var payload struct {
+		Success bool `json:"success"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.True(t, payload.Success)
+
+	var updated model.User
+	require.NoError(t, model.DB.First(&updated, member.Id).Error)
+	require.Equal(t, 0, updated.OrganizationId)
+	require.Equal(t, "", updated.OrganizationRole)
+}
+
+func TestRemoveOrganizationUserMembershipRejectsOwner(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+
+	owner := model.User{Username: "owner", Password: "x", Role: common.RoleCommonUser, AffCode: "o", OrganizationId: 1, OrganizationRole: "owner"}
+	owner2 := model.User{Username: "owner2", Password: "x", Role: common.RoleCommonUser, AffCode: "o2", OrganizationId: 1, OrganizationRole: "owner"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&owner2).Error)
+
+	res := performOrganizationRequest(
+		RemoveOrganizationUserMembership,
+		owner,
+		http.MethodDelete,
+		"/organization/users/"+strconv.Itoa(owner2.Id)+"/membership",
+		"",
+		gin.Param{Key: "id", Value: strconv.Itoa(owner2.Id)},
+	)
+	requireOrganizationApiError(t, res, "organization owner cannot be removed")
+}
+
+func TestRemoveOrganizationUserMembershipRejectsNonMember(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+
+	owner := model.User{Username: "owner", Password: "x", Role: common.RoleCommonUser, AffCode: "o", OrganizationId: 1, OrganizationRole: "owner"}
+	outsider := model.User{Username: "outsider", Password: "x", Role: common.RoleCommonUser, AffCode: "out", OrganizationId: 2, OrganizationRole: "member"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&outsider).Error)
+
+	res := performOrganizationRequest(
+		RemoveOrganizationUserMembership,
+		owner,
+		http.MethodDelete,
+		"/organization/users/"+strconv.Itoa(outsider.Id)+"/membership",
+		"",
+		gin.Param{Key: "id", Value: strconv.Itoa(outsider.Id)},
+	)
+	requireOrganizationApiError(t, res, "user does not belong to your organization")
+}
+
+func TestRemoveOrganizationUserMembershipRejectsNonOwner(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+
+	admin := model.User{Username: "admin", Password: "x", Role: common.RoleCommonUser, AffCode: "a", OrganizationId: 1, OrganizationRole: "admin"}
+	member := model.User{Username: "member", Password: "x", Role: common.RoleCommonUser, AffCode: "m", OrganizationId: 1, OrganizationRole: "member"}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+
+	res := performOrganizationRequest(
+		RemoveOrganizationUserMembership,
+		admin,
+		http.MethodDelete,
+		"/organization/users/"+strconv.Itoa(member.Id)+"/membership",
+		"",
+		gin.Param{Key: "id", Value: strconv.Itoa(member.Id)},
+	)
+	requireOrganizationApiError(t, res, "organization owner permission required")
+}
+
+func TestRemoveOrganizationUserMembershipRejectsInvalidId(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+
+	owner := model.User{Username: "owner", Password: "x", Role: common.RoleCommonUser, AffCode: "o", OrganizationId: 1, OrganizationRole: "owner"}
+	require.NoError(t, model.DB.Create(&owner).Error)
+
+	res := performOrganizationRequest(
+		RemoveOrganizationUserMembership,
+		owner,
+		http.MethodDelete,
+		"/organization/users/abc/membership",
+		"",
+		gin.Param{Key: "id", Value: "abc"},
+	)
+	require.Equal(t, http.StatusOK, res.Code)
+	var payload struct{ Success bool `json:"success"` }
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.False(t, payload.Success)
 }
