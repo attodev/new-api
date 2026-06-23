@@ -553,30 +553,6 @@ export function OrganizationUsersTable() {
         onOpenChange={setImportDialogOpen}
         onSuccess={() => void loadUsers()}
       />
-      {pendingChanges.length > 0 && (
-        <div className='flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm'>
-          <span className='text-blue-700'>
-            {[
-              pendingChanges.filter(c => c.type === 'quota').length > 0 &&
-                t('{{count}} quota changes', { count: pendingChanges.filter(c => c.type === 'quota').length }),
-              pendingChanges.filter(c => c.type === 'status').length > 0 &&
-                t('{{count}} status changes', { count: pendingChanges.filter(c => c.type === 'status').length }),
-              pendingChanges.filter(c => c.type === 'remove').length > 0 &&
-                t('{{count}} pending removal', { count: pendingChanges.filter(c => c.type === 'remove').length }),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </span>
-          <div className='flex gap-2'>
-            <Button size='sm' onClick={() => void handleSavePending()} disabled={saving}>
-              {t('Save')}
-            </Button>
-            <Button size='sm' variant='outline' onClick={handleCancelPending} disabled={saving}>
-              {t('Cancel')}
-            </Button>
-          </div>
-        </div>
-      )}
       <div className='flex items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold'>{t('Organization Users')}</h1>
         <div className='flex items-center gap-2'>
@@ -881,6 +857,30 @@ export function OrganizationUsersTable() {
         </div>
       )}
 
+      {pendingChanges.length > 0 && (
+        <div className='flex items-center justify-between rounded-md border border-border bg-muted/60 px-4 py-2 text-sm'>
+          <span className='text-foreground'>
+            {[
+              pendingChanges.filter(c => c.type === 'quota').length > 0 &&
+                t('{{count}} quota changes', { count: pendingChanges.filter(c => c.type === 'quota').length }),
+              pendingChanges.filter(c => c.type === 'status').length > 0 &&
+                t('{{count}} status changes', { count: pendingChanges.filter(c => c.type === 'status').length }),
+              pendingChanges.filter(c => c.type === 'remove').length > 0 &&
+                t('{{count}} pending removal', { count: pendingChanges.filter(c => c.type === 'remove').length }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          <div className='flex gap-2'>
+            <Button size='sm' onClick={() => void handleSavePending()} disabled={saving}>
+              {t('Save')}
+            </Button>
+            <Button size='sm' variant='outline' onClick={handleCancelPending} disabled={saving}>
+              {t('Cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='flex items-center gap-2'>
           <Input
@@ -909,7 +909,7 @@ export function OrganizationUsersTable() {
               {t('Disable')}
             </Button>
             <Button size='sm' variant='outline' onClick={handleBulkRemove} className='border-destructive text-destructive'>
-              {t('Remove from organization')}
+              {t('조직에서 제거')}
             </Button>
           </div>
         )}
