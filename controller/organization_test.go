@@ -1353,8 +1353,5 @@ func TestRemoveOrganizationUserMembershipRejectsInvalidId(t *testing.T) {
 		"",
 		gin.Param{Key: "id", Value: "abc"},
 	)
-	require.Equal(t, http.StatusOK, res.Code)
-	var payload struct{ Success bool `json:"success"` }
-	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
-	require.False(t, payload.Success)
+	requireOrganizationApiError(t, res, `strconv.Atoi: parsing "abc": invalid syntax`)
 }
