@@ -681,8 +681,8 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner permission required"))
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
 		return
 	}
 
@@ -697,11 +697,11 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 	if target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
 		return
 	}
 	if target.Id == actor.Id {
-		common.ApiError(c, errors.New("organization owners cannot reassign themselves"))
+		common.ApiError(c, errors.New("organization admins cannot reassign themselves"))
 		return
 	}
 
@@ -712,6 +712,10 @@ func AssignOrganizationUser(c *gin.Context) {
 	}
 	if !model.IsValidOrganizationRole(req.OrganizationRole) {
 		common.ApiError(c, errors.New("invalid organization role"))
+		return
+	}
+	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("only organization owner can assign owner role"))
 		return
 	}
 
@@ -734,8 +738,8 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner permission required"))
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
 		return
 	}
 
@@ -750,7 +754,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 	if target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
 		return
 	}
 	if target.OrganizationId != actor.OrganizationId {

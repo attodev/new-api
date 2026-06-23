@@ -232,7 +232,7 @@ export function OrganizationUsersTable() {
   }
 
   async function loadOrganizationProfile() {
-    if (!isOrganizationOwner && !currentUser?.organization_role) {
+    if (!isOrganizationAdmin && !currentUser?.organization_role) {
       setOrganizationProfile(null)
       return
     }
@@ -247,7 +247,7 @@ export function OrganizationUsersTable() {
   }
 
   async function loadCandidateUsers() {
-    if (!isRoot && !isOrganizationOwner) return
+    if (!isRoot && !isOrganizationAdmin) return
     setLoadingCandidates(true)
     try {
       const res = isRoot
@@ -290,7 +290,7 @@ export function OrganizationUsersTable() {
 
   useEffect(() => {
     void loadCandidateUsers()
-  }, [isRoot, isOrganizationOwner])
+  }, [isRoot, isOrganizationAdmin])
 
   async function handleCreateOrganization() {
     const parsedOwnerUserId = Number(ownerUserId)
@@ -570,7 +570,7 @@ export function OrganizationUsersTable() {
       <div className='flex items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold'>{t('Organization Users')}</h1>
         <div className='flex items-center gap-2'>
-          {isOrganizationOwner && (
+          {isOrganizationAdmin && (
             <>
               <Button
                 variant='outline'
@@ -594,7 +594,7 @@ export function OrganizationUsersTable() {
         </div>
       </div>
 
-      {(isRoot || isOrganizationOwner) && (
+      {(isRoot || isOrganizationAdmin) && (
         <div className='grid gap-3 lg:grid-cols-2'>
           {isRoot && (
             <div className='space-y-3 rounded-md border p-3'>
@@ -685,7 +685,7 @@ export function OrganizationUsersTable() {
             </div>
           )}
 
-          {isOrganizationOwner && (
+          {isOrganizationAdmin && (
             <div className='space-y-3 rounded-md border p-3'>
               <div className='flex items-center gap-2 text-sm font-medium'>
                 <UserPlus className='size-4' />
@@ -754,7 +754,7 @@ export function OrganizationUsersTable() {
                 <BarChart3 />
                 {t('Usage dashboard')}
               </Button>
-              {isOrganizationOwner && (
+              {isOrganizationAdmin && (
                 <Button
                   variant='outline'
                   size='sm'
@@ -885,7 +885,7 @@ export function OrganizationUsersTable() {
             <Button size='sm' variant='outline' onClick={handleBulkDisable}>
               {t('Disable')}
             </Button>
-            {isOrganizationOwner && (
+            {isOrganizationAdmin && (
               <Button size='sm' variant='outline' onClick={handleBulkRemove} className='border-destructive text-destructive'>
                 {t('조직에서 제거')}
               </Button>
