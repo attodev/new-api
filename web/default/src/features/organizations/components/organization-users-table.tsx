@@ -37,6 +37,7 @@ import {
 } from '@/lib/format'
 import {
   ORGANIZATION_ROLE,
+  hasOrganizationAdminRole,
   hasOrganizationOwnerRole,
 } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
@@ -144,11 +145,13 @@ export function OrganizationUsersTable() {
   const isOrganizationOwner = hasOrganizationOwnerRole(
     currentUser?.organization_role
   )
+  const isOrganizationAdmin = hasOrganizationAdminRole(
+    currentUser?.organization_role
+  )
   const { meta: currencyMeta } = getCurrencyDisplay()
   const currencyLabel = getCurrencyLabel()
   const tokensOnly = currencyMeta.kind === 'tokens'
-  const canManageOrganizationUsers =
-    Boolean(currentUser?.organization_id) || isOrganizationOwner
+  const canManageOrganizationUsers = isOrganizationAdmin || isRoot
   const [currentPage, setCurrentPage] = useState(1)
   const [totalUsers, setTotalUsers] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -882,9 +885,11 @@ export function OrganizationUsersTable() {
             <Button size='sm' variant='outline' onClick={handleBulkDisable}>
               {t('Disable')}
             </Button>
-            <Button size='sm' variant='outline' onClick={handleBulkRemove} className='border-destructive text-destructive'>
-              {t('조직에서 제거')}
-            </Button>
+            {isOrganizationOwner && (
+              <Button size='sm' variant='outline' onClick={handleBulkRemove} className='border-destructive text-destructive'>
+                {t('조직에서 제거')}
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -984,7 +989,7 @@ export function OrganizationUsersTable() {
                     )}
                   </td>
                   <td className='px-3 py-2'>
-                    {isOwner || pendingRemove ? (
+                    {isOwner || pendingRemove || !isOrganizationOwner ? (
                       <span className={pendingRemove ? 'text-muted-foreground line-through' : ''}>
                         {user.organization_role}
                       </span>
