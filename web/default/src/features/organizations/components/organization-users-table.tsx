@@ -95,6 +95,7 @@ type PendingChange =
   | { type: 'quota'; userId: number; newQuota: number; originalQuota: number }
   | { type: 'status'; userId: number; newStatus: number }
   | { type: 'remove'; userId: number }
+  | { type: 'role'; userId: number; newRole: OrganizationRole }
 
 const USER_STATUS_ENABLED = 1
 const USER_STATUS_DISABLED = 2
@@ -102,6 +103,10 @@ const ORGANIZATION_ROLES: OrganizationRole[] = [
   ORGANIZATION_ROLE.MEMBER,
   ORGANIZATION_ROLE.ADMIN,
   ORGANIZATION_ROLE.OWNER,
+]
+const ASSIGNABLE_ROLES: OrganizationRole[] = [
+  ORGANIZATION_ROLE.MEMBER,
+  ORGANIZATION_ROLE.ADMIN,
 ]
 const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 
@@ -133,10 +138,7 @@ export function OrganizationUsersTable() {
   const [editingOrganization, setEditingOrganization] =
     useState<Organization | null>(null)
   const [ownerUserId, setOwnerUserId] = useState('')
-  const [assignUserId, setAssignUserId] = useState('')
-  const [assignRole, setAssignRole] = useState<OrganizationRole>(
-    ORGANIZATION_ROLE.MEMBER
-  )
+  const [assignUsername, setAssignUsername] = useState('')
 
   const isRoot = (currentUser?.role ?? 0) >= ROLE.SUPER_ADMIN
   const isOrganizationOwner = hasOrganizationOwnerRole(
@@ -255,10 +257,6 @@ export function OrganizationUsersTable() {
           return true
         })
         setCandidateUsers(items)
-        if (items.length > 0) {
-          const firstId = String(items[0].id)
-          if (isOrganizationOwner && !assignUserId) setAssignUserId(firstId)
-        }
       } else {
         toast.error(res.message || t('Failed to load users'))
       }
@@ -323,19 +321,25 @@ export function OrganizationUsersTable() {
   }
 
   async function handleAssignUser() {
-    const parsedUserId = Number(assignUserId)
-    if (!Number.isInteger(parsedUserId)) {
-      toast.error(t('User is required'))
+    const username = assignUsername.trim()
+    if (!username) {
+      toast.error(t('Username is required'))
       return
     }
 
     setAssigning(true)
     try {
-      const res = await assignOrganizationUser(parsedUserId, {
-        organization_role: assignRole,
+      const matched = candidateUsers.find(u => u.username === username)
+      if (!matched) {
+        toast.error(t('User not found'))
+        return
+      }
+      const res = await assignOrganizationUser(matched.id, {
+        organization_role: ORGANIZATION_ROLE.MEMBER,
       })
       if (res.success) {
         toast.success(t('Organization member assigned'))
+        setAssignUsername('')
         await Promise.all([loadUsers(), loadCandidateUsers()])
       } else {
         toast.error(res.message || t('Failed to assign organization member'))
@@ -343,6 +347,10 @@ export function OrganizationUsersTable() {
     } finally {
       setAssigning(false)
     }
+  }
+
+  function handleRoleChange(userId: number, newRole: OrganizationRole) {
+    setPendingChange({ type: 'role', userId, newRole })
   }
 
   function handleStartEditOrganization(organization: Organization) {
@@ -474,6 +482,9 @@ export function OrganizationUsersTable() {
           } else if (change.type === 'remove') {
             const res = await removeOrganizationUserMembership(change.userId)
             if (!res.success) errors.push(res.message ?? t('Failed to remove member'))
+          } else if (change.type === 'role') {
+            const res = await assignOrganizationUser(change.userId, { organization_role: change.newRole })
+            if (!res.success) errors.push(res.message ?? t('Failed to update role'))
           }
         } catch (e: unknown) {
           errors.push(e instanceof Error ? e.message : t('Unknown error'))
@@ -678,59 +689,22 @@ export function OrganizationUsersTable() {
                 {t('Assign Organization Member')}
               </div>
               <div className='flex flex-wrap items-center gap-2'>
-                <Select
-                  items={candidateUsers.map((user) => ({
-                    value: String(user.id),
-                    label: user.username,
-                  }))}
-                  value={assignUserId}
-                  onValueChange={(value) =>
-                    value !== null && setAssignUserId(value)
-                  }
-                  disabled={loadingCandidates || candidateUsers.length === 0}
-                >
-                  <SelectTrigger className='min-w-56 flex-1'>
-                    <SelectValue placeholder={t('User')} />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {candidateUsers.map((user) => (
-                        <SelectItem key={user.id} value={String(user.id)}>
-                          {user.username} #{user.id}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Select
-                  items={ORGANIZATION_ROLES.map((role) => ({
-                    value: role,
-                    label: role,
-                  }))}
-                  value={assignRole}
-                  onValueChange={(value) =>
-                    value !== null && setAssignRole(value as OrganizationRole)
-                  }
-                >
-                  <SelectTrigger className='w-32'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {ORGANIZATION_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {t(role)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Input
+                  className='min-w-56 flex-1'
+                  placeholder={t('Username')}
+                  value={assignUsername}
+                  onChange={(e) => setAssignUsername(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleAssignUser()
+                  }}
+                  disabled={assigning}
+                />
                 <Button
                   onClick={() => void handleAssignUser()}
-                  disabled={assigning || !assignUserId}
+                  disabled={assigning || !assignUsername.trim()}
                 >
                   <UserPlus />
-                  {t('Assign')}
+                  추가
                 </Button>
               </div>
             </div>
@@ -966,6 +940,8 @@ export function OrganizationUsersTable() {
                 | { type: 'status'; userId: number; newStatus: number } | undefined
               const pendingQuota = pendingChanges.find(c => c.type === 'quota' && c.userId === user.id) as
                 | { type: 'quota'; userId: number; newQuota: number; originalQuota: number } | undefined
+              const pendingRole = pendingChanges.find(c => c.type === 'role' && c.userId === user.id) as
+                | { type: 'role'; userId: number; newRole: OrganizationRole } | undefined
               const quotaControlState = getOrganizationQuotaControlState(
                 user.id,
                 user.quota,
@@ -1007,8 +983,34 @@ export function OrganizationUsersTable() {
                       <div className='text-xs text-amber-700'>{t('Quota modified')}</div>
                     )}
                   </td>
-                  <td className={`px-3 py-2${pendingRemove ? ' text-muted-foreground line-through' : ''}`}>
-                    {user.organization_role}
+                  <td className='px-3 py-2'>
+                    {isOwner || pendingRemove ? (
+                      <span className={pendingRemove ? 'text-muted-foreground line-through' : ''}>
+                        {user.organization_role}
+                      </span>
+                    ) : (
+                      <Select
+                        items={ASSIGNABLE_ROLES.map(r => ({ value: r, label: r }))}
+                        value={pendingRole ? pendingRole.newRole : user.organization_role}
+                        onValueChange={value => {
+                          if (value !== null) handleRoleChange(user.id, value as OrganizationRole)
+                        }}
+                      >
+                        <SelectTrigger className='h-7 w-28 text-xs'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectGroup>
+                            {ASSIGNABLE_ROLES.map(r => (
+                              <SelectItem key={r} value={r}>{t(r)}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {pendingRole && !pendingRemove && (
+                      <div className='text-xs text-amber-700'>{t('Role modified')}</div>
+                    )}
                   </td>
                   <td className={`px-3 py-2${pendingRemove ? ' text-muted-foreground line-through' : ''}`}>
                     {effectiveStatus === USER_STATUS_ENABLED ? t('Enabled') : t('Disabled')}
