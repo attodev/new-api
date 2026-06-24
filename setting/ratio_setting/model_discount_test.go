@@ -33,3 +33,25 @@ func TestDiscountValidationRejectsOutOfRange(t *testing.T) {
 		t.Fatalf(">100 percent must be rejected")
 	}
 }
+
+func TestEffectiveDiscountPrecedence(t *testing.T) {
+	_ = UpdateModelDiscountByJSONString(`{"m-model":20}`)
+	_ = UpdateVendorDiscountByJSONString(`{"acme":10}`)
+	SetVendorResolver(func(model string) (string, bool) {
+		switch model {
+		case "m-model", "v-model":
+			return "acme", true
+		}
+		return "", false
+	})
+
+	if got := GetEffectiveDiscountMultiplier("m-model"); got != 0.8 {
+		t.Fatalf("model precedence: want 0.8 got %v", got)
+	}
+	if got := GetEffectiveDiscountMultiplier("v-model"); got != 0.9 {
+		t.Fatalf("vendor fallback: want 0.9 got %v", got)
+	}
+	if got := GetEffectiveDiscountMultiplier("none"); got != 1.0 {
+		t.Fatalf("no discount: want 1.0 got %v", got)
+	}
+}

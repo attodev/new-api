@@ -65,3 +65,25 @@ func GetVendorDiscountMultiplier(vendorName string) (float64, bool) {
 	}
 	return percentToMultiplier(percent), true
 }
+
+// vendorResolver: 모델명 -> 벤더명. model 패키지가 init 시 주입(순환 의존 회피).
+var vendorResolver func(modelName string) (string, bool)
+
+func SetVendorResolver(fn func(modelName string) (string, bool)) {
+	vendorResolver = fn
+}
+
+// GetEffectiveDiscountMultiplier: 모델 할인 > 벤더 할인 > 1.0.
+func GetEffectiveDiscountMultiplier(modelName string) float64 {
+	if mul, ok := GetModelDiscountMultiplier(modelName); ok {
+		return mul
+	}
+	if vendorResolver != nil {
+		if vendor, ok := vendorResolver(modelName); ok {
+			if mul, ok := GetVendorDiscountMultiplier(vendor); ok {
+				return mul
+			}
+		}
+	}
+	return 1
+}

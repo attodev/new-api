@@ -83,6 +83,7 @@ func InvalidatePricingCache() {
 
 	pricingMap = nil
 	vendorsList = nil
+	modelVendorNameCache = nil
 	lastGetPricingTime = time.Time{}
 }
 
@@ -351,4 +352,33 @@ func updatePricing() {
 // GetSupportedEndpointMap
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+func init() {
+	ratio_setting.SetVendorResolver(resolveVendorName)
+}
+
+// modelVendorNameCache: 모델명 -> 벤더명. pricing 캐시에서 파생.
+var modelVendorNameCache map[string]string
+
+func resolveVendorName(modelName string) (string, bool) {
+	if modelVendorNameCache == nil {
+		buildModelVendorNameCache()
+	}
+	name, ok := modelVendorNameCache[modelName]
+	return name, ok && name != ""
+}
+
+func buildModelVendorNameCache() {
+	cache := make(map[string]string)
+	vendorIDToName := make(map[int]string)
+	for _, v := range GetVendors() {
+		vendorIDToName[v.ID] = v.Name
+	}
+	for _, p := range GetPricing() {
+		if name, ok := vendorIDToName[p.VendorID]; ok {
+			cache[p.ModelName] = name
+		}
+	}
+	modelVendorNameCache = cache
 }
