@@ -533,8 +533,10 @@ passkey.not_logged_in: "로그인이 필요합니다"
 
 # 조직 컨트롤러 메시지
 org.root_required: "루트 권한이 필요합니다"
+org.owner_required: "조직 소유자 권한이 필요합니다"
 org.admin_required: "조직 관리자 권한이 필요합니다"
 org.no_fields_to_update: "업데이트할 조직 필드가 없습니다"
+org.no_user_fields_to_update: "업데이트할 사용자 필드가 없습니다"
 org.invalid_start_timestamp: "잘못된 시작 타임스탬프 파라미터입니다"
 org.invalid_end_timestamp: "잘못된 종료 타임스탬프 파라미터입니다"
 org.invalid_preset: "잘못된 프리셋 파라미터입니다"
@@ -542,6 +544,12 @@ org.timestamp_order: "시작 타임스탬프는 종료 타임스탬프보다 이
 org.id_required: "조직 ID가 필요합니다"
 org.subscription_no_fields_to_update: "업데이트할 구독 플랜 필드가 없습니다"
 org.target_permission_denied: "해당 사용자를 관리할 권한이 없습니다"
+org.global_admin_unmanageable: "전역 관리자는 조직 관리자가 관리할 수 없습니다"
+org.cannot_reassign_self: "조직 관리자는 자기 자신을 재배정할 수 없습니다"
+org.invalid_role: "잘못된 조직 역할입니다"
+org.only_owner_can_assign_owner: "소유자 역할은 조직 소유자만 할당할 수 있습니다"
+org.user_not_in_org: "해당 사용자는 내 조직에 속하지 않습니다"
+org.owner_cannot_be_removed: "조직 소유자는 제거할 수 없습니다"
 
 # 이메일 전송 메시지
 email.send_failed: "이메일 전송에 실패했습니다"

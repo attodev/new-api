@@ -557,7 +557,7 @@ func ListAssignableOrganizationUsers(c *gin.Context) {
 		return
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -600,7 +600,7 @@ func GetOrganizationUser(c *gin.Context) {
 		return
 	}
 	if !model.CanManageOrganizationTarget(*actor, *target) {
-		common.ApiError(c, errors.New("organization target permission denied"))
+		common.ApiErrorI18n(c, i18n.MsgOrgTargetPermDenied)
 		return
 	}
 	common.ApiSuccess(c, target)
@@ -613,7 +613,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		return
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -628,7 +628,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		return
 	}
 	if !model.CanManageOrganizationTarget(*actor, *target) {
-		common.ApiError(c, errors.New("organization target permission denied"))
+		common.ApiErrorI18n(c, i18n.MsgOrgTargetPermDenied)
 		return
 	}
 
@@ -662,7 +662,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		updates["remark"] = remark
 	}
 	if len(updates) == 0 {
-		common.ApiError(c, errors.New("no organization user fields to update"))
+		common.ApiErrorI18n(c, i18n.MsgOrgNoUserFieldsToUpdate)
 		return
 	}
 
@@ -683,7 +683,7 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -698,11 +698,11 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 	if target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
+		common.ApiErrorI18n(c, i18n.MsgOrgGlobalAdminUnmanageable)
 		return
 	}
 	if target.Id == actor.Id {
-		common.ApiError(c, errors.New("organization admins cannot reassign themselves"))
+		common.ApiErrorI18n(c, i18n.MsgOrgCannotReassignSelf)
 		return
 	}
 
@@ -712,11 +712,11 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 	if !model.IsValidOrganizationRole(req.OrganizationRole) {
-		common.ApiError(c, errors.New("invalid organization role"))
+		common.ApiErrorI18n(c, i18n.MsgOrgInvalidRole)
 		return
 	}
 	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("only organization owner can assign owner role"))
+		common.ApiErrorI18n(c, i18n.MsgOrgOnlyOwnerCanAssignOwner)
 		return
 	}
 
@@ -740,7 +740,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -755,15 +755,15 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 	if target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
+		common.ApiErrorI18n(c, i18n.MsgOrgGlobalAdminUnmanageable)
 		return
 	}
 	if target.OrganizationId != actor.OrganizationId {
-		common.ApiError(c, errors.New("user does not belong to your organization"))
+		common.ApiErrorI18n(c, i18n.MsgOrgUserNotInOrg)
 		return
 	}
 	if model.HasOrganizationOwnerRole(target.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner cannot be removed"))
+		common.ApiErrorI18n(c, i18n.MsgOrgOwnerCannotBeRemoved)
 		return
 	}
 
@@ -782,7 +782,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 
 func DeleteOrganization(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
-		common.ApiError(c, errors.New("root permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgRootRequired)
 		return
 	}
 

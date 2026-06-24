@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -42,7 +43,7 @@ func getOrganizationWalletActor(c *gin.Context) (*model.User, *model.Organizatio
 		return nil, nil, err
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		return nil, nil, errors.New("organization owner permission required")
+		return nil, nil, errors.New(common.TranslateMessage(c, i18n.MsgOrgOwnerRequired))
 	}
 
 	org := &model.Organization{}
