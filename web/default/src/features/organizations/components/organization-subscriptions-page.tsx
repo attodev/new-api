@@ -81,7 +81,6 @@ type PlanFormState = {
   duration_value: string
   custom_seconds: string
   quota_amount: string
-  enabled: boolean
 }
 
 const emptyForm: PlanFormState = {
@@ -91,7 +90,6 @@ const emptyForm: PlanFormState = {
   duration_value: '1',
   custom_seconds: '0',
   quota_amount: '1',
-  enabled: true,
 }
 
 function toPlanPayload(form: PlanFormState): OrganizationSubscriptionPlanPayload {
@@ -102,11 +100,7 @@ function toPlanPayload(form: PlanFormState): OrganizationSubscriptionPlanPayload
     duration_value: Number(form.duration_value || 1),
     custom_seconds:
       form.duration_unit === 'custom' ? Number(form.custom_seconds || 0) : 0,
-    enabled: form.enabled,
-    upgrade_group: '',
     total_amount: parseQuotaFromDollars(Number(form.quota_amount || 0)),
-    quota_reset_period: 'never',
-    quota_reset_custom_seconds: 0,
   }
 }
 
@@ -118,7 +112,6 @@ function formFromPlan(plan: OrganizationSubscriptionPlan): PlanFormState {
     duration_value: String(plan.duration_value || 1),
     custom_seconds: String(plan.custom_seconds || 0),
     quota_amount: String(quotaUnitsToDollars(plan.total_amount || 0)),
-    enabled: plan.enabled,
   }
 }
 

@@ -318,6 +318,213 @@ func TestCalculateTextQuotaSummaryKeepsPrePRClaudeOpenRouterBilling(t *testing.T
 	require.Equal(t, 798, summary.Quota)
 }
 
+func TestCalculateTextQuotaSummaryTreatsDisjointCacheAsClaudeSemantic(t *testing.T) {
+	// Reproduces a real under-billing case: a downstream new-api relays a Claude
+	// model through an OpenAI-compatible upstream (request_conversion
+	// ["Claude Messages", "OpenAI Compatible"]). The upstream reports
+	// Anthropic-style disjoint counts — prompt_tokens EXCLUDES cache — but omits
+	// usage_semantic="anthropic". Under genuine OpenAI semantics cached tokens are
+	// a subset of prompt_tokens, so cache_read > prompt_tokens is impossible.
+	// The old code subtracted cache from prompt, underflowed to a negative base,
+	// and clamped quota to 1 (severe under-billing).
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RelayFormat:             types.RelayFormatClaude,
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		OriginModelName:         "claude-opus-4-8",
+		PriceData: types.PriceData{
+			ModelRatio:      2.25,
+			CompletionRatio: 5,
+			CacheRatio:      0.1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     19453,
+		CompletionTokens: 1095,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens: 40990,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	// Disjoint counts must be billed Claude-style (no subtraction):
+	// (19453 + 40990*0.1 + 1095*5) * 2.25 = 29027 * 2.25 = 65310.75 => 65311
+	require.True(t, summary.IsClaudeUsageSemantic)
+	require.Equal(t, 19453, summary.PromptTokens)
+	require.Equal(t, 65311, summary.Quota)
+}
+
+func TestCalculateTextQuotaSummaryHonorsChannelUsageSemanticOverride(t *testing.T) {
+	// Subtle case the magnitude heuristic cannot catch: an OpenAI-compatible
+	// upstream reports Anthropic-style disjoint counts (prompt EXCLUDES cache)
+	// with cache < prompt and no usage_semantic tag. Numbers are indistinguishable
+	// from genuine OpenAI usage, so the admin declares the channel's semantic
+	// explicitly via channel settings.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RelayFormat:             types.RelayFormatClaude,
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		OriginModelName:         "claude-opus-4-8",
+		ChannelMeta:             &relaycommon.ChannelMeta{ChannelSetting: dto.ChannelSettings{UsageSemantic: "anthropic"}},
+		PriceData: types.PriceData{
+			ModelRatio:      1,
+			CompletionRatio: 1,
+			CacheRatio:      0.1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     50000,
+		CompletionTokens: 0,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens: 10000, // cache < prompt: heuristic does NOT fire
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	// Forced Claude-style (no subtraction): 50000 + 10000*0.1 = 51000
+	require.True(t, summary.IsClaudeUsageSemantic)
+	require.Equal(t, 51000, summary.Quota)
+}
+
+func TestCalculateTextQuotaSummaryUpstreamSemanticOverridesChannelSetting(t *testing.T) {
+	// An explicit usage_semantic from the upstream must win over the channel
+	// override, so a recent upstream that correctly reports OpenAI-style usage
+	// (cache included in prompt) is still billed with cache subtraction.
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RelayFormat:             types.RelayFormatClaude,
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		OriginModelName:         "claude-opus-4-8",
+		ChannelMeta:             &relaycommon.ChannelMeta{ChannelSetting: dto.ChannelSettings{UsageSemantic: "anthropic"}},
+		PriceData: types.PriceData{
+			ModelRatio:      1,
+			CompletionRatio: 1,
+			CacheRatio:      0.1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     50000, // OpenAI-style: prompt INCLUDES cache
+		CompletionTokens: 0,
+		UsageSemantic:    "openai",
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens: 10000,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	// OpenAI-style (subtract cache): (50000-10000) + 10000*0.1 = 41000
+	require.False(t, summary.IsClaudeUsageSemantic)
+	require.Equal(t, 41000, summary.Quota)
+}
+
+func TestUsageSemanticModelPatternMatchesClaudeButNotGPT(t *testing.T) {
+	// Channel sets usage_semantic="anthropic" with model pattern "claude-*".
+	// A claude-opus-4-8 request should use Anthropic billing (no cache subtraction).
+	// A gpt-4o request on the same channel should use OpenAI billing (cache subtracted).
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	priceData := types.PriceData{
+		ModelRatio:      1,
+		CompletionRatio: 1,
+		CacheRatio:      0.1,
+		GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+	}
+	channelMeta := &relaycommon.ChannelMeta{
+		ChannelSetting: dto.ChannelSettings{
+			UsageSemantic:       "anthropic",
+			UsageSemanticModels: []string{"claude-*"},
+		},
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     50000,
+		CompletionTokens: 0,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens: 10000,
+		},
+	}
+
+	// Claude model: pattern matches → Anthropic billing (no subtraction)
+	claudeInfo := &relaycommon.RelayInfo{
+		OriginModelName:         "claude-opus-4-8",
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta:             channelMeta,
+		PriceData:               priceData,
+		StartTime:               time.Now(),
+	}
+	claudeSummary := calculateTextQuotaSummary(ctx, claudeInfo, usage)
+	require.True(t, claudeSummary.IsClaudeUsageSemantic, "claude-opus-4-8 should be Anthropic-semantic")
+	require.Equal(t, 51000, claudeSummary.Quota) // 50000 + 10000*0.1 = 51000
+
+	// GPT model: pattern does not match → OpenAI billing (cache subtracted)
+	gptInfo := &relaycommon.RelayInfo{
+		OriginModelName:         "gpt-4o",
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta:             channelMeta,
+		PriceData:               priceData,
+		StartTime:               time.Now(),
+	}
+	gptSummary := calculateTextQuotaSummary(ctx, gptInfo, usage)
+	require.False(t, gptSummary.IsClaudeUsageSemantic, "gpt-4o should be OpenAI-semantic")
+	require.Equal(t, 41000, gptSummary.Quota) // (50000-10000) + 10000*0.1 = 41000
+}
+
+func TestUsageSemanticEmptyModelPatternsAppliesToAll(t *testing.T) {
+	// Empty UsageSemanticModels = apply override to ALL models (backward compat).
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName:         "gpt-4o",
+		FinalRequestRelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelSetting: dto.ChannelSettings{
+				UsageSemantic:       "anthropic",
+				UsageSemanticModels: nil, // empty → all models
+			},
+		},
+		PriceData: types.PriceData{
+			ModelRatio:      1,
+			CompletionRatio: 1,
+			CacheRatio:      0.1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+	usage := &dto.Usage{
+		PromptTokens: 50000,
+		PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 10000},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	require.True(t, summary.IsClaudeUsageSemantic, "empty patterns should apply override to all models")
+	require.Equal(t, 51000, summary.Quota)
+}
+
 func TestComposeTieredTextQuotaKeepsToolCallSurcharges(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()

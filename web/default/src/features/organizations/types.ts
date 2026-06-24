@@ -232,10 +232,6 @@ export interface OrganizationSubscriptionPlanPayload {
   duration_unit: OrganizationSubscriptionDurationUnit
   duration_value: number
   custom_seconds?: number
-  enabled?: boolean
   sort_order?: number
-  upgrade_group?: string
   total_amount: number
-  quota_reset_period: OrganizationSubscriptionResetPeriod
-  quota_reset_custom_seconds?: number
 }

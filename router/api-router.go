@@ -180,6 +180,7 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
 			organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)
 			organizationRoute.PUT("/users/:id/membership", controller.AssignOrganizationUser)
+			organizationRoute.DELETE("/users/:id/membership", controller.RemoveOrganizationUserMembership)
 			organizationRoute.GET("/subscription/self", controller.GetMyOrganizationSubscription)
 			organizationRoute.GET("/subscription/plans", controller.ListOrganizationSubscriptionPlans)
 			organizationRoute.POST("/subscription/plans", controller.CreateOrganizationSubscriptionPlan)

@@ -556,8 +556,8 @@ func ListAssignableOrganizationUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner permission required"))
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
 		return
 	}
 
@@ -682,8 +682,8 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner permission required"))
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
 		return
 	}
 
@@ -698,11 +698,11 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 	if target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("global admin users cannot be managed by organization owners"))
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
 		return
 	}
 	if target.Id == actor.Id {
-		common.ApiError(c, errors.New("organization owners cannot reassign themselves"))
+		common.ApiError(c, errors.New("organization admins cannot reassign themselves"))
 		return
 	}
 
@@ -715,6 +715,10 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiError(c, errors.New("invalid organization role"))
 		return
 	}
+	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("only organization owner can assign owner role"))
+		return
+	}
 
 	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
 		"organization_id":   actor.OrganizationId,
@@ -725,6 +729,53 @@ func AssignOrganizationUser(c *gin.Context) {
 	}
 	if err := model.InvalidateUserCache(target.Id); err != nil {
 		common.SysLog("failed to invalidate organization membership cache: " + err.Error())
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+func RemoveOrganizationUserMembership(c *gin.Context) {
+	actor, err := getOrganizationActor(c)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
+		return
+	}
+
+	targetId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	target, err := model.GetUserById(targetId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if target.Role >= common.RoleAdminUser {
+		common.ApiError(c, errors.New("global admin users cannot be managed by organization admins"))
+		return
+	}
+	if target.OrganizationId != actor.OrganizationId {
+		common.ApiError(c, errors.New("user does not belong to your organization"))
+		return
+	}
+	if model.HasOrganizationOwnerRole(target.OrganizationRole) {
+		common.ApiError(c, errors.New("organization owner cannot be removed"))
+		return
+	}
+
+	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
+		"organization_id":   0,
+		"organization_role": "",
+	}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.InvalidateUserCache(target.Id); err != nil {
+		common.SysLog("failed to invalidate cache after membership removal: " + err.Error())
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }

@@ -29,7 +29,10 @@ import {
   ShieldCheck,
   UserCog,
   Info,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { formatLogQuota, formatTokens, formatUseTime } from '@/lib/format'
@@ -133,6 +136,194 @@ function DetailSection(props: {
 function formatRatio(ratio: number | undefined): string {
   if (ratio == null) return '-'
   return ratio.toFixed(4)
+}
+
+/**
+ * Build a human-readable billing formula for per-token logs.
+ * Returns an array of formula lines (one per billing component).
+ */
+function buildBillingFormula(
+  log: { prompt_tokens?: number; completion_tokens?: number; quota: number },
+  other: LogOtherData,
+  fmtAmount: (usd: number) => string
+): string[] | null {
+  if (other.billing_mode === 'tiered_expr') return null
+
+  const isPerCall =
+    other.model_price != null &&
+    other.model_price >= 0 &&
+    other.model_price !== -1
+
+  const userGR = other.user_group_ratio
+  const isUserGR = userGR != null && Number.isFinite(userGR) && userGR !== -1
+  const groupRatio = isUserGR
+    ? (userGR as number)
+    : (other.group_ratio ?? 1)
+  const ratioLabel = isUserGR ? 'User Ratio' : 'Group Ratio'
+
+  if (isPerCall) {
+    const price = other.model_price as number
+    const total = price * groupRatio
+    return [
+      `${fmtAmount(price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(total)}`,
+    ]
+  }
+
+  if (other.model_ratio == null) return null
+
+  const basePrice = other.model_ratio * 2.0
+  const completionRatio = other.completion_ratio ?? 0
+  const cacheRatio = other.cache_ratio ?? 1
+  const imageRatio = other.image_ratio ?? 1
+  const audioInputSeperatePrice = other.audio_input_seperate_price ?? false
+
+  const inputTokens = log.prompt_tokens ?? 0
+  const completionTokens = log.completion_tokens ?? 0
+  const cacheReadTokens = other.cache_tokens ?? 0
+  const cacheWrite = other.cache_creation_tokens ?? 0
+  const cacheWrite5m = other.cache_creation_tokens_5m ?? 0
+  const cacheWrite1h = other.cache_creation_tokens_1h ?? 0
+  const audioInputTokens = other.audio_input_token_count ?? 0
+  const imageTokens =
+    other.image && other.image_output ? other.image_output : 0
+
+  // Claude API reports input_tokens as pure non-cached text only (cache is separate).
+  // So for Claude-semantic channels, prompt_tokens already excludes cache — don't subtract again.
+  // For OpenAI-semantic channels, prompt_tokens includes cache and needs subtraction.
+  const isClaudeSemantic = other.claude === true
+  const textInput = isClaudeSemantic
+    ? Math.max(inputTokens - (audioInputSeperatePrice ? audioInputTokens : 0) - imageTokens, 0)
+    : Math.max(inputTokens - cacheReadTokens - (audioInputSeperatePrice ? audioInputTokens : 0) - imageTokens, 0)
+  const outputPrice = basePrice * completionRatio
+
+  const lines: string[] = []
+
+  if (textInput > 0) {
+    const amount = (textInput / 1_000_000) * basePrice * groupRatio
+    lines.push(
+      `Input: ${textInput.toLocaleString()} / 1M × ${fmtAmount(basePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (cacheReadTokens > 0) {
+    const cachePrice = basePrice * cacheRatio
+    const amount = (cacheReadTokens / 1_000_000) * cachePrice * groupRatio
+    lines.push(
+      `Cache Read: ${cacheReadTokens.toLocaleString()} / 1M × ${fmtAmount(cachePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (cacheWrite > 0 && other.cache_creation_ratio != null) {
+    const writePrice = basePrice * other.cache_creation_ratio
+    const amount = (cacheWrite / 1_000_000) * writePrice * groupRatio
+    lines.push(
+      `Cache Write: ${cacheWrite.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (cacheWrite5m > 0 && other.cache_creation_ratio_5m != null) {
+    const writePrice = basePrice * other.cache_creation_ratio_5m
+    const amount = (cacheWrite5m / 1_000_000) * writePrice * groupRatio
+    lines.push(
+      `Cache Write (5m): ${cacheWrite5m.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (cacheWrite1h > 0 && other.cache_creation_ratio_1h != null) {
+    const writePrice = basePrice * other.cache_creation_ratio_1h
+    const amount = (cacheWrite1h / 1_000_000) * writePrice * groupRatio
+    lines.push(
+      `Cache Write (1h): ${cacheWrite1h.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (imageTokens > 0) {
+    const imgPrice = basePrice * imageRatio
+    const amount = (imageTokens / 1_000_000) * imgPrice * groupRatio
+    lines.push(
+      `Image Input: ${imageTokens.toLocaleString()} / 1M × ${fmtAmount(imgPrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (audioInputSeperatePrice && audioInputTokens > 0 && other.audio_input_price != null) {
+    const amount = (audioInputTokens / 1_000_000) * other.audio_input_price * groupRatio
+    lines.push(
+      `Audio Input: ${audioInputTokens.toLocaleString()} / 1M × ${fmtAmount(other.audio_input_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (completionTokens > 0) {
+    const amount = (completionTokens / 1_000_000) * outputPrice * groupRatio
+    lines.push(
+      `Output: ${completionTokens.toLocaleString()} / 1M × ${fmtAmount(outputPrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (other.web_search && (other.web_search_call_count ?? 0) > 0 && other.web_search_price) {
+    const count = other.web_search_call_count as number
+    const amount = (count / 1000) * other.web_search_price * groupRatio
+    lines.push(
+      `Web Search: ${count} / 1K × ${fmtAmount(other.web_search_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (other.file_search && (other.file_search_call_count ?? 0) > 0 && other.file_search_price) {
+    const count = other.file_search_call_count as number
+    const amount = (count / 1000) * other.file_search_price * groupRatio
+    lines.push(
+      `File Search: ${count} / 1K × ${fmtAmount(other.file_search_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (other.image_generation_call && other.image_generation_call_price) {
+    const amount = other.image_generation_call_price * groupRatio
+    lines.push(
+      `Image Generation: 1 × ${fmtAmount(other.image_generation_call_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+    )
+  }
+
+  if (lines.length === 0) return null
+  return lines
+}
+
+function BillingFormula(props: {
+  log: { prompt_tokens?: number; completion_tokens?: number; quota: number }
+  other: LogOtherData
+  fmtAmount: (usd: number) => string
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const lines = buildBillingFormula(props.log, props.other, props.fmtAmount)
+  if (!lines || lines.length === 0) return null
+
+  return (
+    <div className='mt-1.5 min-w-0'>
+      <button
+        type='button'
+        className='text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors'
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? (
+          <ChevronDown className='size-3' />
+        ) : (
+          <ChevronRight className='size-3' />
+        )}
+        {t('Show formula')}
+      </button>
+      {open && (
+        <div className='bg-muted/40 mt-1 min-w-0 rounded border p-2'>
+          {lines.map((line, idx) => (
+            <p
+              key={idx}
+              className='font-mono text-[11px] leading-relaxed break-all'
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function BillingBreakdown(props: {
@@ -321,6 +512,7 @@ function BillingBreakdown(props: {
       {rows.map((row, idx) => (
         <DetailRow key={idx} label={row.label} value={row.value} mono />
       ))}
+      <BillingFormula log={log} other={other} fmtAmount={fmtPrice} />
     </DetailSection>
   )
 }

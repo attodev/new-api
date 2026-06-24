@@ -21,7 +21,6 @@ import { Link } from '@tanstack/react-router'
 import {
   BarChart3,
   Building2,
-  Power,
   RefreshCw,
   Save,
   UserPlus,
@@ -38,6 +37,7 @@ import {
 } from '@/lib/format'
 import {
   ORGANIZATION_ROLE,
+  hasOrganizationAdminRole,
   hasOrganizationOwnerRole,
 } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
@@ -74,6 +74,7 @@ import {
   getOrganizationUsers,
   getOrganizationUserSubscriptions,
   getOrganizations,
+  removeOrganizationUserMembership,
   updateOrganization,
   updateOrganizationUser,
 } from '../api'
@@ -91,12 +92,22 @@ import type {
   OrganizationUserSubscriptionRecord,
 } from '../types'
 
+type PendingChange =
+  | { type: 'quota'; userId: number; newQuota: number; originalQuota: number }
+  | { type: 'status'; userId: number; newStatus: number }
+  | { type: 'remove'; userId: number }
+  | { type: 'role'; userId: number; newRole: OrganizationRole }
+
 const USER_STATUS_ENABLED = 1
 const USER_STATUS_DISABLED = 2
 const ORGANIZATION_ROLES: OrganizationRole[] = [
   ORGANIZATION_ROLE.MEMBER,
   ORGANIZATION_ROLE.ADMIN,
   ORGANIZATION_ROLE.OWNER,
+]
+const ASSIGNABLE_ROLES: OrganizationRole[] = [
+  ORGANIZATION_ROLE.MEMBER,
+  ORGANIZATION_ROLE.ADMIN,
 ]
 const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 
@@ -117,7 +128,9 @@ export function OrganizationUsersTable() {
   const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadingCandidates, setLoadingCandidates] = useState(false)
-  const [savingId, setSavingId] = useState<number | null>(null)
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set())
+  const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [organizationName, setOrganizationName] = useState('')
@@ -126,26 +139,42 @@ export function OrganizationUsersTable() {
   const [editingOrganization, setEditingOrganization] =
     useState<Organization | null>(null)
   const [ownerUserId, setOwnerUserId] = useState('')
-  const [assignUserId, setAssignUserId] = useState('')
-  const [assignRole, setAssignRole] = useState<OrganizationRole>(
-    ORGANIZATION_ROLE.MEMBER
-  )
+  const [assignUsername, setAssignUsername] = useState('')
 
   const isRoot = (currentUser?.role ?? 0) >= ROLE.SUPER_ADMIN
   const isOrganizationOwner = hasOrganizationOwnerRole(
     currentUser?.organization_role
   )
+  const isOrganizationAdmin = hasOrganizationAdminRole(
+    currentUser?.organization_role
+  )
   const { meta: currencyMeta } = getCurrencyDisplay()
   const currencyLabel = getCurrencyLabel()
   const tokensOnly = currencyMeta.kind === 'tokens'
-  const canManageOrganizationUsers =
-    Boolean(currentUser?.organization_id) || isOrganizationOwner
+  const canManageOrganizationUsers = isOrganizationAdmin || isRoot
   const [currentPage, setCurrentPage] = useState(1)
   const [totalUsers, setTotalUsers] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [orderBy, setOrderBy] = useState('id')
   const [orderDir, setOrderDir] = useState<'asc' | 'desc'>('asc')
   const [keywordInput, setKeywordInput] = useState('')
+
+  function setPendingChange(change: PendingChange) {
+    setPendingChanges(prev => {
+      const filtered = prev.filter(c => {
+        if (c.userId !== change.userId) return true
+        if (c.type !== change.type) return true
+        return false
+      })
+      return [...filtered, change]
+    })
+  }
+
+  function removePendingChange(userId: number, type: PendingChange['type']) {
+    setPendingChanges(prev =>
+      prev.filter(c => !(c.userId === userId && c.type === type))
+    )
+  }
 
   async function loadUsers() {
     if (!canManageOrganizationUsers) {
@@ -203,7 +232,7 @@ export function OrganizationUsersTable() {
   }
 
   async function loadOrganizationProfile() {
-    if (!isOrganizationOwner && !currentUser?.organization_role) {
+    if (!isOrganizationAdmin && !currentUser?.organization_role) {
       setOrganizationProfile(null)
       return
     }
@@ -218,7 +247,7 @@ export function OrganizationUsersTable() {
   }
 
   async function loadCandidateUsers() {
-    if (!isRoot && !isOrganizationOwner) return
+    if (!isRoot && !isOrganizationAdmin) return
     setLoadingCandidates(true)
     try {
       const res = isRoot
@@ -231,10 +260,6 @@ export function OrganizationUsersTable() {
           return true
         })
         setCandidateUsers(items)
-        if (items.length > 0) {
-          const firstId = String(items[0].id)
-          if (isOrganizationOwner && !assignUserId) setAssignUserId(firstId)
-        }
       } else {
         toast.error(res.message || t('Failed to load users'))
       }
@@ -265,7 +290,7 @@ export function OrganizationUsersTable() {
 
   useEffect(() => {
     void loadCandidateUsers()
-  }, [isRoot, isOrganizationOwner])
+  }, [isRoot, isOrganizationAdmin])
 
   async function handleCreateOrganization() {
     const parsedOwnerUserId = Number(ownerUserId)
@@ -299,19 +324,25 @@ export function OrganizationUsersTable() {
   }
 
   async function handleAssignUser() {
-    const parsedUserId = Number(assignUserId)
-    if (!Number.isInteger(parsedUserId)) {
-      toast.error(t('User is required'))
+    const username = assignUsername.trim()
+    if (!username) {
+      toast.error(t('Username is required'))
       return
     }
 
     setAssigning(true)
     try {
-      const res = await assignOrganizationUser(parsedUserId, {
-        organization_role: assignRole,
+      const matched = candidateUsers.find(u => u.username === username)
+      if (!matched) {
+        toast.error(t('User not found'))
+        return
+      }
+      const res = await assignOrganizationUser(matched.id, {
+        organization_role: ORGANIZATION_ROLE.MEMBER,
       })
       if (res.success) {
         toast.success(t('Organization member assigned'))
+        setAssignUsername('')
         await Promise.all([loadUsers(), loadCandidateUsers()])
       } else {
         toast.error(res.message || t('Failed to assign organization member'))
@@ -321,43 +352,8 @@ export function OrganizationUsersTable() {
     }
   }
 
-  async function saveUser(
-    user: OrganizationUser,
-    payload: Parameters<typeof updateOrganizationUser>[1]
-  ) {
-    setSavingId(user.id)
-    try {
-      const res = await updateOrganizationUser(user.id, payload)
-      if (res.success) {
-        toast.success(t('Organization user updated'))
-        await loadUsers()
-      } else {
-        toast.error(res.message || t('Failed to update organization user'))
-      }
-    } finally {
-      setSavingId(null)
-    }
-  }
-
-  async function saveQuota(user: OrganizationUser, quota: number) {
-    if (
-      shouldDisableQuotaForOrganizationSubscription(
-        user.id,
-        subscriptionRecords
-      )
-    )
-      return
-    if (!Number.isFinite(quota) || quota === user.quota) return
-    await saveUser(user, { quota })
-  }
-
-  async function saveDisplayQuota(user: OrganizationUser, amount: string) {
-    if (!amount.trim()) return
-
-    const value = Number(amount)
-    if (!Number.isFinite(value)) return
-
-    await saveQuota(user, parseQuotaFromDollars(value))
+  function handleRoleChange(userId: number, newRole: OrganizationRole) {
+    setPendingChange({ type: 'role', userId, newRole })
   }
 
   function handleStartEditOrganization(organization: Organization) {
@@ -436,12 +432,116 @@ export function OrganizationUsersTable() {
     }
   }
 
-  async function toggleStatus(user: OrganizationUser) {
-    await saveUser(user, {
-      status:
-        user.status === USER_STATUS_ENABLED
-          ? USER_STATUS_DISABLED
-          : USER_STATUS_ENABLED,
+  function handleQuotaChange(user: OrganizationUser, displayValue: string) {
+    const value = Number(displayValue)
+    if (!Number.isFinite(value)) return
+    const newQuota = parseQuotaFromDollars(value)
+    if (newQuota === user.quota) {
+      removePendingChange(user.id, 'quota')
+      return
+    }
+    setPendingChange({ type: 'quota', userId: user.id, newQuota, originalQuota: user.quota })
+  }
+
+  function handleQuotaAdd(user: OrganizationUser, amount: number) {
+    const quotaChange = pendingChanges.find(c => c.type === 'quota' && c.userId === user.id) as
+      | { type: 'quota'; userId: number; newQuota: number; originalQuota: number }
+      | undefined
+    const base = quotaChange ? quotaChange.newQuota : user.quota
+    const newQuota = base + parseQuotaFromDollars(amount)
+    setPendingChange({ type: 'quota', userId: user.id, newQuota, originalQuota: user.quota })
+  }
+
+  function handleMarkRemove(userId: number) {
+    setPendingChanges(prev => [
+      ...prev.filter(c => c.userId !== userId),
+      { type: 'remove', userId },
+    ])
+    setSelectedUserIds(prev => {
+      const next = new Set(prev)
+      next.delete(userId)
+      return next
+    })
+  }
+
+  function handleCancelPending() {
+    setPendingChanges([])
+    setSelectedUserIds(new Set())
+  }
+
+  async function handleSavePending() {
+    if (pendingChanges.length === 0) return
+    setSaving(true)
+    const errors: string[] = []
+    await Promise.all(
+      pendingChanges.map(async change => {
+        try {
+          if (change.type === 'quota') {
+            const res = await updateOrganizationUser(change.userId, { quota: change.newQuota })
+            if (!res.success) errors.push(res.message ?? t('Failed to update quota'))
+          } else if (change.type === 'status') {
+            const res = await updateOrganizationUser(change.userId, { status: change.newStatus })
+            if (!res.success) errors.push(res.message ?? t('Failed to update status'))
+          } else if (change.type === 'remove') {
+            const res = await removeOrganizationUserMembership(change.userId)
+            if (!res.success) errors.push(res.message ?? t('Failed to remove member'))
+          } else if (change.type === 'role') {
+            const res = await assignOrganizationUser(change.userId, { organization_role: change.newRole })
+            if (!res.success) errors.push(res.message ?? t('Failed to update role'))
+          }
+        } catch (e: unknown) {
+          errors.push(e instanceof Error ? e.message : t('Unknown error'))
+        }
+      })
+    )
+    setSaving(false)
+    if (errors.length > 0) {
+      errors.forEach(msg => toast.error(msg))
+    } else {
+      toast.success(t('Changes saved'))
+    }
+    setPendingChanges([])
+    setSelectedUserIds(new Set())
+    await loadUsers()
+  }
+
+  function handleBulkDisable() {
+    selectedUserIds.forEach(userId => {
+      const user = users.find(u => u.id === userId)
+      if (!user) return
+      const statusChange = pendingChanges.find(c => c.type === 'status' && c.userId === userId) as
+        | { type: 'status'; userId: number; newStatus: number }
+        | undefined
+      const currentStatus = statusChange ? statusChange.newStatus : user.status
+      if (currentStatus === USER_STATUS_ENABLED) {
+        setPendingChange({ type: 'status', userId, newStatus: USER_STATUS_DISABLED })
+      }
+    })
+  }
+
+  function handleBulkRemove() {
+    selectedUserIds.forEach(userId => {
+      handleMarkRemove(userId)
+    })
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      const selectableIds = users
+        .filter(u => u.organization_role !== ORGANIZATION_ROLE.OWNER)
+        .map(u => u.id)
+      setSelectedUserIds(new Set(selectableIds))
+    } else {
+      setSelectedUserIds(new Set())
+    }
+  }
+
+  function handleSelectUser(userId: number, checked: boolean) {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev)
+      if (checked) next.add(userId)
+      else next.delete(userId)
+      return next
     })
   }
 
@@ -470,7 +570,7 @@ export function OrganizationUsersTable() {
       <div className='flex items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold'>{t('Organization Users')}</h1>
         <div className='flex items-center gap-2'>
-          {isOrganizationOwner && (
+          {isOrganizationAdmin && (
             <>
               <Button
                 variant='outline'
@@ -494,7 +594,7 @@ export function OrganizationUsersTable() {
         </div>
       </div>
 
-      {(isRoot || isOrganizationOwner) && (
+      {(isRoot || isOrganizationAdmin) && (
         <div className='grid gap-3 lg:grid-cols-2'>
           {isRoot && (
             <div className='space-y-3 rounded-md border p-3'>
@@ -585,66 +685,29 @@ export function OrganizationUsersTable() {
             </div>
           )}
 
-          {isOrganizationOwner && (
+          {isOrganizationAdmin && (
             <div className='space-y-3 rounded-md border p-3'>
               <div className='flex items-center gap-2 text-sm font-medium'>
                 <UserPlus className='size-4' />
                 {t('Assign Organization Member')}
               </div>
               <div className='flex flex-wrap items-center gap-2'>
-                <Select
-                  items={candidateUsers.map((user) => ({
-                    value: String(user.id),
-                    label: user.username,
-                  }))}
-                  value={assignUserId}
-                  onValueChange={(value) =>
-                    value !== null && setAssignUserId(value)
-                  }
-                  disabled={loadingCandidates || candidateUsers.length === 0}
-                >
-                  <SelectTrigger className='min-w-56 flex-1'>
-                    <SelectValue placeholder={t('User')} />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {candidateUsers.map((user) => (
-                        <SelectItem key={user.id} value={String(user.id)}>
-                          {user.username} #{user.id}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Select
-                  items={ORGANIZATION_ROLES.map((role) => ({
-                    value: role,
-                    label: role,
-                  }))}
-                  value={assignRole}
-                  onValueChange={(value) =>
-                    value !== null && setAssignRole(value as OrganizationRole)
-                  }
-                >
-                  <SelectTrigger className='w-32'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectGroup>
-                      {ORGANIZATION_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {t(role)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Input
+                  className='min-w-56 flex-1'
+                  placeholder={t('Username')}
+                  value={assignUsername}
+                  onChange={(e) => setAssignUsername(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleAssignUser()
+                  }}
+                  disabled={assigning}
+                />
                 <Button
                   onClick={() => void handleAssignUser()}
-                  disabled={assigning || !assignUserId}
+                  disabled={assigning || !assignUsername.trim()}
                 >
                   <UserPlus />
-                  {t('Assign')}
+                  추가
                 </Button>
               </div>
             </div>
@@ -691,7 +754,7 @@ export function OrganizationUsersTable() {
                 <BarChart3 />
                 {t('Usage dashboard')}
               </Button>
-              {isOrganizationOwner && (
+              {isOrganizationAdmin && (
                 <Button
                   variant='outline'
                   size='sm'
@@ -771,21 +834,63 @@ export function OrganizationUsersTable() {
         </div>
       )}
 
-      <div className='flex items-center gap-2'>
-        <Input
-          value={keywordInput}
-          onChange={(e) => setKeywordInput(e.target.value)}
-          placeholder={t('Search by username or display name')}
-          className='max-w-xs'
-        />
-        {keywordInput && (
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={() => { setKeywordInput(''); setKeyword(''); setCurrentPage(1) }}
-          >
-            ✕
-          </Button>
+      {pendingChanges.length > 0 && (
+        <div className='flex items-center justify-between rounded-md border border-border bg-muted/60 px-4 py-2 text-sm'>
+          <span className='text-foreground'>
+            {[
+              pendingChanges.filter(c => c.type === 'quota').length > 0 &&
+                t('{{count}} quota changes', { count: pendingChanges.filter(c => c.type === 'quota').length }),
+              pendingChanges.filter(c => c.type === 'status').length > 0 &&
+                t('{{count}} status changes', { count: pendingChanges.filter(c => c.type === 'status').length }),
+              pendingChanges.filter(c => c.type === 'remove').length > 0 &&
+                t('{{count}} pending removal', { count: pendingChanges.filter(c => c.type === 'remove').length }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          <div className='flex gap-2'>
+            <Button size='sm' onClick={() => void handleSavePending()} disabled={saving}>
+              {t('Save')}
+            </Button>
+            <Button size='sm' variant='outline' onClick={handleCancelPending} disabled={saving}>
+              {t('Cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='flex items-center gap-2'>
+          <Input
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            placeholder={t('Search by username or display name')}
+            className='max-w-xs'
+          />
+          {keywordInput && (
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => { setKeywordInput(''); setKeyword(''); setCurrentPage(1) }}
+            >
+              ✕
+            </Button>
+          )}
+        </div>
+        {selectedUserIds.size > 0 && (
+          <div className='flex items-center gap-2 text-sm'>
+            <span className='text-muted-foreground'>
+              {t('{{count}} selected', { count: selectedUserIds.size })}
+            </span>
+            <div className='h-4 w-px bg-border' />
+            <Button size='sm' variant='outline' onClick={handleBulkDisable}>
+              {t('Disable')}
+            </Button>
+            {isOrganizationAdmin && (
+              <Button size='sm' variant='outline' onClick={handleBulkRemove} className='border-destructive text-destructive'>
+                {t('조직에서 제거')}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -793,6 +898,19 @@ export function OrganizationUsersTable() {
         <table className='w-full min-w-[720px] text-sm'>
           <thead className='bg-muted/50'>
             <tr>
+              <th className='w-10 px-3 py-2'>
+                <input
+                  type='checkbox'
+                  checked={
+                    users.filter(u => u.organization_role !== ORGANIZATION_ROLE.OWNER).length > 0 &&
+                    users
+                      .filter(u => u.organization_role !== ORGANIZATION_ROLE.OWNER)
+                      .every(u => selectedUserIds.has(u.id))
+                  }
+                  onChange={e => handleSelectAll(e.target.checked)}
+                  className='cursor-pointer'
+                />
+              </th>
               <th
                 className='px-3 py-2 text-left font-medium cursor-pointer select-none'
                 onClick={() => handleSort('username')}
@@ -817,34 +935,90 @@ export function OrganizationUsersTable() {
               >
                 {t('Quota')}<SortIcon col='quota' />
               </th>
-              <th className='px-3 py-2 text-right font-medium'>
-                {t('Actions')}
-              </th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => {
+              const isOwner = user.organization_role === ORGANIZATION_ROLE.OWNER
+              const pendingRemove = pendingChanges.find(c => c.type === 'remove' && c.userId === user.id)
+              const pendingStatus = pendingChanges.find(c => c.type === 'status' && c.userId === user.id) as
+                | { type: 'status'; userId: number; newStatus: number } | undefined
+              const pendingQuota = pendingChanges.find(c => c.type === 'quota' && c.userId === user.id) as
+                | { type: 'quota'; userId: number; newQuota: number; originalQuota: number } | undefined
+              const pendingRole = pendingChanges.find(c => c.type === 'role' && c.userId === user.id) as
+                | { type: 'role'; userId: number; newRole: OrganizationRole } | undefined
               const quotaControlState = getOrganizationQuotaControlState(
                 user.id,
                 user.quota,
                 subscriptionRecords
               )
               const hasActivePlan = quotaControlState.hasActivePlan
+              const effectiveStatus = pendingStatus ? pendingStatus.newStatus : user.status
+
               return (
                 <tr key={user.id} className='border-t'>
                   <td className='px-3 py-2'>
-                    <div className='font-medium'>{user.username}</div>
+                    <input
+                      type='checkbox'
+                      disabled={isOwner}
+                      checked={!isOwner && selectedUserIds.has(user.id)}
+                      onChange={e => !isOwner && handleSelectUser(user.id, e.target.checked)}
+                      className={isOwner ? 'cursor-not-allowed opacity-30' : 'cursor-pointer'}
+                      title={isOwner ? t('Owner cannot be modified') : undefined}
+                    />
+                  </td>
+                  <td className='px-3 py-2'>
+                    <div className={`font-medium${pendingRemove ? ' line-through text-muted-foreground' : ''}`}>
+                      {user.username}
+                    </div>
                     {user.display_name && (
-                      <div className='text-muted-foreground text-xs'>
-                        {user.display_name}
+                      <div className='text-muted-foreground text-xs'>{user.display_name}</div>
+                    )}
+                    {pendingRemove && (
+                      <div className='text-xs text-destructive'>{t('Pending removal')}</div>
+                    )}
+                    {!pendingRemove && pendingStatus && (
+                      <div className='text-xs text-orange-600'>
+                        {pendingStatus.newStatus === USER_STATUS_DISABLED
+                          ? t('Pending disable')
+                          : t('Pending enable')}
                       </div>
                     )}
+                    {!pendingRemove && !pendingStatus && pendingQuota && (
+                      <div className='text-xs text-amber-700'>{t('Quota modified')}</div>
+                    )}
                   </td>
-                  <td className='px-3 py-2'>{user.organization_role}</td>
                   <td className='px-3 py-2'>
-                    {user.status === USER_STATUS_ENABLED
-                      ? t('Enabled')
-                      : t('Disabled')}
+                    {isOwner || pendingRemove || !isOrganizationOwner ? (
+                      <span className={pendingRemove ? 'text-muted-foreground line-through' : ''}>
+                        {user.organization_role}
+                      </span>
+                    ) : (
+                      <Select
+                        items={ASSIGNABLE_ROLES.map(r => ({ value: r, label: r }))}
+                        value={pendingRole ? pendingRole.newRole : user.organization_role}
+                        onValueChange={value => {
+                          if (value !== null) handleRoleChange(user.id, value as OrganizationRole)
+                        }}
+                      >
+                        <SelectTrigger className='h-7 w-28 text-xs'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectGroup>
+                            {ASSIGNABLE_ROLES.map(r => (
+                              <SelectItem key={r} value={r}>{t(r)}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {pendingRole && !pendingRemove && (
+                      <div className='text-xs text-amber-700'>{t('Role modified')}</div>
+                    )}
+                  </td>
+                  <td className={`px-3 py-2${pendingRemove ? ' text-muted-foreground line-through' : ''}`}>
+                    {effectiveStatus === USER_STATUS_ENABLED ? t('Enabled') : t('Disabled')}
                   </td>
                   <td className='px-3 py-2'>
                     <div className='min-w-64 space-y-2'>
@@ -856,35 +1030,31 @@ export function OrganizationUsersTable() {
                       </div>
                       <div className='flex items-center gap-2'>
                         <Input
-                          key={`${user.id}-${user.quota}-${hasActivePlan}`}
-                          className='w-32'
+                          key={`${user.id}-${user.quota}-${hasActivePlan}-${pendingQuota?.newQuota ?? ''}`}
+                          className={`w-32${pendingQuota ? ' border-amber-500' : ''}`}
                           type='number'
                           step={tokensOnly ? 1 : 0.01}
                           min={0}
-                          defaultValue={
-                            quotaUnitsToDollars(
-                              quotaControlState.displayQuota
-                            )
-                          }
+                          defaultValue={quotaUnitsToDollars(
+                            pendingQuota ? pendingQuota.newQuota : quotaControlState.displayQuota
+                          )}
                           placeholder={t('Quota amount')}
-                          disabled={
-                            savingId === user.id || quotaControlState.disabled
-                          }
+                          disabled={!!pendingRemove || quotaControlState.disabled}
                           onBlur={(event) => {
-                            void saveDisplayQuota(
-                              user,
-                              event.currentTarget.value
-                            )
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.currentTarget.blur()
+                            if (!shouldDisableQuotaForOrganizationSubscription(user.id, subscriptionRecords)) {
+                              handleQuotaChange(user, event.currentTarget.value)
                             }
                           }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') event.currentTarget.blur()
+                          }}
                         />
-                        <span className='text-muted-foreground text-xs'>
-                          {currencyLabel}
-                        </span>
+                        <span className='text-muted-foreground text-xs'>{currencyLabel}</span>
+                        {pendingQuota && (
+                          <span className='text-muted-foreground text-xs'>
+                            ({t('was')} {quotaUnitsToDollars(pendingQuota.originalQuota).toFixed(2)})
+                          </span>
+                        )}
                       </div>
                       {!tokensOnly && (
                         <div className='flex flex-wrap gap-1'>
@@ -894,36 +1064,15 @@ export function OrganizationUsersTable() {
                               type='button'
                               variant='outline'
                               size='sm'
-                              disabled={
-                                savingId === user.id ||
-                                quotaControlState.disabled
-                              }
-                              onClick={() =>
-                                void saveQuota(
-                                  user,
-                                  parseQuotaFromDollars(amount)
-                                )
-                              }
+                              disabled={!!pendingRemove || quotaControlState.disabled}
+                              onClick={() => handleQuotaAdd(user, amount)}
                             >
-                              {formatQuota(parseQuotaFromDollars(amount))}
+                              +{formatQuota(parseQuotaFromDollars(amount))}
                             </Button>
                           ))}
                         </div>
                       )}
                     </div>
-                  </td>
-                  <td className='px-3 py-2 text-right'>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      onClick={() => void toggleStatus(user)}
-                      disabled={savingId === user.id}
-                    >
-                      <Power />
-                      {user.status === USER_STATUS_ENABLED
-                        ? t('Disable')
-                        : t('Enable')}
-                    </Button>
                   </td>
                 </tr>
               )
