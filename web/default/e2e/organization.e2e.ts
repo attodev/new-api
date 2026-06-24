@@ -142,9 +142,9 @@ async function createOrganizationViaUi(
 ) {
   await openAuthenticatedPage(page, '/organization')
   await page.getByPlaceholder('Organization Name').fill(options.name)
-  // Owner selector is a Base UI Select; its trigger shows the "Owner User"
-  // placeholder until a user is picked.
-  await page.getByText('Owner User', { exact: true }).click()
+  // Owner selector is a Base UI Select; root sees exactly one combobox here
+  // (the Create Organization form). Open it and pick the owner by "username #id".
+  await page.getByRole('combobox').click()
   await page
     .getByRole('option', {
       name: new RegExp(`^${options.ownerUsername}\\s+#\\d+$`),
@@ -168,6 +168,7 @@ async function promoteMemberToAdminViaUi(page: Page, username: string) {
   await expect(row).toBeVisible()
   // Only the owner sees the editable Role select in the members table.
   await row.getByRole('combobox').click()
+  // Assumes the English locale: t('admin') falls back to the literal key.
   await page.getByRole('option', { name: /^admin$/i }).click()
   await page.getByRole('button', { name: /^save$/i }).click()
   await expect(page.getByText(/changes saved/i)).toBeVisible()
@@ -175,11 +176,14 @@ async function promoteMemberToAdminViaUi(page: Page, username: string) {
 
 async function deleteOrganizationViaUi(page: Page, name: string) {
   await openAuthenticatedPage(page, '/organization')
+  // The org cards and their section wrapper share the same classes, but only
+  // the wrapper and the one leaf card matching `name` survive the hasText
+  // filter; .last() picks the leaf (it appears later in the DOM than the wrapper).
   const card = page
-    .locator('div.rounded-md.border')
+    .locator('div.rounded-md.border.p-3')
     .filter({ hasText: name })
     .filter({ has: page.getByRole('button', { name: /^delete$/i }) })
-    .first()
+    .last()
   await card.getByRole('button', { name: /^delete$/i }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog.getByText(/delete organization/i)).toBeVisible()
