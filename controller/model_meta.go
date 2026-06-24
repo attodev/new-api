@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetAllModelsMeta 获取模型列表（分页）
+// GetAllModelsMeta
 func GetAllModelsMeta(c *gin.Context) {
 
 	pageInfo := common.GetPageQuery(c)
@@ -23,12 +23,10 @@ func GetAllModelsMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	// 批量填充附加字段，提升列表接口性能
 	enrichModels(modelsMeta)
 	var total int64
 	model.DB.Model(&model.Model{}).Count(&total)
 
-	// 统计供应商计数（全部数据，不受分页影响）
 	vendorCounts, _ := model.GetVendorModelCounts()
 
 	pageInfo.SetTotal(int(total))
@@ -42,7 +40,7 @@ func GetAllModelsMeta(c *gin.Context) {
 	})
 }
 
-// SearchModelsMeta 搜索模型列表
+// SearchModelsMeta
 func SearchModelsMeta(c *gin.Context) {
 
 	keyword := c.Query("keyword")
@@ -54,14 +52,13 @@ func SearchModelsMeta(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	// 批量填充附加字段，提升列表接口性能
 	enrichModels(modelsMeta)
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(modelsMeta)
 	common.ApiSuccess(c, pageInfo)
 }
 
-// GetModelMeta 根据 ID 获取单条模型信息
+// GetModelMeta ID
 func GetModelMeta(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -78,7 +75,7 @@ func GetModelMeta(c *gin.Context) {
 	common.ApiSuccess(c, &m)
 }
 
-// CreateModelMeta 新建模型
+// CreateModelMeta
 func CreateModelMeta(c *gin.Context) {
 	var m model.Model
 	if err := c.ShouldBindJSON(&m); err != nil {
@@ -89,7 +86,6 @@ func CreateModelMeta(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgModelNameEmpty)
 		return
 	}
-	// 名称冲突检查
 	if dup, err := model.IsModelNameDuplicated(0, m.ModelName); err != nil {
 		common.ApiError(c, err)
 		return
@@ -106,7 +102,7 @@ func CreateModelMeta(c *gin.Context) {
 	common.ApiSuccess(c, &m)
 }
 
-// UpdateModelMeta 更新模型
+// UpdateModelMeta
 func UpdateModelMeta(c *gin.Context) {
 	statusOnly := c.Query("status_only") == "true"
 
@@ -121,13 +117,11 @@ func UpdateModelMeta(c *gin.Context) {
 	}
 
 	if statusOnly {
-		// 只更新状态，防止误清空其他字段
 		if err := model.DB.Model(&model.Model{}).Where("id = ?", m.Id).Update("status", m.Status).Error; err != nil {
 			common.ApiError(c, err)
 			return
 		}
 	} else {
-		// 名称冲突检查
 		if dup, err := model.IsModelNameDuplicated(m.Id, m.ModelName); err != nil {
 			common.ApiError(c, err)
 			return
@@ -145,7 +139,7 @@ func UpdateModelMeta(c *gin.Context) {
 	common.ApiSuccess(c, &m)
 }
 
-// DeleteModelMeta 删除模型
+// DeleteModelMeta
 func DeleteModelMeta(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -161,13 +155,13 @@ func DeleteModelMeta(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
-// enrichModels 批量填充附加信息：端点、渠道、分组、计费类型，避免 N+1 查询
+// enrichModels N+1
 func enrichModels(models []*model.Model) {
 	if len(models) == 0 {
 		return
 	}
 
-	// 1) 拆分精确与规则匹配
+	// 1)
 	exactNames := make([]string, 0)
 	exactIdx := make(map[string][]int) // modelName -> indices in models
 	ruleIndices := make([]int, 0)
@@ -183,10 +177,10 @@ func enrichModels(models []*model.Model) {
 		}
 	}
 
-	// 2) 批量查询精确模型的绑定渠道
+	// 2)
 	channelsByModel, _ := model.GetBoundChannelsByModelsMap(exactNames)
 
-	// 3) 精确模型：端点从缓存、渠道批量映射、分组/计费类型从缓存
+	// 3) /
 	for name, indices := range exactIdx {
 		chs := channelsByModel[name]
 		for _, idx := range indices {
@@ -207,10 +201,9 @@ func enrichModels(models []*model.Model) {
 		return
 	}
 
-	// 4) 一次性读取定价缓存，内存匹配所有规则模型
+	// 4)
 	pricings := model.GetPricing()
 
-	// 为全部规则模型收集匹配名集合、端点并集、分组并集、配额集合
 	matchedNamesByIdx := make(map[int][]string)
 	endpointSetByIdx := make(map[int]map[constant.EndpointType]struct{})
 	groupSetByIdx := make(map[int]map[string]struct{})
@@ -260,7 +253,7 @@ func enrichModels(models []*model.Model) {
 		}
 	}
 
-	// 5) 汇总所有匹配到的模型名称，批量查询一次渠道
+	// 5)
 	allMatchedSet := make(map[string]struct{})
 	for _, names := range matchedNamesByIdx {
 		for _, n := range names {
@@ -273,11 +266,11 @@ func enrichModels(models []*model.Model) {
 	}
 	matchedChannelsByModel, _ := model.GetBoundChannelsByModelsMap(allMatched)
 
-	// 6) 回填每个规则模型的并集信息
+	// 6)
 	for _, idx := range ruleIndices {
 		mm := models[idx]
 
-		// 端点并集 -> 序列化
+		// ->
 		if es, ok := endpointSetByIdx[idx]; ok && mm.Endpoints == "" {
 			eps := make([]constant.EndpointType, 0, len(es))
 			for et := range es {
@@ -288,7 +281,6 @@ func enrichModels(models []*model.Model) {
 			}
 		}
 
-		// 分组并集
 		if gs, ok := groupSetByIdx[idx]; ok {
 			groups := make([]string, 0, len(gs))
 			for g := range gs {
@@ -297,7 +289,6 @@ func enrichModels(models []*model.Model) {
 			mm.EnableGroups = groups
 		}
 
-		// 配额类型集合（保持去重并排序）
 		if qs, ok := quotaSetByIdx[idx]; ok {
 			arr := make([]int, 0, len(qs))
 			for k := range qs {
@@ -307,7 +298,6 @@ func enrichModels(models []*model.Model) {
 			mm.QuotaTypes = arr
 		}
 
-		// 渠道并集
 		names := matchedNamesByIdx[idx]
 		channelSet := make(map[string]model.BoundChannel)
 		for _, n := range names {
@@ -324,7 +314,6 @@ func enrichModels(models []*model.Model) {
 			mm.BoundChannels = chs
 		}
 
-		// 匹配信息
 		mm.MatchedModels = names
 		mm.MatchedCount = len(names)
 	}

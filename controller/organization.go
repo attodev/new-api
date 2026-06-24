@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -742,7 +743,7 @@ func DeleteOrganization(c *gin.Context) {
 
 	if err := model.DeleteOrganization(organizationId); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "organization not found"})
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgOrgNotFound)})
 			return
 		}
 		common.ApiError(c, err)

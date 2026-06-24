@@ -32,7 +32,7 @@ func oaiImage2AliImageRequest(info *relaycommon.RelayInfo, request dto.ImageRequ
 				return nil, fmt.Errorf("invalid parameters field: %w", err)
 			}
 		} else {
-			// 兼容没有parameters字段的情况，从openai标准字段中提取参数
+			// parametersopenai
 			imageRequest.Parameters = AliImageParameters{
 				Size:      strings.Replace(request.Size, "x", "*", -1),
 				N:         int(lo.FromPtrOr(request.N, uint(1))),
@@ -48,7 +48,7 @@ func oaiImage2AliImageRequest(info *relaycommon.RelayInfo, request dto.ImageRequ
 	}
 
 	if strings.Contains(request.Model, "z-image") {
-		// z-image 开启prompt_extend后，按2倍计费
+		// z-image prompt_extend2
 		if imageRequest.Parameters.PromptExtendValue() {
 			info.PriceData.AddOtherRatio("prompt_extend", 2)
 		}
@@ -58,7 +58,6 @@ func oaiImage2AliImageRequest(info *relaycommon.RelayInfo, request dto.ImageRequ
 		info.PriceData.AddOtherRatio("n", float64(imageRequest.Parameters.N))
 	}
 
-	// 同步图片模型和异步图片模型请求格式不一样
 	if isSync {
 		if imageRequest.Input == nil {
 			imageRequest.Input = AliImageInput{
@@ -124,7 +123,7 @@ func getImageBase64sFromForm(c *gin.Context, fieldName string) ([]string, error)
 	//	return nil, errors.New("only one image is supported for qwen edit")
 	//}
 
-	// 获取base64编码的图片
+	// base64
 	var imageBase64s []string
 	for _, file := range imageFiles {
 		image, err := file.Open()
@@ -132,19 +131,18 @@ func getImageBase64sFromForm(c *gin.Context, fieldName string) ([]string, error)
 			return nil, errors.New("failed to open image file")
 		}
 
-		// 读取文件内容
 		imageData, err := io.ReadAll(image)
 		if err != nil {
 			return nil, errors.New("failed to read image file")
 		}
 
-		// 获取MIME类型
+		// MIME
 		mimeType := http.DetectContentType(imageData)
 
-		// 编码为base64
+		// base64
 		base64Data := base64.StdEncoding.EncodeToString(imageData)
 
-		// 构造data URL格式
+		// data URL
 		dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
 		imageBase64s = append(imageBase64s, dataURL)
 		image.Close()
@@ -305,7 +303,6 @@ func aliImageHandler(a *Adaptor, c *gin.Context, resp *http.Response, info *rela
 		aliResponse = &aliTaskResponse
 		originRespBody = responseBody
 	} else {
-		// 异步图片模型需要轮询任务结果
 		aliResponse, originRespBody, err = asyncTaskWait(c, info, aliTaskResponse.Output.TaskId)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeBadResponse), nil

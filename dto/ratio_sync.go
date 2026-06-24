@@ -13,16 +13,16 @@ type UpstreamRequest struct {
 	Timeout    int           `json:"timeout"`
 }
 
-// TestResult 上游测试连通性结果
+// TestResult
 type TestResult struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
 
-// DifferenceItem 差异项
-// Current 为本地值，可能为 nil
-// Upstreams 为各渠道的上游值，具体数值 / "same" / nil
+// DifferenceItem
+// Current nil
+// Upstreams / "same" / nil
 
 type DifferenceItem struct {
 	Current    interface{}            `json:"current"`

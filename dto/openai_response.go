@@ -17,7 +17,7 @@ type SimpleResponse struct {
 	Error any `json:"error"`
 }
 
-// GetOpenAIError 从动态错误类型中提取OpenAIError结构
+// GetOpenAIError OpenAIError
 func (s *SimpleResponse) GetOpenAIError() *types.OpenAIError {
 	return GetOpenAIError(s.Error)
 }
@@ -47,7 +47,7 @@ type OpenAITextResponse struct {
 	Usage   `json:"usage"`
 }
 
-// GetOpenAIError 从动态错误类型中提取OpenAIError结构
+// GetOpenAIError OpenAIError
 func (o *OpenAITextResponse) GetOpenAIError() *types.OpenAIError {
 	return GetOpenAIError(o.Error)
 }
@@ -292,7 +292,7 @@ type OpenAIResponsesResponse struct {
 	Metadata           json.RawMessage    `json:"metadata"`
 }
 
-// GetOpenAIError 从动态错误类型中提取OpenAIError结构
+// GetOpenAIError OpenAIError
 func (o *OpenAIResponsesResponse) GetOpenAIError() *types.OpenAIError {
 	return GetOpenAIError(o.Error)
 }
@@ -388,7 +388,7 @@ const (
 	ResponsesOutputTypeItemDone  = "response.output_item.done"
 )
 
-// ResponsesStreamResponse 用于处理 /v1/responses 流式响应
+// ResponsesStreamResponse /v1/responses
 type ResponsesStreamResponse struct {
 	Type     string                   `json:"type"`
 	Response *OpenAIResponsesResponse `json:"response,omitempty"`
@@ -403,7 +403,7 @@ type ResponsesStreamResponse struct {
 	Part         *ResponsesReasoningSummaryPart `json:"part,omitempty"`
 }
 
-// GetOpenAIError 从动态错误类型中提取OpenAIError结构
+// GetOpenAIError OpenAIError
 func GetOpenAIError(errorField any) *types.OpenAIError {
 	if errorField == nil {
 		return nil
@@ -415,7 +415,7 @@ func GetOpenAIError(errorField any) *types.OpenAIError {
 	case *types.OpenAIError:
 		return err
 	case map[string]interface{}:
-		// 处理从JSON解析来的map结构
+		// JSONmap
 		openaiErr := &types.OpenAIError{}
 		if errType, ok := err["type"].(string); ok {
 			openaiErr.Type = errType
@@ -431,13 +431,11 @@ func GetOpenAIError(errorField any) *types.OpenAIError {
 		}
 		return openaiErr
 	case string:
-		// 处理简单字符串错误
 		return &types.OpenAIError{
 			Type:    "error",
 			Message: err,
 		}
 	default:
-		// 未知类型，尝试转换为字符串
 		return &types.OpenAIError{
 			Type:    "unknown_error",
 			Message: fmt.Sprintf("%v", err),

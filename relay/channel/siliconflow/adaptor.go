@@ -37,7 +37,7 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
-	// 解析extra到SFImageRequest里，以填入SiliconFlow特殊字段。若失败重建一个空的。
+	// extraSFImageRequestSiliconFlow
 	sfRequest := &SFImageRequest{}
 	extra, err := common.Marshal(request.Extra)
 	if err == nil {
@@ -49,7 +49,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 
 	sfRequest.Model = request.Model
 	sfRequest.Prompt = request.Prompt
-	// 优先使用image_size/batch_size，否则使用OpenAI标准的size/n
+	// image_size/batch_sizeOpenAIsize/n
 	if sfRequest.ImageSize == "" {
 		sfRequest.ImageSize = request.Size
 	}

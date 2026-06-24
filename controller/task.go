@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// UpdateTaskBulk 薄入口，实际轮询逻辑在 service 层
+// UpdateTaskBulk service
 func UpdateTaskBulk() {
 	service.TaskPollingLoop()
 }
@@ -24,7 +24,6 @@ func GetAllTask(c *gin.Context) {
 
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
-	// 解析其他查询参数
 	queryParams := model.SyncTaskQueryParams{
 		Platform:       constant.TaskPlatform(c.Query("platform")),
 		TaskID:         c.Query("task_id"),

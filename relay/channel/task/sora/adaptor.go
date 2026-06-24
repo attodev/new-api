@@ -40,7 +40,7 @@ type ImageURL struct {
 
 type responseTask struct {
 	ID                 string `json:"id"`
-	TaskID             string `json:"task_id,omitempty"` //兼容旧接口
+	TaskID             string `json:"task_id,omitempty"`
 	Object             string `json:"object"`
 	Model              string `json:"model"`
 	Status             string `json:"status"`
@@ -82,7 +82,7 @@ func validateRemixRequest(c *gin.Context) *dto.TaskError {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return service.TaskErrorWrapperLocal(fmt.Errorf("field prompt is required"), "invalid_request", http.StatusBadRequest)
 	}
-	// 存储原始请求到 context，与 ValidateMultipartDirect 路径保持一致
+	// context ValidateMultipartDirect
 	c.Set("task_request", req)
 	return nil
 }
@@ -94,9 +94,9 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 	return relaycommon.ValidateMultipartDirect(c, info)
 }
 
-// EstimateBilling 根据用户请求的 seconds 和 size 计算 OtherRatios。
+// EstimateBilling seconds size OtherRatios
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
-	// remix 路径的 OtherRatios 已在 ResolveOriginTask 中设置
+	// remix OtherRatios ResolveOriginTask
 	if info.Action == constant.TaskActionRemix {
 		return nil
 	}
@@ -249,7 +249,7 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
-	// 使用公开 task_xxxx ID 返回给客户端
+	// task_xxxx ID
 	dResp.ID = info.PublicTaskID
 	dResp.TaskID = info.PublicTaskID
 	c.JSON(http.StatusOK, dResp)

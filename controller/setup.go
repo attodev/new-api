@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
@@ -56,7 +57,7 @@ func PostSetup(c *gin.Context) {
 	if constant.Setup {
 		c.JSON(200, gin.H{
 			"success": false,
-			"message": "system is already initialized",
+			"message": common.TranslateMessage(c, i18n.MsgSetupAlreadyInitialized),
 		})
 		return
 	}
@@ -69,7 +70,7 @@ func PostSetup(c *gin.Context) {
 	if err != nil {
 		c.JSON(200, gin.H{
 			"success": false,
-			"message": "invalid request parameters",
+			"message": common.TranslateMessage(c, i18n.MsgInvalidParams),
 		})
 		return
 	}
@@ -80,7 +81,7 @@ func PostSetup(c *gin.Context) {
 		if len(req.Username) > 12 {
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": "username cannot exceed 12 characters",
+				"message": common.TranslateMessage(c, i18n.MsgSetupUsernameMaxLength),
 			})
 			return
 		}
@@ -88,7 +89,7 @@ func PostSetup(c *gin.Context) {
 		if req.Password != req.ConfirmPassword {
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": "passwords do not match",
+				"message": common.TranslateMessage(c, i18n.MsgSetupPasswordMismatch),
 			})
 			return
 		}
@@ -96,7 +97,7 @@ func PostSetup(c *gin.Context) {
 		if len(req.Password) < 8 {
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": "password must be at least 8 characters",
+				"message": common.TranslateMessage(c, i18n.MsgSetupPasswordMinLength),
 			})
 			return
 		}
@@ -170,7 +171,7 @@ func PostSetup(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"success": true,
-		"message": "system initialized successfully",
+		"message": common.TranslateMessage(c, i18n.MsgSetupSuccess),
 	})
 }
 

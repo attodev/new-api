@@ -123,7 +123,7 @@ func UpdateOption(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"message": "invalid parameter",
+			"message": common.TranslateMessage(c, i18n.MsgInvalidParams),
 		})
 		return
 	}
@@ -154,7 +154,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && common.GitHubClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable GitHub OAuth, please fill in GitHub Client Id and GitHub Client Secret first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionGitHubConfigMissing),
 			})
 			return
 		}
@@ -162,7 +162,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && system_setting.GetDiscordSettings().ClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable Discord OAuth, please fill in Discord Client Id and Discord Client Secret first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionDiscordConfigMissing),
 			})
 			return
 		}
@@ -170,7 +170,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && system_setting.GetOIDCSettings().ClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable OIDC login, please fill in OIDC Client Id and OIDC Client Secret first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionOIDCConfigMissing),
 			})
 			return
 		}
@@ -178,7 +178,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && common.LinuxDOClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable LinuxDO OAuth, please fill in LinuxDO Client Id and LinuxDO Client Secret first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionLinuxDOConfigMissing),
 			})
 			return
 		}
@@ -186,7 +186,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && len(common.EmailDomainWhitelist) == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable email domain restriction, please fill in the allowed email domains first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionEmailDomainMissing),
 			})
 			return
 		}
@@ -194,7 +194,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && common.WeChatServerAddress == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable WeChat login, please fill in WeChat login configuration first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionWeChatConfigMissing),
 			})
 			return
 		}
@@ -202,7 +202,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && common.TurnstileSiteKey == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable Turnstile verification, please fill in Turnstile configuration first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionTurnstileConfigMissing),
 			})
 
 			return
@@ -211,7 +211,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value == "true" && common.TelegramBotToken == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "cannot enable Telegram OAuth, please fill in Telegram Bot Token first",
+				"message": common.TranslateMessage(c, i18n.MsgOptionTelegramConfigMissing),
 			})
 			return
 		}
@@ -219,7 +219,7 @@ func UpdateOption(c *gin.Context) {
 		if option.Value != "default" && option.Value != "classic" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "invalid theme value, allowed values: default (new frontend), classic (classic frontend)",
+				"message": common.TranslateMessage(c, i18n.MsgOptionInvalidTheme),
 			})
 			return
 		}

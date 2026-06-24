@@ -25,7 +25,6 @@ var (
 
 func New(ctx context.Context, r *redis.Client) *RedisLimiter {
 	once.Do(func() {
-		// 预加载脚本
 		limitSHA, err := r.ScriptLoad(ctx, rateLimitScript).Result()
 		if err != nil {
 			common.SysLog(fmt.Sprintf("Failed to load rate limit script: %v", err))
@@ -40,19 +39,16 @@ func New(ctx context.Context, r *redis.Client) *RedisLimiter {
 }
 
 func (rl *RedisLimiter) Allow(ctx context.Context, key string, opts ...Option) (bool, error) {
-	// 默认配置
 	config := &Config{
 		Capacity:  10,
 		Rate:      1,
 		Requested: 1,
 	}
 
-	// 应用选项模式
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	// 执行限流
 	result, err := rl.client.EvalSha(
 		ctx,
 		rl.limitScriptSHA,
@@ -68,7 +64,7 @@ func (rl *RedisLimiter) Allow(ctx context.Context, key string, opts ...Option) (
 	return result == 1, nil
 }
 
-// Config 配置选项模式
+// Config
 type Config struct {
 	Capacity  int64
 	Rate      int64

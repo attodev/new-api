@@ -320,8 +320,8 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
-	// 在 SetupRequestHeader 之后应用 Header Override，确保用户设置优先级最高
-	// 这样可以覆盖默认的 Authorization header 设置
+	// SetupRequestHeader Header Override
+	// Authorization header
 	headerOverride, err := processHeaderOverride(info, c)
 	if err != nil {
 		return nil, err
@@ -352,8 +352,8 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
-	// 在 SetupRequestHeader 之后应用 Header Override，确保用户设置优先级最高
-	// 这样可以覆盖默认的 Authorization header 设置
+	// SetupRequestHeader Header Override
+	// Authorization header
 	headerOverride, err := processHeaderOverride(info, c)
 	if err != nil {
 		return nil, err
@@ -376,8 +376,8 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
-	// 在 SetupRequestHeader 之后应用 Header Override，确保用户设置优先级最高
-	// 这样可以覆盖默认的 Authorization header 设置
+	// SetupRequestHeader Header Override
+	// Authorization header
 	headerOverride, err := processHeaderOverride(info, c)
 	if err != nil {
 		return nil, err
@@ -401,7 +401,7 @@ func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) context.Canc
 
 	gopool.Go(func() {
 		defer func() {
-			// 增加panic恢复处理
+			// panic
 			if r := recover(); r != nil {
 				logger.LogDebug(c, "SSE ping goroutine panic recovered: %v", r)
 			}
@@ -413,7 +413,7 @@ func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) context.Canc
 		}
 
 		ticker := time.NewTicker(pingInterval)
-		// 确保在任何情况下都清理ticker
+		// ticker
 		defer func() {
 			ticker.Stop()
 			logger.LogDebug(c, "SSE ping ticker stopped")
@@ -422,26 +422,25 @@ func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) context.Canc
 		var pingMutex sync.Mutex
 		logger.LogDebug(c, "SSE ping goroutine started")
 
-		// 增加超时控制，防止goroutine长时间运行
-		maxPingDuration := 120 * time.Minute // 最大ping持续时间
+		// goroutine
+		maxPingDuration := 120 * time.Minute // ping
 		pingTimeout := time.NewTimer(maxPingDuration)
 		defer pingTimeout.Stop()
 
 		for {
 			select {
-			// 发送 ping 数据
+			// ping
 			case <-ticker.C:
 				if err := sendPingData(c, &pingMutex); err != nil {
 					logger.LogDebug(c, "SSE ping error, stopping goroutine: %s", err.Error())
 					return
 				}
-			// 收到退出信号
 			case <-pingerCtx.Done():
 				return
-			// request 结束
+			// request
 			case <-c.Request.Context().Done():
 				return
-			// 超时保护，防止goroutine无限运行
+			// goroutine
 			case <-pingTimeout.C:
 				logger.LogDebug(c, "SSE ping goroutine timeout, stopping")
 				return
@@ -453,7 +452,6 @@ func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) context.Canc
 }
 
 func sendPingData(c *gin.Context, mutex *sync.Mutex) error {
-	// 增加超时控制，防止锁死等待
 	done := make(chan error, 1)
 	go func() {
 		mutex.Lock()
@@ -470,7 +468,7 @@ func sendPingData(c *gin.Context, mutex *sync.Mutex) error {
 		done <- nil
 	}()
 
-	// 设置发送ping数据的超时时间
+	// ping
 	select {
 	case err := <-done:
 		return err
@@ -499,12 +497,12 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	var stopPinger context.CancelFunc
 	if info.IsStream {
 		helper.SetEventStreamHeaders(c)
-		// 处理流式请求的 ping 保活
+		// ping
 		generalSettings := operation_setting.GetGeneralSetting()
 		if generalSettings.PingIntervalEnabled && !info.DisablePing {
 			pingInterval := time.Duration(generalSettings.PingIntervalSeconds) * time.Second
 			stopPinger = startPingKeepAlive(c, pingInterval)
-			// 使用defer确保在任何情况下都能停止ping goroutine
+			// deferping goroutine
 			defer func() {
 				if stopPinger != nil {
 					stopPinger()

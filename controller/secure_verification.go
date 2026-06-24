@@ -20,14 +20,14 @@ const (
 	secureVerificationMethodPasskey    = "passkey"
 	// PasskeyReadySessionKey means WebAuthn finished and /api/verify can finalize step-up verification.
 	PasskeyReadySessionKey = "secure_passkey_ready_at"
-	// SecureVerificationTimeout 验证有效期（秒）
-	SecureVerificationTimeout = 300 // 5分钟
-	// PasskeyReadyTimeout passkey ready 标记有效期（秒）
+	// SecureVerificationTimeout
+	SecureVerificationTimeout = 300 // 5
+	// PasskeyReadyTimeout passkey ready
 	PasskeyReadyTimeout = 60
 )
 
 type UniversalVerifyRequest struct {
-	Method string `json:"method"` // "2fa" 或 "passkey"
+	Method string `json:"method"` // "2fa" "passkey"
 	Code   string `json:"code,omitempty"`
 }
 
@@ -36,14 +36,14 @@ type VerificationStatusResponse struct {
 	ExpiresAt int64 `json:"expires_at,omitempty"`
 }
 
-// UniversalVerify 通用验证接口
-// 支持 2FA 和 Passkey 验证，验证成功后在 session 中记录时间戳
+// UniversalVerify
+// 2FA Passkey session
 func UniversalVerify(c *gin.Context) {
 	userId := c.GetInt("id")
 	if userId == 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"message": "not logged in",
+			"message": common.TranslateMessage(c, i18n.MsgAuthNotLoggedIn),
 		})
 		return
 	}
@@ -54,7 +54,6 @@ func UniversalVerify(c *gin.Context) {
 		return
 	}
 
-	// 获取用户信息
 	user := &model.User{Id: userId}
 	if err := user.FillUserById(); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgVerifyGetUserFailed, map[string]any{"Error": err.Error()})
@@ -66,7 +65,6 @@ func UniversalVerify(c *gin.Context) {
 		return
 	}
 
-	// 检查用户的验证方式
 	twoFA, _ := model.GetTwoFAByUserId(userId)
 	has2FA := twoFA != nil && twoFA.IsEnabled
 
@@ -78,7 +76,6 @@ func UniversalVerify(c *gin.Context) {
 		return
 	}
 
-	// 根据验证方式进行验证
 	var verified bool
 	var verifyMethod string
 	var err error
@@ -123,19 +120,18 @@ func UniversalVerify(c *gin.Context) {
 		return
 	}
 
-	// 验证成功，在 session 中记录时间戳
+	// session
 	now, err := setSecureVerificationSession(c, req.Method)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgVerifySaveStateFailed, map[string]any{"Error": err.Error()})
 		return
 	}
 
-	// 记录日志
 	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("universal security verification successful (method: %s)", verifyMethod))
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "verification successful",
+		"message": common.TranslateMessage(c, i18n.MsgVerifySuccess),
 		"data": gin.H{
 			"verified":   true,
 			"expires_at": now + SecureVerificationTimeout,

@@ -142,10 +142,9 @@ func Distribute() func(c *gin.Context) {
 							showGroup = fmt.Sprintf("auto(%s)", selectGroup)
 						}
 						message := i18n.T(c, i18n.MsgDistributorGetChannelFailed, map[string]any{"Group": showGroup, "Model": modelRequest.Model, "Error": err.Error()})
-						// 如果错误，但是渠道不为空，说明是数据库一致性问题
 						//if channel != nil {
-						//	common.SysError(fmt.Sprintf("渠道不存在：%d", channel.Id))
-						//	message = "数据库一致性已被破坏，请联系管理员"
+						// common.SysError(fmt.Sprintf("%d", channel.Id))
+						// message = ""
 						//}
 						abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message, types.ErrorCodeModelNotFound)
 						return
@@ -166,8 +165,8 @@ func Distribute() func(c *gin.Context) {
 	}
 }
 
-// getModelFromRequest 从请求中读取模型信息
-// 根据 Content-Type 自动处理：
+// getModelFromRequest
+// Content-Type
 // - application/json
 // - application/x-www-form-urlencoded
 // - multipart/form-data
@@ -317,7 +316,7 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			c.Set("relay_mode", relayMode)
 		}
 	} else if strings.HasPrefix(c.Request.URL.Path, "/v1beta/models/") || strings.HasPrefix(c.Request.URL.Path, "/v1/models/") {
-		// Gemini API 路径处理: /v1beta/models/gemini-2.0-flash:generateContent
+		// Gemini API : /v1beta/models/gemini-2.0-flash:generateContent
 		relayMode := relayconstant.RelayModeGemini
 		modelName := extractModelNameFromGeminiPath(c.Request.URL.Path)
 		if modelName != "" {
@@ -363,14 +362,12 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 
 			modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "tts-1")
 		} else if strings.HasPrefix(c.Request.URL.Path, "/v1/audio/translations") {
-			// 先尝试从请求读取
 			if req, err := getModelFromRequest(c); err == nil && req.Model != "" {
 				modelRequest.Model = req.Model
 			}
 			modelRequest.Model = common.GetStringIfEmpty(modelRequest.Model, "whisper-1")
 			relayMode = relayconstant.RelayModeAudioTranslation
 		} else if strings.HasPrefix(c.Request.URL.Path, "/v1/audio/transcriptions") {
-			// 先尝试从请求读取
 			if req, err := getModelFromRequest(c); err == nil && req.Model != "" {
 				modelRequest.Model = req.Model
 			}
@@ -429,7 +426,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 		common.SetContextKey(c, constant.ContextKeyChannelIsMultiKey, true)
 		common.SetContextKey(c, constant.ContextKeyChannelMultiKeyIndex, index)
 	} else {
-		// 必须设置为 false，否则在重试到单个 key 的时候会导致日志显示错误
+		// false key
 		common.SetContextKey(c, constant.ContextKeyChannelIsMultiKey, false)
 	}
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
@@ -438,7 +435,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 
-	// TODO: api_version统一
+	// TODO: api_version
 	switch channel.Type {
 	case constant.ChannelTypeAzure:
 		c.Set("api_version", channel.Other)
@@ -460,30 +457,29 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	return nil
 }
 
-// extractModelNameFromGeminiPath 从 Gemini API URL 路径中提取模型名
-// 输入格式: /v1beta/models/gemini-2.0-flash:generateContent
-// 输出: gemini-2.0-flash
+// extractModelNameFromGeminiPath Gemini API URL
+// : /v1beta/models/gemini-2.0-flash:generateContent
+// : gemini-2.0-flash
 func extractModelNameFromGeminiPath(path string) string {
-	// 查找 "/models/" 的位置
+	// "/models/"
 	modelsPrefix := "/models/"
 	modelsIndex := strings.Index(path, modelsPrefix)
 	if modelsIndex == -1 {
 		return ""
 	}
 
-	// 从 "/models/" 之后开始提取
+	// "/models/"
 	startIndex := modelsIndex + len(modelsPrefix)
 	if startIndex >= len(path) {
 		return ""
 	}
 
-	// 查找 ":" 的位置，模型名在 ":" 之前
+	// ":" ":"
 	colonIndex := strings.Index(path[startIndex:], ":")
 	if colonIndex == -1 {
-		// 如果没有找到 ":"，返回从 "/models/" 到路径结尾的部分
+		// ":" "/models/"
 		return path[startIndex:]
 	}
 
-	// 返回模型名部分
 	return path[startIndex : startIndex+colonIndex]
 }

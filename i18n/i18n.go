@@ -16,10 +16,9 @@ import (
 )
 
 const (
-	LangZhCN    = "zh-CN"
-	LangZhTW    = "zh-TW"
+	LangKo      = "ko"
 	LangEn      = "en"
-	DefaultLang = LangEn // Fallback to English if language not supported
+	DefaultLang = LangKo // Fallback to Korean if language not supported
 )
 
 //go:embed locales/*.yaml
@@ -36,11 +35,11 @@ var (
 func Init() error {
 	var initErr error
 	initOnce.Do(func() {
-		bundle = i18n.NewBundle(language.Chinese)
+		bundle = i18n.NewBundle(language.Korean)
 		bundle.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
 
 		// Load embedded translation files
-		files := []string{"locales/zh-CN.yaml", "locales/zh-TW.yaml", "locales/en.yaml"}
+		files := []string{"locales/ko.yaml", "locales/en.yaml"}
 		for _, file := range files {
 			_, err := bundle.LoadMessageFileFS(localeFS, file)
 			if err != nil {
@@ -50,8 +49,7 @@ func Init() error {
 		}
 
 		// Pre-create localizers for supported languages
-		localizers[LangZhCN] = i18n.NewLocalizer(bundle, LangZhCN)
-		localizers[LangZhTW] = i18n.NewLocalizer(bundle, LangZhTW)
+		localizers[LangKo] = i18n.NewLocalizer(bundle, LangKo)
 		localizers[LangEn] = i18n.NewLocalizer(bundle, LangEn)
 
 		// Set the TranslateMessage function in common package
@@ -201,12 +199,10 @@ func ParseAcceptLanguage(header string) string {
 func normalizeLang(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
 
-	// Handle common variations
+	// Handle supported language variations
 	switch {
-	case strings.HasPrefix(lang, "zh-tw"):
-		return LangZhTW
-	case strings.HasPrefix(lang, "zh"):
-		return LangZhCN
+	case strings.HasPrefix(lang, "ko"):
+		return LangKo
 	case strings.HasPrefix(lang, "en"):
 		return LangEn
 	default:
@@ -216,7 +212,7 @@ func normalizeLang(lang string) string {
 
 // SupportedLanguages returns a list of supported language codes
 func SupportedLanguages() []string {
-	return []string{LangZhCN, LangZhTW, LangEn}
+	return []string{LangKo, LangEn}
 }
 
 // IsSupported checks if a language code is supported

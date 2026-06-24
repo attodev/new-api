@@ -52,7 +52,7 @@ var (
 	lastGetPricingTime   time.Time
 	updatePricingLock    sync.Mutex
 
-	// 缓存映射：模型名 -> 启用分组 / 计费类型
+	// -> /
 	modelEnableGroups     = make(map[string][]string)
 	modelQuotaTypeMap     = make(map[string]int)
 	modelEnableGroupsLock = sync.RWMutex{}
@@ -86,10 +86,9 @@ func InvalidatePricingCache() {
 	lastGetPricingTime = time.Time{}
 }
 
-// GetVendors 返回当前定价接口使用到的供应商信息
+// GetVendors
 func GetVendors() []PricingVendor {
 	if time.Since(lastGetPricingTime) > time.Minute*1 || len(pricingMap) == 0 {
-		// 保证先刷新一次
 		GetPricing()
 	}
 	return vendorsList
@@ -114,7 +113,6 @@ func updatePricing() {
 		common.SysLog(fmt.Sprintf("GetAllEnableAbilityWithChannels error: %v", err))
 		return
 	}
-	// 预加载模型元数据与供应商一次，避免循环查询
 	var allMeta []Model
 	_ = DB.Find(&allMeta).Error
 	metaMap := make(map[string]*Model)
@@ -137,7 +135,7 @@ func updatePricing() {
 		}
 	}
 
-	// 将非精确规则模型匹配到 metaMap
+	// metaMap
 	for _, m := range prefixList {
 		for _, pricingModel := range enableAbilities {
 			if strings.HasPrefix(pricingModel.Model, m.ModelName) {
@@ -166,7 +164,6 @@ func updatePricing() {
 		}
 	}
 
-	// 预加载供应商
 	var vendors []Vendor
 	_ = DB.Find(&vendors).Error
 	vendorMap := make(map[int]*Vendor)
@@ -174,10 +171,8 @@ func updatePricing() {
 		vendorMap[vendors[i].Id] = &vendors[i]
 	}
 
-	// 初始化默认供应商映射
 	initDefaultVendorMapping(metaMap, vendorMap, enableAbilities)
 
-	// 构建对前端友好的供应商列表
 	vendorsList = make([]PricingVendor, 0, len(vendorMap))
 	for _, v := range vendorMap {
 		vendorsList = append(vendorsList, PricingVendor{
@@ -199,10 +194,9 @@ func updatePricing() {
 		groups.Add(ability.Group)
 	}
 
-	//这里使用切片而不是Set，因为一个模型可能支持多个端点类型，并且第一个端点是优先使用端点
+	// Set
 	modelSupportEndpointsStr := make(map[string][]string)
 
-	// 先根据已有能力填充原生端点
 	for _, ability := range enableAbilities {
 		endpoints := modelSupportEndpointsStr[ability.Model]
 		channelTypes := common.GetEndpointTypesByChannelType(ability.ChannelType, ability.Model)
@@ -214,7 +208,6 @@ func updatePricing() {
 		modelSupportEndpointsStr[ability.Model] = endpoints
 	}
 
-	// 再补充模型自定义端点：若配置有效则替换默认端点，不做合并
 	for modelName, meta := range metaMap {
 		if strings.TrimSpace(meta.Endpoints) == "" {
 			continue
@@ -246,9 +239,9 @@ func updatePricing() {
 		modelSupportEndpointTypes[model] = supportedEndpoints
 	}
 
-	// 构建全局 supportedEndpointMap（默认 + 自定义覆盖）
+	// supportedEndpointMap +
 	supportedEndpointMap = make(map[string]common.EndpointInfo)
-	// 1. 默认端点
+	// 1.
 	for _, endpoints := range modelSupportEndpointTypes {
 		for _, et := range endpoints {
 			if info, ok := common.GetDefaultEndpointInfo(et); ok {
@@ -258,7 +251,7 @@ func updatePricing() {
 			}
 		}
 	}
-	// 2. 自定义端点（models 表）覆盖默认
+	// 2. models
 	for _, meta := range metaMap {
 		if strings.TrimSpace(meta.Endpoints) == "" {
 			continue
@@ -293,9 +286,8 @@ func updatePricing() {
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
 		}
 
-		// 补充模型元数据（描述、标签、供应商、状态）
 		if meta, ok := metaMap[model]; ok {
-			// 若模型被禁用(status!=1)，则直接跳过，不返回给前端
+			// (status!=1)
 			if meta.Status != 1 {
 				continue
 			}
@@ -340,12 +332,10 @@ func updatePricing() {
 		pricingMap = append(pricingMap, pricing)
 	}
 
-	// 防止大更新后数据不通用
 	if len(pricingMap) > 0 {
 		pricingMap[0].PricingVersion = "5a90f2b86c08bd983a9a2e6d66c255f4eaef9c4bc934386d2b6ae84ef0ff1f1f"
 	}
 
-	// 刷新缓存映射，供高并发快速查询
 	modelEnableGroupsLock.Lock()
 	modelEnableGroups = make(map[string][]string)
 	modelQuotaTypeMap = make(map[string]int)
@@ -358,7 +348,7 @@ func updatePricing() {
 	lastGetPricingTime = time.Now()
 }
 
-// GetSupportedEndpointMap 返回全局端点到路径的映射
+// GetSupportedEndpointMap
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
 }

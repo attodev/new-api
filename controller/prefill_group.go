@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetPrefillGroups 获取预填组列表，可通过 ?type=xxx 过滤
+// GetPrefillGroups ?type=xxx
 func GetPrefillGroups(c *gin.Context) {
 	groupType := c.Query("type")
 	groups, err := model.GetAllPrefillGroups(groupType)
@@ -21,7 +21,7 @@ func GetPrefillGroups(c *gin.Context) {
 	common.ApiSuccess(c, groups)
 }
 
-// CreatePrefillGroup 创建新的预填组
+// CreatePrefillGroup
 func CreatePrefillGroup(c *gin.Context) {
 	var g model.PrefillGroup
 	if err := c.ShouldBindJSON(&g); err != nil {
@@ -32,7 +32,6 @@ func CreatePrefillGroup(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPrefillGroupNameTypeEmpty)
 		return
 	}
-	// 创建前检查名称
 	if dup, err := model.IsPrefillGroupNameDuplicated(0, g.Name); err != nil {
 		common.ApiError(c, err)
 		return
@@ -48,7 +47,7 @@ func CreatePrefillGroup(c *gin.Context) {
 	common.ApiSuccess(c, &g)
 }
 
-// UpdatePrefillGroup 更新预填组
+// UpdatePrefillGroup
 func UpdatePrefillGroup(c *gin.Context) {
 	var g model.PrefillGroup
 	if err := c.ShouldBindJSON(&g); err != nil {
@@ -59,7 +58,6 @@ func UpdatePrefillGroup(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPrefillGroupIdMissing)
 		return
 	}
-	// 名称冲突检查
 	if dup, err := model.IsPrefillGroupNameDuplicated(g.Id, g.Name); err != nil {
 		common.ApiError(c, err)
 		return
@@ -75,7 +73,7 @@ func UpdatePrefillGroup(c *gin.Context) {
 	common.ApiSuccess(c, &g)
 }
 
-// DeletePrefillGroup 删除预填组
+// DeletePrefillGroup
 func DeletePrefillGroup(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)

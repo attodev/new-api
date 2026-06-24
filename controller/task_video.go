@@ -124,7 +124,6 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 		taskResult = relaycommon.FailTaskInfo("upstream returned empty status")
 	}
 
-	// 记录原本的状态，防止重复退款
 	shouldRefund := false
 	quota := task.Quota
 	preStatus := task.Status
@@ -149,17 +148,14 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 			task.FailReason = taskResult.Url
 		}
 
-		// 如果返回了 total_tokens 并且配置了模型倍率(非固定价格),则重新计费
+		// total_tokens (),
 		if taskResult.TotalTokens > 0 {
-			// 获取模型名称
 			var taskData map[string]interface{}
 			if err := json.Unmarshal(task.Data, &taskData); err == nil {
 				if modelName, ok := taskData["model"].(string); ok && modelName != "" {
-					// 获取模型价格和倍率
 					modelRatio, hasRatioSetting, _ := ratio_setting.GetModelRatio(modelName)
-					// 只有配置了倍率(非固定价格)时才按 token 重新计费
+					// () token
 					if hasRatioSetting && modelRatio > 0 {
-						// 获取用户和组的倍率信息
 						group := task.Group
 						if group == "" {
 							user, err := model.GetUserById(task.UserId, false)
@@ -178,15 +174,13 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 								finalGroupRatio = groupRatio
 							}
 
-							// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio
+							// : totalTokens * modelRatio * groupRatio
 							actualQuota := int(float64(taskResult.TotalTokens) * modelRatio * finalGroupRatio)
 
-							// 计算差额
 							preConsumedQuota := task.Quota
 							quotaDelta := actualQuota - preConsumedQuota
 
 							if quotaDelta > 0 {
-								// 需要补扣费
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s post-charge deduction: %s (actual: %s, pre-charged: %s, tokens: %d)",
 									task.TaskID,
 									logger.LogQuota(quotaDelta),
@@ -199,7 +193,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 								} else {
 									model.UpdateUserUsedQuotaAndRequestCount(task.UserId, quotaDelta)
 									model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
-									task.Quota = actualQuota // 更新任务记录的实际扣费额度
+									task.Quota = actualQuota
 
 									// record billing log
 									logContent := fmt.Sprintf("video task post-charge succeeded, model ratio %.2f, group ratio %.2f, tokens %d, pre-charged %s, actual %s, deducted %s",
@@ -208,7 +202,6 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 									model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 								}
 							} else if quotaDelta < 0 {
-								// 需要退还多扣的费用
 								refundQuota := -quotaDelta
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s post-charge refund: %s (actual: %s, pre-charged: %s, tokens: %d)",
 									task.TaskID,
@@ -220,16 +213,15 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 								if err := model.IncreaseUserQuota(task.UserId, refundQuota, false); err != nil {
 									logger.LogError(ctx, fmt.Sprintf("post-charge refund failed: %s", err.Error()))
 								} else {
-									task.Quota = actualQuota // 更新任务记录的实际扣费额度
+									task.Quota = actualQuota
 
-									// 记录退款日志
 									logContent := fmt.Sprintf("video task refund succeeded, model ratio %.2f, group ratio %.2f, tokens %d, pre-charged %s, actual %s, refunded %s",
 										modelRatio, finalGroupRatio, taskResult.TotalTokens,
 										logger.LogQuota(preConsumedQuota), logger.LogQuota(actualQuota), logger.LogQuota(refundQuota))
 									model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 								}
 							} else {
-								// quotaDelta == 0, 预扣费刚好准确
+								// quotaDelta == 0,
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s pre-charge accurate (%s, tokens: %d)",
 									task.TaskID, logger.LogQuota(actualQuota), taskResult.TotalTokens))
 							}
@@ -267,7 +259,6 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 	}
 
 	if shouldRefund {
-		// 任务失败且之前状态不是失败才退还额度，防止重复退还
 		if err := model.IncreaseUserQuota(task.UserId, quota, false); err != nil {
 			logger.LogWarn(ctx, "Failed to increase user quota: "+err.Error())
 		}

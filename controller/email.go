@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,12 +16,12 @@ type testEmailRequest struct {
 func TestEmail(c *gin.Context) {
 	var req testEmailRequest
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgInvalidParams)})
 		return
 	}
 
 	if req.To == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Recipient email is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgEmailRecipientRequired)})
 		return
 	}
 

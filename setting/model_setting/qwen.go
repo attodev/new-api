@@ -6,12 +6,11 @@ import (
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
-// QwenSettings defines Qwen model configuration. 注意bool要以enabled结尾才可以生效编辑
+// QwenSettings defines Qwen model configuration. boolenabled
 type QwenSettings struct {
 	SyncImageModels []string `json:"sync_image_models"`
 }
 
-// 默认配置
 var defaultQwenSettings = QwenSettings{
 	SyncImageModels: []string{
 		"z-image",
@@ -27,11 +26,9 @@ var defaultQwenSettings = QwenSettings{
 	},
 }
 
-// 全局实例
 var qwenSettings = defaultQwenSettings
 
 func init() {
-	// 注册到全局配置管理器
 	config.GlobalConfig.Register("qwen", &qwenSettings)
 }
 

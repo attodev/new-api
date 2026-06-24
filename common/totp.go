@@ -12,16 +12,14 @@ import (
 )
 
 const (
-	// 备用码配置
-	BackupCodeLength = 8 // 备用码长度
-	BackupCodeCount  = 4 // 生成备用码数量
+	BackupCodeLength = 8
+	BackupCodeCount  = 4
 
-	// 限制配置
-	MaxFailAttempts = 5   // 最大失败尝试次数
-	LockoutDuration = 300 // 锁定时间（秒）
+	MaxFailAttempts = 5
+	LockoutDuration = 300
 )
 
-// GenerateTOTPSecret 生成TOTP密钥和配置
+// GenerateTOTPSecret TOTP
 func GenerateTOTPSecret(accountName string) (*otp.Key, error) {
 	issuer := Get2FAIssuer()
 	return totp.Generate(totp.GenerateOpts{
@@ -33,19 +31,17 @@ func GenerateTOTPSecret(accountName string) (*otp.Key, error) {
 	})
 }
 
-// ValidateTOTPCode 验证TOTP验证码
+// ValidateTOTPCode TOTP
 func ValidateTOTPCode(secret, code string) bool {
-	// 清理验证码格式
 	cleanCode := strings.ReplaceAll(code, " ", "")
 	if len(cleanCode) != 6 {
 		return false
 	}
 
-	// 验证验证码
 	return totp.Validate(cleanCode, secret)
 }
 
-// GenerateBackupCodes 生成备用恢复码
+// GenerateBackupCodes
 func GenerateBackupCodes() ([]string, error) {
 	codes := make([]string, BackupCodeCount)
 
@@ -60,7 +56,7 @@ func GenerateBackupCodes() ([]string, error) {
 	return codes, nil
 }
 
-// generateRandomBackupCode 生成单个备用码
+// generateRandomBackupCode
 func generateRandomBackupCode() (string, error) {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	code := make([]byte, BackupCodeLength)
@@ -74,19 +70,17 @@ func generateRandomBackupCode() (string, error) {
 		code[i] = charset[int(randomBytes[0])%len(charset)]
 	}
 
-	// 格式化为 XXXX-XXXX 格式
+	// XXXX-XXXX
 	return fmt.Sprintf("%s-%s", string(code[:4]), string(code[4:])), nil
 }
 
-// ValidateBackupCode 验证备用码格式
+// ValidateBackupCode
 func ValidateBackupCode(code string) bool {
-	// 移除所有分隔符并转为大写
 	cleanCode := strings.ToUpper(strings.ReplaceAll(code, "-", ""))
 	if len(cleanCode) != BackupCodeLength {
 		return false
 	}
 
-	// 检查字符是否合法
 	for _, char := range cleanCode {
 		if !((char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9')) {
 			return false
@@ -96,7 +90,7 @@ func ValidateBackupCode(code string) bool {
 	return true
 }
 
-// NormalizeBackupCode 标准化备用码格式
+// NormalizeBackupCode
 func NormalizeBackupCode(code string) string {
 	cleanCode := strings.ToUpper(strings.ReplaceAll(code, "-", ""))
 	if len(cleanCode) == BackupCodeLength {
@@ -105,18 +99,18 @@ func NormalizeBackupCode(code string) string {
 	return code
 }
 
-// HashBackupCode 对备用码进行哈希
+// HashBackupCode
 func HashBackupCode(code string) (string, error) {
 	normalizedCode := NormalizeBackupCode(code)
 	return Password2Hash(normalizedCode)
 }
 
-// Get2FAIssuer 获取2FA发行者名称
+// Get2FAIssuer 2FA
 func Get2FAIssuer() string {
 	return SystemName
 }
 
-// getEnvOrDefault 获取环境变量或默认值
+// getEnvOrDefault
 func getEnvOrDefault(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
@@ -124,16 +118,14 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// ValidateNumericCode 验证数字验证码格式
+// ValidateNumericCode
 func ValidateNumericCode(code string) (string, error) {
-	// 移除空格
 	code = strings.ReplaceAll(code, " ", "")
 
 	if len(code) != 6 {
 		return "", fmt.Errorf("verification code must be 6 digits")
 	}
 
-	// 检查是否为纯数字
 	if _, err := strconv.Atoi(code); err != nil {
 		return "", fmt.Errorf("verification code can only contain digits")
 	}
@@ -141,7 +133,7 @@ func ValidateNumericCode(code string) (string, error) {
 	return code, nil
 }
 
-// GenerateQRCodeData 生成二维码数据
+// GenerateQRCodeData
 func GenerateQRCodeData(secret, username string) string {
 	issuer := Get2FAIssuer()
 	accountName := fmt.Sprintf("%s (%s)", username, issuer)

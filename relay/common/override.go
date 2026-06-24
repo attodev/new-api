@@ -47,11 +47,11 @@ type paramOverrideAuditRecorder struct {
 }
 
 type ConditionOperation struct {
-	Path           string      `json:"path"`             // JSON路径
+	Path           string      `json:"path"`             // JSON
 	Mode           string      `json:"mode"`             // full, prefix, suffix, contains, gt, gte, lt, lte
-	Value          interface{} `json:"value"`            // 匹配的值
-	Invert         bool        `json:"invert"`           // 反选功能，true表示取反结果
-	PassMissingKey bool        `json:"pass_missing_key"` // 未获取到json key时的行为
+	Value          interface{} `json:"value"`
+	Invert         bool        `json:"invert"`           // true
+	PassMissingKey bool        `json:"pass_missing_key"` // json key
 }
 
 type ParamOperation struct {
@@ -61,8 +61,8 @@ type ParamOperation struct {
 	KeepOrigin bool                 `json:"keep_origin"`
 	From       string               `json:"from,omitempty"`
 	To         string               `json:"to,omitempty"`
-	Conditions []ConditionOperation `json:"conditions,omitempty"` // 条件列表
-	Logic      string               `json:"logic,omitempty"`      // AND, OR (默认OR)
+	Conditions []ConditionOperation `json:"conditions,omitempty"`
+	Logic      string               `json:"logic,omitempty"`      // AND, OR (OR)
 }
 
 type ParamOverrideReturnError struct {
@@ -141,7 +141,6 @@ func ApplyParamOverride(jsonData []byte, paramOverride map[string]interface{}, c
 	}
 	auditRecorder := getParamOverrideAuditRecorder(conditionContext)
 
-	// 尝试断言为操作格式
 	if operations, ok := tryParseOperations(paramOverride); ok {
 		legacyOverride := buildLegacyParamOverride(paramOverride)
 		workingJSON := jsonData
@@ -153,11 +152,10 @@ func ApplyParamOverride(jsonData []byte, paramOverride map[string]interface{}, c
 			}
 		}
 
-		// 使用新方法（基于 []byte，避免整包 string 拷贝）
+		// []byte string
 		return applyOperations(workingJSON, operations, conditionContext)
 	}
 
-	// 直接使用旧方法
 	return applyOperationsLegacy(jsonData, paramOverride, auditRecorder)
 }
 
@@ -439,7 +437,7 @@ func GetEffectiveHeaderOverride(info *RelayInfo) map[string]interface{} {
 }
 
 func tryParseOperations(paramOverride map[string]interface{}) ([]ParamOperation, bool) {
-	// 检查是否包含 "operations" 字段
+	// "operations"
 	opsValue, exists := paramOverride["operations"]
 	if !exists {
 		return nil, false
@@ -466,17 +464,15 @@ func tryParseOperations(paramOverride map[string]interface{}) ([]ParamOperation,
 	for _, opMap := range opMaps {
 		operation := ParamOperation{}
 
-		// 断言必要字段
 		if path, ok := opMap["path"].(string); ok {
 			operation.Path = path
 		}
 		if mode, ok := opMap["mode"].(string); ok {
 			operation.Mode = mode
 		} else {
-			return nil, false // mode 是必需的
+			return nil, false // mode
 		}
 
-		// 可选字段
 		if value, exists := opMap["value"]; exists {
 			operation.Value = value
 		}
@@ -492,10 +488,9 @@ func tryParseOperations(paramOverride map[string]interface{}) ([]ParamOperation,
 		if logic, ok := opMap["logic"].(string); ok {
 			operation.Logic = logic
 		} else {
-			operation.Logic = "OR" // 默认为OR
+			operation.Logic = "OR" // OR
 		}
 
-		// 解析条件
 		if conditions, exists := opMap["conditions"]; exists {
 			parsedConditions, err := parseConditionOperations(conditions)
 			if err != nil {
@@ -511,7 +506,7 @@ func tryParseOperations(paramOverride map[string]interface{}) ([]ParamOperation,
 
 func checkConditions(data []byte, contextJSON string, conditions []ConditionOperation, logic string) (bool, error) {
 	if len(conditions) == 0 {
-		return true, nil // 没有条件，直接通过
+		return true, nil
 	}
 	results := make([]bool, len(conditions))
 	for i, condition := range conditions {
@@ -529,7 +524,6 @@ func checkConditions(data []byte, contextJSON string, conditions []ConditionOper
 }
 
 func checkSingleCondition(data []byte, contextJSON string, condition ConditionOperation) (bool, error) {
-	// 处理负数索引
 	path := processNegativeIndex(data, condition.Path)
 	value := gjson.GetBytes(data, path)
 	if !value.Exists() && contextJSON != "" {
@@ -542,7 +536,7 @@ func checkSingleCondition(data []byte, contextJSON string, condition ConditionOp
 		return false, nil
 	}
 
-	// 利用gjson的类型解析
+	// gjson
 	targetBytes, err := common.Marshal(condition.Value)
 	if err != nil {
 		return false, fmt.Errorf("failed to marshal condition value: %v", err)
@@ -590,7 +584,7 @@ func processNegativeIndex(data []byte, path string) string {
 	return result
 }
 
-// compareGjsonValues 直接比较两个gjson.Result，支持所有比较模式
+// compareGjsonValues gjson.Result
 func compareGjsonValues(jsonValue, targetValue gjson.Result, mode string) (bool, error) {
 	switch mode {
 	case "full":
@@ -615,18 +609,16 @@ func compareGjsonValues(jsonValue, targetValue gjson.Result, mode string) (bool,
 }
 
 func compareEqual(jsonValue, targetValue gjson.Result) (bool, error) {
-	// 对null值特殊处理：两个都是null返回true，一个是null另一个不是返回false
+	// nullnulltruenullfalse
 	if jsonValue.Type == gjson.Null || targetValue.Type == gjson.Null {
 		return jsonValue.Type == gjson.Null && targetValue.Type == gjson.Null, nil
 	}
 
-	// 对布尔值特殊处理
 	if (jsonValue.Type == gjson.True || jsonValue.Type == gjson.False) &&
 		(targetValue.Type == gjson.True || targetValue.Type == gjson.False) {
 		return jsonValue.Bool() == targetValue.Bool(), nil
 	}
 
-	// 如果类型不同，报错
 	if jsonValue.Type != targetValue.Type {
 		return false, fmt.Errorf("compare for different types, got %v and %v", jsonValue.Type, targetValue.Type)
 	}
@@ -644,7 +636,6 @@ func compareEqual(jsonValue, targetValue gjson.Result) (bool, error) {
 }
 
 func compareNumeric(jsonValue, targetValue gjson.Result, operator string) (bool, error) {
-	// 只有数字类型才支持数值比较
 	if jsonValue.Type != gjson.Number || targetValue.Type != gjson.Number {
 		return false, fmt.Errorf("numeric comparison requires both values to be numbers, got %v and %v", jsonValue.Type, targetValue.Type)
 	}
@@ -666,17 +657,17 @@ func compareNumeric(jsonValue, targetValue gjson.Result, operator string) (bool,
 	}
 }
 
-// applyOperationsLegacy 原参数覆盖方法。
+// applyOperationsLegacy
 //
-// 旧实现把整个 jsonData unmarshal 成 map[string]interface{} 再 marshal 回来，
-// 对包含大 base64 字段（如 Gemini inlineData.data）的请求会放大数倍内存
-// （interface 装箱、map bucket、再次 marshal）。
-// 这里改成在 []byte 上直接调用 sjson.SetBytes，按顶层 key 逐个写入，
-// 不再把 payload 解码到 map[string]interface{}。
+// jsonData unmarshal map[string]interface{} marshal
+// base64 Gemini inlineData.data
+// interface map bucket marshal
+// []byte sjson.SetBytes key
+// payload map[string]interface{}
 //
-// 语义保持：每个 paramOverride 顶层 key 视为字面 key（不解析点号路径），
-// 与旧的 reqMap[key] = value 一致。包含 `.` `*` `?` `\` 的 key 会被转义，
-// 防止被 sjson 当作嵌套路径或通配符。
+// paramOverride key key
+// reqMap[key] = value `.` `*` `?` `\` key
+// sjson
 func applyOperationsLegacy(jsonData []byte, paramOverride map[string]interface{}, auditRecorder *paramOverrideAuditRecorder) ([]byte, error) {
 	if len(paramOverride) == 0 {
 		return jsonData, nil
@@ -696,8 +687,8 @@ func applyOperationsLegacy(jsonData []byte, paramOverride map[string]interface{}
 	return result, nil
 }
 
-// escapeSjsonLiteralKey 把可能被 sjson 误判为路径或通配符的字符转义，
-// 用于把字面 key 安全地传给 sjson.SetBytes / sjson.DeleteBytes。
+// escapeSjsonLiteralKey sjson
+// key sjson.SetBytes / sjson.DeleteBytes
 func escapeSjsonLiteralKey(key string) string {
 	if !strings.ContainsAny(key, ".*?\\") {
 		return key
@@ -715,13 +706,13 @@ func escapeSjsonLiteralKey(key string) string {
 	return sb.String()
 }
 
-// applyOperations 在 []byte 上原地应用所有 param override 操作。
+// applyOperations []byte param override
 //
-// 旧实现走 string-based gjson/sjson，在 ApplyParamOverride 入口会做
-// string(jsonData) 与最终 []byte(result) 各一次整包拷贝，对大 base64
-// payload 来说每次重试都额外多花 2 倍 body 体积的临时内存。
-// 这里改成全程在 []byte 上工作，sjson.SetBytes / gjson.GetBytes 都是
-// 直接读写 []byte，每个操作只会产生一份新 buffer。
+// string-based gjson/sjson ApplyParamOverride
+// string(jsonData) []byte(result) base64
+// payload 2 body
+// []byte sjson.SetBytes / gjson.GetBytes
+// []byte buffer
 func applyOperations(jsonData []byte, operations []ParamOperation, conditionContext map[string]interface{}) ([]byte, error) {
 	context := ensureContextMap(conditionContext)
 	auditRecorder := getParamOverrideAuditRecorder(context)
@@ -732,15 +723,13 @@ func applyOperations(jsonData []byte, operations []ParamOperation, conditionCont
 
 	result := jsonData
 	for _, op := range operations {
-		// 检查条件是否满足
 		ok, err := checkConditions(result, contextJSON, op.Conditions, op.Logic)
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
-			continue // 条件不满足，跳过当前操作
+			continue
 		}
-		// 处理路径中的负数索引
 		opPath := processNegativeIndex(result, op.Path)
 		var opPaths []string
 		if isPathBasedOperation(op.Mode) {
@@ -1664,7 +1653,6 @@ func modifyValue(data []byte, path string, value interface{}, keepOrigin, isPrep
 func modifyArray(data []byte, path string, value interface{}, isPrepend bool) ([]byte, error) {
 	current := gjson.GetBytes(data, path)
 	var newArray []interface{}
-	// 添加新值
 	addValue := func() {
 		if arr, ok := value.([]interface{}); ok {
 			newArray = append(newArray, arr...)
@@ -1672,7 +1660,6 @@ func modifyArray(data []byte, path string, value interface{}, isPrepend bool) ([
 			newArray = append(newArray, value)
 		}
 	}
-	// 添加原值
 	addOriginal := func() {
 		current.ForEach(func(_, val gjson.Result) bool {
 			newArray = append(newArray, val.Value())
@@ -2012,11 +1999,10 @@ func mergeObjects(data []byte, path string, value interface{}, keepOrigin bool) 
 	current := gjson.GetBytes(data, path)
 	var currentMap, newMap map[string]interface{}
 
-	// 解析当前值（current.Raw 是 data 的子串，避免再分配一份）
+	// current.Raw data
 	if err := common.UnmarshalJsonStr(current.Raw, &currentMap); err != nil {
 		return nil, err
 	}
-	// 解析新值
 	switch v := value.(type) {
 	case map[string]interface{}:
 		newMap = v
@@ -2026,7 +2012,6 @@ func mergeObjects(data []byte, path string, value interface{}, keepOrigin bool) 
 			return nil, err
 		}
 	}
-	// 合并
 	result := make(map[string]interface{})
 	for k, v := range currentMap {
 		result[k] = v
@@ -2039,12 +2024,11 @@ func mergeObjects(data []byte, path string, value interface{}, keepOrigin bool) 
 	return sjson.SetBytes(data, path, result)
 }
 
-// BuildParamOverrideContext 提供 ApplyParamOverride 可用的上下文信息。
-// 目前内置以下字段：
-//   - upstream_model/model：始终为通道映射后的上游模型名。
-//   - original_model：请求最初指定的模型名。
-//   - request_path：请求路径
-//   - is_channel_test：是否为渠道测试请求（同 is_test）。
+// BuildParamOverrideContext ApplyParamOverride
+// - upstream_model/model
+// - original_model
+// - request_path
+// - is_channel_test is_test
 func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
 	if info == nil {
 		return nil

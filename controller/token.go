@@ -120,7 +120,7 @@ func GetTokenUsage(c *gin.Context) {
 	if authHeader == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"message": "No Authorization header",
+			"message": common.TranslateMessage(c, i18n.MsgTokenNotProvided),
 		})
 		return
 	}
@@ -129,7 +129,7 @@ func GetTokenUsage(c *gin.Context) {
 	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"message": "Invalid Bearer token",
+			"message": common.TranslateMessage(c, i18n.MsgTokenInvalid),
 		})
 		return
 	}
@@ -149,7 +149,7 @@ func GetTokenUsage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    true,
-		"message": "ok",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 		"data": gin.H{
 			"object":               "token_usage",
 			"name":                 token.Name,
@@ -175,7 +175,6 @@ func AddToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
-	// 非无限额度时，检查额度值是否超出有效范围
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
@@ -187,7 +186,6 @@ func AddToken(c *gin.Context) {
 			return
 		}
 	}
-	// 检查用户令牌数量是否已达上限
 	maxTokens := operation_setting.GetMaxUserTokens()
 	count, err := model.CountUserTokens(c.GetInt("id"))
 	if err != nil {

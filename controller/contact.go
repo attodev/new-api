@@ -30,7 +30,7 @@ func Contact(c *gin.Context) {
 	}
 
 	if common.ContactEmail == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "contact recipient email is not configured"})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgContactNotConfigured)})
 		return
 	}
 

@@ -60,7 +60,7 @@ func ThemeAwarePath(suffix string) string {
 // var ChatLink = ""
 // var ChatLink2 = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
-// 保留旧变量以兼容历史逻辑，实际展示由 general_setting.quota_display_type 控制
+// general_setting.quota_display_type
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
 var DrawingEnabled = true
@@ -91,8 +91,8 @@ var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
 var RegisterEnabled = true
 
-var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制
-var EmailAliasRestrictionEnabled = false  // 是否启用邮箱别名限制
+var EmailDomainRestrictionEnabled = false
+var EmailAliasRestrictionEnabled = false
 var EmailDomainWhitelist = []string{
 	"gmail.com",
 	"163.com",
@@ -157,8 +157,8 @@ var RetryTimes = 0
 
 var IsMasterNode bool
 
-// NodeName 节点名称，从 NODE_NAME 环境变量读取；
-// 用于审计日志中标识节点身份，在容器/K8s 部署时比自动探测到的容器内网 IP 更具可读性。
+// NodeName NODE_NAME
+// /K8s IP
 var NodeName = ""
 
 var requestInterval int

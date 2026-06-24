@@ -9,7 +9,7 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 )
 
-// Monitor 定时监控cpu使用率，超过阈值输出pprof文件
+// Monitor cpupprof
 func Monitor() {
 	for {
 		percent, err := cpu.Percent(time.Second, false)

@@ -20,7 +20,7 @@ func CheckSensitiveMessages(messages []dto.Message) ([]string, error) {
 				// TODO: check image url
 				continue
 			}
-			// 检查 text 是否为空
+			// text
 			if m.Text == "" {
 				continue
 			}
@@ -36,7 +36,7 @@ func CheckSensitiveText(text string) (bool, []string) {
 	return SensitiveWordContains(text)
 }
 
-// SensitiveWordContains 是否包含敏感词，返回是否包含敏感词和敏感词列表
+// SensitiveWordContains
 func SensitiveWordContains(text string) (bool, []string) {
 	if len(setting.SensitiveWords) == 0 {
 		return false, nil
@@ -48,7 +48,7 @@ func SensitiveWordContains(text string) (bool, []string) {
 	return AcSearch(checkText, setting.SensitiveWords, true)
 }
 
-// SensitiveWordReplace 敏感词替换，返回是否包含敏感词和替换后的文本
+// SensitiveWordReplace
 func SensitiveWordReplace(text string, returnImmediately bool) (bool, []string, string) {
 	if len(setting.SensitiveWords) == 0 {
 		return false, nil, text

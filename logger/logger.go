@@ -120,7 +120,6 @@ func logHelper(ctx context.Context, level string, msg string) {
 }
 
 func LogQuota(quota int) string {
-	// 新逻辑：根据额度展示类型输出
 	q := float64(quota)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:
@@ -172,7 +171,7 @@ func FormatQuota(quota int) string {
 	}
 }
 
-// LogJson 仅供测试使用 only for test
+// LogJson only for test
 func LogJson(ctx context.Context, msg string, obj any) {
 	if !common.DebugEnabled {
 		return

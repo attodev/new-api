@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-contrib/sessions"
@@ -33,7 +33,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 		return nil, errors.New("invalid parameters")
 	}
 	values := map[string]string{"client_id": common.GitHubClientId, "client_secret": common.GitHubClientSecret, "code": code}
-	jsonData, err := json.Marshal(values)
+	jsonData, err := common.Marshal(values)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	defer res.Body.Close()
 	var oAuthResponse GitHubOAuthResponse
-	err = json.NewDecoder(res.Body).Decode(&oAuthResponse)
+	err = common.DecodeJson(res.Body, &oAuthResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	defer res2.Body.Close()
 	var githubUser GitHubUser
-	err = json.NewDecoder(res2.Body).Decode(&githubUser)
+	err = common.DecodeJson(res2.Body, &githubUser)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func GitHubOAuth(c *gin.Context) {
 	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"message": "state is empty or not same",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthStateInvalid),
 		})
 		return
 	}
@@ -98,7 +98,7 @@ func GitHubOAuth(c *gin.Context) {
 	if !common.GitHubOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "GitHub login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "GitHub"}),
 		})
 		return
 	}
@@ -126,7 +126,7 @@ func GitHubOAuth(c *gin.Context) {
 		if user.Id == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "user has been deactivated",
+				"message": common.TranslateMessage(c, i18n.MsgUserDisabled),
 			})
 			return
 		}
@@ -157,7 +157,7 @@ func GitHubOAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "new user registration is disabled by admin",
+				"message": common.TranslateMessage(c, i18n.MsgUserRegisterDisabled),
 			})
 			return
 		}
@@ -165,7 +165,7 @@ func GitHubOAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "user has been banned",
+			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			"success": false,
 		})
 		return
@@ -177,7 +177,7 @@ func GitHubBind(c *gin.Context) {
 	if !common.GitHubOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "GitHub login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "GitHub"}),
 		})
 		return
 	}
@@ -193,7 +193,7 @@ func GitHubBind(c *gin.Context) {
 	if model.IsGitHubIdAlreadyTaken(user.GitHubId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "this GitHub account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 		})
 		return
 	}
@@ -214,7 +214,7 @@ func GitHubBind(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "bind",
+		"message": common.TranslateMessage(c, i18n.MsgOAuthBindSuccess),
 	})
 	return
 }

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-contrib/sessions"
@@ -40,7 +40,7 @@ func getWeChatIdByCode(code string) (string, error) {
 	}
 	defer httpResponse.Body.Close()
 	var res wechatLoginResponse
-	err = json.NewDecoder(httpResponse.Body).Decode(&res)
+	err = common.DecodeJson(httpResponse.Body, &res)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +56,7 @@ func getWeChatIdByCode(code string) (string, error) {
 func WeChatAuth(c *gin.Context) {
 	if !common.WeChatAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "WeChat login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "WeChat"}),
 			"success": false,
 		})
 		return
@@ -85,7 +85,7 @@ func WeChatAuth(c *gin.Context) {
 		if user.Id == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "user has been deactivated",
+				"message": common.TranslateMessage(c, i18n.MsgUserDisabled),
 			})
 			return
 		}
@@ -106,7 +106,7 @@ func WeChatAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "new user registration is disabled by admin",
+				"message": common.TranslateMessage(c, i18n.MsgUserRegisterDisabled),
 			})
 			return
 		}
@@ -114,7 +114,7 @@ func WeChatAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "user has been banned",
+			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			"success": false,
 		})
 		return
@@ -129,7 +129,7 @@ type wechatBindRequest struct {
 func WeChatBind(c *gin.Context) {
 	if !common.WeChatAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "WeChat login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "WeChat"}),
 			"success": false,
 		})
 		return
@@ -138,7 +138,7 @@ func WeChatBind(c *gin.Context) {
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "invalid request",
+			"message": common.TranslateMessage(c, i18n.MsgInvalidParams),
 		})
 		return
 	}
@@ -154,7 +154,7 @@ func WeChatBind(c *gin.Context) {
 	if model.IsWeChatIdAlreadyTaken(wechatId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "this WeChat account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 		})
 		return
 	}

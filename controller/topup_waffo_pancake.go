@@ -147,7 +147,7 @@ func SaveWaffoPancake(c *gin.Context) {
 			"Waffo Pancake save config failed store_id=%q product_id=%q error=%q",
 			req.StoreID, req.ProductID, err.Error(),
 		))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "save config failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupSaveConfigFailed)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -185,7 +185,7 @@ func CreateWaffoPancakePair(c *gin.Context) {
 	}
 	merchantID, privateKey := resolveWaffoPancakeAdminCreds(req.MerchantID, req.PrivateKey)
 	if merchantID == "" || privateKey == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo Pancake credentials not configured"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupWaffoPancakeNotConfig)})
 		return
 	}
 	result, err := service.CreateWaffoPancakePrimaryPair(
@@ -236,7 +236,7 @@ func ListWaffoPancakeCatalog(c *gin.Context) {
 	}
 	merchantID, privateKey := resolveWaffoPancakeAdminCreds(req.MerchantID, req.PrivateKey)
 	if merchantID == "" || privateKey == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo Pancake credentials not configured"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupWaffoPancakeNotConfig)})
 		return
 	}
 	catalog, err := service.ListWaffoPancakeCatalog(c.Request.Context(), merchantID, privateKey)
@@ -244,7 +244,7 @@ func ListWaffoPancakeCatalog(c *gin.Context) {
 		logger.LogError(c.Request.Context(), fmt.Sprintf(
 			"Waffo Pancake fetch store and product catalog failed error=%q", err.Error(),
 		))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "fetch catalog failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupFetchCatalogFailed)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": catalog})
@@ -269,17 +269,17 @@ func CreateWaffoPancakeSubscriptionProduct(c *gin.Context) {
 		}
 	}
 	if strings.TrimSpace(req.Name) == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "plan name cannot be empty"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupPlanNameEmpty)})
 		return
 	}
 	if strings.TrimSpace(req.Amount) == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "plan price cannot be empty"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupPlanPriceEmpty)})
 		return
 	}
 	merchantID, privateKey := resolveWaffoPancakeAdminCreds("", "")
 	storeID := strings.TrimSpace(setting.WaffoPancakeStoreID)
 	if merchantID == "" || privateKey == "" || storeID == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo Pancake not fully configured, please complete gateway binding in payment settings"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupWaffoPancakeNotFull)})
 		return
 	}
 	productID, err := service.CreateWaffoPancakeProductForPlan(
@@ -296,7 +296,7 @@ func CreateWaffoPancakeSubscriptionProduct(c *gin.Context) {
 			"Waffo Pancake create plan product failed store_id=%q name=%q amount=%q error=%q",
 			storeID, req.Name, req.Amount, err.Error(),
 		))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "create plan product failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupCreatePlanFailed)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -316,7 +316,7 @@ func ListWaffoPancakeSubscriptionProductOptions(c *gin.Context) {
 	merchantID, privateKey := resolveWaffoPancakeAdminCreds("", "")
 	storeID := strings.TrimSpace(setting.WaffoPancakeStoreID)
 	if merchantID == "" || privateKey == "" || storeID == "" {
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo Pancake not fully configured, please complete gateway binding in payment settings"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupWaffoPancakeNotFull)})
 		return
 	}
 	catalog, err := service.ListWaffoPancakeCatalog(c.Request.Context(), merchantID, privateKey)
@@ -324,7 +324,7 @@ func ListWaffoPancakeSubscriptionProductOptions(c *gin.Context) {
 		logger.LogError(c.Request.Context(), fmt.Sprintf(
 			"Waffo Pancake fetch subscription product list failed store_id=%q error=%q", storeID, err.Error(),
 		))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "fetch product list failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgTopupFetchProductsFailed)})
 		return
 	}
 	products := []service.WaffoPancakeCatalogProduct{}
@@ -404,7 +404,7 @@ func RequestWaffoPancakePay(c *gin.Context) {
 	}
 	if err := topUp.Insert(); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo Pancake create topup order failed user_id=%d trade_no=%s amount=%d error=%q", id, tradeNo, req.Amount, err.Error()))
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "create order failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgPaymentCreateFailed)})
 		return
 	}
 
@@ -424,7 +424,7 @@ func RequestWaffoPancakePay(c *gin.Context) {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo Pancake create checkout session failed user_id=%d trade_no=%s error=%q", id, tradeNo, err.Error()))
 		topUp.Status = common.TopUpStatusFailed
 		_ = topUp.Update()
-		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "payment start failed"})
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgPaymentStartFailed)})
 		return
 	}
 	logger.LogInfo(c.Request.Context(), fmt.Sprintf("Waffo Pancake topup order created user_id=%d trade_no=%s session_id=%s amount=%d money=%.2f", id, tradeNo, session.SessionID, req.Amount, payMoney))

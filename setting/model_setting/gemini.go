@@ -4,7 +4,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
-// GeminiSettings defines Gemini model configuration. 注意bool要以enabled结尾才可以生效编辑
+// GeminiSettings defines Gemini model configuration. boolenabled
 type GeminiSettings struct {
 	SafetySettings                        map[string]string `json:"safety_settings"`
 	VersionSettings                       map[string]string `json:"version_settings"`
@@ -15,7 +15,6 @@ type GeminiSettings struct {
 	RemoveFunctionResponseIdEnabled       bool              `json:"remove_function_response_id_enabled"`
 }
 
-// 默认配置
 var defaultGeminiSettings = GeminiSettings{
 	SafetySettings: map[string]string{
 		"default": "OFF",
@@ -37,20 +36,18 @@ var defaultGeminiSettings = GeminiSettings{
 	RemoveFunctionResponseIdEnabled:       true,
 }
 
-// 全局实例
 var geminiSettings = defaultGeminiSettings
 
 func init() {
-	// 注册到全局配置管理器
 	config.GlobalConfig.Register("gemini", &geminiSettings)
 }
 
-// GetGeminiSettings 获取Gemini配置
+// GetGeminiSettings Gemini
 func GetGeminiSettings() *GeminiSettings {
 	return &geminiSettings
 }
 
-// GetGeminiSafetySetting 获取安全设置
+// GetGeminiSafetySetting
 func GetGeminiSafetySetting(key string) string {
 	if value, ok := geminiSettings.SafetySettings[key]; ok {
 		return value
@@ -58,7 +55,7 @@ func GetGeminiSafetySetting(key string) string {
 	return geminiSettings.SafetySettings["default"]
 }
 
-// GetGeminiVersionSetting 获取版本设置
+// GetGeminiVersionSetting
 func GetGeminiVersionSetting(key string) string {
 	if value, ok := geminiSettings.VersionSettings[key]; ok {
 		return value

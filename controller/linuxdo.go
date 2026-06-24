@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-contrib/sessions"
@@ -31,7 +31,7 @@ func LinuxDoBind(c *gin.Context) {
 	if !common.LinuxDOOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "Linux DO login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Linux DO"}),
 		})
 		return
 	}
@@ -50,7 +50,7 @@ func LinuxDoBind(c *gin.Context) {
 	if model.IsLinuxDOIdAlreadyTaken(user.LinuxDOId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "this Linux DO account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 		})
 		return
 	}
@@ -74,7 +74,7 @@ func LinuxDoBind(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "bind",
+		"message": common.TranslateMessage(c, i18n.MsgOAuthBindSuccess),
 	})
 }
 
@@ -120,7 +120,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 		AccessToken string `json:"access_token"`
 		Message     string `json:"message"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&tokenRes); err != nil {
+	if err := common.DecodeJson(res.Body, &tokenRes); err != nil {
 		return nil, err
 	}
 
@@ -144,7 +144,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 	defer res2.Body.Close()
 
 	var linuxdoUser LinuxdoUser
-	if err := json.NewDecoder(res2.Body).Decode(&linuxdoUser); err != nil {
+	if err := common.DecodeJson(res2.Body, &linuxdoUser); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +172,7 @@ func LinuxdoOAuth(c *gin.Context) {
 	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"message": "state is empty or not same",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthStateInvalid),
 		})
 		return
 	}
@@ -186,7 +186,7 @@ func LinuxdoOAuth(c *gin.Context) {
 	if !common.LinuxDOOAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "Linux DO login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Linux DO"}),
 		})
 		return
 	}
@@ -215,7 +215,7 @@ func LinuxdoOAuth(c *gin.Context) {
 		if user.Id == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "user has been deactivated",
+				"message": common.TranslateMessage(c, i18n.MsgUserDisabled),
 			})
 			return
 		}
@@ -243,14 +243,14 @@ func LinuxdoOAuth(c *gin.Context) {
 			} else {
 				c.JSON(http.StatusOK, gin.H{
 					"success": false,
-					"message": "Linux DO trust level does not meet the minimum trust level set by admin",
+					"message": common.TranslateMessage(c, i18n.MsgOAuthTrustLevelLow),
 				})
 				return
 			}
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "new user registration is disabled by admin",
+				"message": common.TranslateMessage(c, i18n.MsgUserRegisterDisabled),
 			})
 			return
 		}
@@ -258,7 +258,7 @@ func LinuxdoOAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "user has been banned",
+			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			"success": false,
 		})
 		return

@@ -120,9 +120,8 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var toolCount int
 	var usage = &dto.Usage{}
 	var lastStreamData string
-	var secondLastStreamData string // 存储倒数第二个stream data，用于音频模型
+	var secondLastStreamData string // stream data
 
-	// 检查是否为音频模型
 	isAudioModel := strings.Contains(strings.ToLower(model), "audio")
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
@@ -133,7 +132,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 		if len(data) > 0 {
-			// 对音频模型，保存倒数第二个stream data
+			// stream data
 			if isAudioModel && lastStreamData != "" {
 				secondLastStreamData = lastStreamData
 			}
@@ -146,7 +145,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		}
 	})
 
-	// 对音频模型，从倒数第二个stream data中提取usage信息
+	// stream datausage
 	if isAudioModel && secondLastStreamData != "" {
 		var streamResp struct {
 			Usage *dto.Usage `json:"usage"`
@@ -164,7 +163,6 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		}
 	}
 
-	// 处理最后的响应
 	shouldSendLastResp := true
 	if err := handleLastResponse(lastStreamData, &responseId, &createAt, &systemFingerprint, &model, &usage,
 		&containStreamUsage, info, &shouldSendLastResp); err != nil {
@@ -200,7 +198,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	logger.LogDebug(c, "upstream response body: %s", responseBody)
 	// Unmarshal to simpleResponse
 	if info.ChannelType == constant.ChannelTypeOpenRouter && info.ChannelOtherSettings.IsOpenRouterEnterprise() {
-		// 尝试解析为 openrouter enterprise
+		// openrouter enterprise
 		var enterpriseResponse openrouter.OpenRouterEnterpriseResponse
 		err = common.Unmarshal(responseBody, &enterpriseResponse)
 		if err != nil {
@@ -449,7 +447,6 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 							errChan <- fmt.Errorf("error consume usage: %v", err)
 							return
 						}
-						// 本次计费完成，清除
 						usage = &dto.RealtimeUsage{}
 
 						localUsage = &dto.RealtimeUsage{}
@@ -470,7 +467,6 @@ func OpenaiRealtimeHandler(c *gin.Context, info *relaycommon.RelayInfo) (*types.
 							errChan <- fmt.Errorf("error consume usage: %v", err)
 							return
 						}
-						// 本次计费完成，清除
 						localUsage = &dto.RealtimeUsage{}
 						// print now usage
 					}
@@ -566,7 +562,7 @@ func OpenaiHandlerWithUsage(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
-	// 写入新的 response body
+	// response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	// Once we've written to the client, we should not return errors anymore
@@ -598,7 +594,7 @@ func applyUsagePostProcessing(info *relaycommon.RelayInfo, usage *dto.Usage, res
 			usage.PromptTokensDetails.CachedTokens = usage.PromptCacheHitTokens
 		}
 	case constant.ChannelTypeZhipu_v4:
-		// 智普的cached_tokens在标准位置: usage.prompt_tokens_details.cached_tokens
+		// cached_tokens: usage.prompt_tokens_details.cached_tokens
 		if usage.PromptTokensDetails.CachedTokens == 0 {
 			if usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedTokens > 0 {
 				usage.PromptTokensDetails.CachedTokens = usage.InputTokensDetails.CachedTokens
@@ -609,7 +605,7 @@ func applyUsagePostProcessing(info *relaycommon.RelayInfo, usage *dto.Usage, res
 			}
 		}
 	case constant.ChannelTypeMoonshot:
-		// Moonshot的cached_tokens在非标准位置: choices[].usage.cached_tokens
+		// Moonshotcached_tokens: choices[].usage.cached_tokens
 		if usage.PromptTokensDetails.CachedTokens == 0 {
 			if usage.InputTokensDetails != nil && usage.InputTokensDetails.CachedTokens > 0 {
 				usage.PromptTokensDetails.CachedTokens = usage.InputTokensDetails.CachedTokens
@@ -661,8 +657,8 @@ func extractCachedTokensFromBody(body []byte) (int, bool) {
 	return 0, false
 }
 
-// extractMoonshotCachedTokensFromBody 从Moonshot的非标准位置提取cached_tokens
-// Moonshot的流式响应格式: {"choices":[{"usage":{"cached_tokens":111}}]}
+// extractMoonshotCachedTokensFromBody Moonshotcached_tokens
+// Moonshot: {"choices":[{"usage":{"cached_tokens":111}}]}
 func extractMoonshotCachedTokensFromBody(body []byte) (int, bool) {
 	if len(body) == 0 {
 		return 0, false
@@ -680,7 +676,7 @@ func extractMoonshotCachedTokensFromBody(body []byte) (int, bool) {
 		return 0, false
 	}
 
-	// 遍历choices查找cached_tokens
+	// choicescached_tokens
 	for _, choice := range payload.Choices {
 		if choice.Usage.CachedTokens != nil && *choice.Usage.CachedTokens > 0 {
 			return *choice.Usage.CachedTokens, true
@@ -690,7 +686,7 @@ func extractMoonshotCachedTokensFromBody(body []byte) (int, bool) {
 	return 0, false
 }
 
-// extractLlamaCachedTokensFromBody 从llama.cpp的非标准位置提取cache_n
+// extractLlamaCachedTokensFromBody llama.cppcache_n
 func extractLlamaCachedTokensFromBody(body []byte) (int, bool) {
 	if len(body) == 0 {
 		return 0, false

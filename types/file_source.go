@@ -8,8 +8,8 @@ import (
 	"sync"
 )
 
-// FileSource 统一的文件来源抽象接口
-// 支持 URL 和 base64 两种来源，提供懒加载和缓存机制
+// FileSource
+// URL base64
 type FileSource interface {
 	IsURL() bool
 	GetIdentifier() string
@@ -26,7 +26,7 @@ type FileSource interface {
 	Mu() *sync.Mutex
 }
 
-// baseFileSource 共享的缓存/锁/清理注册状态
+// baseFileSource //
 type baseFileSource struct {
 	cachedData  *CachedFileData
 	cacheLoaded bool
@@ -68,7 +68,7 @@ func (b *baseFileSource) Mu() *sync.Mutex {
 }
 
 // ---------------------------------------------------------------------------
-// URLSource — URL 来源的 FileSource 实现
+// URLSource — URL FileSource
 // ---------------------------------------------------------------------------
 
 type URLSource struct {
@@ -90,7 +90,7 @@ func (u *URLSource) GetRawData() string { return u.URL }
 func (u *URLSource) ClearRawData() {}
 
 // ---------------------------------------------------------------------------
-// Base64Source — Base64 内联数据来源的 FileSource 实现
+// Base64Source — Base64 FileSource
 // ---------------------------------------------------------------------------
 
 type Base64Source struct {
@@ -139,22 +139,22 @@ func NewFileSourceFromData(data string, mimeType string) FileSource {
 }
 
 // ---------------------------------------------------------------------------
-// CachedFileData — 缓存的文件数据（支持内存和磁盘两种模式）
+// CachedFileData —
 // ---------------------------------------------------------------------------
 
 type CachedFileData struct {
-	base64Data  string        // 内存中的 base64 数据（小文件）
-	MimeType    string        // MIME 类型
-	Size        int64         // 文件大小（字节）
-	DiskSize    int64         // 磁盘缓存实际占用大小（字节，通常是 base64 长度）
-	ImageConfig *image.Config // 图片配置（如果是图片）
-	ImageFormat string        // 图片格式（如果是图片）
+	base64Data  string        // base64
+	MimeType    string        // MIME
+	Size        int64
+	DiskSize    int64         // base64
+	ImageConfig *image.Config
+	ImageFormat string
 
-	diskPath        string     // 磁盘缓存文件路径（大文件）
-	isDisk          bool       // 是否使用磁盘缓存
-	diskMu          sync.Mutex // 磁盘操作锁（保护磁盘文件的读取和删除）
-	diskClosed      bool       // 是否已关闭/清理
-	statDecremented bool       // 是否已扣减统计
+	diskPath        string
+	isDisk          bool
+	diskMu          sync.Mutex
+	diskClosed      bool       // /
+	statDecremented bool
 
 	OnClose func(size int64)
 }

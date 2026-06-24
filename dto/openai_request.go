@@ -25,7 +25,7 @@ type FormatJsonSchema struct {
 }
 
 // GeneralOpenAIRequest represents a general request structure for OpenAI-compatible APIs.
-// 参数增加规范：无引用的参数必须使用json.RawMessage类型，并添加omitempty标签
+// json.RawMessageomitempty
 type GeneralOpenAIRequest struct {
 	Model               string            `json:"model,omitempty"`
 	Messages            []Message         `json:"messages,omitempty"`
@@ -65,12 +65,12 @@ type GeneralOpenAIRequest struct {
 	Dimensions  *int            `json:"dimensions,omitempty"`
 	Modalities  json.RawMessage `json:"modalities,omitempty"`
 	Audio       json.RawMessage `json:"audio,omitempty"`
-	// 安全标识符，用于帮助 OpenAI 检测可能违反使用政策的应用程序用户
-	// 注意：此字段会向 OpenAI 发送用户标识信息，默认过滤，可通过 allow_safety_identifier 开启
+	// OpenAI
+	// OpenAI allow_safety_identifier
 	SafetyIdentifier json.RawMessage `json:"safety_identifier,omitempty"`
 	// Whether or not to store the output of this chat completion request for use in our model distillation or evals products.
-	// 是否存储此次请求数据供 OpenAI 用于评估和优化产品
-	// 注意：默认允许透传，可通过 disable_store 禁用；禁用后可能导致 Codex 无法正常使用
+	// OpenAI
+	// disable_store Codex
 	Store json.RawMessage `json:"store,omitempty"`
 	// Used by OpenAI to cache responses for similar requests to optimize your cache hit rates. Replaces the user field
 	PromptCacheKey       string          `json:"prompt_cache_key,omitempty"`
@@ -427,7 +427,7 @@ const (
 	ContentTypeImageURL   = "image_url"
 	ContentTypeInputAudio = "input_audio"
 	ContentTypeFile       = "file"
-	ContentTypeVideoUrl   = "video_url" // 阿里百炼视频识别
+	ContentTypeVideoUrl   = "video_url"
 	//ContentTypeAudioUrl   = "audio_url"
 )
 
@@ -523,7 +523,6 @@ func (m *Message) ParseContent() []MediaContent {
 	}
 
 	var contentList []MediaContent
-	// 先尝试解析为字符串
 	content, ok := m.Content.(string)
 	if ok {
 		contentList = []MediaContent{{
@@ -534,7 +533,6 @@ func (m *Message) ParseContent() []MediaContent {
 		return contentList
 	}
 
-	// 尝试解析为数组
 	//var arrayContent []map[string]interface{}
 
 	arrayContent, ok := m.Content.([]any)
@@ -711,7 +709,6 @@ func (m *Message) ParseContent() []MediaContent {
 
 	var contentList []MediaContent
 
-	// 先尝试解析为字符串
 	var stringContent string
 	if err := json.Unmarshal(m.Content, &stringContent); err == nil {
 		contentList = []MediaContent{{
@@ -722,7 +719,6 @@ func (m *Message) ParseContent() []MediaContent {
 		return contentList
 	}
 
-	// 尝试解析为数组
 	var arrayContent []map[string]interface{}
 	if err := json.Unmarshal(m.Content, &arrayContent); err == nil {
 		for _, contentItem := range arrayContent {
@@ -831,7 +827,6 @@ type OpenAIResponsesRequest struct {
 	Model   string          `json:"model"`
 	Input   json.RawMessage `json:"input,omitempty"`
 	Include json.RawMessage `json:"include,omitempty"`
-	// 在后台运行推理，暂时还不支持依赖的接口
 	// Background         json.RawMessage `json:"background,omitempty"`
 	Conversation       json.RawMessage `json:"conversation,omitempty"`
 	ContextManagement  json.RawMessage `json:"context_management,omitempty"`
@@ -858,7 +853,7 @@ type OpenAIResponsesRequest struct {
 	Temperature      *float64        `json:"temperature,omitempty"`
 	Text             json.RawMessage `json:"text,omitempty"`
 	ToolChoice       json.RawMessage `json:"tool_choice,omitempty"`
-	Tools            json.RawMessage `json:"tools,omitempty"` // 需要处理的参数很少，MCP 参数太多不确定，所以用 map
+	Tools            json.RawMessage `json:"tools,omitempty"` // MCP map
 	TopP             *float64        `json:"top_p,omitempty"`
 	Truncation       json.RawMessage `json:"truncation,omitempty"`
 	User             json.RawMessage `json:"user,omitempty"`
@@ -963,7 +958,7 @@ type MediaInput struct {
 	Text     string `json:"text,omitempty"`
 	FileUrl  string `json:"file_url,omitempty"`
 	ImageUrl string `json:"image_url,omitempty"`
-	Detail   string `json:"detail,omitempty"` // 仅 input_image 有效
+	Detail   string `json:"detail,omitempty"` // input_image
 }
 
 // ParseInput parses the Responses API `input` field into a normalized slice of MediaInput.

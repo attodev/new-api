@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -61,7 +61,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	}
 	defer res.Body.Close()
 	var discordResponse DiscordResponse
-	err = json.NewDecoder(res.Body).Decode(&discordResponse)
+	err = common.DecodeJson(res.Body, &discordResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	}
 
 	var discordUser DiscordUser
-	err = json.NewDecoder(res2.Body).Decode(&discordUser)
+	err = common.DecodeJson(res2.Body, &discordUser)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func DiscordOAuth(c *gin.Context) {
 	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"message": "state is empty or not same",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthStateInvalid),
 		})
 		return
 	}
@@ -117,7 +117,7 @@ func DiscordOAuth(c *gin.Context) {
 	if !system_setting.GetDiscordSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "Discord login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Discord"}),
 		})
 		return
 	}
@@ -162,7 +162,7 @@ func DiscordOAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "new user registration is disabled by admin",
+				"message": common.TranslateMessage(c, i18n.MsgUserRegisterDisabled),
 			})
 			return
 		}
@@ -170,7 +170,7 @@ func DiscordOAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "user has been banned",
+			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			"success": false,
 		})
 		return
@@ -182,7 +182,7 @@ func DiscordBind(c *gin.Context) {
 	if !system_setting.GetDiscordSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "Discord login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Discord"}),
 		})
 		return
 	}
@@ -198,7 +198,7 @@ func DiscordBind(c *gin.Context) {
 	if model.IsDiscordIdAlreadyTaken(user.DiscordId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "this Discord account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 		})
 		return
 	}
@@ -218,6 +218,6 @@ func DiscordBind(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "bind",
+		"message": common.TranslateMessage(c, i18n.MsgOAuthBindSuccess),
 	})
 }

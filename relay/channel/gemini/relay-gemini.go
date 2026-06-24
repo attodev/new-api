@@ -52,7 +52,7 @@ var geminiSupportedMimeTypes = map[string]bool{
 
 const thoughtSignatureBypassValue = "context_engineering_is_the_way_to_go"
 
-// Gemini 允许的思考预算范围
+// Gemini
 const (
 	pro25MinBudget       = 128
 	pro25MaxBudget       = 32768
@@ -71,7 +71,7 @@ func is25FlashLiteModel(modelName string) bool {
 	return strings.HasPrefix(modelName, "gemini-2.5-flash-lite")
 }
 
-// clampThinkingBudget 根据模型名称将预算限制在允许的范围内
+// clampThinkingBudget
 func clampThinkingBudget(modelName string, budget int) int {
 	isNew25Pro := isNew25ProModel(modelName)
 	is25FlashLite := is25FlashLiteModel(modelName)
@@ -90,7 +90,7 @@ func clampThinkingBudget(modelName string, budget int) int {
 		if budget > pro25MaxBudget {
 			return pro25MaxBudget
 		}
-	} else { // 其他模型
+	} else {
 		if budget < 0 {
 			return 0
 		}
@@ -176,7 +176,7 @@ func ThinkingAdaptor(geminiRequest *dto.GeminiChatRequest, info *relaycommon.Rel
 					geminiRequest.GenerationConfig.ThinkingConfig.ThinkingBudget = common.GetPointer(clampedBudget)
 				} else {
 					if len(oaiRequest) > 0 {
-						// 如果有reasoningEffort参数，则根据其值设置思考预算
+						// reasoningEffort
 						geminiRequest.GenerationConfig.ThinkingConfig.ThinkingBudget = common.GetPointer(clampThinkingBudgetByEffort(modelName, oaiRequest[0].ReasoningEffort))
 					}
 				}
@@ -270,10 +270,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 							budgetInt := int(v)
 							tempThinkingConfig.ThinkingBudget = common.GetPointer(budgetInt)
 							if budgetInt > 0 {
-								// 有正数预算
 								tempThinkingConfig.IncludeThoughts = true
 							} else {
-								// 存在但为0或负数，禁用思考
+								// 0
 								tempThinkingConfig.IncludeThoughts = false
 							}
 							hasThinkingConfig = true
@@ -300,11 +299,10 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					}
 
 					if hasThinkingConfig {
-						// 避免 panic: 仅在获得配置时分配，防止后续赋值时空指针
+						// panic:
 						if geminiRequest.GenerationConfig.ThinkingConfig == nil {
 							geminiRequest.GenerationConfig.ThinkingConfig = &tempThinkingConfig
 						} else {
-							// 如果已分配，则合并内容
 							if tempThinkingConfig.ThinkingBudget != nil {
 								geminiRequest.GenerationConfig.ThinkingConfig.ThinkingBudget = tempThinkingConfig.ThinkingBudget
 							}
@@ -435,7 +433,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 		geminiRequest.GenerationConfig.ResponseMimeType = "application/json"
 
 		if len(textRequest.ResponseFormat.JsonSchema) > 0 {
-			// 先将json.RawMessage解析
+			// json.RawMessage
 			var jsonSchema dto.FormatJsonSchema
 			if err := common.Unmarshal(textRequest.ResponseFormat.JsonSchema, &jsonSchema); err == nil {
 				cleanedSchema := removeAdditionalPropertiesWithDepth(jsonSchema.Schema, 0)
@@ -466,15 +464,14 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			var contentMap map[string]interface{}
 			contentStr := message.StringContent()
 
-			// 1. 尝试解析为 JSON 对象
+			// 1. JSON
 			if err := json.Unmarshal([]byte(contentStr), &contentMap); err != nil {
-				// 2. 如果失败，尝试解析为 JSON 数组
+				// 2. JSON
 				var contentSlice []interface{}
 				if err := json.Unmarshal([]byte(contentStr), &contentSlice); err == nil {
-					// 如果是数组，包装成对象
 					contentMap = map[string]interface{}{"result": contentSlice}
 				} else {
-					// 3. 如果再次失败，作为纯文本处理
+					// 3.
 					contentMap = map[string]interface{}{"content": contentStr}
 				}
 			}
@@ -528,22 +525,19 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					continue
 				}
 				// check markdown image ![image](data:image/jpeg;base64,xxxxxxxxxxxx)
-				// 使用字符串查找而非正则，避免大文本性能问题
 				text := part.Text
 				hasMarkdownImage := false
 				for {
-					// 快速检查是否包含 markdown 图片标记
+					// markdown
 					startIdx := strings.Index(text, "![")
 					if startIdx == -1 {
 						break
 					}
-					// 找到 ](
 					bracketIdx := strings.Index(text[startIdx:], "](data:")
 					if bracketIdx == -1 {
 						break
 					}
 					bracketIdx += startIdx
-					// 找到闭合的 )
 					closeIdx := strings.Index(text[bracketIdx+2:], ")")
 					if closeIdx == -1 {
 						break
@@ -551,7 +545,6 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					closeIdx += bracketIdx + 2
 
 					hasMarkdownImage = true
-					// 添加图片前的文本
 					if startIdx > 0 {
 						textBefore := text[:startIdx]
 						if textBefore != "" {
@@ -560,7 +553,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 							})
 						}
 					}
-					// 提取 data URL (从 "](" 后面开始，到 ")" 之前)
+					// data URL ( "](" ")" )
 					dataUrl := text[bracketIdx+2 : closeIdx]
 					format, base64String, err := service.DecodeBase64FileData(dataUrl)
 					if err != nil {
@@ -576,10 +569,9 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 						imgPart.ThoughtSignature = json.RawMessage(strconv.Quote(thoughtSignatureBypassValue))
 					}
 					parts = append(parts, imgPart)
-					// 继续处理剩余文本
 					text = text[closeIdx+1:]
 				}
-				// 添加剩余文本或原始文本（如果没有找到 markdown 图片）
+				// markdown
 				if !hasMarkdownImage {
 					parts = append(parts, dto.GeminiPart{
 						Text: part.Text,
@@ -595,7 +587,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 					return nil, fmt.Errorf("get file data from '%s' failed: %w", source.GetIdentifier(), err)
 				}
 
-				// 校验 MimeType 是否在 Gemini 支持的白名单中
+				// MimeType Gemini
 				if _, ok := geminiSupportedMimeTypes[strings.ToLower(mimeType)]; !ok {
 					return nil, fmt.Errorf("mime type is not supported by Gemini: '%s', url: '%s', supported types are: %v", mimeType, source.GetIdentifier(), getSupportedMimeTypesList())
 				}
@@ -609,8 +601,8 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 			}
 		}
 
-		// 如果需要附加签名但还没有附加（没有 tool_calls 或 tool_calls 为空），
-		// 则在第一个文本 part 上附加 thoughtSignature
+		// tool_calls tool_calls
+		// part thoughtSignature
 		if shouldAttachThoughtSignature && !signatureAttached && len(parts) > 0 {
 			for i := range parts {
 				if parts[i].Text != "" {
@@ -644,7 +636,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	return &geminiRequest, nil
 }
 
-// parseStopSequences 解析停止序列，支持字符串或字符串数组
+// parseStopSequences
 func parseStopSequences(stop any) []string {
 	if stop == nil {
 		return nil
@@ -890,17 +882,17 @@ func removeAdditionalPropertiesWithDepth(schema interface{}, depth int) interfac
 	if !ok || len(v) == 0 {
 		return schema
 	}
-	// 删除所有的title字段
+	// title
 	delete(v, "title")
 	delete(v, "$schema")
-	// 如果type不为object和array，则直接返回
+	// typeobjectarray
 	if typeVal, exists := v["type"]; !exists || (typeVal != "object" && typeVal != "array") {
 		return schema
 	}
 	switch v["type"] {
 	case "object":
 		delete(v, "additionalProperties")
-		// 处理 properties
+		// properties
 		if properties, ok := v["properties"].(map[string]interface{}); ok {
 			for key, value := range properties {
 				properties[key] = removeAdditionalPropertiesWithDepth(value, depth+1)
@@ -928,13 +920,12 @@ func unescapeString(s string) (string, error) {
 	i := 0
 
 	for i < len(s) {
-		r, size := utf8.DecodeRuneInString(s[i:]) // 正确解码UTF-8字符
+		r, size := utf8.DecodeRuneInString(s[i:]) // UTF-8
 		if r == utf8.RuneError {
 			return "", fmt.Errorf("invalid UTF-8 encoding")
 		}
 
 		if escaped {
-			// 如果是转义符后的字符，检查其类型
 			switch r {
 			case '"':
 				result = append(result, '"')
@@ -955,18 +946,17 @@ func unescapeString(s string) (string, error) {
 			case '\'':
 				result = append(result, '\'')
 			default:
-				// 如果遇到一个非法的转义字符，直接按原样输出
 				result = append(result, '\\', r)
 			}
 			escaped = false
 		} else {
 			if r == '\\' {
-				escaped = true // 记录反斜杠作为转义符
+				escaped = true
 			} else {
 				result = append(result, r)
 			}
 		}
-		i += size // 移动到下一个字符
+		i += size
 	}
 
 	return string(result), nil
@@ -994,8 +984,8 @@ func unescapeMapOrSlice(data interface{}) interface{} {
 func getResponseToolCall(item *dto.GeminiPart) *dto.ToolCallResponse {
 	var argsBytes []byte
 	var err error
-	// 移除 unescapeMapOrSlice 调用，直接使用 json.Marshal
-	// JSON 序列化/反序列化已经正确处理了转义字符
+	// unescapeMapOrSlice json.Marshal
+	// JSON /
 	argsBytes, err = json.Marshal(item.FunctionCall.Arguments)
 
 	if err != nil {
@@ -1079,11 +1069,10 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 			FinishReason: constant.FinishReasonStop,
 		}
 		if len(candidate.Content.Parts) > 0 {
-			// 使用 strings.Builder 直接累积最终 content，避免:
-			//   1) 每张 inline image 生成一次中间 "![image](...)" 字符串
-			//   2) 末尾 strings.Join 再分配一份等大缓冲
-			// Gemini 图片返回时 InlineData.Data 可能是数 MB 的 base64，
-			// 上述两份临时分配在高并发下会显著放大堆驻留。
+			// strings.Builder content:
+			// 1) inline image "![image](...)"
+			// 2) strings.Join
+			// Gemini InlineData.Data MB base64
 			var content strings.Builder
 			var inlineGrow int
 			for _, part := range candidate.Content.Parts {
@@ -1104,7 +1093,6 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 			var toolCalls []dto.ToolCallResponse
 			for _, part := range candidate.Content.Parts {
 				if part.InlineData != nil {
-					// 媒体内容
 					if strings.HasPrefix(part.InlineData.MimeType, "image") {
 						writeSep()
 						content.WriteString("![image](data:")
@@ -1113,7 +1101,6 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 						content.WriteString(part.InlineData.Data)
 						content.WriteByte(')')
 					} else {
-						// 其他媒体类型，直接显示链接
 						writeSep()
 						content.WriteString("[media](data:")
 						content.WriteString(part.InlineData.MimeType)
@@ -1142,7 +1129,6 @@ func responseGeminiChat2OpenAI(c *gin.Context, response *dto.GeminiChatResponse)
 						content.WriteString(part.CodeExecutionResult.Output)
 						content.WriteString("\n```")
 					} else {
-						// 过滤掉空行
 						if part.Text != "\n" {
 							writeSep()
 							content.WriteString(part.Text)
@@ -1208,8 +1194,8 @@ func streamResponseGeminiChat2OpenAI(geminiResponse *dto.GeminiChatResponse) (*d
 				//Role: "assistant",
 			},
 		}
-		// 使用 strings.Builder 直接累积 delta content，避免每张 image / 每个
-		// 文本片段都先 `+` 拼出一份临时 string，再 strings.Join 再拷贝一遍。
+		// strings.Builder delta content image /
+		// `+` string strings.Join
 		var content strings.Builder
 		var inlineGrow int
 		for _, part := range candidate.Content.Parts {
@@ -1357,7 +1343,6 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			common.SetContextKey(c, constant.ContextKeyAdminRejectReason, fmt.Sprintf("gemini_block_reason=%s", *geminiResponse.PromptFeedback.BlockReason))
 		}
 
-		// 统计图片数量
 		for _, candidate := range geminiResponse.Candidates {
 			for _, part := range candidate.Content.Parts {
 				if part.InlineData != nil && part.InlineData.MimeType != "" {
@@ -1369,7 +1354,6 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			}
 		}
 
-		// 更新使用量统计
 		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
 			mappedUsage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 			*usage = mappedUsage

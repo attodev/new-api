@@ -60,7 +60,7 @@ func getWaffoCurrency() string {
 	return "USD"
 }
 
-// zeroDecimalCurrencies 零小数位币种，金额不能带小数点
+// zeroDecimalCurrencies
 var zeroDecimalCurrencies = map[string]bool{
 	"IDR": true, "JPY": true, "KRW": true, "VND": true,
 }
@@ -95,9 +95,9 @@ func getWaffoPayMoney(amount float64, group string) float64 {
 
 type WaffoPayRequest struct {
 	Amount         int64  `json:"amount"`
-	PayMethodIndex *int   `json:"pay_method_index"` // 服务端支付方式列表的索引，nil 表示由 Waffo 自动选择
-	PayMethodType  string `json:"pay_method_type"`  // Deprecated: 兼容旧前端，优先使用 pay_method_index
-	PayMethodName  string `json:"pay_method_name"`  // Deprecated: 兼容旧前端，优先使用 pay_method_index
+	PayMethodIndex *int   `json:"pay_method_index"` // nil Waffo
+	PayMethodType  string `json:"pay_method_type"`  // Deprecated: pay_method_index
+	PayMethodName  string `json:"pay_method_name"`  // Deprecated: pay_method_index
 }
 
 func RequestWaffoAmount(c *gin.Context) {
@@ -133,7 +133,7 @@ func RequestWaffoAmount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
 }
 
-// RequestWaffoPay 创建 Waffo 支付订单
+// RequestWaffoPay Waffo
 func RequestWaffoPay(c *gin.Context) {
 	if !setting.WaffoEnabled {
 		common.ApiErrorI18n(c, i18n.MsgTopupWaffoNotConfig)
@@ -162,11 +162,9 @@ func RequestWaffoPay(c *gin.Context) {
 		return
 	}
 
-	// 从服务端配置查找支付方式，客户端只传索引或旧字段
 	var resolvedPayMethodType, resolvedPayMethodName string
 	methods := setting.GetWaffoPayMethods()
 	if req.PayMethodIndex != nil {
-		// 新协议：按索引查找
 		idx := *req.PayMethodIndex
 		if idx < 0 || idx >= len(methods) {
 			logger.LogWarn(c.Request.Context(), fmt.Sprintf("Waffo invalid pay method index user_id=%d pay_method_index=%d method_count=%d", id, idx, len(methods)))
@@ -176,7 +174,6 @@ func RequestWaffoPay(c *gin.Context) {
 		resolvedPayMethodType = methods[idx].PayMethodType
 		resolvedPayMethodName = methods[idx].PayMethodName
 	} else if req.PayMethodType != "" {
-		// 兼容旧前端：验证客户端传的值在服务端列表中
 		valid := false
 		for _, m := range methods {
 			if m.PayMethodType == req.PayMethodType && m.PayMethodName == req.PayMethodName {
@@ -192,7 +189,7 @@ func RequestWaffoPay(c *gin.Context) {
 			return
 		}
 	}
-	// resolvedPayMethodType/Name 为空时，Waffo 自动选择支付方式
+	// resolvedPayMethodType/Name Waffo
 
 	group, _ := model.GetUserGroup(id, true)
 	payMoney := getWaffoPayMoney(float64(req.Amount), group)
@@ -201,11 +198,11 @@ func RequestWaffoPay(c *gin.Context) {
 		return
 	}
 
-	// 生成唯一订单号，paymentRequestId 与 merchantOrderId 保持一致，简化追踪
+	// paymentRequestId merchantOrderId
 	merchantOrderId := fmt.Sprintf("WAFFO-%d-%d-%s", id, time.Now().UnixMilli(), randstr.String(6))
 	paymentRequestId := merchantOrderId
 
-	// Token 模式下归一化 Amount（存等价美元/CNY 数量，避免 RechargeWaffo 双重放大）
+	// Token Amount/CNY RechargeWaffo
 	amount := req.Amount
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		amount = int64(float64(req.Amount) / common.QuotaPerUnit)
@@ -214,7 +211,6 @@ func RequestWaffoPay(c *gin.Context) {
 		}
 	}
 
-	// 创建本地订单
 	topUp := &model.TopUp{
 		UserId:          id,
 		TargetType:      getTopUpTargetType(c),
@@ -310,7 +306,7 @@ func RequestWaffoPay(c *gin.Context) {
 	})
 }
 
-// webhookPayloadWithSubInfo 扩展 PAYMENT_NOTIFICATION，包含 SDK 未定义的 subscriptionInfo 字段
+// webhookPayloadWithSubInfo PAYMENT_NOTIFICATION SDK subscriptionInfo
 type webhookPayloadWithSubInfo struct {
 	EventType string `json:"eventType"`
 	Result    struct {
@@ -326,7 +322,7 @@ type webhookSubscriptionInfo struct {
 	SubscriptionRequest string `json:"subscriptionRequest,omitempty"`
 }
 
-// WaffoWebhook 处理 Waffo 回调通知（支付/退款/订阅）
+// WaffoWebhook Waffo //
 func WaffoWebhook(c *gin.Context) {
 	if !isWaffoWebhookEnabled() {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Waffo webhook rejected reason=webhook_disabled path=%q client_ip=%s", c.Request.RequestURI, c.ClientIP()))
@@ -353,7 +349,6 @@ func WaffoWebhook(c *gin.Context) {
 	signature := c.GetHeader("X-SIGNATURE")
 	logger.LogInfo(c.Request.Context(), fmt.Sprintf("Waffo webhook received path=%q client_ip=%s signature=%q body=%q", c.Request.RequestURI, c.ClientIP(), signature, bodyStr))
 
-	// 验证请求签名
 	if !wh.VerifySignature(bodyStr, signature) {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Waffo webhook signature verification failed path=%q client_ip=%s signature=%q body=%q", c.Request.RequestURI, c.ClientIP(), signature, bodyStr))
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -369,7 +364,6 @@ func WaffoWebhook(c *gin.Context) {
 
 	switch event.EventType {
 	case core.EventPayment:
-		// 解析为扩展类型，区分普通支付和订阅支付
 		var payload webhookPayloadWithSubInfo
 		if err := common.Unmarshal(bodyBytes, &payload); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo payment callback payload parse failed event_type=%s client_ip=%s error=%q body=%q", event.EventType, c.ClientIP(), err.Error(), bodyStr))
@@ -384,11 +378,11 @@ func WaffoWebhook(c *gin.Context) {
 	}
 }
 
-// handleWaffoPayment 处理支付完成通知
+// handleWaffoPayment
 func handleWaffoPayment(c *gin.Context, wh *core.WebhookHandler, result *core.PaymentNotificationResult) {
 	if result.OrderStatus != "PAY_SUCCESS" {
 		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Waffo order status not successful, ignoring recharge trade_no=%s order_status=%s client_ip=%s", result.MerchantOrderID, result.OrderStatus, c.ClientIP()))
-		// 终态失败订单标记为 failed，避免永远停在 pending
+		// failed pending
 		if result.MerchantOrderID != "" {
 			if err := model.UpdatePendingTopUpStatus(result.MerchantOrderID, model.PaymentProviderWaffo, common.TopUpStatusFailed); err != nil &&
 				!errors.Is(err, model.ErrTopUpNotFound) &&
@@ -415,7 +409,7 @@ func handleWaffoPayment(c *gin.Context, wh *core.WebhookHandler, result *core.Pa
 	sendWaffoWebhookResponse(c, wh, true, "")
 }
 
-// sendWaffoWebhookResponse 发送签名响应
+// sendWaffoWebhookResponse
 func sendWaffoWebhookResponse(c *gin.Context, wh *core.WebhookHandler, success bool, msg string) {
 	var body, sig string
 	if success {

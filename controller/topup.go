@@ -25,17 +25,16 @@ import (
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
-	// 只有 Epay 网关已完整配置时才暴露 Epay 支付方式；
-	// 未配置时 PayMethods 变量含硬编码的默认方法（支付宝/微信等），
-	// 不应暴露给前端。
+	// Epay Epay
+	// PayMethods /
 	var payMethods []map[string]string
 	if complianceConfirmed && isEpayTopUpEnabled() {
 		payMethods = operation_setting.PayMethods
 	}
 
-	// 如果启用了 Stripe 支付，添加到支付方法列表
+	// Stripe
 	if isStripeTopUpEnabled() {
-		// 检查是否已经包含 Stripe
+		// Stripe
 		hasStripe := false
 		for _, method := range payMethods {
 			if method["type"] == "stripe" {
@@ -76,7 +75,7 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
-	// 如果启用了 PayPal 支付，添加到支付方法列表
+	// PayPal
 	if isPayPalTopUpEnabled() {
 		hasPayPal := false
 		for _, method := range payMethods {
@@ -95,7 +94,7 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
-	// 如果启用了 Waffo 支付，添加到支付方法列表
+	// Waffo
 	enableWaffo := isWaffoTopUpEnabled()
 	if enableWaffo {
 		hasWaffo := false
@@ -172,8 +171,7 @@ func GetEpayClient() *epay.Client {
 
 func getPayMoney(amount int64, group string) float64 {
 	dAmount := decimal.NewFromInt(amount)
-	// 充值金额以“展示类型”为准：
-	// - USD/CNY: 前端传 amount 为金额单位；TOKENS: 前端传 tokens，需要换成 USD 金额
+	// - USD/CNY: amount TOKENS: tokens USD
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		dAmount = dAmount.Div(dQuotaPerUnit)
@@ -299,13 +297,13 @@ func RequestEpay(c *gin.Context) {
 var orderLocks sync.Map
 var createLock sync.Mutex
 
-// refCountedMutex 带引用计数的互斥锁，确保最后一个使用者才从 map 中删除
+// refCountedMutex map
 type refCountedMutex struct {
 	mu       sync.Mutex
 	refCount int
 }
 
-// LockOrder 尝试对给定订单号加锁
+// LockOrder
 func LockOrder(tradeNo string) {
 	createLock.Lock()
 	var rcm *refCountedMutex
@@ -320,7 +318,7 @@ func LockOrder(tradeNo string) {
 	rcm.mu.Lock()
 }
 
-// UnlockOrder 释放给定订单号的锁
+// UnlockOrder
 func UnlockOrder(tradeNo string) {
 	v, ok := orderLocks.Load(tradeNo)
 	if !ok {
@@ -347,7 +345,7 @@ func EpayNotify(c *gin.Context) {
 	var params map[string]string
 
 	if c.Request.Method == "POST" {
-		// POST 请求：从 POST body 解析参数
+		// POST POST body
 		if err := c.Request.ParseForm(); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Epay webhook POST form parse failed path=%q client_ip=%s error=%q", c.Request.RequestURI, c.ClientIP(), err.Error()))
 			_, _ = c.Writer.Write([]byte("fail"))
@@ -358,7 +356,7 @@ func EpayNotify(c *gin.Context) {
 			return r
 		}, map[string]string{})
 	} else {
-		// GET 请求：从 URL Query 解析参数
+		// GET URL Query
 		params = lo.Reduce(lo.Keys(c.Request.URL.Query()), func(r map[string]string, t string, i int) map[string]string {
 			r[t] = c.Request.URL.Query().Get(t)
 			return r
@@ -496,7 +494,7 @@ func GetUserTopUps(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
-// GetAllTopUps 管理员获取全平台充值记录
+// GetAllTopUps
 func GetAllTopUps(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	keyword := c.Query("keyword")
@@ -525,7 +523,7 @@ type AdminCompleteTopupRequest struct {
 	TradeNo string `json:"trade_no"`
 }
 
-// AdminCompleteTopUp 管理员补单接口
+// AdminCompleteTopUp
 func AdminCompleteTopUp(c *gin.Context) {
 	var req AdminCompleteTopupRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.TradeNo == "" {
@@ -533,7 +531,6 @@ func AdminCompleteTopUp(c *gin.Context) {
 		return
 	}
 
-	// 订单级互斥，防止并发补单
 	LockOrder(req.TradeNo)
 	defer UnlockOrder(req.TradeNo)
 

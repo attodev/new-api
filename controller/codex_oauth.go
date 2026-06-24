@@ -81,11 +81,11 @@ func startCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 			return
 		}
 		if ch == nil {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": "channel not found"})
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgChannelNotFound)})
 			return
 		}
 		if ch.Type != constant.ChannelTypeCodex {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": "channel type is not Codex"})
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexChannelTypeNotCodex)})
 			return
 		}
 	}
@@ -138,11 +138,11 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 		return
 	}
 	if strings.TrimSpace(code) == "" {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "missing authorization code"})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexMissingCode)})
 		return
 	}
 	if strings.TrimSpace(state) == "" {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "missing state in input"})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexMissingState)})
 		return
 	}
 
@@ -154,11 +154,11 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 			return
 		}
 		if ch == nil {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": "channel not found"})
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgChannelNotFound)})
 			return
 		}
 		if ch.Type != constant.ChannelTypeCodex {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": "channel type is not Codex"})
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexChannelTypeNotCodex)})
 			return
 		}
 		channelProxy = ch.GetSetting().Proxy
@@ -168,11 +168,11 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 	expectedState, _ := session.Get(codexOAuthSessionKey(channelID, "state")).(string)
 	verifier, _ := session.Get(codexOAuthSessionKey(channelID, "verifier")).(string)
 	if strings.TrimSpace(expectedState) == "" || strings.TrimSpace(verifier) == "" {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "oauth flow not started or session expired"})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexFlowExpired)})
 		return
 	}
 	if state != expectedState {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "state mismatch"})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexStateMismatch)})
 		return
 	}
 
@@ -188,7 +188,7 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 
 	accountID, ok := service.ExtractCodexAccountIDFromJWT(tokenRes.AccessToken)
 	if !ok {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "failed to extract account_id from access_token"})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgCodexExtractAccountIdFailed)})
 		return
 	}
 	email, _ := service.ExtractEmailFromJWT(tokenRes.AccessToken)
@@ -222,7 +222,7 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 		service.ResetProxyClientCache()
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"message": "saved",
+			"message": common.TranslateMessage(c, i18n.MsgCodexSaved),
 			"data": gin.H{
 				"channel_id":   channelID,
 				"account_id":   accountID,
@@ -236,7 +236,7 @@ func completeCodexOAuthWithChannelID(c *gin.Context, channelID int) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "generated",
+		"message": common.TranslateMessage(c, i18n.MsgCodexGenerated),
 		"data": gin.H{
 			"key":          string(encoded),
 			"account_id":   accountID,

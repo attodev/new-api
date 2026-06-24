@@ -37,7 +37,6 @@ func UpdateMidjourneyTaskBulk() {
 		nullTaskIds := make([]int, 0)
 		for _, task := range tasks {
 			if task.MjId == "" {
-				// 统计失败的未完成任务
 				nullTaskIds = append(nullTaskIds, task.Id)
 				continue
 			}
@@ -87,10 +86,9 @@ func UpdateMidjourneyTaskBulk() {
 				logger.LogError(ctx, fmt.Sprintf("Get Task error: %v", err))
 				continue
 			}
-			// 设置超时时间
 			timeout := time.Second * 15
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			// 使用带有超时的 context 创建新的请求
+			// context
 			req = req.WithContext(ctx)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("mj-api-secret", midjourneyChannel.Key)
@@ -122,7 +120,7 @@ func UpdateMidjourneyTaskBulk() {
 				task := taskM[responseItem.MjId]
 
 				useTime := (time.Now().UnixNano() / int64(time.Millisecond)) - task.SubmitTime
-				// 如果时间超过一小时，且进度不是100%，则认为任务失败
+				// 100%
 				if useTime > 3600000 && task.Progress != "100%" {
 					responseItem.FailReason = "upstream task timed out (exceeded 1 hour)"
 					responseItem.Status = "FAILURE"
@@ -149,20 +147,20 @@ func UpdateMidjourneyTaskBulk() {
 					buttonStr, _ := json.Marshal(responseItem.Buttons)
 					task.Buttons = string(buttonStr)
 				}
-				// 映射 VideoUrl
+				// VideoUrl
 				task.VideoUrl = responseItem.VideoUrl
 
-				// 映射 VideoUrls - 将数组序列化为 JSON 字符串
+				// VideoUrls - JSON
 				if responseItem.VideoUrls != nil && len(responseItem.VideoUrls) > 0 {
 					videoUrlsStr, err := json.Marshal(responseItem.VideoUrls)
 					if err != nil {
 						logger.LogError(ctx, fmt.Sprintf("failed to serialize VideoUrls: %v", err))
-						task.VideoUrls = "[]" // 失败时设置为空数组
+						task.VideoUrls = "[]"
 					} else {
 						task.VideoUrls = string(videoUrlsStr)
 					}
 				} else {
-					task.VideoUrls = "" // 空值时清空字段
+					task.VideoUrls = ""
 				}
 
 				shouldReturnQuota := false
@@ -236,18 +234,18 @@ func checkMjTaskNeedUpdate(oldTask *model.Midjourney, newTask dto.MidjourneyDto)
 	if oldTask.Progress != "100%" && newTask.FailReason != "" {
 		return true
 	}
-	// 检查 VideoUrl 是否需要更新
+	// VideoUrl
 	if oldTask.VideoUrl != newTask.VideoUrl {
 		return true
 	}
-	// 检查 VideoUrls 是否需要更新
+	// VideoUrls
 	if newTask.VideoUrls != nil && len(newTask.VideoUrls) > 0 {
 		newVideoUrlsStr, _ := json.Marshal(newTask.VideoUrls)
 		if oldTask.VideoUrls != string(newVideoUrlsStr) {
 			return true
 		}
 	} else if oldTask.VideoUrls != "" {
-		// 如果新数据没有 VideoUrls 但旧数据有，需要更新（清空）
+		// VideoUrls
 		return true
 	}
 
@@ -257,7 +255,6 @@ func checkMjTaskNeedUpdate(oldTask *model.Midjourney, newTask dto.MidjourneyDto)
 func GetAllMidjourney(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 
-	// 解析其他查询参数
 	queryParams := model.TaskQueryParams{
 		ChannelID:      c.Query("channel_id"),
 		MjID:           c.Query("mj_id"),

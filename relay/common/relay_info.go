@@ -77,7 +77,7 @@ type ChannelMeta struct {
 	ChannelOtherSettings dto.ChannelOtherSettings
 	UpstreamModelName    string
 	IsModelMapped        bool
-	SupportStreamOptions bool // 是否支持流式选项
+	SupportStreamOptions bool
 }
 
 type TokenCountMeta struct {
@@ -90,8 +90,8 @@ type RelayInfo struct {
 	TokenKey          string
 	TokenGroup        string
 	UserId            int
-	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
-	UserGroup         string // 用户所在分组
+	UsingGroup        string // auto
+	UserGroup         string
 	TokenUnlimited    bool
 	StartTime         time.Time
 	FirstResponseTime time.Time
@@ -106,7 +106,7 @@ type RelayInfo struct {
 	RequestURLPath         string
 	RequestHeaders         map[string]string
 	ShouldIncludeUsage     bool
-	DisablePing            bool // 是否禁止向下游发送自定义 Ping
+	DisablePing            bool // Ping
 	ClientWs               *websocket.Conn
 	TargetWs               *websocket.Conn
 	InputAudioFormat       string
@@ -121,13 +121,12 @@ type RelayInfo struct {
 	RelayFormat            types.RelayFormat
 	SendResponseCount      int
 	ReceivedResponseCount  int
-	FinalPreConsumedQuota  int // 最终预消耗的配额
-	// ForcePreConsume 为 true 时禁用 BillingSession 的信任额度旁路，
-	// 强制预扣全额。用于异步任务（视频/音乐生成等），因为请求返回后任务仍在运行，
-	// 必须在提交前锁定全额。
+	FinalPreConsumedQuota  int
+	// ForcePreConsume true BillingSession
+	// /
 	ForcePreConsume bool
-	// Billing 是计费会话，封装了预扣费/结算/退款的统一生命周期。
-	// 免费模型时为 nil。
+	// Billing //
+	// nil
 	Billing BillingSettler
 	// BillingSource indicates whether this request is billed from wallet quota or subscription.
 	// "" or "wallet" => wallet; "subscription" => subscription
@@ -173,8 +172,8 @@ type RelayInfo struct {
 	// RequestConversionChain records request format conversions in order, e.g.
 	// ["openai", "openai_responses"] or ["openai", "claude"].
 	RequestConversionChain []types.RelayFormat
-	// 最终请求到上游的格式。可由 adaptor 显式设置；
-	// 若为空，调用 GetFinalRequestRelayFormat 会回退到 RequestConversionChain 的最后一项或 RelayFormat。
+	// adaptor
+	// GetFinalRequestRelayFormat RequestConversionChain RelayFormat
 	FinalRequestRelayFormat types.RelayFormat
 
 	StreamStatus *StreamStatus
@@ -235,7 +234,6 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 	info.ChannelMeta = channelMeta
 
 	// reset some fields based on channel meta
-	// 重置某些字段，例如模型名称等
 	if info.Request != nil {
 		info.Request.SetModelName(info.OriginModelName)
 	}
@@ -316,7 +314,6 @@ func (info *RelayInfo) ToString() string {
 	return b.String()
 }
 
-// 定义支持流式选项的通道类型
 var streamSupportedChannels = map[int]bool{
 	constant.ChannelTypeOpenAI:      true,
 	constant.ChannelTypeAnthropic:   true,
@@ -437,7 +434,6 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 	//paramOverride := common.GetContextKeyStringMap(c, constant.ContextKeyChannelParamOverride)
 
 	tokenGroup := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
-	// 当令牌分组为空时，表示使用用户分组
 	if tokenGroup == "" {
 		tokenGroup = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 	}
@@ -669,8 +665,8 @@ func (info *RelayInfo) HasSendResponse() bool {
 type TaskRelayInfo struct {
 	Action       string
 	OriginTaskID string
-	// PublicTaskID 是提交时预生成的 task_xxxx 格式公开 ID，
-	// 供 DoResponse 在返回给客户端时使用（避免暴露上游真实 ID）。
+	// PublicTaskID task_xxxx ID
+	// DoResponse ID
 	PublicTaskID string
 
 	ConsumeQuota bool
@@ -771,8 +767,8 @@ type TaskInfo struct {
 	Url              string `json:"url,omitempty"`
 	RemoteUrl        string `json:"remote_url,omitempty"`
 	Progress         string `json:"progress,omitempty"`
-	CompletionTokens int    `json:"completion_tokens,omitempty"` // 用于按倍率计费
-	TotalTokens      int    `json:"total_tokens,omitempty"`      // 用于按倍率计费
+	CompletionTokens int    `json:"completion_tokens,omitempty"`
+	TotalTokens      int    `json:"total_tokens,omitempty"`
 }
 
 func FailTaskInfo(reason string) *TaskInfo {
@@ -782,13 +778,13 @@ func FailTaskInfo(reason string) *TaskInfo {
 	}
 }
 
-// RemoveDisabledFields 从请求 JSON 数据中移除渠道设置中禁用的字段
-// service_tier: 服务层级字段，可能导致额外计费（OpenAI、Claude、Responses API 支持）
-// inference_geo: Claude 数据驻留推理区域字段（仅 Claude 支持，默认过滤）
-// speed: Claude 推理速度模式字段（仅 Claude 支持，默认过滤）
-// store: 数据存储授权字段，涉及用户隐私（仅 OpenAI、Responses API 支持，默认允许透传，禁用后可能导致 Codex 无法使用）
-// safety_identifier: 安全标识符，用于向 OpenAI 报告违规用户（仅 OpenAI 支持，涉及用户隐私）
-// stream_options.include_obfuscation: 响应流混淆控制字段（仅 OpenAI Responses API 支持）
+// RemoveDisabledFields JSON
+// service_tier: OpenAIClaudeResponses API
+// inference_geo: Claude Claude
+// speed: Claude Claude
+// store: OpenAIResponses API Codex
+// safety_identifier: OpenAI OpenAI
+// stream_options.include_obfuscation: OpenAI Responses API
 func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOtherSettings, channelPassThroughEnabled bool) ([]byte, error) {
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || channelPassThroughEnabled {
 		return jsonData, nil
@@ -803,42 +799,42 @@ func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOther
 		return jsonData, nil
 	}
 
-	// 默认移除 service_tier，除非明确允许（避免额外计费风险）
+	// service_tier
 	if !channelOtherSettings.AllowServiceTier {
 		if _, exists := data["service_tier"]; exists {
 			delete(data, "service_tier")
 		}
 	}
 
-	// 默认移除 inference_geo，除非明确允许（避免在未授权情况下透传数据驻留区域）
+	// inference_geo
 	if !channelOtherSettings.AllowInferenceGeo {
 		if _, exists := data["inference_geo"]; exists {
 			delete(data, "inference_geo")
 		}
 	}
 
-	// 默认移除 speed，除非明确允许（避免意外切换 Claude 推理速度模式）
+	// speed Claude
 	if !channelOtherSettings.AllowSpeed {
 		if _, exists := data["speed"]; exists {
 			delete(data, "speed")
 		}
 	}
 
-	// 默认允许 store 透传，除非明确禁用（禁用可能影响 Codex 使用）
+	// store Codex
 	if channelOtherSettings.DisableStore {
 		if _, exists := data["store"]; exists {
 			delete(data, "store")
 		}
 	}
 
-	// 默认移除 safety_identifier，除非明确允许（保护用户隐私，避免向 OpenAI 报告用户信息）
+	// safety_identifier OpenAI
 	if !channelOtherSettings.AllowSafetyIdentifier {
 		if _, exists := data["safety_identifier"]; exists {
 			delete(data, "safety_identifier")
 		}
 	}
 
-	// 默认移除 stream_options.include_obfuscation，除非明确允许（避免关闭响应流混淆保护）
+	// stream_options.include_obfuscation
 	if !channelOtherSettings.AllowIncludeObfuscation {
 		if streamOptionsAny, exists := data["stream_options"]; exists {
 			if streamOptions, ok := streamOptionsAny.(map[string]interface{}); ok {

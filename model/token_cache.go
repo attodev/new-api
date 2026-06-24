@@ -49,7 +49,7 @@ func cacheSetTokenField(key string, field string, value string) error {
 	return nil
 }
 
-// CacheGetTokenByKey 从缓存中获取 token，如果缓存中不存在，则从数据库中获取
+// CacheGetTokenByKey token
 func cacheGetTokenByKey(key string) (*Token, error) {
 	hmacKey := common.GenerateHMAC(key)
 	if !common.RedisEnabled {

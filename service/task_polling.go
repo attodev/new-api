@@ -21,23 +21,23 @@ import (
 	"github.com/samber/lo"
 )
 
-// TaskPollingAdaptor 定义轮询所需的最小适配器接口，避免 service -> relay 的循环依赖
+// TaskPollingAdaptor service -> relay
 type TaskPollingAdaptor interface {
 	Init(info *relaycommon.RelayInfo)
 	FetchTask(baseURL string, key string, body map[string]any, proxy string) (*http.Response, error)
 	ParseTaskResult(body []byte) (*relaycommon.TaskInfo, error)
-	// AdjustBillingOnComplete 在任务到达终态（成功/失败）时由轮询循环调用。
-	// 返回正数触发差额结算（补扣/退还），返回 0 保持预扣费金额不变。
+	// AdjustBillingOnComplete /
+	// / 0
 	AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int
 }
 
-// GetTaskAdaptorFunc 由 main 包注入，用于获取指定平台的任务适配器。
-// 打破 service -> relay -> relay/channel -> service 的循环依赖。
+// GetTaskAdaptorFunc main
+// service -> relay -> relay/channel -> service
 var GetTaskAdaptorFunc func(platform constant.TaskPlatform) TaskPollingAdaptor
 
-// sweepTimedOutTasks 在主轮询之前独立清理超时任务。
-// 每次最多处理 100 条，剩余的下个周期继续处理。
-// 使用 per-task CAS (UpdateWithStatus) 防止覆盖被正常轮询已推进的任务。
+// sweepTimedOutTasks
+// 100
+// per-task CAS (UpdateWithStatus)
 func sweepTimedOutTasks(ctx context.Context) {
 	if constant.TaskTimeoutMinutes <= 0 {
 		return
@@ -87,7 +87,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 	}
 }
 
-// TaskPollingLoop 主轮询循环，每 15 秒检查一次未完成的任务
+// TaskPollingLoop 15
 func TaskPollingLoop() {
 	for {
 		time.Sleep(time.Duration(15) * time.Second)
@@ -109,7 +109,6 @@ func TaskPollingLoop() {
 			for _, task := range tasks {
 				upstreamID := task.GetUpstreamTaskID()
 				if upstreamID == "" {
-					// 统计失败的未完成任务
 					nullTaskIds = append(nullTaskIds, task.ID)
 					continue
 				}
@@ -137,11 +136,11 @@ func TaskPollingLoop() {
 	}
 }
 
-// DispatchPlatformUpdate 按平台分发轮询更新
+// DispatchPlatformUpdate
 func DispatchPlatformUpdate(platform constant.TaskPlatform, taskChannelM map[int][]string, taskM map[string]*model.Task) {
 	switch platform {
 	case constant.TaskPlatformMidjourney:
-		// MJ 轮询由其自身处理，这里预留入口
+		// MJ
 	case constant.TaskPlatformSuno:
 		_ = UpdateSunoTasks(context.Background(), taskChannelM, taskM)
 	default:
@@ -151,7 +150,7 @@ func DispatchPlatformUpdate(platform constant.TaskPlatform, taskChannelM map[int
 	}
 }
 
-// UpdateSunoTasks 按渠道更新所有 Suno 任务
+// UpdateSunoTasks Suno
 func UpdateSunoTasks(ctx context.Context, taskChannelM map[int][]string, taskM map[string]*model.Task) error {
 	for channelId, taskIds := range taskChannelM {
 		err := updateSunoTasks(ctx, channelId, taskIds, taskM)
@@ -249,7 +248,7 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 	return nil
 }
 
-// taskNeedsUpdate 检查 Suno 任务是否需要更新
+// taskNeedsUpdate Suno
 func taskNeedsUpdate(oldTask *model.Task, newTask dto.SunoDataResponse) bool {
 	if oldTask.SubmitTime != newTask.SubmitTime {
 		return true
@@ -287,7 +286,7 @@ func taskNeedsUpdate(oldTask *model.Task, newTask dto.SunoDataResponse) bool {
 	return false
 }
 
-// UpdateVideoTasks 按渠道更新所有视频任务
+// UpdateVideoTasks
 func UpdateVideoTasks(ctx context.Context, platform constant.TaskPlatform, taskChannelM map[int][]string, taskM map[string]*model.Task) error {
 	for channelId, taskIds := range taskChannelM {
 		if err := updateVideoTasks(ctx, platform, channelId, taskIds, taskM); err != nil {
@@ -403,13 +402,12 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		if err = common.Unmarshal(responseBody, &errorResult); err == nil {
 			openaiError := errorResult.TryToOpenAIError()
 			if openaiError != nil {
-				// 返回规范的 OpenAI 错误格式，提取错误信息，判断错误是否为任务失败
+				// OpenAI
 				if openaiError.Code == "429" {
-					// 429 错误通常表示请求过多或速率限制，暂时不认为是任务失败，保持原状态等待下一轮轮询
+					// 429
 					return nil
 				}
 
-				// 其他错误认为是任务失败，记录错误信息并更新任务状态
 				taskResult = relaycommon.FailTaskInfo("upstream returned error")
 			} else {
 				// unknown error format, log original response
@@ -535,26 +533,26 @@ func truncateBase64(s string) string {
 	return s[:maxKeep] + "..."
 }
 
-// settleTaskBillingOnComplete 任务完成时的统一计费调整。
-// 优先级：1. adaptor.AdjustBillingOnComplete 返回正数 → 使用 adaptor 计算的额度
+// settleTaskBillingOnComplete
+// 1. adaptor.AdjustBillingOnComplete → adaptor
 //
-//  2. taskResult.TotalTokens > 0 → 按 token 重算
-//  3. 都不满足 → 保持预扣额度不变
+// 2. taskResult.TotalTokens > 0 → token
+// 3. →
 func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor, task *model.Task, taskResult *relaycommon.TaskInfo) {
-	// 0. 按次计费的任务不做差额结算
+	// 0.
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.PerCallBilling {
 		logger.LogInfo(ctx, fmt.Sprintf("task %s billed per-use, skipping settlement", task.TaskID))
 		return
 	}
-	// 1. 优先让 adaptor 决定最终额度
+	// 1. adaptor
 	if actualQuota := adaptor.AdjustBillingOnComplete(task, taskResult); actualQuota > 0 {
 		RecalculateTaskQuota(ctx, task, actualQuota, "adaptor billing adjustment")
 		return
 	}
-	// 2. 回退到 token 重算
+	// 2. token
 	if taskResult.TotalTokens > 0 {
 		RecalculateTaskQuotaByTokens(ctx, task, taskResult.TotalTokens)
 		return
 	}
-	// 3. 无调整，保持预扣额度
+	// 3.
 }

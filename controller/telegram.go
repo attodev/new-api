@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-contrib/sessions"
@@ -18,7 +19,7 @@ import (
 func TelegramBind(c *gin.Context) {
 	if !common.TelegramOAuthEnabled {
 		c.JSON(200, gin.H{
-			"message": "Telegram login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Telegram"}),
 			"success": false,
 		})
 		return
@@ -26,7 +27,7 @@ func TelegramBind(c *gin.Context) {
 	params := c.Request.URL.Query()
 	if !checkTelegramAuthorization(params, common.TelegramBotToken) {
 		c.JSON(200, gin.H{
-			"message": "invalid request",
+			"message": common.TranslateMessage(c, i18n.MsgInvalidParams),
 			"success": false,
 		})
 		return
@@ -34,7 +35,7 @@ func TelegramBind(c *gin.Context) {
 	telegramId := params["id"][0]
 	if model.IsTelegramIdAlreadyTaken(telegramId) {
 		c.JSON(200, gin.H{
-			"message": "this Telegram account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 			"success": false,
 		})
 		return
@@ -53,7 +54,7 @@ func TelegramBind(c *gin.Context) {
 	if user.Id == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "user has been deactivated",
+			"message": common.TranslateMessage(c, i18n.MsgUserDisabled),
 		})
 		return
 	}
@@ -72,7 +73,7 @@ func TelegramBind(c *gin.Context) {
 func TelegramLogin(c *gin.Context) {
 	if !common.TelegramOAuthEnabled {
 		c.JSON(200, gin.H{
-			"message": "Telegram login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "Telegram"}),
 			"success": false,
 		})
 		return
@@ -80,7 +81,7 @@ func TelegramLogin(c *gin.Context) {
 	params := c.Request.URL.Query()
 	if !checkTelegramAuthorization(params, common.TelegramBotToken) {
 		c.JSON(200, gin.H{
-			"message": "invalid request",
+			"message": common.TranslateMessage(c, i18n.MsgInvalidParams),
 			"success": false,
 		})
 		return

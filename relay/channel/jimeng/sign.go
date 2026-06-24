@@ -19,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SignRequestForJimeng 对即梦 API 请求进行签名，支持 http.Request 或 header+url+body 方式
+// SignRequestForJimeng API http.Request header+url+body
 //func SignRequestForJimeng(req *http.Request, accessKey, secretKey string) error {
 //	var bodyBytes []byte
 //	var err error
@@ -169,7 +169,7 @@ func Sign(c *gin.Context, req *http.Request, apiKey string) error {
 	return nil
 }
 
-// hmacSHA256 计算 HMAC-SHA256
+// hmacSHA256 HMAC-SHA256
 func hmacSHA256(key []byte, data []byte) []byte {
 	h := hmac.New(sha256.New, key)
 	h.Write(data)

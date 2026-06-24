@@ -68,7 +68,7 @@ type responseTask struct {
 }
 
 const (
-	// 即梦限制单个文件最大4.7MB https://www.volcengine.com/docs/85621/1747301
+	// 4.7MB https://www.volcengine.com/docs/85621/1747301
 	MaxFileSize int64 = 4*1024*1024 + 700*1024 // 4.7MB (4MB + 724KB)
 )
 
@@ -130,7 +130,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if !ok {
 		return nil, fmt.Errorf("invalid request type in context")
 	}
-	// 支持openai sdk的图片上传方式
+	// openai sdk
 	if mf, err := c.MultipartForm(); err == nil {
 		if files, exists := mf.File["input_reference"]; exists && len(files) > 0 {
 			if len(files) == 1 {
@@ -139,11 +139,10 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 				info.Action = constant.TaskActionFirstTailGenerate
 			}
 
-			// 将上传的文件转换为base64格式
+			// base64
 			var images []string
 
 			for _, fileHeader := range files {
-				// 检查文件大小
 				if fileHeader.Size > MaxFileSize {
 					return nil, fmt.Errorf("file %s size exceeds limit, maximum allowed: %d MB", fileHeader.Filename, MaxFileSize/(1024*1024))
 				}
@@ -157,7 +156,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 				if err != nil {
 					continue
 				}
-				// 将文件内容转换为base64
+				// base64
 				base64Str := base64.StdEncoding.EncodeToString(fileBytes)
 				images = append(images, base64Str)
 			}
@@ -403,21 +402,18 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
 	}
 
-	// 即梦视频3.0 ReqKey转换
+	// 3.0 ReqKey
 	// https://www.volcengine.com/docs/85621/1792707
 	imageLen := lo.Max([]int{len(req.Images), len(r.BinaryDataBase64), len(r.ImageUrls)})
 	if strings.Contains(r.ReqKey, "jimeng_v30") {
 		if r.ReqKey == "jimeng_v30_pro" {
-			// 3.0 pro只有固定的jimeng_ti2v_v30_pro
+			// 3.0 projimeng_ti2v_v30_pro
 			r.ReqKey = "jimeng_ti2v_v30_pro"
 		} else if imageLen > 1 {
-			// 多张图片：首尾帧生成
 			r.ReqKey = strings.TrimSuffix(strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_i2v_first_tail_v30", 1), "p")
 		} else if imageLen == 1 {
-			// 单张图片：图生视频
 			r.ReqKey = strings.TrimSuffix(strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_i2v_first_v30", 1), "p")
 		} else {
-			// 无图片：文生视频
 			r.ReqKey = strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_t2v_v30", 1)
 		}
 	}

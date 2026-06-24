@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetCheckinStatus 获取用户签到状态和历史记录
+// GetCheckinStatus
 func GetCheckinStatus(c *gin.Context) {
 	setting := operation_setting.GetCheckinSetting()
 	if !setting.Enabled {
@@ -21,7 +21,6 @@ func GetCheckinStatus(c *gin.Context) {
 		return
 	}
 	userId := c.GetInt("id")
-	// 获取月份参数，默认为当前月份
 	month := c.DefaultQuery("month", time.Now().Format("2006-01"))
 
 	stats, err := model.GetUserCheckinStats(userId, month)
@@ -44,7 +43,7 @@ func GetCheckinStatus(c *gin.Context) {
 	})
 }
 
-// DoCheckin 执行用户签到
+// DoCheckin
 func DoCheckin(c *gin.Context) {
 	setting := operation_setting.GetCheckinSetting()
 	if !setting.Enabled {
@@ -65,7 +64,7 @@ func DoCheckin(c *gin.Context) {
 	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("Check-in successful, quota awarded: %s", logger.LogQuota(checkin.QuotaAwarded)))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "check-in successful",
+		"message": common.TranslateMessage(c, i18n.MsgCheckinSuccess),
 		"data": gin.H{
 			"quota_awarded": checkin.QuotaAwarded,
 			"checkin_date":  checkin.CheckinDate},

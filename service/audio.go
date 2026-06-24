@@ -17,13 +17,13 @@ func parseAudio(audioBase64 string, format string) (duration float64, err error)
 
 	switch format {
 	case "pcm16":
-		samplesCount = len(audioData) / 2 // 16位 = 2字节每样本
+		samplesCount = len(audioData) / 2 // 16 = 2
 		sampleRate = 24000                // 24kHz
 	case "g711_ulaw", "g711_alaw":
-		samplesCount = len(audioData) // 8位 = 1字节每样本
+		samplesCount = len(audioData) // 8 = 1
 		sampleRate = 8000             // 8kHz
 	default:
-		samplesCount = len(audioData) // 8位 = 1字节每样本
+		samplesCount = len(audioData) // 8 = 1
 		sampleRate = 8000             // 8kHz
 	}
 
@@ -32,13 +32,13 @@ func parseAudio(audioBase64 string, format string) (duration float64, err error)
 }
 
 func DecodeBase64AudioData(audioBase64 string) (string, error) {
-	// 检查并移除 data:audio/xxx;base64, 前缀
+	// data:audio/xxx;base64,
 	idx := strings.Index(audioBase64, ",")
 	if idx != -1 {
 		audioBase64 = audioBase64[idx+1:]
 	}
 
-	// 解码 Base64 数据
+	// Base64
 	_, err := base64.StdEncoding.DecodeString(audioBase64)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode error: %v", err)

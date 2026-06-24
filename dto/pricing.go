@@ -2,7 +2,6 @@ package dto
 
 import "github.com/QuantumNous/new-api/constant"
 
-// 这里不好动就不动了，本来想独立出来的（
 type OpenAIModels struct {
 	Id                     string                  `json:"id"`
 	Object                 string                  `json:"object"`

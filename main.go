@@ -100,10 +100,8 @@ func main() {
 		go model.SyncChannelCache(common.SyncFrequency)
 	}
 
-	// 热更新配置
 	go model.SyncOptions(common.SyncFrequency)
 
-	// 数据看板
 	go model.UpdateQuotaData()
 
 	if os.Getenv("CHANNEL_UPDATE_FREQUENCY") != "" {
@@ -192,7 +190,6 @@ func main() {
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
 
-	// 设置路由
 	router.SetRouter(server, router.ThemeAssets{
 		DefaultBuildFS:   buildFS,
 		DefaultIndexPage: indexPage,
@@ -269,7 +266,6 @@ func InitResources() error {
 		}
 	}
 
-	// 加载环境变量
 	common.InitEnv()
 
 	logger.SetupLogger()
@@ -293,10 +289,8 @@ func InitResources() error {
 	// Initialize options, should after model.InitDB()
 	model.InitOptionMap()
 
-	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()
 
-	// 初始化模型
 	model.GetPricing()
 
 	// Initialize SQL Database
@@ -313,7 +307,6 @@ func InitResources() error {
 
 	perfmetrics.Init()
 
-	// 启动系统监控
 	common.StartSystemMonitor()
 
 	// Initialize i18n

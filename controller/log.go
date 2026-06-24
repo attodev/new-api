@@ -147,7 +147,7 @@ func DeleteHistoryLogs(c *gin.Context) {
 	if targetTimestamp == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "target timestamp is required",
+			"message": common.TranslateMessage(c, i18n.MsgLogTimestampRequired),
 		})
 		return
 	}

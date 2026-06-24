@@ -41,7 +41,7 @@ type Adaptor struct {
 }
 
 func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
-	// 使用 service.GeminiToOpenAIRequest 转换请求格式
+	// service.GeminiToOpenAIRequest
 	openaiRequest, err := service.GeminiToOpenAIRequest(request, info)
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			task = "chat/completions" + task
 		}
 
-		// 特殊处理 responses API（包含 compact）
+		// responses API compact
 		if info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact {
 			responsesApiVersion := "preview"
 
@@ -136,7 +136,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 				responsesApiVersion = info.ChannelOtherSettings.AzureResponsesVersion
 			}
 
-			// compact 模式追加 /compact
+			// compact /compact
 			if info.RelayMode == relayconstant.RelayModeResponsesCompact {
 				subUrl = subUrl + "/compact"
 			}
@@ -146,7 +146,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		}
 
 		model_ := info.UpstreamModelName
-		// 2025年5月10日后创建的渠道不移除.
+		// 2025510.
 		if info.ChannelCreateTime < constant.AzureNoRemoveDotTime {
 			model_ = strings.Replace(model_, ".", "", -1)
 		}
@@ -181,8 +181,8 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 	if info.ChannelType == constant.ChannelTypeOpenAI && "" != info.Organization {
 		header.Set("OpenAI-Organization", info.Organization)
 	}
-	// 检查 Header Override 是否已设置 Authorization，如果已设置则跳过默认设置
-	// 这样可以避免在 Header Override 应用时被覆盖（虽然 Header Override 会在之后应用，但这里作为额外保护）
+	// Header Override Authorization
+	// Header Override Header Override
 	hasAuthOverride := false
 	if len(info.HeadersOverride) > 0 {
 		for k := range info.HeadersOverride {
@@ -237,7 +237,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		if len(request.Usage) == 0 {
 			request.Usage = json.RawMessage(`{"include":true}`)
 		}
-		// 适配 OpenRouter 的 thinking 后缀
+		// OpenRouter thinking
 		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
 			strings.HasSuffix(info.UpstreamModelName, "-thinking") {
 			info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
@@ -255,11 +255,11 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 				}
 				request.Reasoning = marshal
 			}
-			// 清空多余的ReasoningEffort
+			// ReasoningEffort
 			request.ReasoningEffort = ""
 		} else {
 			if len(request.Reasoning) == 0 {
-				// 适配 OpenAI 的 ReasoningEffort 格式
+				// OpenAI ReasoningEffort
 				if request.ReasoningEffort != "" {
 					reasoning := map[string]any{
 						"enabled": true,
@@ -278,16 +278,16 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 
 		// https://docs.anthropic.com/en/api/openai-sdk#extended-thinking-support
-		// 没有做排除3.5Haiku等，要出问题再加吧，最佳兼容性（不是
+		// 3.5Haiku
 		if request.THINKING != nil && strings.HasPrefix(info.UpstreamModelName, "anthropic") {
-			var thinking dto.Thinking // Claude标准Thinking格式
+			var thinking dto.Thinking // ClaudeThinking
 			if err := json.Unmarshal(request.THINKING, &thinking); err != nil {
 				return nil, fmt.Errorf("error Unmarshal thinking: %w", err)
 			}
 
-			// 只有当 thinking.Type 是 "enabled" 时才处理
+			// thinking.Type "enabled"
 			if thinking.Type == "enabled" {
-				// 检查 BudgetTokens 是否为 nil
+				// BudgetTokens nil
 				if thinking.BudgetTokens == nil {
 					return nil, fmt.Errorf("BudgetTokens is nil when thinking is enabled")
 				}
@@ -305,7 +305,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 				request.Reasoning = marshal
 			}
 
-			// 清空 THINKING
+			// THINKING
 			request.THINKING = nil
 		}
 
@@ -320,14 +320,13 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 			request.Temperature = nil
 		}
 
-		// gpt-5系列模型适配 归零不再支持的参数
+		// gpt-5
 		if strings.HasPrefix(info.UpstreamModelName, "gpt-5") {
 			request.Temperature = nil
 			request.TopP = nil
 			request.LogProbs = nil
 		}
 
-		// 转换模型推理力度后缀
 		effort, originModel := reasoning.ParseOpenAIReasoningEffortFromModelSuffix(info.UpstreamModelName)
 		if effort != "" {
 			request.ReasoningEffort = effort
@@ -337,9 +336,9 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 
 		info.ReasoningEffort = request.ReasoningEffort
 
-		// o系列模型developer适配（o1-mini除外）
+		// odevelopero1-mini
 		if !strings.HasPrefix(info.UpstreamModelName, "o1-mini") && !strings.HasPrefix(info.UpstreamModelName, "o1-preview") {
-			//修改第一个Message的内容，将system改为developer
+			// Messagesystemdeveloper
 			if len(request.Messages) > 0 && request.Messages[0].Role == "system" {
 				request.Messages[0].Role = "developer"
 			}
@@ -376,10 +375,9 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 			return nil, fmt.Errorf("error parsing multipart form: %w", err2)
 		}
 
-		// 打印类似 curl 命令格式的信息
+		// curl
 		logger.LogDebug(c.Request.Context(), "--form 'model=\"%s\"'", request.Model)
 
-		// 遍历表单字段并打印输出
 		for key, values := range formData.Value {
 			if key == "model" {
 				continue
@@ -390,13 +388,13 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 			}
 		}
 
-		// 从 formData 中获取文件
+		// formData
 		fileHeaders := formData.File["file"]
 		if len(fileHeaders) == 0 {
 			return nil, errors.New("file is required")
 		}
 
-		// 使用 formData 中的第一个文件
+		// formData
 		fileHeader := fileHeaders[0]
 		logger.LogDebug(c.Request.Context(), "--form 'file=@\"%s\"' (size: %d bytes, content-type: %s)",
 			fileHeader.Filename, fileHeader.Size, fileHeader.Header.Get("Content-Type"))
@@ -415,7 +413,7 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 			return nil, errors.New("copy file failed")
 		}
 
-		// 关闭 multipart 编写器以设置分界线
+		// multipart
 		writer.Close()
 		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
 		logger.LogDebug(c.Request.Context(), "--header 'Content-Type: %s'", writer.FormDataContentType())
@@ -434,7 +432,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		writer := multipart.NewWriter(&requestBody)
 
 		writer.WriteField("model", request.Model)
-		// 使用已解析的 multipart 表单，避免重复解析
+		// multipart
 		mf := c.Request.MultipartForm
 		if mf == nil {
 			if _, err := c.MultipartForm(); err != nil {
@@ -443,7 +441,6 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 			mf = c.Request.MultipartForm
 		}
 
-		// 写入所有非文件字段
 		if mf != nil {
 			for key, values := range mf.Value {
 				if key == "model" {
@@ -510,7 +507,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 					return nil, fmt.Errorf("copy file failed for image %d: %w", i, err)
 				}
 
-				// 复制完立即关闭，避免在循环内使用 defer 占用资源
+				// defer
 				_ = file.Close()
 			}
 
@@ -520,7 +517,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 				if err != nil {
 					return nil, errors.New("failed to open mask file")
 				}
-				// 复制完立即关闭，避免在循环内使用 defer 占用资源
+				// defer
 
 				// Determine MIME type for mask file
 				mimeType := detectImageMimeType(maskFiles[0].Filename)
@@ -544,7 +541,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 			return nil, errors.New("no multipart form data found")
 		}
 
-		// 关闭 multipart 编写器以设置分界线
+		// multipart
 		writer.Close()
 		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
 		return &requestBody, nil
@@ -582,7 +579,6 @@ func detectImageMimeType(filename string) string {
 }
 
 func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.OpenAIResponsesRequest) (any, error) {
-	//  转换模型推理力度后缀
 	effort, originModel := reasoning.ParseOpenAIReasoningEffortFromModelSuffix(request.Model)
 	if effort != "" {
 		if request.Reasoning == nil {

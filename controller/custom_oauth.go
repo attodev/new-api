@@ -262,7 +262,7 @@ func CreateCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "created successfully",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 		"data":    toCustomOAuthProviderResponse(provider),
 	})
 }
@@ -395,7 +395,7 @@ func UpdateCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "updated successfully",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 		"data":    toCustomOAuthProviderResponse(provider),
 	})
 }
@@ -438,7 +438,7 @@ func DeleteCustomOAuthProvider(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "deleted successfully",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 	})
 }
 
@@ -542,7 +542,7 @@ func UnbindCustomOAuth(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "unbound successfully",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 	})
 }
 
@@ -580,6 +580,6 @@ func UnbindCustomOAuthByAdmin(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "success",
+		"message": common.TranslateMessage(c, i18n.MsgOperationSuccess),
 	})
 }

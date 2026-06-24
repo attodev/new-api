@@ -10,7 +10,7 @@ import (
 
 // from songquanpeng/one-api
 const (
-	USD2RMB = 7.3 // 暂定 1 USD = 7.3 RMB
+	USD2RMB = 7.3 // 1 USD = 7.3 RMB
 	USD     = 500 // $0.002 = 1 -> $1 = 500
 	RMB     = USD / USD2RMB
 )
@@ -21,7 +21,7 @@ const (
 // https://openai.com/pricing
 // TODO: when a new api is enabled, check the pricing here
 // 1 === $0.002 / 1K tokens
-// 1 === ￥0.014 / 1k tokens
+// 1 === 0.014 / 1k tokens
 
 var defaultModelRatio = map[string]float64{
 	//"midjourney":                50,
@@ -184,21 +184,21 @@ var defaultModelRatio = map[string]float64{
 	"gemini-2.5-flash-preview-05-20":            0.075,
 	"gemini-2.5-flash-preview-05-20-thinking":   0.075,
 	"gemini-2.5-flash-preview-05-20-nothinking": 0.075,
-	"gemini-2.5-flash-thinking-*":               0.075, // 用于为后续所有2.5 flash thinking budget 模型设置默认倍率
-	"gemini-2.5-pro-thinking-*":                 0.625, // 用于为后续所有2.5 pro thinking budget 模型设置默认倍率
+	"gemini-2.5-flash-thinking-*":               0.075, // 2.5 flash thinking budget
+	"gemini-2.5-pro-thinking-*":                 0.625, // 2.5 pro thinking budget
 	"gemini-2.5-flash-lite-preview-thinking-*":  0.05,
 	"gemini-2.5-flash-lite-preview-06-17":       0.05,
 	"gemini-2.5-flash":                          0.15,
 	"gemini-robotics-er-1.5-preview":            0.15,
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
-	"chatglm_turbo":                             0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_pro":                               0.7143,     // ￥0.01 / 1k tokens
-	"chatglm_std":                               0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_lite":                              0.1429,     // ￥0.002 / 1k tokens
-	"glm-4":                                     7.143,      // ￥0.1 / 1k tokens
-	"glm-4v":                                    0.05 * RMB, // ￥0.05 / 1k tokens
-	"glm-4-alltools":                            0.1 * RMB,  // ￥0.1 / 1k tokens
+	"chatglm_turbo":                             0.3572,     // 0.005 / 1k tokens
+	"chatglm_pro":                               0.7143,     // 0.01 / 1k tokens
+	"chatglm_std":                               0.3572,     // 0.005 / 1k tokens
+	"chatglm_lite":                              0.1429,     // 0.002 / 1k tokens
+	"glm-4":                                     7.143,      // 0.1 / 1k tokens
+	"glm-4v":                                    0.05 * RMB, // 0.05 / 1k tokens
+	"glm-4-alltools":                            0.1 * RMB,  // 0.1 / 1k tokens
 	"glm-3-turbo":                               0.3572,
 	"glm-4-plus":                                0.05 * RMB,
 	"glm-4-0520":                                0.1 * RMB,
@@ -207,13 +207,13 @@ var defaultModelRatio = map[string]float64{
 	"glm-4-long":                                0.001 * RMB,
 	"glm-4-flash":                               0,
 	"glm-4v-plus":                               0.01 * RMB,
-	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
-	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
-	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
-	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.5":                            1.2858, // ￥0.018 / 1k tokens
+	"qwen-turbo":                                0.8572, // 0.012 / 1k tokens
+	"qwen-plus":                                 10,     // 0.14 / 1k tokens
+	"text-embedding-v1":                         0.05,   // 0.0007 / 1k tokens
+	"SparkDesk-v1.1":                            1.2858, // 0.018 / 1k tokens
+	"SparkDesk-v2.1":                            1.2858, // 0.018 / 1k tokens
+	"SparkDesk-v3.1":                            1.2858, // 0.018 / 1k tokens
+	"SparkDesk-v3.5":                            1.2858, // 0.018 / 1k tokens
 	"SparkDesk-v4.0":                            1.2858,
 	"360GPT_S2_V9":                              0.8572, // ¥0.012 / 1k tokens
 	"360gpt-turbo":                              0.0858, // ¥0.0012 / 1k tokens
@@ -224,8 +224,8 @@ var defaultModelRatio = map[string]float64{
 	"embedding_s1_v1":                           0.0715, // ¥0.001 / 1k tokens
 	"semantic_similarity_s1_v1":                 0.0715, // ¥0.001 / 1k tokens
 	"hunyuan":                                   7.143,  // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
-	// https://platform.lingyiwanwu.com/docs#-计费单元
-	// 已经按照 7.2 来换算美元价格
+	// https://platform.lingyiwanwu.com/docs#-
+	// 7.2
 	"yi-34b-chat-0205":       0.18,
 	"yi-34b-chat-200k":       0.864,
 	"yi-vl-plus":             0.432,
@@ -249,7 +249,7 @@ var defaultModelRatio = map[string]float64{
 	"deepseek-chat":          0.27 / 2,
 	"deepseek-coder":         0.27 / 2,
 	"deepseek-reasoner":      0.55 / 2, // 0.55 / 1k tokens
-	// Perplexity online 模型对搜索额外收费，有需要应自行调整，此处不计入搜索费用
+	// Perplexity online
 	"llama-3-sonar-small-32k-chat":   0.2 / 1000 * USD,
 	"llama-3-sonar-small-32k-online": 0.2 / 1000 * USD,
 	"llama-3-sonar-large-32k-chat":   1 / 1000 * USD,
@@ -363,7 +363,7 @@ func UpdateModelPriceByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
 }
 
-// GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
+// GetModelPrice -1false
 func GetModelPrice(name string, printErr bool) (float64, bool) {
 	name = FormatMatchingModelName(name)
 
@@ -392,7 +392,6 @@ func UpdateModelRatioByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(modelRatioMap, jsonStr, InvalidateExposedDataCache)
 }
 
-// 处理带有思考预算的模型名称，方便统一定价
 func handleThinkingBudgetModel(name, prefix, wildcard string) string {
 	if strings.HasPrefix(name, prefix) && strings.Contains(name, "-thinking-") {
 		return wildcard
@@ -513,7 +512,7 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			}
 			return 4, false
 		}
-		// gpt-5 匹配
+		// gpt-5
 		if strings.HasPrefix(name, "gpt-5") {
 			if strings.HasPrefix(name, "gpt-5.5") {
 				return 6, true
@@ -526,14 +525,14 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			}
 			return 8, true
 		}
-		// gpt-4.5-preview匹配
+		// gpt-4.5-preview
 		if strings.HasPrefix(name, "gpt-4.5-preview") {
 			return 2, true
 		}
 		if strings.HasPrefix(name, "gpt-4-turbo") || strings.HasSuffix(name, "gpt-4-1106") || strings.HasSuffix(name, "gpt-4-1105") {
 			return 3, true
 		}
-		// 没有特殊标记的 gpt-4 模型默认倍率为 2
+		// gpt-4 2
 		return 2, false
 	}
 	if strings.HasPrefix(name, "o1") || strings.HasPrefix(name, "o3") {
@@ -568,9 +567,9 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			return 4, true
 		} else if strings.HasPrefix(name, "gemini-2.0") {
 			return 4, true
-		} else if strings.HasPrefix(name, "gemini-2.5-pro") { // 移除preview来增加兼容性，这里假设正式版的倍率和preview一致
+		} else if strings.HasPrefix(name, "gemini-2.5-pro") { // previewpreview
 			return 8, false
-		} else if strings.HasPrefix(name, "gemini-2.5-flash") { // 处理不同的flash模型倍率
+		} else if strings.HasPrefix(name, "gemini-2.5-flash") { // flash
 			if strings.HasPrefix(name, "gemini-2.5-flash-preview") {
 				if strings.HasSuffix(name, "-nothinking") {
 					return 4, false
@@ -605,7 +604,7 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			return 4, false
 		}
 	}
-	// hint 只给官方上4倍率，由于开源模型供应商自行定价，不对其进行补全倍率进行强制对齐
+	// hint 4
 	if strings.HasPrefix(name, "ERNIE-Speed-") {
 		return 2, true
 	} else if strings.HasPrefix(name, "ERNIE-Lite-") {
@@ -721,7 +720,6 @@ func GetAudioCompletionRatioCopy() map[string]float64 {
 	return audioCompletionRatioMap.ReadAll()
 }
 
-// 转换模型名，减少渠道必须配置各种带参数模型
 func FormatMatchingModelName(name string) string {
 
 	if strings.HasPrefix(name, "gemini-2.5-flash-lite") {
@@ -741,7 +739,7 @@ func FormatMatchingModelName(name string) string {
 	return name
 }
 
-// result: 倍率or价格， usePrice， exist
+// result: or usePrice exist
 func GetModelRatioOrPrice(model string) (float64, bool, bool) { // price or ratio
 	price, usePrice := GetModelPrice(model, false)
 	if usePrice {

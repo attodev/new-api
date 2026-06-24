@@ -34,7 +34,7 @@ func IsRequestBodyTooLargeError(err error) bool {
 }
 
 func GetRequestBody(c *gin.Context) (io.Seeker, error) {
-	// 首先检查是否有 BodyStorage 缓存
+	// BodyStorage
 	if storage, exists := c.Get(KeyBodyStorage); exists && storage != nil {
 		if bs, ok := storage.(BodyStorage); ok {
 			if _, err := bs.Seek(0, io.SeekStart); err != nil {
@@ -44,7 +44,6 @@ func GetRequestBody(c *gin.Context) (io.Seeker, error) {
 		}
 	}
 
-	// 检查旧的缓存方式
 	cached, exists := c.Get(KeyRequestBody)
 	if exists && cached != nil {
 		if b, ok := cached.([]byte); ok {
@@ -59,13 +58,12 @@ func GetRequestBody(c *gin.Context) (io.Seeker, error) {
 
 	maxMB := constant.MaxRequestBodyMB
 	if maxMB <= 0 {
-		maxMB = 128 // 默认 128MB
+		maxMB = 128 // 128MB
 	}
 	maxBytes := int64(maxMB) << 20
 
 	contentLength := c.Request.ContentLength
 
-	// 使用新的存储系统
 	storage, err := CreateBodyStorageFromReader(c.Request.Body, contentLength, maxBytes)
 	_ = c.Request.Body.Close()
 
@@ -76,13 +74,12 @@ func GetRequestBody(c *gin.Context) (io.Seeker, error) {
 		return nil, err
 	}
 
-	// 缓存存储对象
 	c.Set(KeyBodyStorage, storage)
 
 	return storage, nil
 }
 
-// GetBodyStorage 获取请求体存储对象（用于需要多次读取的场景）
+// GetBodyStorage
 func GetBodyStorage(c *gin.Context) (BodyStorage, error) {
 	seeker, err := GetRequestBody(c)
 	if err != nil {
@@ -95,7 +92,7 @@ func GetBodyStorage(c *gin.Context) (BodyStorage, error) {
 	return bs, nil
 }
 
-// CleanupBodyStorage 清理请求体存储（应在请求结束时调用）
+// CleanupBodyStorage
 func CleanupBodyStorage(c *gin.Context) {
 	if storage, exists := c.Get(KeyBodyStorage); exists && storage != nil {
 		if bs, ok := storage.(BodyStorage); ok {

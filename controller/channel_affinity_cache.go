@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
@@ -36,7 +38,7 @@ func ClearChannelAffinityCache(c *gin.Context) {
 	if ruleName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"message": "missing parameter: rule_name, or use all=true to clear all",
+			"message": common.TranslateMessage(c, i18n.MsgChannelAffinityMissingRuleName),
 		})
 		return
 	}
@@ -67,14 +69,14 @@ func GetChannelAffinityUsageCacheStats(c *gin.Context) {
 	if ruleName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"message": "missing param: rule_name",
+			"message": common.TranslateMessage(c, i18n.MsgChannelAffinityMissingRuleName),
 		})
 		return
 	}
 	if keyFp == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"message": "missing param: key_fp",
+			"message": common.TranslateMessage(c, i18n.MsgChannelAffinityMissingKeyFp),
 		})
 		return
 	}

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -63,7 +63,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 	defer res.Body.Close()
 	var oidcResponse OidcResponse
-	err = json.NewDecoder(res.Body).Decode(&oidcResponse)
+	err = common.DecodeJson(res.Body, &oidcResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 
 	var oidcUser OidcUser
-	err = json.NewDecoder(res2.Body).Decode(&oidcUser)
+	err = common.DecodeJson(res2.Body, &oidcUser)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func OidcAuth(c *gin.Context) {
 	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"message": "state is empty or not same",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthStateInvalid),
 		})
 		return
 	}
@@ -119,7 +119,7 @@ func OidcAuth(c *gin.Context) {
 	if !system_setting.GetOIDCSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "OIDC login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "OIDC"}),
 		})
 		return
 	}
@@ -165,7 +165,7 @@ func OidcAuth(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "new user registration is disabled by admin",
+				"message": common.TranslateMessage(c, i18n.MsgUserRegisterDisabled),
 			})
 			return
 		}
@@ -173,7 +173,7 @@ func OidcAuth(c *gin.Context) {
 
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "user has been banned",
+			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
 			"success": false,
 		})
 		return
@@ -185,7 +185,7 @@ func OidcBind(c *gin.Context) {
 	if !system_setting.GetOIDCSettings().Enabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "OIDC login and registration is not enabled by admin",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthNotEnabled, map[string]any{"Provider": "OIDC"}),
 		})
 		return
 	}
@@ -201,7 +201,7 @@ func OidcBind(c *gin.Context) {
 	if model.IsOidcIdAlreadyTaken(user.OidcId) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": "this OIDC account is already bound",
+			"message": common.TranslateMessage(c, i18n.MsgOAuthAccountUsed),
 		})
 		return
 	}
@@ -222,7 +222,7 @@ func OidcBind(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "bind",
+		"message": common.TranslateMessage(c, i18n.MsgOAuthBindSuccess),
 	})
 	return
 }

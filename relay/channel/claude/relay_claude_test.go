@@ -49,7 +49,7 @@ func TestFormatClaudeResponseInfo_MessageStart(t *testing.T) {
 }
 
 func TestFormatClaudeResponseInfo_MessageDelta_FullUsage(t *testing.T) {
-	// message_start 先积累 usage
+	// message_start usage
 	claudeInfo := &ClaudeResponseInfo{
 		Usage: &dto.Usage{
 			PromptTokens: 100,
@@ -61,7 +61,7 @@ func TestFormatClaudeResponseInfo_MessageDelta_FullUsage(t *testing.T) {
 		},
 	}
 
-	// message_delta 带完整 usage（原生 Anthropic 场景）
+	// message_delta usage Anthropic
 	claudeResponse := &dto.ClaudeResponse{
 		Type: "message_delta",
 		Usage: &dto.ClaudeUsage{
@@ -91,7 +91,7 @@ func TestFormatClaudeResponseInfo_MessageDelta_FullUsage(t *testing.T) {
 }
 
 func TestFormatClaudeResponseInfo_MessageDelta_OnlyOutputTokens(t *testing.T) {
-	// 模拟 Bedrock: message_start 已积累 usage
+	// Bedrock: message_start usage
 	claudeInfo := &ClaudeResponseInfo{
 		Usage: &dto.Usage{
 			PromptTokens: 100,
@@ -105,12 +105,12 @@ func TestFormatClaudeResponseInfo_MessageDelta_OnlyOutputTokens(t *testing.T) {
 		},
 	}
 
-	// Bedrock 的 message_delta 只有 output_tokens，缺少 input_tokens 和 cache 字段
+	// Bedrock message_delta output_tokens input_tokens cache
 	claudeResponse := &dto.ClaudeResponse{
 		Type: "message_delta",
 		Usage: &dto.ClaudeUsage{
 			OutputTokens: 200,
-			// InputTokens, CacheCreationInputTokens, CacheReadInputTokens 都是 0
+			// InputTokens, CacheCreationInputTokens, CacheReadInputTokens 0
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestFormatClaudeResponseInfo_MessageDelta_OnlyOutputTokens(t *testing.T) {
 	if !ok {
 		t.Fatal("expected true")
 	}
-	// PromptTokens 应保持 message_start 的值（因为 message_delta 的 InputTokens=0，不更新）
+	// PromptTokens message_start message_delta InputTokens=0
 	if claudeInfo.Usage.PromptTokens != 100 {
 		t.Errorf("PromptTokens = %d, want 100", claudeInfo.Usage.PromptTokens)
 	}
@@ -128,7 +128,7 @@ func TestFormatClaudeResponseInfo_MessageDelta_OnlyOutputTokens(t *testing.T) {
 	if claudeInfo.Usage.TotalTokens != 300 {
 		t.Errorf("TotalTokens = %d, want 300", claudeInfo.Usage.TotalTokens)
 	}
-	// cache 字段应保持 message_start 的值
+	// cache message_start
 	if claudeInfo.Usage.PromptTokensDetails.CachedTokens != 30 {
 		t.Errorf("CachedTokens = %d, want 30", claudeInfo.Usage.PromptTokensDetails.CachedTokens)
 	}

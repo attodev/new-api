@@ -207,7 +207,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 		if err != nil {
 			host = addr
 		}
-		// 对 github.io 优先尝试 IPv4，失败则回退 IPv6
+		// github.io IPv4 IPv6
 		if strings.HasSuffix(host, "github.io") {
 			if conn, err := dialer.DialContext(ctx, "tcp4", addr); err == nil {
 				return conn, nil
@@ -281,7 +281,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 				return
 			}
 
-			// 简单重试：最多 3 次，指数退避
+			// 3
 			var resp *http.Response
 			var lastErr error
 			for attempt := 0; attempt < 3; attempt++ {
@@ -303,7 +303,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 				return
 			}
 
-			// Content-Type 和响应体大小校验
+			// Content-Type
 			if ct := resp.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "application/json") {
 				logger.LogWarn(c.Request.Context(), "unexpected content-type from "+chItem.Name+": "+ct)
 			}
@@ -339,9 +339,8 @@ func FetchUpstreamRatios(c *gin.Context) {
 				return
 			}
 
-			// 兼容两种上游接口格式：
-			//  type1: /api/ratio_config -> data 为 map[string]any，包含 model_ratio/completion_ratio/cache_ratio/model_price
-			//  type2: /api/pricing      -> data 为 []Pricing 列表，需要转换为与 type1 相同的 map 格式
+			// type1: /api/ratio_config -> data map[string]any model_ratio/completion_ratio/cache_ratio/model_price
+			// type2: /api/pricing -> data []Pricing type1 map
 			var body struct {
 				Success bool            `json:"success"`
 				Data    json.RawMessage `json:"data"`
@@ -359,12 +358,12 @@ func FetchUpstreamRatios(c *gin.Context) {
 				return
 			}
 
-			// 若 Data 为空，将继续按 type1 尝试解析（与多数静态 ratio_config 兼容）
+			// Data type1 ratio_config
 
-			// 尝试按 type1 解析
+			// type1
 			var type1Data map[string]any
 			if err := common.Unmarshal(body.Data, &type1Data); err == nil {
-				// 如果包含至少一个 ratioTypes 字段，则认为是 type1
+				// ratioTypes type1
 				isType1 := false
 				for _, rt := range pricingSyncFields {
 					if _, ok := type1Data[rt]; ok {
@@ -378,7 +377,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 				}
 			}
 
-			// 如果不是 type1，则尝试按 type2 (/api/pricing) 解析
+			// type1 type2 (/api/pricing)
 			var pricingItems []struct {
 				ModelName            string   `json:"model_name"`
 				QuotaType            int      `json:"quota_type"`
@@ -422,7 +421,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 					modelPriceMap[item.ModelName] = item.ModelPrice
 				} else {
 					modelRatioMap[item.ModelName] = item.ModelRatio
-					// completionRatio 可能为 0，此时也直接赋值，保持与上游一致
+					// completionRatio 0
 					completionRatioMap[item.ModelName] = item.CompletionRatio
 				}
 				if item.CacheRatio != nil {
@@ -558,7 +557,7 @@ func buildDifferences(localData map[string]any, successfulChannels []struct {
 
 	confidenceMap := make(map[string]map[string]bool)
 
-	// 预处理阶段：检查pricing接口的可信度
+	// pricing
 	for _, channel := range successfulChannels {
 		confidenceMap[channel.name] = make(map[string]bool)
 
@@ -566,15 +565,13 @@ func buildDifferences(localData map[string]any, successfulChannels []struct {
 		completionRatios := valueMap(channel.data["completion_ratio"])
 
 		if len(modelRatios) > 0 && len(completionRatios) > 0 {
-			// 遍历所有模型，检查是否满足不可信条件
 			for modelName := range allModels {
-				// 默认为可信
 				confidenceMap[channel.name][modelName] = true
 
-				// 检查是否满足不可信条件：model_ratio为37.5且completion_ratio为1
+				// model_ratio37.5completion_ratio1
 				if modelRatioVal, ok := modelRatios[modelName]; ok {
 					if completionRatioVal, ok := completionRatios[modelName]; ok {
-						// 转换为float64进行比较
+						// float64
 						modelRatioFloat, modelRatioOK := asFloat64(modelRatioVal)
 						completionRatioFloat, completionRatioOK := asFloat64(completionRatioVal)
 						if modelRatioOK && completionRatioOK && nearlyEqual(modelRatioFloat, 37.5) && nearlyEqual(completionRatioFloat, 1.0) {
@@ -584,7 +581,7 @@ func buildDifferences(localData map[string]any, successfulChannels []struct {
 				}
 			}
 		} else {
-			// 如果不是从pricing接口获取的数据，则全部标记为可信
+			// pricing
 			for modelName := range allModels {
 				confidenceMap[channel.name][modelName] = true
 			}
