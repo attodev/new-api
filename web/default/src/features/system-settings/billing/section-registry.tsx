@@ -49,6 +49,7 @@ const getGroupDefaults = (settings: BillingSettings) => ({
   GroupSpecialUsableGroup:
     settings['group_ratio_setting.group_special_usable_group'],
   ModelDiscount: settings.ModelDiscount,
+  VendorDiscount: settings.VendorDiscount,
 })
 
 const BILLING_SECTIONS = [

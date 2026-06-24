@@ -212,6 +212,25 @@ const groupSchema = z.object({
       })
     }
   }),
+  VendorDiscount: z.string().superRefine((value, ctx) => {
+    const result = validateJsonString(value, {
+      predicate: (parsed) =>
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        Object.values(parsed as Record<string, unknown>).every(
+          (v) => typeof v === 'number' && v >= 0 && v <= 100
+        ),
+      predicateMessage:
+        'Expected a JSON map of vendor name to discount percentage (0–100)',
+    })
+    if (!result.valid) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message || 'Invalid JSON',
+      })
+    }
+  }),
 })
 
 type ModelFormValues = z.infer<typeof modelSchema>
@@ -281,6 +300,7 @@ export function RatioSettingsCard({
       groupDefaults.GroupSpecialUsableGroup
     ),
     ModelDiscount: normalizeJsonString(groupDefaults.ModelDiscount),
+    VendorDiscount: normalizeJsonString(groupDefaults.VendorDiscount),
   })
 
   const modelForm = useForm<ModelFormValues>({
@@ -317,6 +337,7 @@ export function RatioSettingsCard({
         groupDefaults.GroupSpecialUsableGroup
       ),
       ModelDiscount: formatJsonForTextarea(groupDefaults.ModelDiscount),
+      VendorDiscount: formatJsonForTextarea(groupDefaults.VendorDiscount),
     },
   })
 
@@ -366,6 +387,7 @@ export function RatioSettingsCard({
         groupDefaults.GroupSpecialUsableGroup
       ),
       ModelDiscount: normalizeJsonString(groupDefaults.ModelDiscount),
+      VendorDiscount: normalizeJsonString(groupDefaults.VendorDiscount),
     }
 
     groupForm.reset({
@@ -379,6 +401,7 @@ export function RatioSettingsCard({
         groupDefaults.GroupSpecialUsableGroup
       ),
       ModelDiscount: formatJsonForTextarea(groupDefaults.ModelDiscount),
+      VendorDiscount: formatJsonForTextarea(groupDefaults.VendorDiscount),
     })
   }, [groupDefaults, groupForm])
 
@@ -435,6 +458,7 @@ export function RatioSettingsCard({
           values.GroupSpecialUsableGroup
         ),
         ModelDiscount: normalizeJsonString(values.ModelDiscount),
+        VendorDiscount: normalizeJsonString(values.VendorDiscount),
       }
 
       // Map form field names to API keys (most are 1:1, except GroupSpecialUsableGroup)

@@ -59,6 +59,7 @@ import { SettingsPageActionsPortal } from '../components/settings-page-context'
 import { GroupRatioVisualEditor } from './group-ratio-visual-editor'
 import { GroupSpecialUsableRulesEditor } from './group-special-usable-editor'
 import { ModelDiscountVisualEditor } from './model-discount-visual-editor'
+import { VendorDiscountVisualEditor } from './vendor-discount-visual-editor'
 
 type GroupFormValues = {
   GroupRatio: string
@@ -69,6 +70,7 @@ type GroupFormValues = {
   DefaultUseAutoGroup: boolean
   GroupSpecialUsableGroup: string
   ModelDiscount: string
+  VendorDiscount: string
 }
 
 type GroupRatioFormProps = {
@@ -150,6 +152,13 @@ export const GroupRatioForm = memo(function GroupRatioForm({
 
             <ModelDiscountVisualEditor
               modelDiscount={form.watch('ModelDiscount')}
+              onChange={(field, value) =>
+                handleFieldChange(field as keyof GroupFormValues, value)
+              }
+            />
+
+            <VendorDiscountVisualEditor
+              vendorDiscount={form.watch('VendorDiscount')}
               onChange={(field, value) =>
                 handleFieldChange(field as keyof GroupFormValues, value)
               }
@@ -316,6 +325,25 @@ export const GroupRatioForm = memo(function GroupRatioForm({
                   <FormDescription>
                     {t(
                       'JSON map of model name → discount percentage (0–100), e.g. { "gpt-4o": 10 }.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='VendorDiscount'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Vendor Discount')}</FormLabel>
+                  <FormControl>
+                    <Textarea rows={6} {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'JSON map of vendor name → discount percentage (0–100), e.g. { "openai": 10 }.'
                     )}
                   </FormDescription>
                   <FormMessage />
