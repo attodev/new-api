@@ -346,6 +346,20 @@ func updatePricing() {
 	}
 	modelEnableGroupsLock.Unlock()
 
+	// modelVendorNameCache(모델명 -> 벤더명)를 pricing 갱신과 같은 락 구간에서 함께
+	// 빌드한다. resolveVendorName은 이 값을 읽기만 하므로 데이터 레이스가 없다.
+	vendorIDToName := make(map[int]string)
+	for _, v := range vendorsList {
+		vendorIDToName[v.ID] = v.Name
+	}
+	rebuiltVendorCache := make(map[string]string)
+	for _, p := range pricingMap {
+		if name, ok := vendorIDToName[p.VendorID]; ok {
+			rebuiltVendorCache[p.ModelName] = name
+		}
+	}
+	modelVendorNameCache = rebuiltVendorCache
+
 	lastGetPricingTime = time.Now()
 }
 
@@ -358,27 +372,15 @@ func init() {
 	ratio_setting.SetVendorResolver(resolveVendorName)
 }
 
-// modelVendorNameCache: 모델명 -> 벤더명. pricing 캐시에서 파생.
+// modelVendorNameCache: 모델명 -> 벤더명. updatePricing()이 락을 쥔 채 빌드한다.
 var modelVendorNameCache map[string]string
 
 func resolveVendorName(modelName string) (string, bool) {
-	if modelVendorNameCache == nil {
-		buildModelVendorNameCache()
-	}
+	// pricingMap/modelVendorNameCache가 준비되도록 보장(필요 시 락 안에서 빌드).
+	GetPricing()
+	// InvalidatePricingCache와의 레이스를 피하려 같은 락으로 읽는다.
+	updatePricingLock.Lock()
+	defer updatePricingLock.Unlock()
 	name, ok := modelVendorNameCache[modelName]
 	return name, ok && name != ""
-}
-
-func buildModelVendorNameCache() {
-	cache := make(map[string]string)
-	vendorIDToName := make(map[int]string)
-	for _, v := range GetVendors() {
-		vendorIDToName[v.ID] = v.Name
-	}
-	for _, p := range GetPricing() {
-		if name, ok := vendorIDToName[p.VendorID]; ok {
-			cache[p.ModelName] = name
-		}
-	}
-	modelVendorNameCache = cache
 }
