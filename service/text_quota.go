@@ -196,6 +196,21 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 		relayInfo.ChannelType == constant.ChannelTypeOpenRouter &&
 		summary.IsClaudeUsageSemantic
 
+	// Defensive: some upstreams (e.g. an older new-api relaying a Claude model
+	// through an OpenAI-compatible channel) report Anthropic-style disjoint token
+	// counts where prompt_tokens EXCLUDES cache, but omit usage_semantic="anthropic".
+	// Under genuine OpenAI semantics cache_read/cache_creation are subsets of
+	// prompt_tokens, so their sum exceeding prompt_tokens is physically impossible
+	// and signals disjoint Anthropic-style counts. Treat such usage as Claude-semantic
+	// so cache is not subtracted into a negative base (which previously underflowed
+	// and clamped quota to 1, i.e. severe under-billing).
+	if !summary.IsClaudeUsageSemantic && !legacyClaudeDerived && !isOpenRouterClaudeBilling &&
+		(summary.CacheTokens > 0 || summary.CacheCreationTokens > 0) &&
+		summary.CacheTokens+summary.CacheCreationTokens > summary.PromptTokens {
+		summary.IsClaudeUsageSemantic = true
+		summary.UsageSemantic = "anthropic"
+	}
+
 	if isOpenRouterClaudeBilling {
 		summary.PromptTokens -= summary.CacheTokens
 		isUsingCustomSettings := relayInfo.PriceData.UsePrice || hasCustomModelRatio(summary.ModelName, relayInfo.PriceData.ModelRatio)
@@ -310,8 +325,15 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 }
 
 func usageSemanticFromUsage(relayInfo *relaycommon.RelayInfo, usage *dto.Usage) string {
+	// An explicit tag from the upstream always wins.
 	if usage != nil && usage.UsageSemantic != "" {
 		return usage.UsageSemantic
+	}
+	// Channel-level override: lets an admin declare the semantic for an
+	// OpenAI-compatible upstream that reports Anthropic-style disjoint usage
+	// without a usage_semantic tag (e.g. an older new-api relaying Claude).
+	if relayInfo != nil && relayInfo.ChannelMeta != nil && relayInfo.ChannelSetting.UsageSemantic != "" {
+		return relayInfo.ChannelSetting.UsageSemantic
 	}
 	if relayInfo != nil && relayInfo.GetFinalRequestRelayFormat() == types.RelayFormatClaude {
 		return "anthropic"

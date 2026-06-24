@@ -187,11 +187,13 @@ function buildBillingFormula(
   const imageTokens =
     other.image && other.image_output ? other.image_output : 0
 
-  // Text input = total input minus cache reads, audio, image
-  const textInput = Math.max(
-    inputTokens - cacheReadTokens - (audioInputSeperatePrice ? audioInputTokens : 0) - imageTokens,
-    0
-  )
+  // Claude API reports input_tokens as pure non-cached text only (cache is separate).
+  // So for Claude-semantic channels, prompt_tokens already excludes cache — don't subtract again.
+  // For OpenAI-semantic channels, prompt_tokens includes cache and needs subtraction.
+  const isClaudeSemantic = other.claude === true
+  const textInput = isClaudeSemantic
+    ? Math.max(inputTokens - (audioInputSeperatePrice ? audioInputTokens : 0) - imageTokens, 0)
+    : Math.max(inputTokens - cacheReadTokens - (audioInputSeperatePrice ? audioInputTokens : 0) - imageTokens, 0)
   const outputPrice = basePrice * completionRatio
 
   const lines: string[] = []

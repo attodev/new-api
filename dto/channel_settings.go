@@ -7,6 +7,13 @@ type ChannelSettings struct {
 	PassThroughBodyEnabled bool   `json:"pass_through_body_enabled,omitempty"`
 	SystemPrompt           string `json:"system_prompt,omitempty"`
 	SystemPromptOverride   bool   `json:"system_prompt_override,omitempty"`
+	// UsageSemantic forces how this channel's upstream usage is interpreted for
+	// billing when the upstream does not send a usage_semantic tag. Set to
+	// "anthropic" for OpenAI-compatible upstreams that report Anthropic-style
+	// disjoint token counts (prompt_tokens EXCLUDES cache), e.g. an older new-api
+	// relaying a Claude model. Empty = auto-detect. An explicit usage_semantic
+	// from the upstream always takes precedence over this override.
+	UsageSemantic string `json:"usage_semantic,omitempty"`
 }
 
 type VertexKeyType string
