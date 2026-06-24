@@ -58,6 +58,7 @@ import {
 import { SettingsPageActionsPortal } from '../components/settings-page-context'
 import { GroupRatioVisualEditor } from './group-ratio-visual-editor'
 import { GroupSpecialUsableRulesEditor } from './group-special-usable-editor'
+import { ModelDiscountVisualEditor } from './model-discount-visual-editor'
 
 type GroupFormValues = {
   GroupRatio: string
@@ -67,6 +68,7 @@ type GroupFormValues = {
   AutoGroups: string
   DefaultUseAutoGroup: boolean
   GroupSpecialUsableGroup: string
+  ModelDiscount: string
 }
 
 type GroupRatioFormProps = {
@@ -141,6 +143,13 @@ export const GroupRatioForm = memo(function GroupRatioForm({
               userUsableGroups={form.watch('UserUsableGroups')}
               groupGroupRatio={form.watch('GroupGroupRatio')}
               autoGroups={form.watch('AutoGroups')}
+              onChange={(field, value) =>
+                handleFieldChange(field as keyof GroupFormValues, value)
+              }
+            />
+
+            <ModelDiscountVisualEditor
+              modelDiscount={form.watch('ModelDiscount')}
               onChange={(field, value) =>
                 handleFieldChange(field as keyof GroupFormValues, value)
               }
@@ -288,6 +297,25 @@ export const GroupRatioForm = memo(function GroupRatioForm({
                   <FormDescription>
                     {t(
                       'Nested JSON defining per-group rules for adding (+:), removing (-:), or appending usable groups.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='ModelDiscount'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Model Discount')}</FormLabel>
+                  <FormControl>
+                    <Textarea rows={6} {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'JSON map of model name → discount percentage (0–100), e.g. { "gpt-4o": 10 }.'
                     )}
                   </FormDescription>
                   <FormMessage />

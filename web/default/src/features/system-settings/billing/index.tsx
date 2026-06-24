@@ -58,6 +58,7 @@ const defaultBillingSettings: BillingSettings = {
   AutoGroups: '',
   DefaultUseAutoGroup: false,
   'group_ratio_setting.group_special_usable_group': '{}',
+  ModelDiscount: '{}',
   PayAddress: '',
   EpayId: '',
   EpayKey: '',
