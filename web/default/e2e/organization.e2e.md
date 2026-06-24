@@ -253,11 +253,17 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 
 ---
 
-### 19. admin removes organization and users via UI
+### 19. admin removes organization members, organization, and users via UI
 **페이지:** `/organization` → 사용자 관리
-**대상:** `rootPage` (teardown, best-effort)
+**대상:** `ownerPage`(멤버 제거), `rootPage`(조직·계정 삭제) (teardown, best-effort)
 
-teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **삭제 순서가 중요하다** — 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부하므로, 먼저 owner가 아닌 두 멤버(`e2e_admin_<runId>` / `e2e_member_<runId>`)를 제거하고, 다음으로 조직(`E2E Org <runId>`)을 삭제한 뒤, 마지막으로 owner(`e2e_owner_<runId>`) 계정을 삭제한다. best-effort로 동작한다.
+teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **순서가 중요하다:**
+
+1. **owner가 조직에서 멤버 제거** — 조직에서의 멤버 추가/제거는 owner/admin만 가능하므로 `ownerPage`로 수행한다. owner가 아닌 두 멤버(`e2e_admin_<runId>` / `e2e_member_<runId>`)의 행 체크박스를 선택하고 "조직에서 제거" → "Save"로 멤버십을 해제한다(`organization_id`를 0으로 초기화). 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부하므로 이 단계가 선행돼야 한다.
+2. **root가 조직 삭제** — `E2E Org <runId>`. 이때 백엔드(`model.DeleteOrganization`)가 해당 조직의 구독 플랜·사용자 구독을 cascade 삭제하고 owner의 멤버십을 정리한다.
+3. **root가 계정 삭제** — `e2e_admin_<runId>` / `e2e_member_<runId>` / `e2e_owner_<runId>` 3계정을 모두 삭제한다.
+
+각 단계는 best-effort(try/catch)로 동작하며, 멤버 제거는 멤버에 활성 구독이 있어도 가능하다(구독은 조직 삭제 cascade로 정리됨).
 
 ## 자원 생명주기 및 정리 (Cleanup)
 
@@ -267,24 +273,29 @@ teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **삭
 
 ```
 setup 테스트(#1)            기능 테스트(#2~#18)            teardown 테스트(#19)
-─────────────────         ───────────────────          ───────────────────
-root가 UI로                 setup이 만든 계정·조직을        UI로 삭제 (best-effort)
- · 사용자 3명 생성            그대로 재사용해 권한·렌더링       · non-owner 멤버 2명
- · 조직 1개 생성              ·상호작용 검증                 · 조직
-owner가 UI로                                              · owner
- · 멤버 2명 추가
+─────────────────         ───────────────────          ──────────────────────────
+root가 UI로                 setup이 만든 계정·조직을        ① owner가 조직에서 멤버 제거
+ · 사용자 3명 생성            그대로 재사용해 권한·렌더링         (e2e_admin, e2e_member)
+ · 조직 1개 생성              ·상호작용 검증                 ② root가 조직 삭제 (cascade)
+owner가 UI로                                              ③ root가 계정 3개 삭제
+ · 멤버 2명 추가                                              (admin, member, owner)
  · 1명 org admin 승격
 ```
 
-### 삭제 순서가 중요한 이유 (백엔드 제약)
+### 삭제 순서가 중요한 이유 (권한 + 백엔드 제약)
 
-`model.DeleteOrganization`은 **owner가 아닌 활성 멤버가 남아 있는 조직의 삭제를 거부**한다(`"organization has N non-owner members, remove them first"`). 따라서 teardown은 반드시 다음 순서를 지킨다.
+- 조직에서의 **멤버 추가/제거는 owner/admin만** 할 수 있다(`RemoveOrganizationUserMembership`는 org admin 권한을 요구). 따라서 멤버 제거 단계는 root가 아니라 **`ownerPage`(조직 소유자)** 로 수행한다.
+- `model.DeleteOrganization`은 **owner가 아닌 활성 멤버가 남아 있는 조직의 삭제를 거부**한다(`"organization has N non-owner members, remove them first"`).
 
-1. **non-owner 멤버 삭제** — `e2e_admin_<runId>`, `e2e_member_<runId>` (사용자 자체를 삭제 → 멤버십도 사라짐)
-2. **조직 삭제** — `E2E Org <runId>` (이제 non-owner 멤버 0명 → owner는 멤버 카운트에서 제외되므로 삭제 가능)
-3. **owner 삭제** — `e2e_owner_<runId>`
+그래서 teardown은 반드시 다음 순서를 지킨다.
+
+1. **owner가 조직에서 멤버 제거** (`ownerPage`) — `e2e_admin_<runId>`, `e2e_member_<runId>`의 행을 선택하고 "조직에서 제거" → "Save". 멤버의 `organization_id`만 0으로 초기화되며, 멤버에 활성 구독이 있어도 제거된다.
+2. **root가 조직 삭제** (`rootPage`) — `E2E Org <runId>`. 이제 non-owner 멤버 0명 → owner는 멤버 카운트에서 제외되므로 삭제 가능. 이때 백엔드가 해당 조직의 구독 플랜·사용자 구독을 cascade 삭제하고 owner 멤버십을 정리한다.
+3. **root가 계정 삭제** (`rootPage`) — `e2e_admin_<runId>` / `e2e_member_<runId>` / `e2e_owner_<runId>` 3계정.
 
 각 단계는 `try/catch`로 감싼 **best-effort**다. 앞 단계가 실패해도 나머지 정리를 계속 진행하며, 실패는 `console.error`로 로그를 남긴다.
+
+> 이전에는 멤버의 **계정 자체를 삭제**해 멤버십을 간접적으로 없앴으나, 실제 운영 흐름(멤버 제거는 owner/admin가 수행)에 맞춰 **명시적 멤버 제거 → 조직 삭제 → 계정 삭제** 순으로 변경했다.
 
 ### 조직 삭제는 토스트가 아니라 "카드 사라짐"으로 검증
 

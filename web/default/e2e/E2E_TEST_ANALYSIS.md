@@ -53,7 +53,7 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 
 핵심 설계 선택:
 - **4개 BrowserContext 분리** — 역할별로 쿠키·localStorage가 완전히 격리됨. `beforeAll`에서는 **root만 로그인**하고 나머지 세 컨텍스트는 빈 채로 둔다. owner/admin/member 계정·조직은 setup 테스트(#1)에서 UI로 생성·로그인하며, 이후 17개 기능 테스트가 그 페이지들을 재사용한다.
-- **self-provisioning** — 사전 시드 조직 계정에 의존하지 않는다. setup(#1)이 생성하고 teardown(#19)이 삭제한다. teardown은 백엔드 제약상 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다.
+- **self-provisioning** — 사전 시드 조직 계정에 의존하지 않는다. setup(#1)이 생성하고 teardown(#19)이 삭제한다. teardown은 **owner가 조직에서 멤버 제거(owner/admin만 가능) → root가 조직 삭제(cascade) → root가 계정 삭제** 순으로 진행한다.
 - **`serial` 모드** — 테스트 간 공유 페이지(`rootPage` 등)와 setup→기능→teardown 순서 의존성 때문에 순차 실행 필수.
 - **`reuseExistingServer: true`** — 로컬에서 이미 띄운 백엔드/프론트를 재사용. 단, 이 경우 config의 `env`(rate limit off)가 **적용되지 않으므로** 수동 기동 시 직접 꺼야 한다(§6 참조).
 
@@ -102,7 +102,7 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 | 16 | 구독 플랜 생성 | admin | `/organization/subscriptions` | **쓰기(생성)** | 플랜 생성 → "Organization plan saved" + 플랜 테이블에 노출 |
 | 17 | 구독 플랜 할당 | admin | `/organization/subscriptions` | **쓰기(할당)** | 멤버에게 플랜 할당 → "Organization plan assigned" + 구독 테이블 행 |
 | 18 | root 조직 사용자 로딩 (회귀) | root | `/organization` | 권한(긍정)·회귀 | 조직 선택 후 "organization_id is required" 오류 없이 멤버 로드 |
-| 19 | **정리 teardown** | root | `/organization`·사용자 관리 | **쓰기(삭제)·정리** | non-owner 멤버 2명 → 조직 → owner 순 삭제 (best-effort, 백엔드 제약 순서) |
+| 19 | **정리 teardown** | owner(멤버 제거), root(조직·계정 삭제) | `/organization`·사용자 관리 | **쓰기(삭제)·정리** | owner가 멤버 2명 제거 → root가 조직 삭제(cascade) → root가 계정 3개 삭제 (best-effort) |
 
 ### 검증 분류 분포
 
@@ -130,6 +130,7 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 | `/organization/usage-logs/common` 접근 | ✅(T5) | — | — | ❌(T6) |
 | `/organization/subscriptions` 접근 | ✅(T2) | ✅(T4) | ✅(T4,14,15) | ❌(T6) |
 | 멤버 추가(Username 입력) | — | ✅(T1) | ✅(T11) | ❌(T11) |
+| 조직에서 멤버 제거 | — | ✅(T19) | — | — |
 | 멤버 → org admin 승격 | — | ✅(T1) | — | — |
 | Role 컬럼/셀렉터 노출 | — | ✅(T12) | ✅(T7) | — |
 | Export / Import | — | — | ✅(T9,10) | — |

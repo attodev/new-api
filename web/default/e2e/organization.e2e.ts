@@ -226,6 +226,21 @@ async function deleteUserViaUi(page: Page, username: string) {
   await expect(page.getByText(/user deleted successfully/i)).toBeVisible()
 }
 
+async function removeMemberFromOrganizationViaUi(page: Page, username: string) {
+  // Only an org owner/admin can remove members, so this must run on the owner's
+  // (or an org-admin's) page. Select the member's row, remove it from the org,
+  // then save the pending change.
+  await openAuthenticatedPage(page, '/organization')
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  await row.locator('input[type="checkbox"]').check()
+  // "조직에서 제거" (remove from organization) is hard-coded Korean in
+  // organization-users-table.tsx and only shows for org admins/owners.
+  await page.getByRole('button', { name: '조직에서 제거' }).click()
+  await page.getByRole('button', { name: /^save$/i }).click()
+  await expect(page.getByText(/changes saved/i)).toBeVisible()
+}
+
 async function createOrganizationPlanViaUi(
   page: Page,
   plan: { title: string; quotaAmount: string }
@@ -600,16 +615,19 @@ test.describe('organization browser smoke tests', () => {
     await expect(page.getByText(ownerUsername, { exact: true }).first()).toBeVisible()
   })
 
-  test('admin removes organization and users via UI', async () => {
-    // Best-effort cleanup: keep going even if an earlier step left things partial.
-    // The backend refuses to delete an organization that still has non-owner
-    // members, so order matters: remove the non-owner members, then the
-    // organization (the owner is excluded from the member check), then the owner.
+  test('admin removes organization members, organization, and users via UI', async () => {
+    // Best-effort cleanup. Order matters:
+    // 1) The owner removes the non-owner members from the organization — only an
+    //    org owner/admin may remove members. (The backend also refuses to delete
+    //    an org that still has non-owner members.)
+    // 2) Root deletes the organization, which cascades subscription plans and
+    //    user subscriptions and clears the owner's membership.
+    // 3) Root deletes all the test accounts.
     for (const username of [orgAdminUsername, memberUsername]) {
       try {
-        await deleteUserViaUi(rootPage, username)
+        await removeMemberFromOrganizationViaUi(ownerPage, username)
       } catch (error) {
-        console.error(`Failed to delete user ${username}:`, error)
+        console.error(`Failed to remove ${username} from organization:`, error)
       }
     }
 
@@ -619,10 +637,12 @@ test.describe('organization browser smoke tests', () => {
       console.error(`Failed to delete organization ${organizationName}:`, error)
     }
 
-    try {
-      await deleteUserViaUi(rootPage, ownerUsername)
-    } catch (error) {
-      console.error(`Failed to delete user ${ownerUsername}:`, error)
+    for (const username of [orgAdminUsername, memberUsername, ownerUsername]) {
+      try {
+        await deleteUserViaUi(rootPage, username)
+      } catch (error) {
+        console.error(`Failed to delete user ${username}:`, error)
+      }
     }
   })
 })
