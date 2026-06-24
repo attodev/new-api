@@ -7,7 +7,9 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'atto1234'
 // org-admin, and member accounts plus the test organization are created and
 // destroyed through the UI within this suite (see setup/teardown tests).
 // A run-scoped id keeps names unique so a crashed run never collides with the next.
-const runId = `${Date.now()}`
+// Base-36 keeps it short (~8 chars) so the longest username (`e2e_member_<id>`)
+// stays within the backend's 20-char `max` validation on Username/DisplayName.
+const runId = Date.now().toString(36)
 const ownerUsername = `e2e_owner_${runId}`
 const orgAdminUsername = `e2e_admin_${runId}`
 const memberUsername = `e2e_member_${runId}`
@@ -227,6 +229,27 @@ test.describe('organization browser smoke tests', () => {
     ownerPage = await contexts[1].newPage()
     organizationAdminPage = await contexts[2].newPage()
     memberPage = await contexts[3].newPage()
+
+    // The dev server renders a fixed-position "Open TanStack Router Devtools"
+    // button in the bottom corner that intercepts clicks on drawer/footer
+    // buttons (e.g. "Save changes"). Hide it on every page in every context.
+    await Promise.all(
+      contexts.map((context) =>
+        context.addInitScript(() => {
+          const inject = () => {
+            const id = 'e2e-hide-devtools'
+            if (document.getElementById(id)) return
+            const style = document.createElement('style')
+            style.id = id
+            style.textContent =
+              '[aria-label="Open TanStack Router Devtools"]{display:none !important;}'
+            ;(document.head || document.documentElement)?.appendChild(style)
+          }
+          if (document.head || document.documentElement) inject()
+          document.addEventListener('DOMContentLoaded', inject)
+        })
+      )
+    )
 
     // Only the admin (root) account exists at the start. The other accounts are
     // created in the first test ("admin provisions ...") and signed in there.
