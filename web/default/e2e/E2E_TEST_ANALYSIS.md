@@ -15,7 +15,7 @@
 |---|---|
 | 테스트 프레임워크 | Playwright (`@playwright/test`) |
 | E2E 파일 수 | **1개** (`organization.e2e.ts`) |
-| 테스트 케이스 수 | **16개** (프로비저닝 setup 1 + 기능 14 + 정리 teardown 1) |
+| 테스트 케이스 수 | **18개** (프로비저닝 setup 1 + 기능 16 + 정리 teardown 1) |
 | 실행 모드 | `serial` (describe 단위 순차 실행) |
 | 병렬 실행 | `fullyParallel: false` |
 | 브라우저 | 시스템 Chromium (`/usr/bin/chromium-browser`), 1개 프로젝트 |
@@ -26,7 +26,7 @@
 
 테스트 대상은 **조직 기능 한정**이다. 릴레이/빌링/채널/사용자관리 등 백엔드 핵심 도메인에 대한 E2E는 현재 존재하지 않으며, 해당 영역은 Go 단위/통합 테스트(`*_test.go`)가 담당한다.
 
-이 스위트는 더 이상 사전 시드된 조직 계정에 의존하지 않는다. root(admin) 계정만 시드 기본값(`E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`)을 쓰고, owner / org admin / member 계정과 테스트 조직은 setup 테스트(#1)에서 **UI로 직접 생성(self-provision)** 하며 teardown 테스트(#16)에서 삭제한다. 모든 런타임 리소스는 `runId = Date.now().toString(36)` 기반 고유 이름(`e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, `E2E Org <runId>`)을 사용해 실행 간 충돌을 방지한다.
+이 스위트는 더 이상 사전 시드된 조직 계정에 의존하지 않는다. root(admin) 계정만 시드 기본값(`E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`)을 쓰고, owner / org admin / member 계정과 테스트 조직은 setup 테스트(#1)에서 **UI로 직접 생성(self-provision)** 하며 teardown 테스트(#18)에서 삭제한다. 모든 런타임 리소스는 `runId = Date.now().toString(36)` 기반 고유 이름(`e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, `E2E Org <runId>`)을 사용해 실행 간 충돌을 방지한다.
 
 ---
 
@@ -52,8 +52,8 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 ```
 
 핵심 설계 선택:
-- **4개 BrowserContext 분리** — 역할별로 쿠키·localStorage가 완전히 격리됨. `beforeAll`에서는 **root만 로그인**하고 나머지 세 컨텍스트는 빈 채로 둔다. owner/admin/member 계정·조직은 setup 테스트(#1)에서 UI로 생성·로그인하며, 이후 14개 기능 테스트가 그 페이지들을 재사용한다.
-- **self-provisioning** — 사전 시드 조직 계정에 의존하지 않는다. setup(#1)이 생성하고 teardown(#16)이 삭제한다. teardown은 백엔드 제약상 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다.
+- **4개 BrowserContext 분리** — 역할별로 쿠키·localStorage가 완전히 격리됨. `beforeAll`에서는 **root만 로그인**하고 나머지 세 컨텍스트는 빈 채로 둔다. owner/admin/member 계정·조직은 setup 테스트(#1)에서 UI로 생성·로그인하며, 이후 16개 기능 테스트가 그 페이지들을 재사용한다.
+- **self-provisioning** — 사전 시드 조직 계정에 의존하지 않는다. setup(#1)이 생성하고 teardown(#18)이 삭제한다. teardown은 백엔드 제약상 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다.
 - **`serial` 모드** — 테스트 간 공유 페이지(`rootPage` 등)와 setup→기능→teardown 순서 의존성 때문에 순차 실행 필수.
 - **`reuseExistingServer: true`** — 로컬에서 이미 띄운 백엔드/프론트를 재사용. 단, 이 경우 config의 `env`(rate limit off)가 **적용되지 않으므로** 수동 기동 시 직접 꺼야 한다(§6 참조).
 
@@ -99,13 +99,15 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 | 13 | 대시보드 프리셋 | admin | `/organization/dashboard` | 상호작용 | Today/7d/30d 클릭 시 에러 토스트 없음 |
 | 14 | 구독 폼 렌더 | admin | `/organization/subscriptions` | 렌더링 | Plan configuration·Plan title·Create |
 | 15 | 구독 폼 유효성 | admin | `/organization/subscriptions` | 폼 유효성 | 빈 제목 Create → "Plan title is required" |
-| 16 | **정리 teardown** | root | `/organization`·사용자 관리 | **쓰기(삭제)·정리** | non-owner 멤버 2명 → 조직 → owner 순 삭제 (best-effort, 백엔드 제약 순서) |
+| 16 | 구독 플랜 생성 | admin | `/organization/subscriptions` | **쓰기(생성)** | 플랜 생성 → "Organization plan saved" + 플랜 테이블에 노출 |
+| 17 | 구독 플랜 할당 | admin | `/organization/subscriptions` | **쓰기(할당)** | 멤버에게 플랜 할당 → "Organization plan assigned" + 구독 테이블 행 |
+| 18 | **정리 teardown** | root | `/organization`·사용자 관리 | **쓰기(삭제)·정리** | non-owner 멤버 2명 → 조직 → owner 순 삭제 (best-effort, 백엔드 제약 순서) |
 
 ### 검증 분류 분포
 
 | 분류 | 테스트 수 | 비고 |
 |---|---|---|
-| 쓰기(생성/삭제) — 셋업·정리 | 1, 16 | UI로 계정·조직 생성/삭제 |
+| 쓰기(생성/삭제) — 셋업·정리·구독 | 1, 16, 17, 18 | UI로 계정·조직·구독 플랜 생성/할당/삭제 |
 | 권한(긍정) — 접근 가능 확인 | 2, 4, 11, 12 | root/owner/admin |
 | 권한(부정) — 접근 차단 확인 | 6, 11 | member 403/sign-in |
 | 렌더링 — 요소 존재 확인 | 2, 5, 7, 14 | heading·컬럼·폼 |
@@ -120,7 +122,7 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 | 기능 | root | owner | org admin | member |
 |---|---|---|---|---|
 | 계정·조직 생성 (UI) | ✅(T1) | ✅(T1, 멤버 추가·승격) | — | — |
-| 계정·조직 삭제 (UI) | ✅(T16) | — | — | — |
+| 계정·조직 삭제 (UI) | ✅(T18) | — | — | — |
 | 사이드바 Organization 메뉴 노출 | ✅(T2) | ✅(T4) | ✅(T4) | ❌ 없음(T6) |
 | `/organization` (Users) 접근 | — | ✅(T4) | ✅(T4,7) | ❌ 403/sign-in(T6,11) |
 | `/organization/dashboard` 접근 | ✅(T2) | — | ✅(T13) | ❌(T6) |
@@ -130,6 +132,7 @@ setup 테스트 (#1)  (UI로 런타임 프로비저닝)
 | 멤버 → org admin 승격 | — | ✅(T1) | — | — |
 | Role 컬럼/셀렉터 노출 | — | ✅(T12) | ✅(T7) | — |
 | Export / Import | — | — | ✅(T9,10) | — |
+| 구독 플랜 생성·멤버 할당 | — | — | ✅(T16,17) | — |
 
 `—` = 해당 역할로 명시적 검증이 없는 조합(= 커버리지 갭 후보).
 
@@ -174,8 +177,8 @@ bun run e2e:install  # chromium 설치
 2. **Snap Chromium (Ubuntu 26.04+)** — 내장 Chromium 미지원으로 시스템 Chromium 사용. ffmpeg 미지원 → `video: 'off'`.
 3. **TanStack Router 세션 재검증** — `page.goto()`가 매번 `getSelf()`를 재호출하므로 페이지 이동은 반드시 `openAuthenticatedPage()`를 경유.
 4. **admin 계정만 선존재 필요** — root(admin) 계정만 DB에 선존재하면 된다(`E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD`). 조직·역할 계정은 setup 테스트가 UI로 self-provision하므로 더 이상 외부 시드에 의존하지 않는다.
-5. **teardown 삭제 순서 (백엔드 제약)** — teardown 테스트(#16)는 반드시 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다. 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부한다(`model.DeleteOrganization`).
-6. **serial 중단 시 잔여물** — serial 모드에서 중간 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어져 **teardown(#16)도 실행되지 않을 수 있다.** 이때 `e2e_*` 계정·조직이 DB에 남지만, run-scoped 고유 이름(`runId`) 덕분에 다음 실행과 충돌하지는 않는다.
+5. **teardown 삭제 순서 (백엔드 제약)** — teardown 테스트(#18)는 반드시 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다. 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부한다(`model.DeleteOrganization`).
+6. **serial 중단 시 잔여물** — serial 모드에서 중간 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어져 **teardown(#18)도 실행되지 않을 수 있다.** 이때 `e2e_*` 계정·조직이 DB에 남지만, run-scoped 고유 이름(`runId`) 덕분에 다음 실행과 충돌하지는 않는다.
 7. **프론트엔드 토스트 결함 우회** — `handleDeleteOrganization`은 API가 `success:false`를 200으로 반환해도 "Organization deleted" 토스트를 띄운다. 그래서 `deleteOrganizationViaUi`는 토스트가 아니라 **카드 사라짐**(`toHaveCount(0)`)으로 삭제를 단언한다. (프론트엔드 결함 자체 수정은 별도 작업.)
 
 ### 검증 결과 (2026-06-24)
@@ -189,10 +192,11 @@ bun run e2e:install  # chromium 설치
 
 ### 이제 커버되는 영역 (이전 갭)
 - **멤버 추가·역할 변경:** setup 테스트(#1)가 owner로 멤버 추가 및 org admin 승격을 UI로 실제 수행한다(이전엔 T10/T11이 *가시성*만 확인).
-- **조직·사용자 생성/삭제:** setup(#1)이 계정 3개와 조직을 UI로 생성하고, teardown(#16)이 멤버 → 조직 → owner 순으로 삭제한다 — 실제 mutation 경로가 검증된다.
+- **조직·사용자 생성/삭제:** setup(#1)이 계정 3개와 조직을 UI로 생성하고, teardown(#18)이 멤버 → 조직 → owner 순으로 삭제한다 — 실제 mutation 경로가 검증된다.
+- **구독 플랜 생성 성공 경로 + 멤버 할당:** T16이 플랜을 실제 생성("Organization plan saved" + 플랜 테이블 노출), T17이 멤버에게 할당("Organization plan assigned" + 구독 테이블 행)한다. 플랜·구독은 조직 삭제 시 cascade로 정리된다.
 
 ### 기능 갭
-- **구독 플랜 생성 성공 경로 미검증:** T15는 *실패* 유효성만 확인하며, 정상 입력으로 플랜이 생성·반영되는지는 확인하지 않음.
+- **구독 할당 결과 단언 약함:** T17은 할당 후 구독 테이블에 행이 보이는지만 확인하며, 쿼터 차감·기간 만료 등 구독 동작 자체는 검증하지 않음.
 - **멤버 추가/승격 결과 단언 약함:** setup(#1)은 흐름을 수행하지만, 테이블에 반영된 최종 역할·멤버 수를 깊게 단언하지는 않는다(셋업 목적의 best-effort 성격).
 - **Import 실제 업로드 미검증:** T9는 다이얼로그 *열림/닫힘*만. 파일 업로드·파싱·결과 미검증.
 - **Export 내용 미검증:** T8은 다운로드 *발생*만. 파일 내용/행 수 미검증.
@@ -214,7 +218,7 @@ bun run e2e:install  # chromium 설치
 
 | 파일 | 설명 |
 |---|---|
-| [`organization.e2e.ts`](organization.e2e.ts) | 테스트 본문 (16 케이스: setup 1 + 기능 14 + teardown 1) |
+| [`organization.e2e.ts`](organization.e2e.ts) | 테스트 본문 (18 케이스: setup 1 + 기능 16 + teardown 1) |
 | [`organization.e2e.md`](organization.e2e.md) | 테스트별 상세 서술 문서 |
 | [`playwright.config.ts`](../playwright.config.ts) | Playwright 설정 (webServer, projects) |
 | `package.json` | `e2e`, `e2e:headed`, `e2e:install` 스크립트 |

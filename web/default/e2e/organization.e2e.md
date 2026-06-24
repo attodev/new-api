@@ -4,7 +4,7 @@
 
 ## 개요
 
-조직(Organization) 기능의 브라우저 스모크 테스트. 총 **16개 (프로비저닝 setup 1 + 기능 14 + 정리 teardown 1)** 테스트를 serial 모드로 실행한다. `beforeAll`에서 4개의 브라우저 컨텍스트를 분리 생성하지만 **root(루트 관리자)만** 로그인한다. owner / org admin / member 계정과 테스트 조직은 첫 번째 setup 테스트에서 **UI를 통해** 런타임에 생성되며, 실행마다 충돌하지 않도록 run-scoped 고유 이름을 사용한다(`runId = Date.now().toString(36)`, 사용자명 `e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, 조직명 `E2E Org <runId>`). 생성된 계정은 admin 비밀번호를 그대로 재사용한다.
+조직(Organization) 기능의 브라우저 스모크 테스트. 총 **18개 (프로비저닝 setup 1 + 기능 16 + 정리 teardown 1)** 테스트를 serial 모드로 실행한다. `beforeAll`에서 4개의 브라우저 컨텍스트를 분리 생성하지만 **root(루트 관리자)만** 로그인한다. owner / org admin / member 계정과 테스트 조직은 첫 번째 setup 테스트에서 **UI를 통해** 런타임에 생성되며, 실행마다 충돌하지 않도록 run-scoped 고유 이름을 사용한다(`runId = Date.now().toString(36)`, 사용자명 `e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, 조직명 `E2E Org <runId>`). 생성된 계정은 admin 비밀번호를 그대로 재사용한다.
 
 ## 실행 방법
 
@@ -45,7 +45,7 @@ cd web/default
 E2E_BACKEND_URL=http://127.0.0.1:3100 npx playwright test e2e/organization.e2e.ts
 ```
 
-> 16개 테스트 통과 후 백엔드 API로 확인하면 `e2e_*` 사용자 0개, 조직 0개로 **DB가 깨끗하게 남는다**(teardown 검증 완료).
+> 18개 테스트 통과 후 백엔드 API로 확인하면 `e2e_*` 사용자 0개, 조직 0개로 **DB가 깨끗하게 남는다**(teardown 검증 완료). 생성한 구독 플랜·사용자 구독도 조직 삭제 cascade로 함께 정리된다.
 
 ## 환경 변수
 
@@ -225,7 +225,25 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 
 ---
 
-### 16. admin removes organization and users via UI
+### 16. admin creates an organization subscription plan
+**페이지:** `/organization/subscriptions`
+**대상:** `organizationAdminPage`
+
+조직 구독 플랜 **생성 성공 경로**를 검증한다. "Plan configuration" 폼에 Plan title(`E2E Plan <runId>`)과 Quota amount(10)를 입력하고(Duration은 기본 1 month) Create를 클릭하면 "Organization plan saved" 토스트가 뜨고, "Organization plans" 테이블에 해당 플랜이 나타나는지 확인한다.
+
+---
+
+### 17. admin assigns the organization subscription plan to a member
+**페이지:** `/organization/subscriptions`
+**대상:** `organizationAdminPage`
+
+"Member plan assignment" 섹션에서 #16에서 만든 플랜을 멤버(`e2e_member_<runId>`)에게 **할당**한다. User/Plan 네이티브 셀렉트를 선택하고 Assign을 클릭하면 "Organization plan assigned" 토스트가 뜨고, 하단 멤버 구독 테이블에 해당 플랜 행이 나타나는지 확인한다.
+
+> 정리: 플랜·구독은 조직에 종속되며, teardown(#18)에서 조직을 삭제하면 백엔드가 해당 조직의 구독 플랜·사용자 구독을 **함께 삭제(cascade)** 하므로 별도 정리가 필요 없다(`model.DeleteOrganization`).
+
+---
+
+### 18. admin removes organization and users via UI
 **페이지:** `/organization` → 사용자 관리
 **대상:** `rootPage` (teardown, best-effort)
 
@@ -238,7 +256,7 @@ teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **삭
 ### 생성 → 사용 → 삭제 흐름
 
 ```
-setup 테스트(#1)            기능 테스트(#2~#15)            teardown 테스트(#16)
+setup 테스트(#1)            기능 테스트(#2~#17)            teardown 테스트(#18)
 ─────────────────         ───────────────────          ───────────────────
 root가 UI로                 setup이 만든 계정·조직을        UI로 삭제 (best-effort)
  · 사용자 3명 생성            그대로 재사용해 권한·렌더링       · non-owner 멤버 2명
@@ -264,7 +282,7 @@ owner가 UI로                                              · owner
 
 ### 충돌 방지: run-scoped 고유 이름
 
-모든 자원은 `runId = Date.now().toString(36)` 기반 고유 이름을 쓴다. 따라서 **중간 테스트 실패로 teardown이 건너뛰어져 잔여물이 남더라도, 다음 실행은 새 `runId`를 쓰므로 충돌하지 않는다.** (serial 모드에서는 한 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어지므로, teardown(#16)도 실행되지 않을 수 있다는 점에 유의.)
+모든 자원은 `runId = Date.now().toString(36)` 기반 고유 이름을 쓴다. 따라서 **중간 테스트 실패로 teardown이 건너뛰어져 잔여물이 남더라도, 다음 실행은 새 `runId`를 쓰므로 충돌하지 않는다.** (serial 모드에서는 한 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어지므로, teardown(#18)도 실행되지 않을 수 있다는 점에 유의.)
 
 ### 사용자명 길이 제약
 

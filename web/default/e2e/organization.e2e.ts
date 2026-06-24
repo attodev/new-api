@@ -15,6 +15,7 @@ const orgAdminUsername = `e2e_admin_${runId}`
 const memberUsername = `e2e_member_${runId}`
 const createdUserPassword = adminPassword
 const organizationName = `E2E Org ${runId}`
+const planTitle = `E2E Plan ${runId}`
 
 type SavedAuthStorage = {
   user: string
@@ -222,6 +223,46 @@ async function deleteUserViaUi(page: Page, username: string) {
   await expect(dialog.getByText(/are you sure/i)).toBeVisible()
   await dialog.getByRole('button', { name: /^delete$/i }).click()
   await expect(page.getByText(/user deleted successfully/i)).toBeVisible()
+}
+
+async function createOrganizationPlanViaUi(
+  page: Page,
+  plan: { title: string; quotaAmount: string }
+) {
+  await openAuthenticatedPage(page, '/organization/subscriptions')
+  // The form labels are not associated with their inputs, so scope by the
+  // "Plan configuration" card: the first textbox is Plan title and the first
+  // number input is Quota amount. Duration keeps its default (1 month).
+  const card = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Plan configuration' })
+  await card.getByRole('textbox').first().fill(plan.title)
+  await card.locator('input[type="number"]').first().fill(plan.quotaAmount)
+  await card.getByRole('button', { name: /^create$/i }).click()
+  await expect(page.getByText(/organization plan saved/i)).toBeVisible()
+  // The new plan appears in the "Organization plans" table.
+  const plansCard = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Organization plans' })
+  await expect(plansCard.getByText(plan.title, { exact: true })).toBeVisible()
+}
+
+async function assignPlanToMemberViaUi(
+  page: Page,
+  options: { memberLabel: string; planTitle: string }
+) {
+  await openAuthenticatedPage(page, '/organization/subscriptions')
+  // "Member plan assignment" uses native <select> elements: first = user,
+  // second = plan.
+  const card = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Member plan assignment' })
+  await card.locator('select').first().selectOption({ label: options.memberLabel })
+  await card.locator('select').nth(1).selectOption({ label: options.planTitle })
+  await card.getByRole('button', { name: /^assign$/i }).click()
+  await expect(page.getByText(/organization plan assigned/i)).toBeVisible()
+  // The assignment shows up as a row (Plan column cell) in the member table.
+  await expect(card.getByRole('cell', { name: options.planTitle })).toBeVisible()
 }
 
 test.describe('organization browser smoke tests', () => {
@@ -528,6 +569,20 @@ test.describe('organization browser smoke tests', () => {
 
     // toast with validation error should appear
     await expect(page.getByText(/plan title is required/i)).toBeVisible()
+  })
+
+  test('admin creates an organization subscription plan', async () => {
+    await createOrganizationPlanViaUi(organizationAdminPage, {
+      title: planTitle,
+      quotaAmount: '10',
+    })
+  })
+
+  test('admin assigns the organization subscription plan to a member', async () => {
+    await assignPlanToMemberViaUi(organizationAdminPage, {
+      memberLabel: memberUsername,
+      planTitle,
+    })
   })
 
   test('admin removes organization and users via UI', async () => {
