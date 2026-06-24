@@ -78,7 +78,10 @@ func GetEffectiveDiscountMultiplier(modelName string) float64 {
 	if mul, ok := GetModelDiscountMultiplier(modelName); ok {
 		return mul
 	}
-	if vendorResolver != nil {
+	// 벤더 할인이 하나도 설정돼 있지 않으면 벤더 해석(모델→벤더 캐시/조회)을 아예
+	// 건너뛴다. 일반적인(할인 없는) 과금 경로의 불필요한 비용을 피하고, 벤더 resolver가
+	// 의존하는 pricing 캐시가 준비되지 않은 환경(예: 단위 테스트)에서의 호출도 막는다.
+	if vendorResolver != nil && vendorDiscountMap.Len() > 0 {
 		if vendor, ok := vendorResolver(modelName); ok {
 			if mul, ok := GetVendorDiscountMultiplier(vendor); ok {
 				return mul
