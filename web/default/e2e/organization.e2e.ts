@@ -157,9 +157,10 @@ async function createOrganizationViaUi(
 ) {
   await openAuthenticatedPage(page, '/organization')
   await page.getByPlaceholder('Organization Name').fill(options.name)
-  // Owner selector is a Base UI Select; root sees exactly one combobox here
-  // (the Create Organization form). Open it and pick the owner by "username #id".
-  await page.getByRole('combobox').click()
+  // Owner selector is a Base UI Select whose trigger shows the "Owner User"
+  // placeholder until a user is picked. Filter by that text so we don't match
+  // the root org-scope selector that also renders as a combobox on this page.
+  await page.getByRole('combobox').filter({ hasText: 'Owner User' }).click()
   await page
     .getByRole('option', {
       name: new RegExp(`^${options.ownerUsername}\\s+#\\d+$`),
@@ -583,6 +584,20 @@ test.describe('organization browser smoke tests', () => {
       memberLabel: memberUsername,
       planTitle,
     })
+  })
+
+  test('root admin can open organization users page without org_id error', async () => {
+    const page = await openAuthenticatedPage(rootPage, '/organization')
+    await expect(
+      page.getByRole('heading', { name: /organization users/i })
+    ).toBeVisible()
+    // Root is not bound to one org, so it must scope the users list to an
+    // organization; select the one created in setup. Without this scoping the
+    // backend rejected the request with "organization_id is required".
+    await page.locator('select').selectOption({ label: organizationName })
+    await expect(page.getByText(/organization_id is required/i)).toHaveCount(0)
+    // The selected org's members load (owner row is visible).
+    await expect(page.getByText(ownerUsername, { exact: true }).first()).toBeVisible()
   })
 
   test('admin removes organization and users via UI', async () => {

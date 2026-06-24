@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
   Select,
   SelectContent,
@@ -119,6 +120,9 @@ export function OrganizationUsersTable() {
     OrganizationUserSubscriptionRecord[]
   >([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  // Root is not bound to a single org, so it must pick which org's users to
+  // view; the backend requires organization_id for root requests.
+  const [organizationId, setOrganizationId] = useState<number | null>(null)
   const [organizationProfile, setOrganizationProfile] =
     useState<Organization | null>(null)
   const [candidateUsers, setCandidateUsers] = useState<
@@ -182,6 +186,15 @@ export function OrganizationUsersTable() {
       setSubscriptionRecords([])
       return
     }
+    // Root must choose an organization first; without it the backend rejects
+    // the request with "organization_id is required".
+    if (isRoot && !organizationId) {
+      setUsers([])
+      setSubscriptionRecords([])
+      setTotalUsers(0)
+      return
+    }
+    const organizationParam = isRoot ? organizationId : undefined
     setLoading(true)
     try {
       const [userRes, subscriptionRes] = await Promise.all([
@@ -191,8 +204,11 @@ export function OrganizationUsersTable() {
           keyword: keyword || undefined,
           order_by: orderBy,
           order_dir: orderDir,
+          organization_id: organizationParam,
         }),
-        getOrganizationUserSubscriptions(),
+        getOrganizationUserSubscriptions({
+          organization_id: organizationParam,
+        }),
       ])
       if (userRes.success && userRes.data?.items) {
         setUsers(userRes.data.items)
@@ -219,6 +235,9 @@ export function OrganizationUsersTable() {
       const res = await getOrganizations({ page: 1, size: 50 })
       if (res.success && res.data?.items) {
         setOrganizations(res.data.items)
+        setOrganizationId((current) =>
+          current ?? (res.data!.items.length ? res.data!.items[0].id : null)
+        )
       } else {
         toast.error(res.message || t('Failed to load organizations'))
       }
@@ -270,7 +289,14 @@ export function OrganizationUsersTable() {
 
   useEffect(() => {
     void loadUsers()
-  }, [canManageOrganizationUsers, currentPage, keyword, orderBy, orderDir])
+  }, [
+    canManageOrganizationUsers,
+    currentPage,
+    keyword,
+    orderBy,
+    orderDir,
+    organizationId,
+  ])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -593,6 +619,32 @@ export function OrganizationUsersTable() {
           </Button>
         </div>
       </div>
+
+      {isRoot && (
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='text-muted-foreground text-sm'>
+            {t('Organization')}
+          </span>
+          <NativeSelect
+            value={organizationId ?? ''}
+            onChange={(event) =>
+              setOrganizationId(Number(event.currentTarget.value) || null)
+            }
+            className='w-full sm:w-72'
+          >
+            {organizations.length === 0 && (
+              <NativeSelectOption value=''>
+                {t('No data')}
+              </NativeSelectOption>
+            )}
+            {organizations.map((org) => (
+              <NativeSelectOption key={org.id} value={org.id}>
+                {org.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
 
       {(isRoot || isOrganizationAdmin) && (
         <div className='grid gap-3 lg:grid-cols-2'>
