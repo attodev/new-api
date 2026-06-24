@@ -59,6 +59,11 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
+	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣는다. HandleGroupRatio가
+	// GroupRatioInfo를 만드는 단일 지점이므로, 사전차감·정산·expr·per-call은 물론
+	// 재시도 시 재계산 경로(controller/relay.go)까지 할인이 일관되게 유지된다.
+	groupRatioInfo.GroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(relayInfo.OriginModelName)
+
 	return groupRatioInfo
 }
 
@@ -66,10 +71,6 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
 
 	groupRatioInfo := HandleGroupRatio(c, info)
-
-	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣어 사전차감·정산·expr이
-	// 동일 배수를 쓰게 한다(GroupRatio와 동일 적용 범위).
-	groupRatioInfo.GroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(info.OriginModelName)
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(info.OriginModelName) == billing_setting.BillingModeTieredExpr {
@@ -168,10 +169,6 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 // ModelPriceHelperPerCall / PriceHelper (MJTask)
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
 	groupRatioInfo := HandleGroupRatio(c, info)
-
-	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣어 per-call(MJ 등) 과금이
-	// 동일 배수를 쓰게 한다(GroupRatio와 동일 적용 범위).
-	groupRatioInfo.GroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(info.OriginModelName)
 
 	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
 	usePrice := success
