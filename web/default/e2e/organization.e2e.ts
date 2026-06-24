@@ -15,7 +15,6 @@ const orgAdminUsername = `e2e_admin_${runId}`
 const memberUsername = `e2e_member_${runId}`
 const createdUserPassword = adminPassword
 const organizationName = `E2E Org ${runId}`
-const createdUsernames = [ownerUsername, orgAdminUsername, memberUsername]
 
 type SavedAuthStorage = {
   user: string
@@ -199,16 +198,16 @@ async function deleteOrganizationViaUi(page: Page, name: string) {
     .filter({ hasText: name })
     .filter({ has: page.getByRole('button', { name: /^delete$/i }) })
     .last()
-  // The card holds two "Delete" buttons: the AlertDialog trigger and its
-  // always-mounted action. Click the trigger specifically to open the dialog.
+  // The trigger and (once open) the dialog's confirm button both expose the
+  // "Delete" accessible name, so target the trigger by its data-slot to avoid
+  // ambiguity.
   await card.locator('[data-slot="alert-dialog-trigger"]').click()
-  // Each card keeps its AlertDialog mounted, so scope to the one whose
-  // description names this organization.
+  // Scope to the dialog whose description names this organization.
   const dialog = page.getByRole('alertdialog').filter({ hasText: name })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: /^delete$/i }).click()
-  // The success toast fires even when the API rejects the delete, so verify the
-  // organization actually disappears from the manage list instead.
+  // Assert the card disappears from the manage list rather than trusting the
+  // toast, so a backend rejection fails the test loudly.
   await expect(card).toHaveCount(0)
 }
 
