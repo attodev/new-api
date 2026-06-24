@@ -174,7 +174,12 @@ bun run e2e:install  # chromium 설치
 2. **Snap Chromium (Ubuntu 26.04+)** — 내장 Chromium 미지원으로 시스템 Chromium 사용. ffmpeg 미지원 → `video: 'off'`.
 3. **TanStack Router 세션 재검증** — `page.goto()`가 매번 `getSelf()`를 재호출하므로 페이지 이동은 반드시 `openAuthenticatedPage()`를 경유.
 4. **admin 계정만 선존재 필요** — root(admin) 계정만 DB에 선존재하면 된다(`E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD`). 조직·역할 계정은 setup 테스트가 UI로 self-provision하므로 더 이상 외부 시드에 의존하지 않는다.
-5. **teardown 삭제 순서 (백엔드 제약)** — teardown 테스트(#16)는 반드시 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다. 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부한다.
+5. **teardown 삭제 순서 (백엔드 제약)** — teardown 테스트(#16)는 반드시 **owner가 아닌 멤버 → 조직 → owner** 순으로 삭제해야 한다. 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부한다(`model.DeleteOrganization`).
+6. **serial 중단 시 잔여물** — serial 모드에서 중간 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어져 **teardown(#16)도 실행되지 않을 수 있다.** 이때 `e2e_*` 계정·조직이 DB에 남지만, run-scoped 고유 이름(`runId`) 덕분에 다음 실행과 충돌하지는 않는다.
+7. **프론트엔드 토스트 결함 우회** — `handleDeleteOrganization`은 API가 `success:false`를 200으로 반환해도 "Organization deleted" 토스트를 띄운다. 그래서 `deleteOrganizationViaUi`는 토스트가 아니라 **카드 사라짐**(`toHaveCount(0)`)으로 삭제를 단언한다. (프론트엔드 결함 자체 수정은 별도 작업.)
+
+### 검증 결과 (2026-06-24)
+빈 SQLite로 rate limit을 끄고 admin만 시드한 격리 백엔드에서 **16/16 통과**, 종료 후 API 조회로 `e2e_*` 사용자 0개·조직 0개를 확인하여 **자원이 완전히 정리됨**을 검증했다.
 
 ---
 

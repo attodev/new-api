@@ -21,6 +21,32 @@ cd web/default
 E2E_BACKEND_URL=http://127.0.0.1:3000 npx playwright test e2e/organization.e2e.ts
 ```
 
+### 격리된 임시 백엔드로 실행 (권장: 공용 서버에 영향 없음)
+
+공용 개발 서버(예: rate limit이 켜진 :3000)에 영향을 주지 않으려면, **빈 SQLite DB로 일회용 백엔드**를 띄워 검증하는 방식을 권장한다. 빈 DB로 기동하면 setup 화면(`POST /api/setup`)으로 admin 계정만 만들어 두면 되고, 나머지 계정·조직은 테스트가 UI로 생성·삭제하므로 격리·재현성이 보장된다.
+
+```bash
+# 1) 빈 SQLite로 rate limit 끈 백엔드 기동 (포트 3100)
+rm -f /tmp/e2e/one-api.db
+env -u SQL_DSN -u LOG_SQL_DSN \
+  SQLITE_PATH=/tmp/e2e/one-api.db \
+  CRITICAL_RATE_LIMIT_ENABLE=false \
+  GLOBAL_API_RATE_LIMIT_ENABLE=false \
+  GLOBAL_WEB_RATE_LIMIT_ENABLE=false \
+  ./new-api --port 3100 &
+
+# 2) admin 계정 1개만 시드 (initial setup)
+curl -s -X POST http://127.0.0.1:3100/api/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"atto1234","confirmPassword":"atto1234"}'
+
+# 3) 테스트 실행 (admin/atto1234는 E2E_ADMIN_* 기본값과 일치)
+cd web/default
+E2E_BACKEND_URL=http://127.0.0.1:3100 npx playwright test e2e/organization.e2e.ts
+```
+
+> 16개 테스트 통과 후 백엔드 API로 확인하면 `e2e_*` 사용자 0개, 조직 0개로 **DB가 깨끗하게 남는다**(teardown 검증 완료).
+
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |
@@ -204,6 +230,45 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 **대상:** `rootPage` (teardown, best-effort)
 
 teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **삭제 순서가 중요하다** — 백엔드는 owner가 아닌 멤버가 남아 있는 조직의 삭제를 거부하므로, 먼저 owner가 아닌 두 멤버(`e2e_admin_<runId>` / `e2e_member_<runId>`)를 제거하고, 다음으로 조직(`E2E Org <runId>`)을 삭제한 뒤, 마지막으로 owner(`e2e_owner_<runId>`) 계정을 삭제한다. best-effort로 동작한다.
+
+## 자원 생명주기 및 정리 (Cleanup)
+
+테스트가 만드는 모든 자원은 **오직 UI를 통해서만** 생성·삭제된다. 테스트 코드에는 DB·SQL 직접 접근이나 API 직접 호출이 일절 없다(`afterAll`도 브라우저 컨텍스트만 닫고 DB는 건드리지 않는다).
+
+### 생성 → 사용 → 삭제 흐름
+
+```
+setup 테스트(#1)            기능 테스트(#2~#15)            teardown 테스트(#16)
+─────────────────         ───────────────────          ───────────────────
+root가 UI로                 setup이 만든 계정·조직을        UI로 삭제 (best-effort)
+ · 사용자 3명 생성            그대로 재사용해 권한·렌더링       · non-owner 멤버 2명
+ · 조직 1개 생성              ·상호작용 검증                 · 조직
+owner가 UI로                                              · owner
+ · 멤버 2명 추가
+ · 1명 org admin 승격
+```
+
+### 삭제 순서가 중요한 이유 (백엔드 제약)
+
+`model.DeleteOrganization`은 **owner가 아닌 활성 멤버가 남아 있는 조직의 삭제를 거부**한다(`"organization has N non-owner members, remove them first"`). 따라서 teardown은 반드시 다음 순서를 지킨다.
+
+1. **non-owner 멤버 삭제** — `e2e_admin_<runId>`, `e2e_member_<runId>` (사용자 자체를 삭제 → 멤버십도 사라짐)
+2. **조직 삭제** — `E2E Org <runId>` (이제 non-owner 멤버 0명 → owner는 멤버 카운트에서 제외되므로 삭제 가능)
+3. **owner 삭제** — `e2e_owner_<runId>`
+
+각 단계는 `try/catch`로 감싼 **best-effort**다. 앞 단계가 실패해도 나머지 정리를 계속 진행하며, 실패는 `console.error`로 로그를 남긴다.
+
+### 조직 삭제는 토스트가 아니라 "카드 사라짐"으로 검증
+
+`deleteOrganizationViaUi`는 성공 토스트 대신 **조직 카드가 목록에서 사라지는지**(`expect(card).toHaveCount(0)`)로 삭제 성공을 단언한다. 현재 프론트엔드의 `handleDeleteOrganization`은 API가 `success:false`(예: 멤버가 남아 삭제 거부)를 200으로 반환해도 "Organization deleted" 성공 토스트를 띄우는 결함이 있어, 토스트만 믿으면 삭제 실패를 놓치기 때문이다. (이 프론트엔드 결함 수정은 별도 작업으로 분리됨.)
+
+### 충돌 방지: run-scoped 고유 이름
+
+모든 자원은 `runId = Date.now().toString(36)` 기반 고유 이름을 쓴다. 따라서 **중간 테스트 실패로 teardown이 건너뛰어져 잔여물이 남더라도, 다음 실행은 새 `runId`를 쓰므로 충돌하지 않는다.** (serial 모드에서는 한 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어지므로, teardown(#16)도 실행되지 않을 수 있다는 점에 유의.)
+
+### 사용자명 길이 제약
+
+백엔드 `User.Username`은 `max=20` 검증이 있다. 따라서 `runId`는 13자리 ms 타임스탬프 대신 `Date.now().toString(36)`(약 8자)로 줄여, 가장 긴 사용자명 `e2e_member_<runId>`가 20자를 넘지 않도록 했다.
 
 ## 알려진 제약사항
 
