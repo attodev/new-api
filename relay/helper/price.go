@@ -67,6 +67,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 
 	groupRatioInfo := HandleGroupRatio(c, info)
 
+	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣어 사전차감·정산·expr이
+	// 동일 배수를 쓰게 한다(GroupRatio와 동일 적용 범위).
+	groupRatioInfo.GroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(info.OriginModelName)
+
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(info.OriginModelName) == billing_setting.BillingModeTieredExpr {
 		return modelPriceHelperTiered(c, info, promptTokens, meta, groupRatioInfo)

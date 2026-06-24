@@ -55,3 +55,13 @@ func TestEffectiveDiscountPrecedence(t *testing.T) {
 		t.Fatalf("no discount: want 1.0 got %v", got)
 	}
 }
+
+func TestEffectiveMultiplierCombinesWithGroupConceptually(t *testing.T) {
+	_ = UpdateModelDiscountByJSONString(`{"combo":50}`)
+	// groupRatio=0.8 가정, 할인 0.5 -> 최종 0.4
+	groupRatio := 0.8
+	final := groupRatio * GetEffectiveDiscountMultiplier("combo")
+	if final != 0.4 {
+		t.Fatalf("want 0.4 got %v", final)
+	}
+}
