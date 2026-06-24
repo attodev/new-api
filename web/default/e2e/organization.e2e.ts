@@ -2,14 +2,18 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 
 const adminUsername = process.env.E2E_ADMIN_USERNAME || 'admin'
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'atto1234'
-const organizationOwnerUsername =
-  process.env.E2E_ORGANIZATION_OWNER_USERNAME || 'atto.o'
-const organizationAdminUsername =
-  process.env.E2E_ORGANIZATION_ADMIN_USERNAME || 'ato.a'
-const organizationMemberUsername =
-  process.env.E2E_ORGANIZATION_MEMBER_USERNAME || 'atto.1'
-const organizationPassword =
-  process.env.E2E_ORGANIZATION_PASSWORD || adminPassword
+
+// Only the admin account relies on seeded defaults. The organization owner,
+// org-admin, and member accounts plus the test organization are created and
+// destroyed through the UI within this suite (see setup/teardown tests).
+// A run-scoped id keeps names unique so a crashed run never collides with the next.
+const runId = `${Date.now()}`
+const ownerUsername = `e2e_owner_${runId}`
+const orgAdminUsername = `e2e_admin_${runId}`
+const memberUsername = `e2e_member_${runId}`
+const createdUserPassword = adminPassword
+const organizationName = `E2E Org ${runId}`
+const createdUsernames = [ownerUsername, orgAdminUsername, memberUsername]
 
 type SavedAuthStorage = {
   user: string
@@ -114,6 +118,88 @@ async function openAuthenticatedPage(page: Page, path = '/') {
   return page
 }
 
+async function createUserViaUi(
+  page: Page,
+  user: { username: string; password: string; displayName?: string }
+) {
+  await openAuthenticatedPage(page, '/users')
+  await page.getByRole('button', { name: /^add user$/i }).click()
+  const drawer = page.getByRole('dialog')
+  await expect(drawer).toBeVisible()
+  // Role defaults to "Common User" (role=1) — no need to touch the Role select.
+  await drawer.getByPlaceholder('Enter username').fill(user.username)
+  if (user.displayName) {
+    await drawer.getByPlaceholder('Enter display name').fill(user.displayName)
+  }
+  await drawer.getByPlaceholder(/Enter password/i).fill(user.password)
+  await page.getByRole('button', { name: /^save changes$/i }).click()
+  await expect(page.getByText(/user created successfully/i)).toBeVisible()
+}
+
+async function createOrganizationViaUi(
+  page: Page,
+  options: { name: string; ownerUsername: string }
+) {
+  await openAuthenticatedPage(page, '/organization')
+  await page.getByPlaceholder('Organization Name').fill(options.name)
+  // Owner selector is a Base UI Select; its trigger shows the "Owner User"
+  // placeholder until a user is picked.
+  await page.getByText('Owner User', { exact: true }).click()
+  await page
+    .getByRole('option', {
+      name: new RegExp(`^${options.ownerUsername}\\s+#\\d+$`),
+    })
+    .click()
+  await page.getByRole('button', { name: /^create$/i }).click()
+  await expect(page.getByText(/organization created/i)).toBeVisible()
+}
+
+async function assignMemberViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/organization')
+  await page.getByPlaceholder('Username', { exact: true }).fill(username)
+  // Add button label is hard-coded Korean "추가" in organization-users-table.tsx.
+  await page.getByRole('button', { name: '추가' }).click()
+  await expect(page.getByText(/organization member assigned/i)).toBeVisible()
+}
+
+async function promoteMemberToAdminViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/organization')
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  // Only the owner sees the editable Role select in the members table.
+  await row.getByRole('combobox').click()
+  await page.getByRole('option', { name: /^admin$/i }).click()
+  await page.getByRole('button', { name: /^save$/i }).click()
+  await expect(page.getByText(/changes saved/i)).toBeVisible()
+}
+
+async function deleteOrganizationViaUi(page: Page, name: string) {
+  await openAuthenticatedPage(page, '/organization')
+  const card = page
+    .locator('div.rounded-md.border')
+    .filter({ hasText: name })
+    .filter({ has: page.getByRole('button', { name: /^delete$/i }) })
+    .first()
+  await card.getByRole('button', { name: /^delete$/i }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog.getByText(/delete organization/i)).toBeVisible()
+  await dialog.getByRole('button', { name: /^delete$/i }).click()
+  await expect(page.getByText(/organization deleted/i)).toBeVisible()
+}
+
+async function deleteUserViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/users')
+  await page.getByPlaceholder(/filter by username/i).fill(username)
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  await row.getByRole('button', { name: /open menu/i }).click()
+  await page.getByRole('menuitem', { name: /^delete$/i }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog.getByText(/are you sure/i)).toBeVisible()
+  await dialog.getByRole('button', { name: /^delete$/i }).click()
+  await expect(page.getByText(/user deleted successfully/i)).toBeVisible()
+}
+
 test.describe('organization browser smoke tests', () => {
   test.describe.configure({ mode: 'serial' })
   test.setTimeout(60_000)
@@ -134,32 +220,58 @@ test.describe('organization browser smoke tests', () => {
     ])
 
     rootPage = await contexts[0].newPage()
-    await signInWithUi(rootPage)
-
     ownerPage = await contexts[1].newPage()
-    await signInWithUi(
-      ownerPage,
-      organizationOwnerUsername,
-      organizationPassword
-    )
-
     organizationAdminPage = await contexts[2].newPage()
-    await signInWithUi(
-      organizationAdminPage,
-      organizationAdminUsername,
-      organizationPassword
-    )
-
     memberPage = await contexts[3].newPage()
-    await signInWithUi(
-      memberPage,
-      organizationMemberUsername,
-      organizationPassword
-    )
+
+    // Only the admin (root) account exists at the start. The other accounts are
+    // created in the first test ("admin provisions ...") and signed in there.
+    await signInWithUi(rootPage)
   })
 
   test.afterAll(async () => {
     await Promise.all(contexts.filter(Boolean).map((context) => context.close()))
+  })
+
+  test('admin provisions organization, users, and roles via UI', async () => {
+    // 1) root creates three Common Users.
+    await createUserViaUi(rootPage, {
+      username: ownerUsername,
+      password: createdUserPassword,
+      displayName: ownerUsername,
+    })
+    await createUserViaUi(rootPage, {
+      username: orgAdminUsername,
+      password: createdUserPassword,
+      displayName: orgAdminUsername,
+    })
+    await createUserViaUi(rootPage, {
+      username: memberUsername,
+      password: createdUserPassword,
+      displayName: memberUsername,
+    })
+
+    // 2) root creates the organization, owned by the owner user.
+    await createOrganizationViaUi(rootPage, {
+      name: organizationName,
+      ownerUsername,
+    })
+
+    // 3) owner signs in (account now exists) and assigns the other two as members.
+    await signInWithUi(ownerPage, ownerUsername, createdUserPassword)
+    await assignMemberViaUi(ownerPage, orgAdminUsername)
+    await assignMemberViaUi(ownerPage, memberUsername)
+
+    // 4) owner promotes the org-admin user from member -> admin.
+    await promoteMemberToAdminViaUi(ownerPage, orgAdminUsername)
+
+    // 5) org-admin and member sign in for the downstream tests.
+    await signInWithUi(
+      organizationAdminPage,
+      orgAdminUsername,
+      createdUserPassword
+    )
+    await signInWithUi(memberPage, memberUsername, createdUserPassword)
   })
 
   test('root admin can see organization management navigation and pages', async () => {
@@ -371,5 +483,22 @@ test.describe('organization browser smoke tests', () => {
 
     // toast with validation error should appear
     await expect(page.getByText(/plan title is required/i)).toBeVisible()
+  })
+
+  test('admin removes organization and users via UI', async () => {
+    // Best-effort cleanup: keep going even if an earlier step left things partial.
+    try {
+      await deleteOrganizationViaUi(rootPage, organizationName)
+    } catch (error) {
+      console.error(`Failed to delete organization ${organizationName}:`, error)
+    }
+
+    for (const username of createdUsernames) {
+      try {
+        await deleteUserViaUi(rootPage, username)
+      } catch (error) {
+        console.error(`Failed to delete user ${username}:`, error)
+      }
+    }
   })
 })
