@@ -183,6 +183,7 @@ export const channelFormSchema = z
     system_prompt: z.string().optional(),
     system_prompt_override: z.boolean().optional(),
     force_anthropic_usage_semantic: z.boolean().optional(),
+    anthropic_usage_semantic_models: z.string().optional(),
     // Type-specific settings (stored in settings JSON)
     is_enterprise_account: z.boolean().optional(), // OpenRouter specific
     vertex_key_type: z.enum(['json', 'api_key']).optional(), // Vertex AI specific
@@ -302,6 +303,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   system_prompt: '',
   system_prompt_override: false,
   force_anthropic_usage_semantic: false,
+  anthropic_usage_semantic_models: '',
   // Type-specific settings
   is_enterprise_account: false,
   vertex_key_type: 'json',
@@ -339,6 +341,7 @@ export function transformChannelToFormDefaults(
     system_prompt: '',
     system_prompt_override: false,
     force_anthropic_usage_semantic: false,
+    anthropic_usage_semantic_models: '',
   }
 
   if (channel.setting) {
@@ -352,6 +355,9 @@ export function transformChannelToFormDefaults(
         system_prompt: parsed.system_prompt || '',
         system_prompt_override: parsed.system_prompt_override || false,
         force_anthropic_usage_semantic: parsed.usage_semantic === 'anthropic',
+        anthropic_usage_semantic_models: Array.isArray(parsed.usage_semantic_models)
+          ? parsed.usage_semantic_models.join(', ')
+          : '',
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -462,6 +468,12 @@ function buildSettingJSON(formData: ChannelFormValues): string {
     system_prompt: formData.system_prompt || '',
     system_prompt_override: formData.system_prompt_override || false,
     usage_semantic: formData.force_anthropic_usage_semantic ? 'anthropic' : '',
+    usage_semantic_models: formData.force_anthropic_usage_semantic
+      ? (formData.anthropic_usage_semantic_models || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      : [],
   }
   return JSON.stringify(settingObj)
 }

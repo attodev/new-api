@@ -14,6 +14,10 @@ type ChannelSettings struct {
 	// relaying a Claude model. Empty = auto-detect. An explicit usage_semantic
 	// from the upstream always takes precedence over this override.
 	UsageSemantic string `json:"usage_semantic,omitempty"`
+	// UsageSemanticModels restricts the UsageSemantic override to models whose
+	// names match any of these glob patterns (e.g. "claude-*"). Empty = apply
+	// to all models on the channel.
+	UsageSemanticModels []string `json:"usage_semantic_models,omitempty"`
 }
 
 type VertexKeyType string

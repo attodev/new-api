@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -332,13 +333,30 @@ func usageSemanticFromUsage(relayInfo *relaycommon.RelayInfo, usage *dto.Usage) 
 	// Channel-level override: lets an admin declare the semantic for an
 	// OpenAI-compatible upstream that reports Anthropic-style disjoint usage
 	// without a usage_semantic tag (e.g. an older new-api relaying Claude).
+	// UsageSemanticModels further restricts the override to specific model patterns.
 	if relayInfo != nil && relayInfo.ChannelMeta != nil && relayInfo.ChannelSetting.UsageSemantic != "" {
-		return relayInfo.ChannelSetting.UsageSemantic
+		if matchesUsageSemanticModels(relayInfo.ChannelSetting.UsageSemanticModels, relayInfo.OriginModelName) {
+			return relayInfo.ChannelSetting.UsageSemantic
+		}
 	}
 	if relayInfo != nil && relayInfo.GetFinalRequestRelayFormat() == types.RelayFormatClaude {
 		return "anthropic"
 	}
 	return "openai"
+}
+
+// matchesUsageSemanticModels reports whether modelName matches any of the glob
+// patterns. An empty patterns list means "match all models".
+func matchesUsageSemanticModels(patterns []string, modelName string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+	for _, pattern := range patterns {
+		if matched, _ := path.Match(pattern, modelName); matched {
+			return true
+		}
+	}
+	return false
 }
 
 func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent []string) {

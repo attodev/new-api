@@ -3205,6 +3205,32 @@ export function ChannelMutateDrawer({
                             </FormItem>
                           )}
                         />
+
+                        {form.watch('force_anthropic_usage_semantic') && (
+                          <FormField
+                            control={form.control}
+                            name='anthropic_usage_semantic_models'
+                            render={({ field }) => (
+                              <FormItem className='px-4 py-3'>
+                                <FormLabel>
+                                  {t('Model patterns (Anthropic-semantic)')}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder='claude-*, claude-opus-4-8'
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  {t(
+                                    'Comma-separated glob patterns (e.g. claude-*). Leave empty to apply to all models on this channel.'
+                                  )}
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
 
                       <FormField
