@@ -419,6 +419,13 @@ task_video.get_channel_failed: "Failed to get channel"
 task_video.get_model_failed: "Failed to get model"
 task_video.upstream_failed: "Upstream request failed"
 
+# Ali relay messages
+relay.ali.image_required: "Image is required"
+relay.ali.image_open_failed: "Failed to open image file"
+relay.ali.image_read_failed: "Failed to read image file"
+relay.ali.image_base64_failed: "Failed to get image data from form"
+relay.ali.async_timeout: "Image generation task timed out"
+
 # 2FA extended messages
 twofa.generate_key_failed: "Failed to generate TOTP key: {{.Error}}"
 twofa.generate_code_failed: "Failed to generate backup code: {{.Error}}"

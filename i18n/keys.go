@@ -502,6 +502,15 @@ const (
 	MsgTaskVideoUpstreamFailed   = "task_video.upstream_failed"
 )
 
+// Ali relay messages
+const (
+	MsgAliImageRequired     = "relay.ali.image_required"
+	MsgAliImageOpenFailed   = "relay.ali.image_open_failed"
+	MsgAliImageReadFailed   = "relay.ali.image_read_failed"
+	MsgAliImageBase64Failed = "relay.ali.image_base64_failed"
+	MsgAliAsyncTimeout      = "relay.ali.async_timeout"
+)
+
 // 2FA extended messages
 const (
 	MsgTwoFAGenerateKeyFailed  = "twofa.generate_key_failed"

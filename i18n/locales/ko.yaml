@@ -529,3 +529,10 @@ passkey.unbound: "Passkey 연결이 해제되었습니다"
 passkey.not_bound: "사용자가 Passkey를 등록하지 않았습니다"
 passkey.reset: "Passkey가 성공적으로 초기화되었습니다"
 passkey.verified: "Passkey 인증이 성공했습니다"
+
+# Ali 릴레이 메시지
+relay.ali.image_required: "이미지가 필요합니다"
+relay.ali.image_open_failed: "이미지 파일을 열지 못했습니다"
+relay.ali.image_read_failed: "이미지 파일을 읽지 못했습니다"
+relay.ali.image_base64_failed: "폼에서 이미지 데이터를 가져오지 못했습니다"
+relay.ali.async_timeout: "이미지 생성 작업 시간이 초과되었습니다"
