@@ -35,9 +35,9 @@ type OidcUser struct {
 	Picture           string `json:"picture"`
 }
 
-func getOidcUserInfoByCode(code string) (*OidcUser, error) {
+func getOidcUserInfoByCode(c *gin.Context, code string) (*OidcUser, error) {
 	if code == "" {
-		return nil, errors.New("invalid parameters")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 
 	values := url.Values{}
@@ -59,7 +59,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	res, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to OIDC server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "OIDC"}))
 	}
 	defer res.Body.Close()
 	var oidcResponse OidcResponse
@@ -70,7 +70,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 
 	if oidcResponse.AccessToken == "" {
 		common.SysLog("failed to get OIDC token, please check settings")
-		return nil, errors.New("failed to get OIDC token, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthTokenFailed, map[string]any{"Provider": "OIDC"}))
 	}
 
 	req, err = http.NewRequest("GET", system_setting.GetOIDCSettings().UserInfoEndpoint, nil)
@@ -81,12 +81,12 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	res2, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to OIDC server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "OIDC"}))
 	}
 	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {
 		common.SysLog("failed to get OIDC user info, please check settings")
-		return nil, errors.New("failed to get OIDC user info, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthGetUserErr))
 	}
 
 	var oidcUser OidcUser
@@ -96,7 +96,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 	if oidcUser.OpenID == "" || oidcUser.Email == "" {
 		common.SysLog("OIDC returned empty user info, please check settings")
-		return nil, errors.New("OIDC returned empty user info, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthUserInfoEmpty, map[string]any{"Provider": "OIDC"}))
 	}
 	return &oidcUser, nil
 }
@@ -124,7 +124,7 @@ func OidcAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	oidcUser, err := getOidcUserInfoByCode(code)
+	oidcUser, err := getOidcUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -190,7 +190,7 @@ func OidcBind(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	oidcUser, err := getOidcUserInfoByCode(code)
+	oidcUser, err := getOidcUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return

@@ -33,9 +33,9 @@ type DiscordUser struct {
 	Name string `json:"global_name"`
 }
 
-func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
+func getDiscordUserInfoByCode(c *gin.Context, code string) (*DiscordUser, error) {
 	if code == "" {
-		return nil, errors.New("invalid parameters")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 
 	values := url.Values{}
@@ -57,7 +57,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	res, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to Discord server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "Discord"}))
 	}
 	defer res.Body.Close()
 	var discordResponse DiscordResponse
@@ -68,7 +68,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 
 	if discordResponse.AccessToken == "" {
 		common.SysError("failed to get Discord token, please check settings")
-		return nil, errors.New("failed to get Discord token, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthTokenFailed, map[string]any{"Provider": "Discord"}))
 	}
 
 	req, err = http.NewRequest("GET", "https://discord.com/api/v10/users/@me", nil)
@@ -79,12 +79,12 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	res2, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to Discord server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "Discord"}))
 	}
 	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {
 		common.SysError("failed to get Discord user info, please check settings")
-		return nil, errors.New("failed to get Discord user info, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthGetUserErr))
 	}
 
 	var discordUser DiscordUser
@@ -94,7 +94,7 @@ func getDiscordUserInfoByCode(code string) (*DiscordUser, error) {
 	}
 	if discordUser.UID == "" || discordUser.ID == "" {
 		common.SysError("Discord returned empty user info, please check settings")
-		return nil, errors.New("Discord returned empty user info, please check settings")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthUserInfoEmpty, map[string]any{"Provider": "Discord"}))
 	}
 	return &discordUser, nil
 }
@@ -122,7 +122,7 @@ func DiscordOAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	discordUser, err := getDiscordUserInfoByCode(code)
+	discordUser, err := getDiscordUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -187,7 +187,7 @@ func DiscordBind(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	discordUser, err := getDiscordUserInfoByCode(code)
+	discordUser, err := getDiscordUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return

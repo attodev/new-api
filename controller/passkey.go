@@ -282,7 +282,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 		}
 
 		if user.Status != common.UserStatusEnabled {
-			return nil, errors.New("user has been disabled")
+			return nil, errors.New(common.TranslateMessage(c, i18n.MsgUserDisabled))
 		}
 
 		if len(userHandle) > 0 {
@@ -290,7 +290,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 			if parseErr != nil {
 				common.SysLog(fmt.Sprintf("PasskeyLogin: userHandle parse error for credential, length: %d", len(userHandle)))
 			} else if userID != user.Id {
-				return nil, errors.New("user handle does not match credential")
+				return nil, errors.New(common.TranslateMessage(c, i18n.MsgPasskeyHandleMismatch))
 			}
 		}
 
@@ -504,18 +504,18 @@ func getSessionUser(c *gin.Context) (*model.User, error) {
 	session := sessions.Default(c)
 	idRaw := session.Get("id")
 	if idRaw == nil {
-		return nil, errors.New("not logged in")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgPasskeyNotLoggedIn))
 	}
 	id, ok := idRaw.(int)
 	if !ok {
-		return nil, errors.New("invalid session info")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgPasskeyInvalidSession))
 	}
 	user := &model.User{Id: id}
 	if err := user.FillUserById(); err != nil {
 		return nil, err
 	}
 	if user.Status != common.UserStatusEnabled {
-		return nil, errors.New("user has been disabled")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgUserDisabled))
 	}
 	return user, nil
 }

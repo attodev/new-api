@@ -649,10 +649,25 @@ const (
 
 // Passkey controller messages
 const (
-	MsgPasskeyNotEnabled = "passkey.not_enabled"
-	MsgPasskeyRegistered = "passkey.registered"
-	MsgPasskeyUnbound    = "passkey.unbound"
-	MsgPasskeyNotBound   = "passkey.not_bound"
-	MsgPasskeyReset      = "passkey.reset"
-	MsgPasskeyVerified   = "passkey.verified"
+	MsgPasskeyNotEnabled   = "passkey.not_enabled"
+	MsgPasskeyRegistered   = "passkey.registered"
+	MsgPasskeyUnbound      = "passkey.unbound"
+	MsgPasskeyNotBound     = "passkey.not_bound"
+	MsgPasskeyReset        = "passkey.reset"
+	MsgPasskeyVerified     = "passkey.verified"
+	MsgPasskeyNotLoggedIn  = "passkey.not_logged_in"
+)
+
+// Organization controller messages
+const (
+	MsgOrgRootRequired       = "org.root_required"
+	MsgOrgAdminRequired      = "org.admin_required"
+	MsgOrgNoFieldsToUpdate   = "org.no_fields_to_update"
+	MsgOrgInvalidStartTs     = "org.invalid_start_timestamp"
+	MsgOrgInvalidEndTs       = "org.invalid_end_timestamp"
+	MsgOrgInvalidPreset      = "org.invalid_preset"
+	MsgOrgTimestampOrder     = "org.timestamp_order"
+	MsgOrgIdRequired         = "org.id_required"
+	MsgOrgSubNoFieldsToUpdate = "org.subscription_no_fields_to_update"
+	MsgOrgTargetPermDenied   = "org.target_permission_denied"
 )

@@ -80,7 +80,7 @@ func LinuxDoBind(c *gin.Context) {
 
 func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error) {
 	if code == "" {
-		return nil, errors.New("invalid code")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 
 	// Get access token using Basic auth
@@ -112,7 +112,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 	client := http.Client{Timeout: 5 * time.Second}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, errors.New("failed to connect to Linux DO server")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "Linux DO"}))
 	}
 	defer res.Body.Close()
 
@@ -125,7 +125,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 	}
 
 	if tokenRes.AccessToken == "" {
-		return nil, fmt.Errorf("failed to get access token: %s", tokenRes.Message)
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthTokenFailed, map[string]any{"Provider": "Linux DO"}))
 	}
 
 	// Get user info
@@ -139,7 +139,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 
 	res2, err := client.Do(req)
 	if err != nil {
-		return nil, errors.New("failed to get user info from Linux DO")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthGetUserErr))
 	}
 	defer res2.Body.Close()
 
@@ -149,7 +149,7 @@ func getLinuxdoUserInfoByCode(code string, c *gin.Context) (*LinuxdoUser, error)
 	}
 
 	if linuxdoUser.Id == 0 {
-		return nil, errors.New("invalid user info returned")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthUserInfoEmpty, map[string]any{"Provider": "Linux DO"}))
 	}
 
 	return &linuxdoUser, nil

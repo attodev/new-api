@@ -43,7 +43,7 @@ type updateOrganizationRequest struct {
 
 func CreateOrganization(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
-		common.ApiError(c, errors.New("root permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgRootRequired)
 		return
 	}
 
@@ -86,7 +86,7 @@ func CreateOrganization(c *gin.Context) {
 
 func ListOrganizations(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
-		common.ApiError(c, errors.New("root permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgRootRequired)
 		return
 	}
 
@@ -111,7 +111,7 @@ func ListOrganizations(c *gin.Context) {
 
 func UpdateOrganization(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
-		common.ApiError(c, errors.New("root permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgRootRequired)
 		return
 	}
 
@@ -151,7 +151,7 @@ func UpdateOrganization(c *gin.Context) {
 		updates["status"] = *req.Status
 	}
 	if len(updates) == 0 {
-		common.ApiError(c, errors.New("no organization fields to update"))
+		common.ApiErrorI18n(c, i18n.MsgOrgNoFieldsToUpdate)
 		return
 	}
 
@@ -169,7 +169,7 @@ func GetOrganizationProfile(c *gin.Context) {
 		return
 	}
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -193,7 +193,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 	if hasStartTimestamp {
 		startTimestamp, err = strconv.ParseInt(startTimestampStr, 10, 64)
 		if err != nil {
-			common.ApiError(c, errors.New("invalid start_timestamp"))
+			common.ApiErrorI18n(c, i18n.MsgOrgInvalidStartTs)
 			return
 		}
 	}
@@ -202,7 +202,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 	if hasEndTimestamp {
 		endTimestamp, err = strconv.ParseInt(endTimestampStr, 10, 64)
 		if err != nil {
-			common.ApiError(c, errors.New("invalid end_timestamp"))
+			common.ApiErrorI18n(c, i18n.MsgOrgInvalidEndTs)
 			return
 		}
 	}
@@ -210,7 +210,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 	preset := strings.TrimSpace(c.Query("preset"))
 	if preset != "" && preset != "custom" {
 		if preset != "today" && preset != "7d" && preset != "30d" {
-			common.ApiError(c, errors.New("invalid preset"))
+			common.ApiErrorI18n(c, i18n.MsgOrgInvalidPreset)
 			return
 		}
 		if !(hasStartTimestamp && hasEndTimestamp) {
@@ -229,7 +229,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 	}
 
 	if startTimestamp > 0 && endTimestamp > 0 && startTimestamp > endTimestamp {
-		common.ApiError(c, errors.New("start_timestamp must be before end_timestamp"))
+		common.ApiErrorI18n(c, i18n.MsgOrgTimestampOrder)
 		return
 	}
 
@@ -444,7 +444,7 @@ func resolveOrganizationAdminTarget(c *gin.Context) (int, bool) {
 	if actor.Role == common.RoleRootUser {
 		organizationId, err := strconv.Atoi(strings.TrimSpace(c.Query("organization_id")))
 		if err != nil || organizationId <= 0 {
-			common.ApiError(c, errors.New("organization_id is required"))
+			common.ApiErrorI18n(c, i18n.MsgOrgIdRequired)
 			return 0, false
 		}
 		var org model.Organization
@@ -456,7 +456,7 @@ func resolveOrganizationAdminTarget(c *gin.Context) (int, bool) {
 	}
 
 	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return 0, false
 	}
 	return actor.OrganizationId, true
@@ -473,7 +473,7 @@ func getOrganizationLogActorAndUserIDs(c *gin.Context) (*model.User, []int, bool
 	if actor.Role == common.RoleRootUser {
 		parsedOrganizationId, err := strconv.Atoi(strings.TrimSpace(c.Query("organization_id")))
 		if err != nil || parsedOrganizationId <= 0 {
-			common.ApiError(c, errors.New("organization_id is required"))
+			common.ApiErrorI18n(c, i18n.MsgOrgIdRequired)
 			return nil, nil, false
 		}
 		organizationId = parsedOrganizationId
@@ -483,7 +483,7 @@ func getOrganizationLogActorAndUserIDs(c *gin.Context) (*model.User, []int, bool
 			return nil, nil, false
 		}
 	} else if organizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return nil, nil, false
 	}
 
