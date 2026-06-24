@@ -289,7 +289,8 @@ func SendEmailVerification(c *gin.Context) {
 		"<p>The code is valid for %d minutes. If you did not request this, please ignore.</p>", common.SystemName, code, common.VerificationValidMinutes)
 	err := common.SendEmail(subject, email, content)
 	if err != nil {
-		common.ApiError(c, err)
+		common.SysError(fmt.Sprintf("email send failed: %v", err))
+		common.ApiErrorI18n(c, i18n.MsgEmailSendFailed)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

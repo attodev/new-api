@@ -624,6 +624,11 @@ const (
 	MsgCodexAccountIdRequired    = "codex.account_id_required"
 )
 
+// Email sending messages
+const (
+	MsgEmailSendFailed = "email.send_failed"
+)
+
 // Misc messages
 const (
 	MsgMigrated               = "common.migrated"

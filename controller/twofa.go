@@ -162,7 +162,7 @@ func Enable2FA(c *gin.Context) {
 	}
 
 	// TOTP
-	cleanCode, err := common.ValidateNumericCode(req.Code)
+	cleanCode, err := common.ValidateNumericCodeI18n(c, req.Code)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -326,7 +326,7 @@ func RegenerateBackupCodes(c *gin.Context) {
 	}
 
 	// TOTP
-	cleanCode, err := common.ValidateNumericCode(req.Code)
+	cleanCode, err := common.ValidateNumericCodeI18n(c, req.Code)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

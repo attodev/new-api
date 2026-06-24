@@ -419,6 +419,9 @@ task_video.get_channel_failed: "Failed to get channel"
 task_video.get_model_failed: "Failed to get model"
 task_video.upstream_failed: "Upstream request failed"
 
+# Email sending messages
+email.send_failed: "Failed to send email"
+
 # Ali relay messages
 relay.ali.image_required: "Image is required"
 relay.ali.image_open_failed: "Failed to open image file"
