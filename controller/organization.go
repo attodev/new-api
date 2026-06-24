@@ -555,8 +555,8 @@ func ListAssignableOrganizationUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization owner permission required"))
+	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
+		common.ApiError(c, errors.New("organization admin permission required"))
 		return
 	}
 

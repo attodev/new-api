@@ -24,16 +24,17 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off',
   },
   webServer: [
     {
-      command: `CRITICAL_RATE_LIMIT_ENABLE=false GLOBAL_WEB_RATE_LIMIT_ENABLE=false CRITICAL_RATE_LIMIT=1000 go run . --port ${backendPort}`,
+      command: `CRITICAL_RATE_LIMIT_ENABLE=false GLOBAL_WEB_RATE_LIMIT_ENABLE=false GLOBAL_API_RATE_LIMIT_ENABLE=false go run . --port ${backendPort}`,
       cwd: path.resolve(__dirname, '../..'),
       env: {
         ...process.env,
         CRITICAL_RATE_LIMIT_ENABLE: 'false',
         GLOBAL_WEB_RATE_LIMIT_ENABLE: 'false',
+        GLOBAL_API_RATE_LIMIT_ENABLE: 'false',
       },
       url: backendURL,
       reuseExistingServer: true,
@@ -57,9 +58,9 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         // Ubuntu 26.04+ does not support Playwright's bundled Chromium — use system browser
-        ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-          ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
-          : {}),
+        executablePath:
+          process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+          '/usr/bin/chromium-browser',
       },
     },
   ],

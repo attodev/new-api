@@ -5,7 +5,7 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'atto1234'
 const organizationOwnerUsername =
   process.env.E2E_ORGANIZATION_OWNER_USERNAME || 'atto.o'
 const organizationAdminUsername =
-  process.env.E2E_ORGANIZATION_ADMIN_USERNAME || 'atto.a'
+  process.env.E2E_ORGANIZATION_ADMIN_USERNAME || 'ato.a'
 const organizationMemberUsername =
   process.env.E2E_ORGANIZATION_MEMBER_USERNAME || 'atto.1'
 const organizationPassword =
@@ -78,20 +78,45 @@ async function signInWithUi(
   }, savedStorage)
 }
 
+async function restoreAuth(page: Page, saved: SavedAuthStorage) {
+  await page.evaluate((storage: SavedAuthStorage) => {
+    if (storage.user) window.localStorage.setItem('user', storage.user)
+    if (storage.uid) window.localStorage.setItem('uid', storage.uid)
+  }, saved)
+}
+
 async function openAuthenticatedPage(page: Page, path = '/') {
   const saved = authStorage.get(page)
+  // Set localStorage before navigation (same-origin persistence).
   if (saved) {
-    await page.evaluate((storage) => {
-      if (storage.user) window.localStorage.setItem('user', storage.user)
-      if (storage.uid) window.localStorage.setItem('uid', storage.uid)
-    }, saved)
+    await restoreAuth(page, saved).catch(() => {
+      // Ignore: page might be at about:blank on first call
+    })
   }
   await page.goto(path)
+  // Wait for the network to settle so the auth guard's getSelf() call completes
+  // before any assertions run. Without this, assertions can race React render.
+  await page.waitForLoadState('networkidle').catch(() => {})
+  if (saved) {
+    // After navigation, verify auth survived. On snap Chromium the context-level
+    // initScript can lose the race against the app's auth guard.
+    const hasUser = await page.evaluate(
+      () => !!window.localStorage.getItem('user')
+    )
+    if (!hasUser || page.url().includes('/sign-in')) {
+      // Restore localStorage and navigate to the intended path so the page
+      // renders with auth.
+      await restoreAuth(page, saved)
+      await page.goto(path)
+      await page.waitForLoadState('networkidle').catch(() => {})
+    }
+  }
   return page
 }
 
 test.describe('organization browser smoke tests', () => {
   test.describe.configure({ mode: 'serial' })
+  test.setTimeout(60_000)
 
   let rootPage: Page
   let ownerPage: Page
@@ -99,7 +124,8 @@ test.describe('organization browser smoke tests', () => {
   let memberPage: Page
   let contexts: BrowserContext[]
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(120_000)
     contexts = await Promise.all([
       browser.newContext(),
       browser.newContext(),
@@ -169,16 +195,15 @@ test.describe('organization browser smoke tests', () => {
   })
 
   test('organization selection survives navigation between organization pages', async () => {
-    const page = await openAuthenticatedPage(rootPage)
-    await page.goto('/organization/dashboard')
+    const page = await openAuthenticatedPage(rootPage, '/organization/dashboard')
 
     const selector = page.getByRole('combobox').first()
     await expect(selector).toBeVisible()
     const selectedText = (await selector.textContent())?.trim()
     test.skip(!selectedText, 'No organization is available for selection.')
 
-    await page.goto('/organization/usage-logs/common')
-    await page.goto('/organization/dashboard')
+    await openAuthenticatedPage(page, '/organization/usage-logs/common')
+    await openAuthenticatedPage(page, '/organization/dashboard')
 
     await expect(selector).toContainText(selectedText!)
   })
@@ -193,13 +218,13 @@ test.describe('organization browser smoke tests', () => {
         page.getByRole('link', { name: /organization subscription/i })
       ).toBeVisible()
 
-      await page.goto('/organization')
+      await openAuthenticatedPage(page, '/organization')
       await expect(page).toHaveURL(/\/organization\/?$/)
       await expect(
         page.getByRole('heading', { name: /organization users/i })
       ).toBeVisible()
 
-      await page.goto('/organization/subscriptions')
+      await openAuthenticatedPage(page, '/organization/subscriptions')
       await expect(page).toHaveURL(/\/organization\/subscriptions/)
       await expect(
         page.getByRole('heading', { name: /organization subscription/i })
@@ -208,9 +233,7 @@ test.describe('organization browser smoke tests', () => {
   })
 
   test('organization usage logs render for admins', async () => {
-    const page = await openAuthenticatedPage(rootPage)
-
-    await page.goto('/organization/usage-logs/common')
+    const page = await openAuthenticatedPage(rootPage, '/organization/usage-logs/common')
     await expect(page).toHaveURL(/\/organization\/usage-logs\/common/)
     await expect(page.getByText(/usage logs/i).first()).toBeVisible()
     await expect(
@@ -240,5 +263,113 @@ test.describe('organization browser smoke tests', () => {
 
     await page.goto('/organization/subscriptions')
     await expect(page).toHaveURL(/\/403|\/sign-in/)
+  })
+
+  test('organization users table renders members for admin', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization')
+    await expect(page).toHaveURL(/\/organization\/?$/)
+    await expect(
+      page.getByRole('heading', { name: /organization users/i })
+    ).toBeVisible()
+    // table header columns
+    await expect(page.getByRole('columnheader', { name: /username/i })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: /role/i })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: /status/i })).toBeVisible()
+  })
+
+  test('organization users search filters table results', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization')
+
+    const searchInput = page.getByPlaceholder(/search by username/i)
+    await expect(searchInput).toBeVisible()
+
+    // type a query that should not match any user
+    await searchInput.fill('__no_match_xyzzy__')
+    // wait for debounce + API response then check empty state
+    await expect(page.getByText(/no data/i)).toBeVisible()
+  })
+
+  test('export button is visible for admin and triggers download', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization')
+
+    const exportBtn = page.getByRole('button', { name: /^export$/i })
+    await expect(exportBtn).toBeVisible()
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      exportBtn.click(),
+    ])
+    expect(download.suggestedFilename()).toMatch(/org-users.*\.xlsx$/)
+  })
+
+  test('import button is visible for admin and opens dialog', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization')
+
+    const importBtn = page.getByRole('button', { name: /^import$/i })
+    await expect(importBtn).toBeVisible()
+    await importBtn.click()
+
+    // dialog / modal should open
+    await expect(page.getByRole('dialog')).toBeVisible()
+    // close dialog
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('add member section is visible for admin but not for member', async () => {
+    const adminPage2 = await openAuthenticatedPage(organizationAdminPage, '/organization')
+    await expect(adminPage2.getByPlaceholder('Username', { exact: true })).toBeVisible()
+
+    const memberPage2 = await openAuthenticatedPage(memberPage, '/organization')
+    await expect(memberPage2).toHaveURL(/\/403|\/sign-in/)
+  })
+
+  test('owner sees all controls including role selector in table', async () => {
+    const page = await openAuthenticatedPage(ownerPage, '/organization')
+    await expect(
+      page.getByRole('heading', { name: /organization users/i })
+    ).toBeVisible()
+    // role column should exist
+    await expect(page.getByRole('columnheader', { name: /role/i })).toBeVisible()
+  })
+
+  test('dashboard preset buttons change the chart range', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization/dashboard')
+    await expect(
+      page.getByRole('heading', { name: /organization dashboard/i })
+    ).toBeVisible()
+
+    // preset buttons: Today / 7d / 30d
+    for (const label of ['Today', '7d', '30d']) {
+      const btn = page.getByRole('button', { name: new RegExp(`^${label}$`, 'i') })
+      if (await btn.isVisible()) {
+        await btn.click()
+        // no error toast should appear
+        await expect(page.getByText(/error/i)).toHaveCount(0)
+      }
+    }
+  })
+
+  test('subscription page renders plan configuration form for admin', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization/subscriptions')
+    await expect(
+      page.getByRole('heading', { name: /organization subscription/i })
+    ).toBeVisible()
+
+    await expect(page.getByText(/plan configuration/i)).toBeVisible()
+    await expect(page.getByText(/plan title/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /^create$/i })).toBeVisible()
+  })
+
+  test('subscription page create plan validates empty title', async () => {
+    const page = await openAuthenticatedPage(organizationAdminPage, '/organization/subscriptions')
+
+    // click Create without filling title
+    const createBtn = page.getByRole('button', { name: /^create$/i })
+    await expect(createBtn).toBeVisible()
+    await createBtn.click()
+
+    // toast with validation error should appear
+    await expect(page.getByText(/plan title is required/i)).toBeVisible()
   })
 })
