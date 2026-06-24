@@ -23,6 +23,9 @@ type SavedAuthStorage = {
 }
 
 const authStorage = new WeakMap<Page, SavedAuthStorage>()
+// Credentials per page so openAuthenticatedPage can fully re-login (re-establishing
+// the session cookie, not just localStorage) when a page lands back on /sign-in.
+const pageCredentials = new WeakMap<Page, { username: string; password: string }>()
 
 async function signInWithUi(
   page: Page,
@@ -78,6 +81,7 @@ async function signInWithUi(
     uid: window.localStorage.getItem('uid') ?? '',
   }))
   authStorage.set(page, savedStorage)
+  pageCredentials.set(page, { username, password })
   await page.context().addInitScript((storage: SavedAuthStorage) => {
     if (storage.user) window.localStorage.setItem('user', storage.user)
     if (storage.uid) window.localStorage.setItem('uid', storage.uid)
@@ -93,30 +97,39 @@ async function restoreAuth(page: Page, saved: SavedAuthStorage) {
 
 async function openAuthenticatedPage(page: Page, path = '/') {
   const saved = authStorage.get(page)
-  // Set localStorage before navigation (same-origin persistence).
-  if (saved) {
-    await restoreAuth(page, saved).catch(() => {
-      // Ignore: page might be at about:blank on first call
-    })
-  }
-  await page.goto(path)
-  // Wait for the network to settle so the auth guard's getSelf() call completes
-  // before any assertions run. Without this, assertions can race React render.
-  await page.waitForLoadState('networkidle').catch(() => {})
-  if (saved) {
-    // After navigation, verify auth survived. On snap Chromium the context-level
-    // initScript can lose the race against the app's auth guard.
+  const creds = pageCredentials.get(page)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // Set localStorage before navigation (same-origin persistence).
+    if (saved) {
+      await restoreAuth(page, saved).catch(() => {
+        // Ignore: page might be at about:blank on the first attempt.
+      })
+    }
+    await page.goto(path)
+    // Wait for the network to settle so the auth guard's getSelf() call completes
+    // before any assertions run.
+    await page.waitForLoadState('networkidle').catch(() => {})
+    if (!saved) return page
+    // Verify auth survived. On snap Chromium the context-level initScript can lose
+    // the race against the app's auth guard, and a restored session cookie can be
+    // rejected (getSelf -> 401), both of which bounce the page to /sign-in.
     const hasUser = await page.evaluate(
       () => !!window.localStorage.getItem('user')
     )
-    if (!hasUser || page.url().includes('/sign-in')) {
-      // Restore localStorage and navigate to the intended path so the page
-      // renders with auth.
-      await restoreAuth(page, saved)
-      await page.goto(path)
-      await page.waitForLoadState('networkidle').catch(() => {})
+    if (hasUser && !page.url().includes('/sign-in')) {
+      return page
+    }
+    // Recovery: a full UI re-login deterministically re-establishes both the
+    // session cookie and localStorage. Falls back to a localStorage restore if
+    // we never captured credentials for this page.
+    if (creds) {
+      await signInWithUi(page, creds.username, creds.password)
+    } else {
+      await restoreAuth(page, saved).catch(() => {})
     }
   }
+  await page.goto(path)
+  await page.waitForLoadState('networkidle').catch(() => {})
   return page
 }
 
@@ -186,11 +199,17 @@ async function deleteOrganizationViaUi(page: Page, name: string) {
     .filter({ hasText: name })
     .filter({ has: page.getByRole('button', { name: /^delete$/i }) })
     .last()
-  await card.getByRole('button', { name: /^delete$/i }).click()
-  const dialog = page.getByRole('alertdialog')
-  await expect(dialog.getByText(/delete organization/i)).toBeVisible()
+  // The card holds two "Delete" buttons: the AlertDialog trigger and its
+  // always-mounted action. Click the trigger specifically to open the dialog.
+  await card.locator('[data-slot="alert-dialog-trigger"]').click()
+  // Each card keeps its AlertDialog mounted, so scope to the one whose
+  // description names this organization.
+  const dialog = page.getByRole('alertdialog').filter({ hasText: name })
+  await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: /^delete$/i }).click()
-  await expect(page.getByText(/organization deleted/i)).toBeVisible()
+  // The success toast fires even when the API rejects the delete, so verify the
+  // organization actually disappears from the manage list instead.
+  await expect(card).toHaveCount(0)
 }
 
 async function deleteUserViaUi(page: Page, username: string) {
@@ -242,7 +261,7 @@ test.describe('organization browser smoke tests', () => {
             const style = document.createElement('style')
             style.id = id
             style.textContent =
-              '[aria-label="Open TanStack Router Devtools"]{display:none !important;}'
+              '[aria-label="Open TanStack Router Devtools"],[aria-label="Open Tanstack query devtools"]{display:none !important;}'
             ;(document.head || document.documentElement)?.appendChild(style)
           }
           if (document.head || document.documentElement) inject()
@@ -514,18 +533,27 @@ test.describe('organization browser smoke tests', () => {
 
   test('admin removes organization and users via UI', async () => {
     // Best-effort cleanup: keep going even if an earlier step left things partial.
+    // The backend refuses to delete an organization that still has non-owner
+    // members, so order matters: remove the non-owner members, then the
+    // organization (the owner is excluded from the member check), then the owner.
+    for (const username of [orgAdminUsername, memberUsername]) {
+      try {
+        await deleteUserViaUi(rootPage, username)
+      } catch (error) {
+        console.error(`Failed to delete user ${username}:`, error)
+      }
+    }
+
     try {
       await deleteOrganizationViaUi(rootPage, organizationName)
     } catch (error) {
       console.error(`Failed to delete organization ${organizationName}:`, error)
     }
 
-    for (const username of createdUsernames) {
-      try {
-        await deleteUserViaUi(rootPage, username)
-      } catch (error) {
-        console.error(`Failed to delete user ${username}:`, error)
-      }
+    try {
+      await deleteUserViaUi(rootPage, ownerUsername)
+    } catch (error) {
+      console.error(`Failed to delete user ${ownerUsername}:`, error)
     }
   })
 })
