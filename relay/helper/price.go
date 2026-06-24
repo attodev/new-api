@@ -169,6 +169,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
 	groupRatioInfo := HandleGroupRatio(c, info)
 
+	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣어 per-call(MJ 등) 과금이
+	// 동일 배수를 쓰게 한다(GroupRatio와 동일 적용 범위).
+	groupRatioInfo.GroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(info.OriginModelName)
+
 	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
 	usePrice := success
 	var modelRatio float64

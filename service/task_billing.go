@@ -306,6 +306,8 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	} else {
 		finalGroupRatio = groupRatio
 	}
+	// Apply model/vendor discount on the resolved group ratio for the task billing path.
+	finalGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(modelName)
 
 	// OtherRatios
 	otherMultiplier := 1.0
