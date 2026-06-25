@@ -439,6 +439,17 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	} else {
 		other = GenerateTextOtherInfo(ctx, relayInfo, summary.ModelRatio, summary.GroupRatio, summary.CompletionRatio, summary.CacheTokens, summary.CacheRatio, summary.ModelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
 	}
+	// 할인을 group_ratio에서 분리해 로그에 별도 기록한다(청구 quota는 불변).
+	// group_ratio에는 할인이 접혀 있으므로(folded = base × discountMultiplier),
+	// 기저 비율로 되돌리고 discount_multiplier/discount_source를 추가한다.
+	// user_group_ratio는 이미 기저값.
+	if mul := relayInfo.PriceData.GroupRatioInfo.DiscountMultiplier; mul > 0 && mul != 1 {
+		other["discount_multiplier"] = mul
+		other["discount_source"] = relayInfo.PriceData.GroupRatioInfo.DiscountSource
+		if folded, ok := other["group_ratio"].(float64); ok {
+			other["group_ratio"] = folded / mul
+		}
+	}
 	if adminRejectReason != "" {
 		other["reject_reason"] = adminRejectReason
 	}

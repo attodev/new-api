@@ -1,1635 +1,2647 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AlRouter</title>
-<link rel="icon" type="image/svg+xml" href="./logo.svg">
-<script src="https://unpkg.com/lucide@latest"></script>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, 'Inter', 'DM Sans', sans-serif;
-    background: #111827;
-    color: #f9fafb;
-    font-size: 14px;
-    line-height: 1.6;
-  }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlRouter</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body {
+                font-family: -apple-system, 'Inter', 'DM Sans', sans-serif;
+                background: #111827;
+                color: #f9fafb;
+                font-size: 14px;
+                line-height: 1.6;
+              }
 
-  /* ── 1. GNB ── */
-  .gnb {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 48px;
-    background: rgba(17,24,39,0.95);
-    border-bottom: 1px solid #1f2937;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(8px);
-  }
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 18px;
-    font-weight: 700;
-    color: #f9fafb;
-  }
-  .logo-icon { width: 32px; height: 32px; }
-  .gnb-menu { display: flex; gap: 32px; list-style: none; }
-  .gnb-menu li a {
-    color: #9ca3af;
-    text-decoration: none;
-    font-size: 14px;
-    transition: color 0.2s;
-  }
-  .gnb-menu li a:hover { color: #f9fafb; }
-  .gnb-right { display: flex; align-items: center; gap: 12px; }
-  .lang-switch {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    color: #9ca3af;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    background: none;
-    padding: 0;
-  }
-  .lang-switch:hover { background: #1f2937; color: #f9fafb; }
-  .lang-switch i[data-lucide] { width: 16px; height: 16px; }
-  .lang-dropdown {
-    display: none;
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 10px;
-    overflow: hidden;
-    min-width: 130px;
-    z-index: 200;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    padding: 4px 0;
-  }
-  .lang-switch.open .lang-dropdown { display: block; }
-  .lang-dropdown a {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    font-size: 14px;
-    color: #d1d5db;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .lang-dropdown a:hover { background: #374151; color: #f9fafb; }
-  .lang-dropdown a .check { color: #f9fafb; font-size: 12px; }
-  .btn-login {
-    font-size: 13px;
-    color: #9ca3af;
-    cursor: pointer;
-    background: none;
-    border: none;
-    transition: color 0.2s;
-  }
-  .btn-login:hover { color: #f9fafb; }
-  .btn-primary {
-    background: linear-gradient(135deg, #0EA5E9, #EC4899);
-    color: white;
-    border: none;
-    padding: 8px 18px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  }
-  .btn-primary:hover {
-    opacity: 0.85;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(14,165,233,0.3);
-  }
+              /* ── 1. GNB ── */
+              .gnb {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 14px 48px;
+                background: rgba(17,24,39,0.95);
+                border-bottom: 1px solid #1f2937;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                backdrop-filter: blur(8px);
+              }
+              .logo {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 18px;
+                font-weight: 700;
+                color: #f9fafb;
+              }
+              .logo-icon { width: 32px; height: 32px; }
+              .gnb-menu { display: flex; gap: 32px; list-style: none; }
+              .gnb-menu li a {
+                color: #9ca3af;
+                text-decoration: none;
+                font-size: 14px;
+                transition: color 0.2s;
+              }
+              .gnb-menu li a:hover { color: #f9fafb; }
+              .gnb-right { display: flex; align-items: center; gap: 16px; }
+              .gnb-divider { width: 1px; height: 16px; background: #374151; }
+              .lang-switch {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                color: #9ca3af;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                background: none;
+                padding: 0;
+              }
+              .lang-switch:hover { background: #1f2937; color: #f9fafb; }
+              .lang-switch i[data-lucide] { width: 16px; height: 16px; }
+              .lang-dropdown {
+                display: none;
+                position: absolute;
+                top: calc(100% + 6px);
+                right: 0;
+                background: #1f2937;
+                border: 1px solid #374151;
+                border-radius: 10px;
+                overflow: hidden;
+                min-width: 130px;
+                z-index: 200;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+                padding: 4px 0;
+              }
+              .lang-switch.open .lang-dropdown { display: block; }
+              .lang-dropdown a {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 16px;
+                font-size: 14px;
+                color: #d1d5db;
+                text-decoration: none;
+                white-space: nowrap;
+              }
+              .lang-dropdown a:hover { background: #374151; color: #f9fafb; }
+              .lang-dropdown a .check { color: #f9fafb; font-size: 12px; }
+              .btn-login {
+                font-size: 13px;
+                color: #9ca3af;
+                cursor: pointer;
+                background: none;
+                border: none;
+                transition: color 0.2s;
+              }
+              .btn-login:hover { color: #f9fafb; }
+              .btn-primary {
+                background: linear-gradient(135deg, #0EA5E9, #EC4899);
+                color: white;
+                border: none;
+                padding: 8px 18px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+              }
+              .btn-primary:hover {
+                opacity: 0.85;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 16px rgba(14,165,233,0.3);
+              }
 
-  /* ── 2. HERO ── */
-  .hero {
-    padding: 96px 48px 80px;
-    background: radial-gradient(ellipse at 30% 50%, rgba(14,165,233,0.08) 0%, transparent 60%),
-                radial-gradient(ellipse at 70% 40%, rgba(236,72,153,0.08) 0%, transparent 60%),
-                #111827;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 64px;
-    align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(14,165,233,0.1);
-    border: 1px solid rgba(14,165,233,0.25);
-    color: #0EA5E9;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 4px 12px;
-    border-radius: 20px;
-    margin-bottom: 24px;
-  }
-  .hero h1 {
-    font-size: 42px;
-    font-weight: 800;
-    line-height: 1.2;
-    margin-bottom: 20px;
-    color: #f9fafb;
-  }
-  .hero h1 .highlight {
-    background: linear-gradient(135deg, #0EA5E9, #EC4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .hero-sub {
-    font-size: 16px;
-    color: #9ca3af;
-    line-height: 1.7;
-    margin-bottom: 32px;
-  }
-  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-  .btn-hero-primary {
-    background: linear-gradient(135deg, #0EA5E9, #EC4899);
-    color: white;
-    border: none;
-    padding: 14px 28px;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  }
-  .btn-hero-primary:hover {
-    opacity: 0.88;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(14,165,233,0.35);
-  }
-  .btn-hero-secondary {
-    background: transparent;
-    color: #f9fafb;
-    border: 1px solid #374151;
-    padding: 14px 28px;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s, transform 0.15s;
-  }
-  .btn-hero-secondary:hover {
-    border-color: #6b7280;
-    background: rgba(255,255,255,0.04);
-    transform: translateY(-1px);
-  }
-  .hero-stats {
-    display: flex;
-    gap: 32px;
-    margin-top: 40px;
-    padding-top: 32px;
-    border-top: 1px solid #1f2937;
-  }
-  .stat-item .stat-value {
-    font-size: 24px;
-    font-weight: 800;
-    background: linear-gradient(135deg, #0EA5E9, #EC4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .stat-item .stat-label { font-size: 12px; color: #6b7280; margin-top: 2px; }
+              /* ── 2. HERO ── */
+              .hero {
+                padding: 96px 48px 80px;
+                background: radial-gradient(ellipse at 30% 50%, rgba(14,165,233,0.08) 0%, transparent 60%),
+                            radial-gradient(ellipse at 70% 40%, rgba(236,72,153,0.08) 0%, transparent 60%),
+                            #111827;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 64px;
+                align-items: center;
+                max-width: 1200px;
+                margin: 0 auto;
+              }
+              .hero-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(14,165,233,0.1);
+                border: 1px solid rgba(14,165,233,0.25);
+                color: #0EA5E9;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 4px 12px;
+                border-radius: 20px;
+                margin-bottom: 24px;
+              }
+              .hero h1 {
+                font-size: 42px;
+                font-weight: 800;
+                line-height: 1.2;
+                margin-bottom: 20px;
+                color: #f9fafb;
+              }
+              .hero h1 .highlight {
+                background: linear-gradient(135deg, #0EA5E9, #EC4899);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+              }
+              .hero-sub {
+                font-size: 16px;
+                color: #9ca3af;
+                line-height: 1.7;
+                margin-bottom: 32px;
+              }
+              .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+              .btn-hero-primary {
+                background: linear-gradient(135deg, #0EA5E9, #EC4899);
+                color: white;
+                border: none;
+                padding: 14px 28px;
+                border-radius: 10px;
+                font-size: 15px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+              }
+              .btn-hero-primary:hover {
+                opacity: 0.88;
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px rgba(14,165,233,0.35);
+              }
+              .btn-hero-secondary {
+                background: transparent;
+                color: #f9fafb;
+                border: 1px solid #374151;
+                padding: 14px 28px;
+                border-radius: 10px;
+                font-size: 15px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: border-color 0.2s, background 0.2s, transform 0.15s;
+              }
+              .btn-hero-secondary:hover {
+                border-color: #6b7280;
+                background: rgba(255,255,255,0.04);
+                transform: translateY(-1px);
+              }
+              .hero-stats {
+                display: flex;
+                gap: 32px;
+                margin-top: 40px;
+                padding-top: 32px;
+                border-top: 1px solid #1f2937;
+              }
+              .stat-item .stat-value {
+                font-size: 32px;
+                font-weight: 900;
+                background: linear-gradient(135deg, #0EA5E9, #EC4899);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                line-height: 1;
+              }
+              .stat-item .stat-label { font-size: 13px; color: #6b7280; margin-top: 6px; }
 
-  /* Hero Right */
-  .hero-right { display: flex; flex-direction: column; gap: 16px; }
-  .billing-before, .billing-after {
-    border-radius: 12px;
-    padding: 20px;
-    font-size: 13px;
-  }
-  .billing-before { background: transparent; border: none; padding: 0; overflow: hidden; }
-  .billing-after {
-    background: linear-gradient(135deg, rgba(14,165,233,0.12), rgba(236,72,153,0.12));
-    border: 1px solid rgba(14,165,233,0.3);
-  }
-  .billing-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 12px;
-  }
-  .billing-before .billing-title { color: #ef4444; }
-  .billing-after .billing-title { color: #0EA5E9; }
-  .bill-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid #374151;
-    color: #d1d5db;
-  }
-  .bill-row:last-child { border-bottom: none; }
-  .bill-row .amount { color: #f9fafb; font-weight: 600; }
-  .arrow-divider { text-align: center; color: #6b7280; font-size: 20px; }
-  .total-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0 0;
-    margin-top: 4px;
-    font-weight: 700;
-  }
+              /* Hero Right */
+              .hero-right { display: flex; flex-direction: column; gap: 16px; }
+              .billing-before, .billing-after {
+                border-radius: 12px;
+                padding: 20px;
+                font-size: 13px;
+              }
+              .billing-before { background: transparent; border: none; padding: 0; overflow: hidden; }
+              .billing-after {
+                background: linear-gradient(135deg, rgba(14,165,233,0.12), rgba(236,72,153,0.12));
+                border: 1px solid rgba(14,165,233,0.3);
+              }
+              .billing-title {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-bottom: 12px;
+              }
+              .billing-before .billing-title { color: #ef4444; }
+              .billing-after .billing-title { color: #0EA5E9; }
+              .bill-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 0;
+                border-bottom: 1px solid #374151;
+                color: #d1d5db;
+              }
+              .bill-row:last-child { border-bottom: none; }
+              .bill-row .amount { color: #f9fafb; font-weight: 600; }
+              .arrow-divider { text-align: center; color: #6b7280; font-size: 20px; }
+              .total-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0 0;
+                margin-top: 4px;
+                font-weight: 700;
+              }
 
-  /* ── SECTIONS ── */
-  .section { max-width: 1200px; margin: 0 auto; padding: 80px 48px; }
-  .section-tag {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #0EA5E9;
-    margin-bottom: 12px;
-  }
-  .section h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
-  .section .section-sub {
-    font-size: 16px;
-    color: #9ca3af;
-    max-width: 560px;
-    line-height: 1.7;
-    margin-bottom: 48px;
-  }
+              /* ── SECTIONS ── */
+              .section { max-width: 1200px; margin: 0 auto; padding: 80px 48px; }
+              .section-tag {
+                display: inline-block;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: #0EA5E9;
+                margin-bottom: 12px;
+              }
+              .section h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
+              .section .section-sub {
+                font-size: 16px;
+                color: #9ca3af;
+                max-width: 560px;
+                line-height: 1.7;
+                margin-bottom: 48px;
+              }
 
-  /* ── 4. PROBLEM CARDS ── */
-  .problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-  .problem-card {
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 16px;
-    padding: 28px;
-    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-  }
-  .problem-card:hover {
-    border-color: rgba(14,165,233,0.35);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-  }
-  .problem-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .problem-icon { font-size: 28px; flex-shrink: 0; }
-  .problem-icon i[data-lucide] { width: 28px; height: 28px; }
-  .problem-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 0; color: #f9fafb; line-height: 1.4; }
-  .problem-card p { font-size: 13px; color: #9ca3af; line-height: 1.7; }
+              /* ── 4. PROBLEM CARDS ── */
+              .problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+              .problem-card {
+                background: linear-gradient(160deg, #1f2937 60%, #1a1f2e);
+                border: 1px solid #374151;
+                border-radius: 16px;
+                padding: 36px;
+                position: relative;
+                overflow: hidden;
+                transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+              }
+              .problem-card:hover {
+                border-color: #4b5563;
+                transform: translateY(-3px);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+              }
+      .problem-card-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+              .problem-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid #374151; display: flex; align-items: center; justify-content: center; }
+              .problem-icon i[data-lucide] { width: 18px; height: 18px; color: #9ca3af; }
+              .problem-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 0; color: #f9fafb; line-height: 1.45; padding-top: 2px; }
+              .problem-card p { font-size: 13px; color: #9ca3af; line-height: 1.75; }
 
-  /* ── 5. SOLUTION ── */
-  .solution-section {
-    background: linear-gradient(180deg, #111827, #0f172a);
-    border-top: 1px solid #1f2937;
-    border-bottom: 1px solid #1f2937;
-  }
-  .solution-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
-  .diagram-box {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: #111827;
-    border: 1px solid #374151;
-    border-radius: 10px;
-    padding: 12px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #d1d5db;
-    text-align: center;
-    min-width: 100px;
-  }
-  .diagram-center {
-    background: linear-gradient(135deg, rgba(14,165,233,0.15), rgba(236,72,153,0.15));
-    border: 2px solid rgba(14,165,233,0.4);
-    border-radius: 14px;
-    padding: 16px 32px;
-    font-size: 16px;
-    font-weight: 800;
-    color: #f9fafb;
-    text-align: center;
-  }
-  .diagram-results {
-    margin-top: 24px;
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .diagram-result-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(14,165,233,0.08);
-    border: 1px solid rgba(14,165,233,0.2);
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 12px;
-    color: #0EA5E9;
-    font-weight: 600;
-  }
+              /* ── 5. SOLUTION ── */
+              .solution-section {
+                background: linear-gradient(180deg, #111827, #0f172a);
+                border-top: 1px solid #1f2937;
+                border-bottom: 1px solid #1f2937;
+              }
+              .solution-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
+              .solution-inner h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
+              .solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin-bottom: 0; }
+              .diagram-box {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                background: #111827;
+                border: 1px solid #374151;
+                border-radius: 10px;
+                padding: 12px 20px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #d1d5db;
+                text-align: center;
+                min-width: 100px;
+              }
+              .diagram-center {
+                background: linear-gradient(135deg, rgba(14,165,233,0.15), rgba(236,72,153,0.15));
+                border: 2px solid rgba(14,165,233,0.4);
+                border-radius: 14px;
+                padding: 16px 32px;
+                font-size: 16px;
+                font-weight: 800;
+                color: #f9fafb;
+                text-align: center;
+              }
+              .diagram-results {
+                margin-top: 24px;
+                display: flex;
+                justify-content: center;
+                gap: 16px;
+                flex-wrap: wrap;
+              }
+              .diagram-result-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(14,165,233,0.08);
+                border: 1px solid rgba(14,165,233,0.2);
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 12px;
+                color: #0EA5E9;
+                font-weight: 600;
+              }
 
-  /* ── 6. FEATURE: COST ── */
-  .feature-section { padding: 80px 0; }
-  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
-  .feature-grid.reverse { direction: rtl; }
-  .feature-grid.reverse > * { direction: ltr; }
-  .feature-content h2 { font-size: 30px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
-  .feature-content p { font-size: 15px; color: #9ca3af; line-height: 1.7; margin-bottom: 24px; }
-  .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .price-table th {
-    background: #374151;
-    padding: 10px 14px;
-    text-align: left;
-    color: #9ca3af;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .price-table th:first-child { border-radius: 8px 0 0 8px; }
-  .price-table th:last-child { border-radius: 0 8px 8px 0; }
-  .price-table td { padding: 10px 14px; border-bottom: 1px solid #1f2937; color: #d1d5db; }
-  .price-table .discounted { color: #0EA5E9; font-weight: 700; }
-  .price-table .discount-pct { color: #EC4899; font-weight: 700; }
-  .payg-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(236,72,153,0.1);
-    border: 1px solid rgba(236,72,153,0.25);
-    color: #EC4899;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 6px 14px;
-    border-radius: 20px;
-    margin-top: 16px;
-  }
-  .feature-visual { background: #1f2937; border: 1px solid #374151; border-radius: 16px; padding: 24px; }
-  .feature-visual-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #6b7280;
-    margin-bottom: 16px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    transition: color 0.2s;
-    display: inline-block;
-  }
-  .feature-visual-title:hover { color: #0EA5E9; }
+              /* ── 6. FEATURE: COST ── */
+              .feature-section { padding: 80px 0; }
+              .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+              .feature-grid.reverse { direction: rtl; }
+              .feature-grid.reverse > * { direction: ltr; }
+              .feature-content h2 { font-size: 30px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
+              .feature-content p { font-size: 15px; color: #9ca3af; line-height: 1.7; margin-bottom: 24px; }
+              .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+              .price-table th {
+                background: #374151;
+                padding: 10px 14px;
+                text-align: left;
+                color: #9ca3af;
+                font-weight: 600;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+              }
+              .price-table th:first-child, .price-table td:first-child { width: 40%; }
+              .price-table th:nth-child(2), .price-table td:nth-child(2) { width: 30%; text-align: center; }
+              .price-table th:first-child { border-radius: 8px 0 0 8px; }
+              .price-table th:last-child { border-radius: 0 8px 8px 0; text-align: center; }
+              .price-table td { padding: 10px 14px; border-bottom: 1px solid #243042; color: #d1d5db; }
+              .price-table td:not(:first-child) { border-left: 1px solid #243042; }
+              .price-table td:last-child { width: 30%; }
+              .price-table .discounted { color: #0EA5E9; font-weight: 700; }
+              .price-table .discount-pct { color: #EC4899; font-weight: 800; font-size: 28px; }
+              .payg-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(236,72,153,0.1);
+                border: 1px solid rgba(236,72,153,0.25);
+                color: #EC4899;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 6px 14px;
+                border-radius: 20px;
+                margin-top: 20px;
+              }
+              .feature-visual { background: #1f2937; border: 1px solid #374151; border-radius: 16px; padding: 24px; }
+              .feature-visual-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: #6b7280;
+                margin-bottom: 16px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                cursor: pointer;
+                transition: color 0.2s;
+                display: inline-block;
+              }
+              .feature-visual-title:hover { color: #0EA5E9; }
 
-  /* ── AI Cost Calculator ── */
-  .calc-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-  .calc-card-title { font-size:14px; font-weight:700; color:#f9fafb; }
-  .calc-card-link { font-size:11px; color:#6b7280; text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.2s; white-space:nowrap; }
-  .calc-card-link:hover { color:#0EA5E9; }
-  .calc-body { display:flex; gap:16px; align-items:stretch; }
-  .calc-form { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
-  .calc-group { display:flex; flex-direction:column; gap:5px; }
-  .calc-group label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; }
-  .calc-select {
-    background:#111827; border:1px solid #374151; border-radius:8px;
-    color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 32px 8px 12px;
-    outline:none; transition:border-color 0.2s; width:100%;
-    appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat:no-repeat; background-position:right 12px center;
-    cursor:pointer;
-  }
-  .calc-select:focus { border-color:#0EA5E9; }
-  .calc-input-wrap { position:relative; display:flex; align-items:center; }
-  .calc-input-wrap input {
-    background:#111827; border:1px solid #374151; border-radius:8px;
-    color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 80px 8px 12px;
-    outline:none; transition:border-color 0.2s; width:100%;
-    -moz-appearance:textfield;
-  }
-  .calc-input-wrap input::-webkit-inner-spin-button,
-  .calc-input-wrap input::-webkit-outer-spin-button { -webkit-appearance:none; }
-  .calc-input-wrap input:focus { border-color:#0EA5E9; }
-  .calc-input-suffix { position:absolute; right:12px; font-size:11px; color:#6b7280; pointer-events:none; white-space:nowrap; }
-  .calc-btn {
-    margin-top:2px; padding:9px 16px; background:#0EA5E9; color:#fff;
-    border:none; border-radius:8px; font-size:13px; font-weight:700;
-    cursor:pointer; transition:opacity 0.2s, transform 0.15s; width:100%;
-  }
-  .calc-btn:hover { opacity:0.88; transform:translateY(-1px); }
-  .calc-result {
-    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:#111827; border-radius:12px; padding:20px 16px; min-width:0;
-    border:1px solid #1f2937;
-  }
-  .calc-result-hint { font-size:15px; color:#7dd3fc; text-align:center; line-height:1.8; font-weight:500; }
-  .calc-result-label { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
-  .calc-result-price { font-size:34px; font-weight:800; color:#0EA5E9; line-height:1; margin-bottom:14px; }
-  .calc-breakdown { display:flex; flex-direction:column; gap:5px; width:100%; }
-  .calc-breakdown-row { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; }
+              /* ── AI 비용 계산기 ── */
+              .calc-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+              .calc-card-title { font-size:14px; font-weight:700; color:#f9fafb; }
+              .calc-card-link { font-size:11px; color:#6b7280; text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.2s; white-space:nowrap; }
+              .calc-card-link:hover { color:#0EA5E9; }
+              .calc-body { display:flex; gap:16px; align-items:stretch; }
+              .calc-form { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
+              .calc-group { display:flex; flex-direction:column; gap:5px; }
+              .calc-group label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; }
+              .calc-select {
+                background:#111827; border:1px solid #374151; border-radius:8px;
+                color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 32px 8px 12px;
+                outline:none; transition:border-color 0.2s; width:100%;
+                appearance:none;
+                background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+                background-repeat:no-repeat; background-position:right 12px center;
+                cursor:pointer;
+              }
+              .calc-select:focus { border-color:#0EA5E9; }
+              .calc-input-wrap { position:relative; display:flex; align-items:center; }
+              .calc-input-wrap input {
+                background:#111827; border:1px solid #374151; border-radius:8px;
+                color:#f9fafb; font-size:13px; font-family:inherit; padding:8px 80px 8px 12px;
+                outline:none; transition:border-color 0.2s; width:100%;
+                -moz-appearance:textfield;
+              }
+              .calc-input-wrap input::-webkit-inner-spin-button,
+              .calc-input-wrap input::-webkit-outer-spin-button { -webkit-appearance:none; }
+              .calc-input-wrap input:focus { border-color:#0EA5E9; }
+              .calc-input-suffix { position:absolute; right:12px; font-size:11px; color:#6b7280; pointer-events:none; white-space:nowrap; }
+              .calc-btn {
+                margin-top:15px; padding:9px 16px; background:#0EA5E9; color:#fff;
+                border:none; border-radius:8px; font-size:13px; font-weight:700;
+                cursor:pointer; transition:opacity 0.2s, transform 0.15s; width:100%;
+              }
+              .calc-btn:hover { opacity:0.88; transform:translateY(-1px); }
+              .calc-result {
+                flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+                background:#111827; border-radius:12px; padding:20px 16px; min-width:0;
+                border:1px solid #1f2937;
+              }
+              .calc-result-hint { font-size:15px; color:#7dd3fc; text-align:center; line-height:1.8; font-weight:500; }
+              .calc-result-label { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
+              .calc-result-price { font-size:34px; font-weight:800; color:#0EA5E9; line-height:1; margin-bottom:14px; }
+              .calc-breakdown { display:flex; flex-direction:column; gap:5px; width:100%; }
+              .calc-breakdown-row { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; }
 
-  /* ── 7. FEATURE: GOVERNANCE ── */
-  .gov-points { display: flex; flex-direction: column; gap: 20px; }
-  .gov-point { display: flex; gap: 14px; align-items: flex-start; }
-  i[data-lucide] { display: inline-flex; }
-  .problem-icon i[data-lucide] { width: 28px; height: 28px; }
-  .gov-icon i[data-lucide] { width: 20px; height: 20px; }
-  .cta-icon i[data-lucide] { width: 36px; height: 36px; }
-  .modality-tag i[data-lucide] { width: 13px; height: 13px; vertical-align: middle; margin-right: 3px; }
-  .logo-box i[data-lucide] { width: 24px; height: 24px; }
-  .gov-icon {
-    font-size: 20px;
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-    background: rgba(14,165,233,0.1);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .gov-text h4 { font-size: 14px; font-weight: 700; color: #f9fafb; margin-bottom: 4px; }
-  .gov-text p { font-size: 13px; color: #9ca3af; line-height: 1.6; margin: 0; }
-  .dashboard-mock { background: #111827; border: 1px solid #374151; border-radius: 12px; overflow: hidden; }
-  .dash-header {
-    background: #1f2937;
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid #374151;
-    font-size: 13px;
-    font-weight: 600;
-    color: #d1d5db;
-  }
-  .dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #374151; }
-  .dash-stat { background: #111827; padding: 14px 16px; }
-  .dash-stat .ds-label { font-size: 10px; color: #6b7280; text-transform: uppercase; }
-  .dash-stat .ds-value { font-size: 18px; font-weight: 800; color: #f9fafb; margin-top: 2px; }
-  .dash-stat .ds-value.blue { color: #0EA5E9; }
-  .dash-stat .ds-value.pink { color: #EC4899; }
-  .dash-chart { padding: 16px; height: 80px; display: flex; align-items: flex-end; gap: 6px; }
-  .dash-bar { flex: 1; background: rgba(14,165,233,0.3); border-radius: 3px 3px 0 0; }
-  .dash-bar.highlight { background: linear-gradient(180deg, #EC4899, rgba(236,72,153,0.4)); }
+              /* ── 7. FEATURE: GOVERNANCE ── */
+              .gov-points { display: flex; flex-direction: column; gap: 20px; }
+              .gov-point { display: flex; gap: 14px; align-items: flex-start; }
+              i[data-lucide] { display: inline-flex; }
+              /* problem-icon size set in section 5 */
+              .gov-icon i[data-lucide] { width: 20px; height: 20px; }
+              .cta-icon i[data-lucide] { width: 36px; height: 36px; }
+              .modality-tag i[data-lucide] { width: 13px; height: 13px; margin-right: 7px; flex-shrink: 0; }
+              .logo-box i[data-lucide] { width: 24px; height: 24px; }
+              .gov-icon {
+                font-size: 20px;
+                flex-shrink: 0;
+                width: 40px;
+                height: 40px;
+                background: rgba(14,165,233,0.1);
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .gov-text h4 { font-size: 14px; font-weight: 700; color: #f9fafb; margin-bottom: 4px; }
+              .gov-text p { font-size: 13px; color: #9ca3af; line-height: 1.6; margin: 0; }
+              .dashboard-mock { background: #111827; border: 1px solid #374151; border-radius: 12px; overflow: hidden; }
+              .dash-header {
+                background: #1f2937;
+                padding: 10px 16px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                border-bottom: 1px solid #374151;
+                font-size: 13px;
+                font-weight: 600;
+                color: #d1d5db;
+              }
+              .dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #374151; }
+              .dash-stat { background: #111827; padding: 14px 16px; }
+              .dash-stat .ds-label { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+              .dash-stat .ds-value { font-size: 18px; font-weight: 800; color: #f9fafb; margin-top: 2px; }
+              .dash-stat .ds-value.blue { color: #0EA5E9; }
+              .dash-stat .ds-value.pink { color: #EC4899; }
+              .dash-chart { padding: 16px; height: 160px; display: flex; align-items: flex-end; gap: 6px; }
+              .dash-bar { flex: 1; background: rgba(14,165,233,0.3); border-radius: 3px 3px 0 0; }
+              .dash-bar.highlight { background: linear-gradient(180deg, #EC4899, rgba(236,72,153,0.4)); }
 
-  /* ── 8. INTEGRATION ── */
-  .integration-section { background: #0f172a; border-top: 1px solid #1f2937; }
-  .integration-inner { max-width: 1200px; margin: 0 auto; padding: 64px 48px; text-align: center; }
-  .provider-logos { display: flex; justify-content: center; align-items: center; gap: 32px; flex-wrap: wrap; margin-top: 36px; }
-  .provider-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: default; }
-  .provider-logo .logo-box {
-    width: 56px; height: 56px;
-    border: 1px solid #374151;
-    border-radius: 14px;
-    background: #1f2937;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-  }
-  .provider-logo .logo-name { font-size: 11px; color: #6b7280; font-weight: 600; }
-  .modality-tags { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
-  .modality-tag { background: #1f2937; border: 1px solid #374151; color: #9ca3af; font-size: 12px; padding: 5px 14px; border-radius: 20px; }
+              /* ── 8. INTEGRATION ── */
+              .integration-section { background: #0f172a; border-top: 1px solid #1f2937; }
+              .integration-inner { max-width: 1200px; margin: 0 auto; padding: 64px 48px; text-align: center; }
+              .provider-logos { display: flex; justify-content: center; align-items: center; gap: 50px; flex-wrap: wrap; margin-top: 36px; }
+              .provider-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: default; }
+              .provider-logo .logo-box {
+                width: 56px; height: 56px;
+                border: 1px solid #374151;
+                border-radius: 14px;
+                background: #1f2937;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 22px;
+              }
+              .provider-logo .logo-name { font-size: 11px; color: #6b7280; font-weight: 600; }
+              .modality-tags { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 24px; }
+              .modality-tag { display: inline-flex; align-items: center; gap: 5px; background: #1f2937; border: 1px solid #374151; color: #9ca3af; font-size: 12px; padding: 5px 14px; border-radius: 20px; }
 
-  /* ── 9. PRICING ── */
-  .pricing-section { background: #111827; border-top: 1px solid #1f2937; }
-  .pricing-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
-  .price-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 48px; }
-  .price-card {
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 16px;
-    padding: 24px;
-    text-align: left;
-    position: relative;
-    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-  }
-  .price-card:hover { border-color: rgba(14,165,233,0.4); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-  .price-card .model-provider { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-bottom: 6px; font-weight: 600; }
-  .price-card .model-name { font-size: 15px; font-weight: 700; color: #f9fafb; margin-bottom: 16px; }
-  .price-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
-  .price-row .label { color: #6b7280; }
-  .price-row .strike { text-decoration: line-through; color: #4b5563; }
-  .price-row .new-price { color: #0EA5E9; font-weight: 700; }
-  .discount-tag {
-    position: absolute; top: 16px; right: 16px;
-    background: rgba(236,72,153,0.15); color: #EC4899;
-    font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px;
-  }
-  .pricing-cta { margin-top: 32px; }
-  .pricing-cta a { color: #0EA5E9; font-size: 14px; font-weight: 600; text-decoration: none; transition: color 0.2s; }
-  .pricing-cta a:hover { color: #38bdf8; text-decoration: underline; }
+              /* ── 9. PRICING ── */
+              .pricing-section { background: #111827; border-top: 1px solid #1f2937; }
+              .pricing-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
+              .price-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 48px; }
+              .price-card {
+                background: linear-gradient(160deg, #1f2937 60%, #172035);
+                border: 1px solid #374151;
+                border-top: 2px solid transparent;
+                border-radius: 16px;
+                padding: 32px 28px;
+                text-align: center;
+                position: relative;
+                transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+                overflow: hidden;
+              }
+              .price-card::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                height: 2px;
+                background: linear-gradient(90deg, #0EA5E9, #EC4899);
+              }
+              .price-card:hover { border-color: rgba(14,165,233,0.3); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+              .price-card .model-provider { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: #9ca3af; font-weight: 700; }
+              .price-card .model-name { font-size: 15px; font-weight: 700; color: #f9fafb; margin-bottom: 16px; }
+              .price-card-divider { border: none; border-top: 1px solid #374151; margin: 20px 0; }
+              .price-card-pct { font-size: 48px; font-weight: 900; color: #EC4899; letter-spacing: -0.03em; line-height: 1; text-shadow: 0 0 32px rgba(236,72,153,0.35); }
+              .price-card-label { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+              .price-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+              .price-row .label { color: #6b7280; }
+              .price-row .strike { text-decoration: line-through; color: #4b5563; }
+              .price-row .new-price { color: #0EA5E9; font-weight: 700; }
+              .discount-tag {
+                position: absolute; top: 16px; right: 16px;
+                background: rgba(236,72,153,0.15); color: #EC4899;
+                font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px;
+              }
+              .pricing-cta { margin-top: 32px; }
+              .pricing-cta a { color: #0EA5E9; font-size: 14px; font-weight: 600; text-decoration: none; transition: color 0.2s; }
+              .pricing-cta a:hover { color: #38bdf8; text-decoration: underline; }
 
-  /* ── 10. DUAL CTA ── */
-  .cta-section {
-    background: linear-gradient(135deg, rgba(14,165,233,0.06), rgba(236,72,153,0.06));
-    border-top: 1px solid #1f2937;
-    padding: 80px 48px;
-  }
-  .cta-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-  .cta-box { padding: 48px; text-align: center; }
-  .cta-box.left { border-right: 1px solid #1f2937; }
-  .cta-box h3 { font-size: 22px; font-weight: 800; margin-bottom: 10px; color: #f9fafb; }
-  .cta-box p { font-size: 14px; color: #9ca3af; line-height: 1.7; margin-bottom: 28px; }
-  .btn-cta-primary {
-    background: linear-gradient(135deg, #0EA5E9, #EC4899);
-    color: white; border: none; padding: 14px 32px;
-    border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
-    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  }
-  .btn-cta-primary:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,0.35); }
-  .btn-cta-secondary {
-    background: transparent; color: #f9fafb;
-    border: 1px solid #374151; padding: 14px 32px;
-    border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
-    transition: border-color 0.2s, background 0.2s, transform 0.15s;
-  }
-  .btn-cta-secondary:hover { border-color: #6b7280; background: rgba(255,255,255,0.04); transform: translateY(-1px); }
+              /* ── 10. DUAL CTA ── */
+              .cta-section {
+                background: linear-gradient(135deg, rgba(14,165,233,0.06), rgba(236,72,153,0.06));
+                border-top: 1px solid #1f2937;
+                padding: 80px 48px;
+              }
+              .cta-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+              .cta-box { padding: 48px; text-align: center; }
+              .cta-box.left { border-right: 1px solid #1f2937; }
+              .cta-box h3 { font-size: 22px; font-weight: 800; margin-bottom: 10px; color: #f9fafb; }
+              .cta-box p { font-size: 14px; color: #9ca3af; line-height: 1.7; margin-bottom: 28px; }
+              .btn-cta-primary {
+                background: linear-gradient(135deg, #0EA5E9, #EC4899);
+                color: white; border: none; padding: 14px 32px;
+                border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
+                transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+              }
+              .btn-cta-primary:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,0.35); }
+              .btn-cta-secondary {
+                background: transparent; color: #f9fafb;
+                border: 1px solid #374151; padding: 14px 32px;
+                border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+                transition: border-color 0.2s, background 0.2s, transform 0.15s;
+              }
+              .btn-cta-secondary:hover { border-color: #6b7280; background: rgba(255,255,255,0.04); transform: translateY(-1px); }
 
-  /* ── 11. FOOTER ── */
-  footer { background: #0f172a; border-top: 1px solid #1f2937; padding: 48px; }
-  .footer-inner {
-    max-width: 1200px; margin: 0 auto;
-    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px;
-  }
-  .footer-brand .logo { margin-bottom: 12px; font-size: 16px; }
-  .footer-brand p { font-size: 13px; color: #6b7280; line-height: 1.6; }
-  .footer-col h4 { font-size: 12px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
-  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-  .footer-col ul li a { color: #6b7280; text-decoration: none; font-size: 13px; transition: color 0.2s; }
-  .footer-col ul li a:hover { color: #d1d5db; }
-  .footer-bottom {
-    max-width: 1200px; margin: 32px auto 0; padding-top: 24px;
-    border-top: 1px solid #1f2937; font-size: 12px; color: #4b5563;
-    display: flex; justify-content: space-between;
-  }
+              /* ── 11. FOOTER ── */
+              footer { background: #0f172a; border-top: 1px solid #1f2937; padding: 48px; }
+              .footer-inner {
+                max-width: 1200px; margin: 0 auto;
+                display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px;
+              }
+              .footer-brand .logo { margin-bottom: 12px; font-size: 16px; }
+              .footer-brand p { font-size: 13px; color: #6b7280; line-height: 1.6; }
+              .footer-col h4 { font-size: 12px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+              .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+              .footer-col ul li a { color: #6b7280; text-decoration: none; font-size: 13px; transition: color 0.2s; }
+              .footer-col ul li a:hover { color: #d1d5db; }
+              .footer-bottom {
+                max-width: 1200px; margin: 32px auto 0; padding-top: 24px;
+                border-top: 1px solid #1f2937; font-size: 12px; color: #4b5563;
+                display: flex; justify-content: space-between;
+              }
 
-/* ── Popup ── */
-.popup-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center; }
-.popup-overlay.open { display:flex; }
-.popup-modal { background:#1f2937; border:1px solid #374151; border-radius:16px; width:min(640px,92vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,0.6); }
-.popup-modal.wide { width:min(1100px,96vw); height:94vh; }
-.popup-header { display:flex; align-items:flex-start; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #374151; flex-shrink:0; }
-.popup-header-left { display:flex; flex-direction:column; gap:4px; }
-.popup-title { font-size:16px; font-weight:700; color:#f9fafb; }
-.popup-note { font-size:11px; font-weight:600; color:#fbbf24; }
-.popup-close { background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; transition:color 0.2s,background 0.2s; }
-.popup-close:hover { color:#f9fafb; background:#374151; }
-.popup-body { overflow-y:auto; padding:24px; color:#d1d5db; font-size:14px; line-height:1.8; flex:1; }
-.popup-body::-webkit-scrollbar { width:6px; }
-.popup-body::-webkit-scrollbar-track { background:#111827; border-radius:3px; }
-.popup-body::-webkit-scrollbar-thumb { background:#4b5563; border-radius:3px; }
-.popup-modal.wide .popup-body { padding:0; display:flex; flex-direction:column; min-height:0; }
-.popup-footer { padding: 16px 24px; border-top: 1px solid #374151; flex-shrink: 0; }
-.popup-iframe { width:100%; height:100%; flex:1; border:none; border-radius:0 0 16px 16px; min-height:0; }
+            /* ── Popup ── */
+            .popup-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center; }
+            .popup-overlay.open { display:flex; }
+            .popup-modal { background:#1f2937; border:1px solid #374151; border-radius:16px; width:min(640px,92vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 24px 80px rgba(0,0,0,0.6); }
+            .popup-modal.wide { width:min(1100px,96vw); height:94vh; }
+            .popup-header { display:flex; align-items:flex-start; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #374151; flex-shrink:0; }
+            .popup-header-left { display:flex; flex-direction:column; gap:4px; }
+            .popup-title { font-size:16px; font-weight:700; color:#f9fafb; }
+            .popup-note { font-size:11px; font-weight:600; color:#fbbf24; }
+            .popup-close { background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; transition:color 0.2s,background 0.2s; }
+            .popup-close:hover { color:#f9fafb; background:#374151; }
+            .popup-body { overflow-y:auto; padding:24px; color:#d1d5db; font-size:14px; line-height:1.8; flex:1; }
+            .popup-body::-webkit-scrollbar { width:6px; }
+            .popup-body::-webkit-scrollbar-track { background:#111827; border-radius:3px; }
+            .popup-body::-webkit-scrollbar-thumb { background:#4b5563; border-radius:3px; }
+            .popup-modal.wide .popup-body { padding:0; display:flex; flex-direction:column; min-height:0; }
+            .popup-footer { padding: 16px 24px; border-top: 1px solid #374151; flex-shrink: 0; }
+            .popup-iframe { width:100%; height:100%; flex:1; border:none; border-radius:0 0 16px 16px; min-height:0; }
 
-/* ── Contact Form ── */
-.contact-form { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
-.cf-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
-.cf-group label { font-size:13px; font-weight:600; color:#d1d5db; }
-.cf-required { color:#EC4899; margin-left:2px; }
-.cf-optional { font-size:11px; font-weight:400; color:#6b7280; margin-left:4px; }
-.cf-group input, .cf-group textarea {
-  background:#111827; border:1px solid #374151; border-radius:8px;
-  padding:10px 14px; color:#f9fafb; font-size:14px; font-family:inherit;
-  transition:border-color 0.2s, box-shadow 0.2s; outline:none; resize:vertical;
-}
-.cf-group input::placeholder, .cf-group textarea::placeholder { color:#4b5563; }
-.cf-group input:focus, .cf-group textarea:focus {
-  border-color:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,0.15);
-}
-.cf-group textarea { min-height:100px; }
-.cf-num-wrap { position:relative; display:flex; align-items:center; }
-.cf-num-wrap input[type="number"] { padding-right:60px; width:100%; -moz-appearance:textfield; }
-.cf-num-wrap input[type="number"]::-webkit-inner-spin-button,
-.cf-num-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; }
-.cf-num-suffix { position:absolute; right:14px; color:#9ca3af; font-size:14px; pointer-events:none; }
-.cf-scale-tabs { display:flex; gap:0; margin-bottom:10px; border-radius:8px; overflow:hidden; border:1px solid #374151; width:fit-content; }
-.cf-scale-tab { position:relative; }
-.cf-scale-tab input[type="radio"] { display:none; }
-.cf-scale-tab label { display:block; padding:6px 16px; font-size:12px; font-weight:600; color:#9ca3af; cursor:pointer; background:#1f2937; transition:background 0.15s, color 0.15s; white-space:nowrap; }
-.cf-scale-tab input[type="radio"]:checked + label { background:#0EA5E9; color:#fff; }
-.cf-token-row { display:flex; gap:10px; }
-.cf-token-row .cf-num-wrap { flex:1; }
-.cf-scale-hint { margin-top:6px; font-size:11px; color:#6b7280; }
-.cf-checks { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 16px; }
-.cf-check { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
-.cf-check input[type="checkbox"] { display:none; }
-.cf-check-box {
-  width:18px; height:18px; flex-shrink:0; border-radius:4px;
-  border:1.5px solid #374151; background:#111827;
-  display:flex; align-items:center; justify-content:center;
-  transition:border-color 0.15s, background 0.15s;
-}
-.cf-check input[type="checkbox"]:checked ~ .cf-check-box { background:#0EA5E9; border-color:#0EA5E9; }
-.cf-check-box svg { display:none; }
-.cf-check input[type="checkbox"]:checked ~ .cf-check-box svg { display:block; }
-.cf-check-label { font-size:13px; color:#d1d5db; }
-.cf-submit {
-  display:block; margin-left:auto;
-  margin-top:4px; padding:12px 24px; background:#0EA5E9; color:#fff;
-  border:none; border-radius:8px; font-size:15px; font-weight:700;
-  cursor:pointer; transition:opacity 0.2s, transform 0.15s;
-}
-.cf-submit:hover { opacity:0.88; transform:translateY(-1px); }
-.cf-submit:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
-.cf-result { padding:12px 16px; border-radius:8px; font-size:13px; line-height:1.6; }
-.cf-result.cf-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
-.cf-result.cf-error   { background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
+            /* ── 문의 폼 ── */
+            .contact-form { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+            .cf-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+            .cf-group label { font-size:13px; font-weight:600; color:#d1d5db; }
+            .cf-required { color:#EC4899; margin-left:2px; }
+            .cf-optional { font-size:11px; font-weight:400; color:#6b7280; margin-left:4px; }
+            .cf-group input, .cf-group textarea {
+              background:#111827; border:1px solid #374151; border-radius:8px;
+              padding:10px 14px; color:#f9fafb; font-size:14px; font-family:inherit;
+              transition:border-color 0.2s, box-shadow 0.2s; outline:none; resize:vertical;
+            }
+            .cf-group input::placeholder, .cf-group textarea::placeholder { color:#4b5563; }
+            .cf-group input:focus, .cf-group textarea:focus {
+              border-color:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,0.15);
+            }
+            .cf-group textarea { min-height:100px; }
+            .cf-num-wrap { position:relative; display:flex; align-items:center; }
+            .cf-num-wrap input[type="number"] { padding-right:60px; width:100%; -moz-appearance:textfield; }
+            .cf-num-wrap input[type="number"]::-webkit-inner-spin-button,
+            .cf-num-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; }
+            .cf-num-suffix { position:absolute; right:14px; color:#9ca3af; font-size:14px; pointer-events:none; }
+            .cf-scale-tabs { display:flex; gap:0; margin-bottom:10px; border-radius:8px; overflow:hidden; border:1px solid #374151; width:fit-content; }
+            .cf-scale-tab { position:relative; }
+            .cf-scale-tab input[type="radio"] { display:none; }
+            .cf-scale-tab label { display:block; padding:6px 16px; font-size:12px; font-weight:600; color:#9ca3af; cursor:pointer; background:#1f2937; transition:background 0.15s, color 0.15s; white-space:nowrap; }
+            .cf-scale-tab input[type="radio"]:checked + label { background:#0EA5E9; color:#fff; }
+            .cf-token-row { display:flex; gap:10px; }
+            .cf-token-row .cf-num-wrap { flex:1; }
+            .cf-scale-hint { margin-top:6px; font-size:11px; color:#6b7280; }
+            .cf-checks { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 16px; }
+            .cf-check { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+            .cf-check input[type="checkbox"] { display:none; }
+            .cf-check-box {
+              width:18px; height:18px; flex-shrink:0; border-radius:4px;
+              border:1.5px solid #374151; background:#111827;
+              display:flex; align-items:center; justify-content:center;
+              transition:border-color 0.15s, background 0.15s;
+            }
+            .cf-check input[type="checkbox"]:checked ~ .cf-check-box { background:#0EA5E9; border-color:#0EA5E9; }
+            .cf-check-box svg { display:none; }
+            .cf-check input[type="checkbox"]:checked ~ .cf-check-box svg { display:block; }
+            .cf-check-label { font-size:13px; color:#d1d5db; }
+            .cf-submit {
+              display:block; margin-left:auto;
+              margin-top:4px; padding:12px 24px; background:#0EA5E9; color:#fff;
+              border:none; border-radius:8px; font-size:15px; font-weight:700;
+              cursor:pointer; transition:opacity 0.2s, transform 0.15s;
+            }
+            .cf-submit:hover { opacity:0.88; transform:translateY(-1px); }
+            .cf-submit:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+            .cf-result { padding:12px 16px; border-radius:8px; font-size:13px; line-height:1.6; }
+            .cf-result.cf-success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
+            .cf-result.cf-error   { background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
 
-/* ── 비디오 플레이어 ── */
-.anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 9/16; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #000; cursor: pointer; }
-.anim-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.anim-play-overlay {
-  position: absolute; inset: 0; z-index: 30; border-radius: 24px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.45); cursor: pointer; gap: 12px;
-  transition: background 0.2s;
-}
-.anim-play-overlay:hover { background: rgba(0,0,0,0.55); }
-.anim-play-btn {
-  width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; pointer-events: none;
-  background: rgba(14,165,233,0.9); display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 0 8px rgba(14,165,233,0.2); transition: transform 0.15s, box-shadow 0.2s;
-}
-.anim-play-overlay:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
-.anim-play-btn svg { width: 32px; height: 32px; margin-left: 5px; }
-.anim-play-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.05em; }
-.anim-hover-overlay {
-  position: absolute; inset: 0; z-index: 20; border-radius: 24px;
-  display: none; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.42); gap: 12px;
-  transition: background 0.2s;
-}
-.anim-hover-overlay:hover { background: rgba(0,0,0,0.55); }
-.anim-hover-state {
-  display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer;
-}
-.anim-hover-state:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
-.anim-pause-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; }
-.anim-pause-icon span { display: block; width: 8px; height: 28px; background: #fff; border-radius: 3px; }
-.anim-cta-wrap {
-  position: absolute; top: 27%; left: 52%; right: 5%;
-  display: flex; flex-direction: column; align-items: stretch; gap: 16px;
-  z-index: 10;
-}
-.anim-cta-overlay {
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 60%, #ec4899 100%);
-  border-radius: 14px; padding: 10px 10px 12px;
-  cursor: pointer; text-decoration: none;
-  transition: transform 0.2s ease;
-}
-.anim-cta-logo { width: 55%; height: auto; object-fit: contain; filter: brightness(0) invert(1); }
-.anim-cta-btn-text { color: #fff; font-size: clamp(7px,2vw,10px); font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
-@keyframes anim-pulse-glow {
-  0%,100% { box-shadow: 0 0 12px rgba(14,165,233,0.9), 0 0 30px rgba(14,165,233,0.6), 0 0 60px rgba(124,58,237,0.45), 0 0 100px rgba(236,72,153,0.2); }
-  50%     { box-shadow: 0 0 20px rgba(14,165,233,1),   0 0 55px rgba(14,165,233,0.8), 0 0 100px rgba(124,58,237,0.65), 0 0 160px rgba(236,72,153,0.4); }
-}
-@keyframes anim-cta-scale-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-.anim-cta-overlay.active {
-  animation: anim-pulse-glow 1.8s 0.3s ease-in-out infinite, anim-cta-scale-pulse 2s 0.3s ease-in-out infinite;
-}
-.anim-end-btn {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  height: 44px; padding: 0 24px; border-radius: 8px; font-size: 14px; font-weight: 700;
-  cursor: pointer; text-decoration: none; border: none; min-width: 180px;
-  box-sizing: border-box; transition: opacity 0.15s, transform 0.15s;
-}
-.anim-end-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-.anim-end-replay {
-  background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.35);
-  color: rgba(255,255,255,0.85); width: 100%; min-width: unset;
-  backdrop-filter: blur(6px); white-space: nowrap;
-}
-.anim-end-replay svg { width: 16px; height: 16px; }
-</style>
-</head>
-<body>
-
-<!-- GNB -->
-<nav class="gnb">
-  <div class="logo">
-    <svg class="logo-icon" viewBox="0 0 1100 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z" fill="#0EA5E9"/>
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z" fill="#EC4899"/>
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z" fill="#EC4899"/>
-    </svg>
-    AlRouter
-  </div>
-  <ul class="gnb-menu">
-    <li><a href="#">About</a></li>
-    <li><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">Models & Pricing</a></li>
-  </ul>
-  <div class="gnb-right">
-    <button class="lang-switch" onclick="this.classList.toggle('open')"><i data-lucide="languages"></i><div class="lang-dropdown"><a href="./index_en.html">English<span class="check">✓</span></a><a href="./index.html">한국어</a></div></button>
-    <a href="/sign-in" class="btn-login">Log in</a>
-    <a href="/sign-in" class="btn-primary">Get Started</a>
-  </div>
-</nav>
-
-<!-- HERO -->
-<div style="padding: 0;">
-  <div class="hero">
-    <div class="hero-left">
-      <div class="hero-badge"><i data-lucide="sparkles"></i> ATTO Research LLM Gateway</div>
-      <h1>Struggling with<br>AI Costs <span class="highlight">Out of Control?</span></h1>
-      <p class="hero-sub">
-        OpenAI, Claude, Gemini — a separate contract for every model,<br>
-        budgets blowing past limits, no visibility into who's spending what.<br><br>
-        Consolidate everything with AlRouter and<br>
-        save <strong style="color:#EC4899">up to 66%</strong> off official prices.
-      </p>
-      <div class="hero-cta">
-        <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
-        <button class="btn-hero-secondary" onclick="document.getElementById('contactOverlay').classList.add('open')">Contact Sales</button>
-      </div>
-      <div class="hero-stats">
-        <div class="stat-item">
-          <div class="stat-value">66%</div>
-          <div class="stat-label">Max Cost Savings</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">$0</div>
-          <div class="stat-label">Monthly Fee</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">1</div>
-          <div class="stat-label">API Key for Everything</div>
-        </div>
-      </div>
-    </div>
-    <div class="hero-right">
-      <div class="billing-before" style="display:flex; justify-content:center; align-items:center;">
-        <div class="anim-wrap" id="anim">
-          <video id="animVideo" src="alrouter_en.mp4" playsinline preload="auto"></video>
-          <div class="anim-hover-overlay" id="animHoverOverlay">
-            <div class="anim-hover-state" id="animPauseState">
-              <div class="anim-play-btn">
-                <div class="anim-pause-icon"><span></span><span></span></div>
-              </div>
-              <span class="anim-play-label">Pause</span>
-            </div>
-            <div class="anim-hover-state" id="animResumeState" style="display:none">
-              <div class="anim-play-btn">
-                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                  <polygon points="6,3 20,12 6,21"/>
-                </svg>
-              </div>
-              <span class="anim-play-label">Continue</span>
-            </div>
-          </div>
-          <div class="anim-play-overlay" id="animPlayOverlay">
-            <div class="anim-play-btn">
-              <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="6,3 20,12 6,21"/>
-              </svg>
-            </div>
-            <span class="anim-play-label">Tap to Start</span>
-          </div>
-          <div class="anim-cta-wrap" id="animCtaWrap" style="display:none">
-            <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
-              <img src="logo.svg" alt="AlRouter" class="anim-cta-logo">
-              <div class="anim-cta-btn-text">Get Started →</div>
-            </a>
-            <button class="anim-end-btn anim-end-replay" id="animReplayBtn" style="display:none">
-              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
-              </svg>
-              Watch Again
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- PROBLEM -->
-<div class="section">
-  <span class="section-tag">Pain Points</span>
-  <h2>Does This Sound Familiar?</h2>
-  <p class="section-sub">Did AI adoption end up increasing costs and complexity? Every team faces the same struggle.</p>
-  <div class="problem-grid">
-    <div class="problem-card">
-      <div class="problem-card-header">
-        <div class="problem-icon"><i data-lucide="banknote"></i></div>
-        <h3>Separate Contracts, Separate Bills for Every AI Service</h3>
-      </div>
-      <p>ChatGPT from OpenAI, images from Gemini, coding from Claude... With every department subscribing separately, nobody knows the total AI spend.</p>
-    </div>
-    <div class="problem-card">
-      <div class="problem-card-header">
-        <div class="problem-icon"><i data-lucide="trending-up"></i></div>
-        <h3>Cost Overruns Only Discovered at Month End</h3>
-      </div>
-      <p>There's no real-time visibility into who used which model and how much. You only react after the invoice arrives.</p>
-    </div>
-    <div class="problem-card">
-      <div class="problem-card-header">
-        <div class="problem-icon"><i data-lucide="siren"></i></div>
-        <h3>Every Model, Every Person, Requests Never End</h3>
-      </div>
-      <p>GPT keys, Claude permissions, Gemini accounts... one more model, one more place to manage.</p>
-      <p style="margin-top:8px;">More AI, more requests — admins never know where to start.</p>
-    </div>
-  </div>
-</div>
-
-<!-- SOLUTION -->
-<div class="solution-section">
-  <div class="solution-inner">
-    <span class="section-tag">Solution</span>
-    <h2>AlRouter Solves It</h2>
-    <p class="section-sub" style="margin: 0 auto 0; text-align:center;">One account, one bill, complete control.<br>Manage AI usage at the organization level and pay less than official prices.</p>
-
-    <!-- Horizontal tree diagram -->
-    <div style="width:100%; overflow:visible; margin-top:48px; padding-top:80px;">
-    <div style="display:flex; align-items:center; justify-content:center; gap:0; min-width:860px;">
-
-      <!-- Level 3: Users -->
-      <div style="display:flex; flex-direction:column; justify-content:space-between; gap:10px; min-width:130px;">
-        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-bottom:2px; text-align:center;">Users</div>
-        <div style="background:#111827; border:1px solid #374151; border-radius:10px; padding:10px 12px;">
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-            <i data-lucide="user" style="width:13px;height:13px;color:#9ca3af;"></i>
-            <span style="font-size:12px; font-weight:700; color:#f9fafb;">User A</span>
-          </div>
-          <div style="font-size:10px; color:#0EA5E9; font-weight:700;">Quota $50 / mo</div>
-        </div>
-        <div style="background:#111827; border:1px solid #374151; border-radius:10px; padding:10px 12px;">
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-            <i data-lucide="user" style="width:13px;height:13px;color:#9ca3af;"></i>
-            <span style="font-size:12px; font-weight:700; color:#f9fafb;">User B</span>
-          </div>
-          <div style="font-size:10px; color:#0EA5E9; font-weight:700;">Quota $30 / mo</div>
-        </div>
-        <div style="background:#111827; border:1px solid #374151; border-radius:10px; padding:10px 12px;">
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-            <i data-lucide="user" style="width:13px;height:13px;color:#9ca3af;"></i>
-            <span style="font-size:12px; font-weight:700; color:#f9fafb;">User C</span>
-          </div>
-          <div style="font-size:10px; color:#0EA5E9; font-weight:700;">Quota $20 / mo</div>
-        </div>
-      </div>
-
-      <!-- Connector → API Keys -->
-      <div style="display:flex; align-items:center; flex-shrink:0; position:relative; width:40px; align-self:stretch;">
-        <div style="position:absolute; left:0; top:18%; width:100%; height:2px; background:#374151;"></div>
-        <div style="position:absolute; left:0; top:50%; width:100%; height:2px; background:#374151;"></div>
-        <div style="position:absolute; left:0; top:82%; width:100%; height:2px; background:#374151;"></div>
-      </div>
-
-      <!-- Level 4: API Keys -->
-      <div style="display:flex; flex-direction:column; justify-content:space-between; gap:10px; min-width:120px;">
-        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-bottom:2px; text-align:center;">API Keys</div>
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 1</div>
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 2</div>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 1</div>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 1</div>
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 2</div>
-          <div style="background:#1f2937; border:1px solid #374151; border-radius:6px; padding:5px 9px; font-size:10px; color:#9ca3af; display:flex; align-items:center; gap:4px;"><i data-lucide="key" style="width:10px;height:10px;color:#0EA5E9;"></i>Key 3</div>
-        </div>
-      </div>
-
-      <!-- Connector → AlRouter -->
-      <div style="display:flex; align-items:center; justify-content:center; flex-direction:column; padding:0 4px; flex-shrink:0; align-self:stretch;">
-        <div style="width:32px; height:2px; background:linear-gradient(90deg,#374151,#0EA5E9);"></div>
-        <div style="font-size:10px; color:#6b7280; margin-top:4px; white-space:nowrap;">API call</div>
-      </div>
-
-      <!-- Level 5: AlRouter (Admin absolutely positioned above) -->
-      <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:120px;">
-        <!-- Admin: absolutely positioned above AlRouter -->
-        <div style="position:absolute; bottom:100%; display:flex; flex-direction:column; align-items:center; left:0; right:0;">
-          <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-bottom:10px; white-space:nowrap;">Admin</div>
-          <div style="background:#1f2937; border:2px solid #EC4899; border-radius:12px; padding:14px 16px; text-align:center;">
-            <i data-lucide="shield-check" style="width:22px;height:22px;color:#EC4899;margin-bottom:6px;"></i>
-            <div style="font-size:12px; font-weight:700; color:#f9fafb;">Admin</div>
-            <div style="font-size:10px; color:#9ca3af; margin-top:3px;">Per-user quota control</div>
-          </div>
-          <div style="width:2px; height:28px; background:#EC4899;"></div>
-        </div>
-        <!-- AlRouter: vertically centered -->
-        <div class="diagram-center" style="padding:14px 16px; text-align:center;">
-          <div style="font-size:10px; color:#9ca3af; margin-bottom:3px;">ATTO Research</div>
-          <div style="font-size:14px; font-weight:800;">AlRouter</div>
-        </div>
-        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-top:10px;">Gateway</div>
-      </div>
-
-      <!-- Connector → LLMs -->
-      <div style="display:flex; align-items:center; justify-content:center; flex-direction:column; padding:0 4px; flex-shrink:0; align-self:stretch;">
-        <div style="width:32px; height:2px; background:linear-gradient(90deg,#0EA5E9,#EC4899);"></div>
-      </div>
-
-      <!-- Level 6: AI Models -->
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-width:100px;">
-        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6b7280; margin-bottom:2px;">AI Models</div>
-        <div class="diagram-box" style="font-size:11px; padding:7px 12px; width:100%; text-align:center;"><i data-lucide="bot"></i> ChatGPT</div>
-        <div class="diagram-box" style="font-size:11px; padding:7px 12px; width:100%; text-align:center;"><i data-lucide="sparkles"></i> Claude</div>
-        <div class="diagram-box" style="font-size:11px; padding:7px 12px; width:100%; text-align:center;"><i data-lucide="gem"></i> Gemini</div>
-      </div>
-
-    </div>
-    </div>
-
-    <div class="diagram-results" style="border-top:1px solid #374151; padding-top:20px; margin-top:32px;">
-      <div class="diagram-result-item"><i data-lucide="circle-dollar-sign"></i> Up to 66% Cost Savings</div>
-      <div class="diagram-result-item"><i data-lucide="sliders-horizontal"></i> Per-user Quota Control</div>
-      <div class="diagram-result-item"><i data-lucide="key"></i> Multiple API Keys</div>
-      <div class="diagram-result-item"><i data-lucide="zap"></i> Pay-as-you-go</div>
-    </div>
-  </div>
-</div>
-
-<!-- FEATURE: COST -->
-<div class="section feature-section">
-  <div class="feature-grid">
-    <div class="feature-content">
-      <span class="section-tag">Cost Savings</span>
-      <h2>Up to 66% Cheaper<br>Than Official Prices</h2>
-      <p>Access major AI models through AlRouter at discounted rates vs. official APIs. No subscription — pay only for what you use.</p>
-      <table class="price-table">
-        <thead>
-          <tr>
-            <th>Model</th>
-            <th>Official Price</th>
-            <th>AlRouter</th>
-            <th>Savings</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>gpt-5-mini</td>
-            <td>$0.75/1M</td>
-            <td class="discounted">$0.25/1M</td>
-            <td class="discount-pct">-66.7%</td>
-          </tr>
-          <tr>
-            <td>claude-sonnet-4.6</td>
-            <td>$3.00/1M</td>
-            <td class="discounted">$2.40/1M</td>
-            <td class="discount-pct">-20%</td>
-          </tr>
-          <tr>
-            <td>gemini-3.1-pro</td>
-            <td>$2.00/1M</td>
-            <td class="discounted">$1.60/1M</td>
-            <td class="discount-pct">-20%</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="payg-badge">💳 Pay-as-you-go — Only pay for what you use. No minimum commitment.</div>
-    </div>
-    <div class="feature-visual">
-      <div class="calc-card-header">
-        <span class="calc-card-title">AI Cost Calculator</span>
-        <a href="#" class="calc-card-link" onclick="openPopup('Models &amp; Pricing','pricing');return false;">View All Model Prices →</a>
-      </div>
-      <div class="calc-body">
-        <div class="calc-form">
-          <div class="calc-group">
-            <label>Select Model</label>
-            <select class="calc-select" id="calcModel">
-              <option value="">Loading models…</option>
-            </select>
-          </div>
-          <div class="calc-group">
-            <label>Input Tokens</label>
-            <div class="calc-input-wrap">
-              <input type="number" id="calcInputTokens" placeholder="0" min="0" step="0.1">
-              <span class="calc-input-suffix">M tokens</span>
-            </div>
-          </div>
-          <div class="calc-group">
-            <label>Output Tokens</label>
-            <div class="calc-input-wrap">
-              <input type="number" id="calcOutputTokens" placeholder="0" min="0" step="0.1">
-              <span class="calc-input-suffix">M tokens</span>
-            </div>
-          </div>
-          <button class="calc-btn" onclick="runCalc()">Calculate</button>
-        </div>
-        <div class="calc-result" id="calcResult">
-          <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
-          <div class="calc-result-label" id="calcLabel" style="display:none">Estimated Cost</div>
-          <div class="calc-result-price" id="calcPrice" style="display:none"></div>
-          <div class="calc-breakdown" id="calcBreakdown"></div>
-        </div>
-      </div>
-      <p style="margin-top:14px; font-size:11px; color:#EC4899; line-height:1.6;">
-        Prices shown are estimates based on public rates.<br>
-        Actual costs may vary depending on usage patterns.
-        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- FEATURE: GOVERNANCE -->
-<div style="background:#0f172a; border-top:1px solid #1f2937; border-bottom:1px solid #1f2937;">
-  <div class="section feature-section">
-    <div class="feature-grid reverse">
-      <div class="feature-content">
-        <span class="section-tag">Governance</span>
-        <h2>Manage AI Costs<br>Within Budget</h2>
-        <p>From real-time monitoring to budget limits, take complete control of AI usage.</p>
-        <div class="gov-points">
-          <div class="gov-point">
-            <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
-            <div class="gov-text">
-              <h4>Real-time Usage Monitoring</h4>
-              <p>View usage by model, team member, and date on a single dashboard.</p>
-            </div>
-          </div>
-          <div class="gov-point">
-            <div class="gov-icon"><i data-lucide="wallet"></i></div>
-            <div class="gov-text">
-              <h4>Budget Limit Controls</h4>
-              <p>Set token quotas and spending caps in advance to prevent overage charges.</p>
-            </div>
-          </div>
-          <div class="gov-point">
-            <div class="gov-icon"><i data-lucide="key-round"></i></div>
-            <div class="gov-text">
-              <h4>Token-based API Key Management</h4>
-              <p>Issue keys, set permissions, and assign expiry dates for each team member — all in one place.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="dashboard-mock">
-          <div class="dash-header"><i data-lucide="bar-chart-2"></i> Model Call Analytics</div>
-          <div class="dash-stats">
-            <div class="dash-stat">
-              <div class="ds-label">Total Budget</div>
-              <div class="ds-value blue">$0.39</div>
-            </div>
-            <div class="dash-stat">
-              <div class="ds-label">Requests</div>
-              <div class="ds-value">34</div>
-            </div>
-            <div class="dash-stat">
-              <div class="ds-label">Total Tokens</div>
-              <div class="ds-value pink">31,743</div>
-            </div>
-          </div>
-          <div class="dash-chart">
-            <div class="dash-bar" style="height:30%"></div>
-            <div class="dash-bar" style="height:45%"></div>
-            <div class="dash-bar" style="height:25%"></div>
-            <div class="dash-bar highlight" style="height:95%"></div>
-            <div class="dash-bar" style="height:40%"></div>
-            <div class="dash-bar" style="height:55%"></div>
-            <div class="dash-bar" style="height:30%"></div>
-          </div>
-          <div style="padding:12px 16px; font-size:11px; color:#6b7280; border-top:1px solid #1f2937;">
-            ● claude-haiku-4-5 &nbsp; ● gemini-3-flash &nbsp; ● gpt-5-mini
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- FEATURE: INTEGRATION -->
-<div class="integration-section">
-  <div class="integration-inner">
-    <span class="section-tag">Integration</span>
-    <h2 style="text-align:center; font-size:28px; margin-bottom:10px;">All Major AI Models, One API</h2>
-    <p style="color:#9ca3af; font-size:14px; text-align:center;">No separate contracts per model. Use all AI models right away with a single AlRouter API.</p>
-    <div class="provider-logos">
-      <div class="provider-logo">
-        <div class="logo-box"><i data-lucide="bot"></i></div>
-        <div class="logo-name">OpenAI</div>
-      </div>
-      <div class="provider-logo">
-        <div class="logo-box"><i data-lucide="sparkles"></i></div>
-        <div class="logo-name">Anthropic</div>
-      </div>
-      <div class="provider-logo">
-        <div class="logo-box"><i data-lucide="gem"></i></div>
-        <div class="logo-name">Google</div>
-      </div>
-      <div class="provider-logo">
-        <div class="logo-box"><i data-lucide="boxes"></i></div>
-        <div class="logo-name">Alibaba</div>
-      </div>
-      <div class="provider-logo">
-        <div class="logo-box"><i data-lucide="circle-ellipsis"></i></div>
-        <div class="logo-name">Others</div>
-      </div>
-    </div>
-    <div class="modality-tags">
-      <span class="modality-tag"><i data-lucide="type"></i> Text</span>
-      <span class="modality-tag"><i data-lucide="image"></i> Image</span>
-      <span class="modality-tag"><i data-lucide="video"></i> Video</span>
-      <span class="modality-tag"><i data-lucide="hash"></i> Embedding</span>
-    </div>
-  </div>
-</div>
-
-<!-- PRICING PREVIEW -->
-<div class="pricing-section">
-  <div class="pricing-inner">
-    <span class="section-tag">Pricing</span>
-    <h2 style="font-size:30px; margin-bottom:10px;">Transparent Pricing, No Hidden Fees</h2>
-    <p style="color:#9ca3af; font-size:14px;">Discounted rates vs. official prices. Pay only for what you use — no subscription fee.</p>
-    <div class="price-cards">
-      <div class="price-card">
-        <div class="discount-tag">-66.7%</div>
-        <div class="model-provider">OpenAI</div>
-        <div class="model-name">gpt-5-mini</div>
-        <div class="price-row"><span class="label">Input</span><span><span class="strike">$0.75</span> → <span class="new-price">$0.25</span> /1M</span></div>
-        <div class="price-row"><span class="label">Output</span><span><span class="strike">$4.50</span> → <span class="new-price">$2.00</span> /1M</span></div>
-      </div>
-      <div class="price-card">
-        <div class="discount-tag">-20%</div>
-        <div class="model-provider">Anthropic</div>
-        <div class="model-name">claude-sonnet-4.6</div>
-        <div class="price-row"><span class="label">Input</span><span><span class="strike">$3.00</span> → <span class="new-price">$2.40</span> /1M</span></div>
-        <div class="price-row"><span class="label">Output</span><span><span class="strike">$15.00</span> → <span class="new-price">$12.00</span> /1M</span></div>
-      </div>
-      <div class="price-card">
-        <div class="discount-tag">-20%</div>
-        <div class="model-provider">Google</div>
-        <div class="model-name">gemini-3.1-pro</div>
-        <div class="price-row"><span class="label">Input</span><span><span class="strike">$2.00</span> → <span class="new-price">$1.60</span> /1M</span></div>
-        <div class="price-row"><span class="label">Output</span><span><span class="strike">$12.00</span> → <span class="new-price">$9.60</span> /1M</span></div>
-      </div>
-    </div>
-    <div class="pricing-cta"><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">View Full Pricing →</a></div>
-  </div>
-</div>
-
-<!-- DUAL CTA -->
-<div class="cta-section">
-  <div class="cta-inner">
-    <div class="cta-box left">
-      <div class="cta-icon" style="color:#0EA5E9; margin-bottom:16px;"><i data-lucide="rocket"></i></div>
-      <h3>Start Your Trial Today</h3>
-      <p>Start with a trial account and get your API key right away. You only pay for what you use.</p>
-      <a href="/sign-in" class="btn-cta-primary">Get Started →</a>
-    </div>
-    <div class="cta-box">
-      <div class="cta-icon" style="color:#EC4899; margin-bottom:16px;"><i data-lucide="building-2"></i></div>
-      <h3>Talk to Our Team</h3>
-      <p>Our experts will walk you through usage planning, model selection, and cost simulations.</p>
-      <button class="btn-cta-secondary" onclick="document.getElementById('contactOverlay').classList.add('open')">Contact Sales →</button>
-    </div>
-  </div>
-</div>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-brand">
+            /* ── 비디오 플레이어 ── */
+            .anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 9/16; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #000; cursor: pointer; }
+            .video-indicator { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+            .video-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); cursor: pointer; border: none; padding: 0; transition: background 0.2s, transform 0.2s; }
+            .video-dot:hover { background: rgba(255,255,255,0.5); transform: scale(1.2); }
+            .video-dot.active { background: rgba(255,255,255,0.85); transform: scale(1.35); }
+            .anim-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+            .anim-play-overlay {
+              position: absolute; inset: 0; z-index: 30; border-radius: 24px;
+              display: flex; flex-direction: column; align-items: center; justify-content: center;
+              background: rgba(0,0,0,0.45); cursor: pointer; gap: 12px;
+              transition: background 0.2s;
+            }
+            .anim-play-overlay:hover { background: rgba(0,0,0,0.55); }
+            .anim-play-btn {
+              width: 72px; height: 72px; border-radius: 50%; border: none; cursor: pointer; pointer-events: none;
+              background: rgba(14,165,233,0.9); display: flex; align-items: center; justify-content: center;
+              box-shadow: 0 0 0 8px rgba(14,165,233,0.2); transition: transform 0.15s, box-shadow 0.2s;
+            }
+            .anim-play-overlay:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
+            .anim-play-btn svg { width: 32px; height: 32px; margin-left: 5px; }
+            .anim-play-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.05em; }
+            .anim-hover-overlay {
+              position: absolute; inset: 0; z-index: 20; border-radius: 24px;
+              display: none; flex-direction: column; align-items: center; justify-content: center;
+              background: rgba(0,0,0,0.42); gap: 12px;
+              transition: background 0.2s;
+              pointer-events: none;
+            }
+            .anim-hover-state {
+              display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer;
+              pointer-events: auto;
+            }
+            .anim-hover-state:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
+            .anim-pause-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+            .anim-pause-icon span { display: block; width: 8px; height: 28px; background: #fff; border-radius: 3px; }
+            .anim-cta-wrap {
+              position: absolute; top: 27%; left: 52%; right: 5%;
+              display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+              z-index: 10;
+            }
+            .anim-cta-overlay {
+              display: flex; flex-direction: column; align-items: center; gap: 5px;
+              background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 60%, #ec4899 100%);
+              border-radius: 14px; padding: 10px 10px 12px;
+              cursor: pointer; text-decoration: none;
+              transition: transform 0.2s ease;
+            }
+            .anim-cta-logo { width: 55%; height: auto; object-fit: contain; filter: brightness(0) invert(1); }
+            .anim-cta-btn-text { color: #fff; font-size: clamp(7px,2vw,10px); font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
+            @keyframes anim-pulse-glow {
+              0%,100% { box-shadow: 0 0 12px rgba(14,165,233,0.9), 0 0 30px rgba(14,165,233,0.6), 0 0 60px rgba(124,58,237,0.45), 0 0 100px rgba(236,72,153,0.2); }
+              50%     { box-shadow: 0 0 20px rgba(14,165,233,1),   0 0 55px rgba(14,165,233,0.8), 0 0 100px rgba(124,58,237,0.65), 0 0 160px rgba(236,72,153,0.4); }
+            }
+            @keyframes anim-cta-scale-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+            .anim-cta-overlay.active {
+              animation: anim-pulse-glow 1.8s 0.3s ease-in-out infinite, anim-cta-scale-pulse 2s 0.3s ease-in-out infinite;
+            }
+            .anim-end-btn {
+              display: flex; align-items: center; justify-content: center; gap: 8px;
+              height: 44px; padding: 0 24px; border-radius: 8px; font-size: 14px; font-weight: 700;
+              cursor: pointer; text-decoration: none; border: none; min-width: 180px;
+              box-sizing: border-box; transition: opacity 0.15s, transform 0.15s;
+            }
+            .anim-end-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+            .anim-end-replay {
+              background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.35);
+              color: rgba(255,255,255,0.85); width: 100%; min-width: unset;
+              backdrop-filter: blur(6px); white-space: nowrap;
+            }
+            .anim-end-replay svg { width: 16px; height: 16px; }
+    </style>
+  </head>
+  <body>
+    <!-- ── SECTION 1: GNB ── -->
+    <nav class="gnb">
       <div class="logo">
-        <svg width="24" height="24" viewBox="0 0 1100 1100" fill="none">
-          <path d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z" fill="#0EA5E9"/>
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z" fill="#EC4899"/>
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z" fill="#EC4899"/>
+        <svg
+          class="logo-icon"
+          viewBox="0 0 1100 1100"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z"
+            fill="#0EA5E9"
+          />
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z"
+            fill="#EC4899"
+          />
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z"
+            fill="#EC4899"
+          />
         </svg>
         AlRouter
       </div>
-      <p>Smart AI cost management.<br>LLM Gateway service by ATTO Research.</p>
-    </div>
-    <div class="footer-col">
-      <h4>Company</h4>
-      <ul>
-        <li><a href="https://www.atto-research.com/eng/main/main.html" target="_blank" rel="noopener">About ATTO Research</a></li>
-      </ul>
-    </div>
-    <div class="footer-col">
-      <h4>Product</h4>
-      <ul>
+      <ul class="gnb-menu">
         <li><a href="#">About</a></li>
-        <li><a href="#" onclick="openPopup('Models &amp; Pricing','pricing');return false;">Models & Pricing</a></li>
-        <li><a href="#" style="display:none">Changelog</a></li>
+        <li>
+          <a
+            href="#"
+            onclick="openPopup('Models &amp; Pricing','pricing');return false;"
+            >Models & Pricing</a
+          >
+        </li>
       </ul>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <ul>
-        <li><a href="#" onclick="openPopup('Terms of Service','terms');return false;">Terms of Service</a></li>
-        <li><a href="#" onclick="openPopup('Privacy Policy','privacy');return false;">Privacy Policy</a></li>
-      </ul>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <span>© 2026 ATTO Research. All rights reserved.</span>
-  </div>
-</footer>
-
-<!-- Contact Modal -->
-<div class="popup-overlay" id="contactOverlay">
-  <div class="popup-modal">
-    <div class="popup-header">
-      <h3 class="popup-title">Enterprise Inquiry</h3>
-      <button class="popup-close" id="contactClose">✕</button>
-    </div>
-    <form id="contactForm" class="contact-form">
-    <div class="popup-body">
-        <div class="cf-group">
-          <label>Organization<span class="cf-required">*</span></label>
-          <input type="text" name="org" placeholder="Company or organization name" required>
-        </div>
-        <div class="cf-group">
-          <label>Email<span class="cf-required">*</span></label>
-          <input type="email" name="email" placeholder="example@company.com" required>
-        </div>
-        <div class="cf-group">
-          <label>Phone<span class="cf-optional">(optional)</span></label>
-          <input type="tel" name="phone" placeholder="+1 000-000-0000">
-        </div>
-        <div class="cf-group">
-          <label>Team Size<span class="cf-required">*</span></label>
-          <div class="cf-scale-tabs">
-            <div class="cf-scale-tab">
-              <input type="radio" name="scale_type" id="scaleTypeToken" value="token" checked>
-              <label for="scaleTypeToken">Token Usage</label>
-            </div>
-            <div class="cf-scale-tab">
-              <input type="radio" name="scale_type" id="scaleTypeHead" value="headcount">
-              <label for="scaleTypeHead">Headcount</label>
-            </div>
-          </div>
-          <div id="scaleHeadField" style="display:none">
-            <div class="cf-num-wrap">
-              <input type="number" name="headcount" placeholder="0" min="1">
-              <span class="cf-num-suffix">people</span>
-            </div>
-          </div>
-          <div id="scaleTokenField">
-            <div class="cf-token-row">
-              <div class="cf-num-wrap">
-                <input type="number" name="input_tokens" placeholder="0" min="0" step="0.1">
-                <span class="cf-num-suffix">M input</span>
-              </div>
-              <div class="cf-num-wrap">
-                <input type="number" name="output_tokens" placeholder="0" min="0" step="0.1">
-                <span class="cf-num-suffix">M output</span>
-              </div>
-            </div>
-            <p class="cf-scale-hint">Enter your estimated monthly token usage from the calculator.</p>
-          </div>
-        </div>
-        <div class="cf-group">
-          <label>Features Needed<span class="cf-optional">(optional)</span></label>
-          <div class="cf-checks">
-            <label class="cf-check"><input type="checkbox" name="features" value="Image Generation"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Image Generation</span></label>
-            <label class="cf-check"><input type="checkbox" name="features" value="Video Generation"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Video Generation</span></label>
-            <label class="cf-check"><input type="checkbox" name="features" value="Agent Builder"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Agent Builder</span></label>
-            <label class="cf-check"><input type="checkbox" name="features" value="Document Analysis"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Document Analysis</span></label>
-            <label class="cf-check"><input type="checkbox" name="features" value="Deep Research"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">Deep Research</span></label>
-            <label class="cf-check"><input type="checkbox" name="features" value="AI Transformation (AX)"><span class="cf-check-box"><svg width="11" height="8" viewBox="0 0 11 8" fill="none"><polyline points="1,4 4,7 10,1" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cf-check-label">AI Transformation (AX)</span></label>
-          </div>
-        </div>
-        <div class="cf-group">
-          <label>Additional Comments<span class="cf-optional">(optional)</span></label>
-          <textarea name="notes" placeholder="Anything else you'd like to share with us."></textarea>
-        </div>
-    </div><!-- /.popup-body -->
-    <div class="popup-footer">
-      <div id="contactResult" class="cf-result" style="display:none;"></div>
-      <button type="submit" class="cf-submit">Submit →</button>
-    </div>
-    </form>
-  </div>
-</div>
-
-<!-- Popup -->
-<div class="popup-overlay" id="popupOverlay">
-  <div class="popup-modal">
-    <div class="popup-header">
-      <div class="popup-header-left">
-        <h3 class="popup-title" id="popupTitle"></h3>
-        <p class="popup-note" id="popupNote" style="display:none"></p>
+      <div class="gnb-right">
+        <button class="lang-switch" onclick="this.classList.toggle('open')">
+          <i data-lucide="languages"></i>
+          <div class="lang-dropdown"><a href="./index_en.html">English<span class="check">✓</span></a><a href="./index.html">한국어</a></div>
+        </button>
+        <div class="gnb-divider"></div>
+        <a href="/sign-in" class="btn-login">Log in</a>
+        <a href="/sign-in" class="btn-primary">Get Started</a>
       </div>
-      <button class="popup-close" id="popupClose">✕</button>
+    </nav>
+
+    <!-- ── SECTION 2: HERO ── -->
+    <div style="padding: 0">
+      <div class="hero">
+        <div class="hero-left">
+          <div class="hero-badge">
+            <i data-lucide="sparkles"></i> ATTO Research LLM Gateway
+          </div>
+          <h1>Struggling with<br>AI Costs <span class="highlight">Out of Control?</span></h1>
+          <p class="hero-sub">OpenAI, Claude, Gemini — a separate contract for every model,<br>
+        budgets blowing past limits, no visibility into who's spending what.<br><br>
+        Consolidate everything with AlRouter and<br>
+        save <strong style="color:#EC4899">up to 10%</strong> off official prices.</p>
+          <div class="hero-cta">
+            <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
+            <button
+              class="btn-hero-secondary"
+              onclick="
+                document.getElementById('contactOverlay').classList.add('open')
+              "
+            >
+              Contact Sales
+            </button>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-item">
+              <div class="stat-value">10%</div>
+              <div class="stat-label">Max Cost Savings</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">$0</div>
+              <div class="stat-label">Monthly Fee</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">1</div>
+              <div class="stat-label">API Key for Everything</div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-right">
+          <div
+            class="billing-before"
+            style="display: flex; justify-content: center; align-items: center"
+          >
+            <div class="anim-wrap" id="anim">
+              <video
+                id="animVideo"
+                src="alrouter_en.mp4"
+                playsinline
+                preload="auto"
+              ></video>
+              <div class="anim-hover-overlay" id="animHoverOverlay">
+                <div class="anim-hover-state" id="animPauseState">
+                  <div class="anim-play-btn">
+                    <div class="anim-pause-icon">
+                      <span></span><span></span>
+                    </div>
+                  </div>
+                  <span class="anim-play-label">Pause</span>
+                </div>
+                <div
+                  class="anim-hover-state"
+                  id="animResumeState"
+                  style="display: none"
+                >
+                  <div class="anim-play-btn">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="white"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <polygon points="6,3 20,12 6,21" />
+                    </svg>
+                  </div>
+                  <span class="anim-play-label">Continue</span>
+                </div>
+              </div>
+              <div class="anim-play-overlay" id="animPlayOverlay">
+                <div class="anim-play-btn">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="white"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <polygon points="6,3 20,12 6,21" />
+                  </svg>
+                </div>
+                <span class="anim-play-label">Tap to Start</span>
+              </div>
+              <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
+                <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
+                  <img src="logo.svg" alt="AlRouter" class="anim-cta-logo" />
+                  <div class="anim-cta-btn-text">Get Started →</div>
+                </a>
+                <button
+                  class="anim-end-btn anim-end-replay"
+                  id="animReplayBtn"
+                  style="display: none"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 .49-4" />
+                  </svg>
+                  Watch Again
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="video-indicator">
+            <button
+              class="video-dot"
+              id="dotStd"
+              onclick="switchVideo('std')"
+            ></button>
+            <button
+              class="video-dot"
+              id="dotLite"
+              onclick="switchVideo('lite')"
+            ></button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="popup-body" id="popupBody"></div>
-  </div>
-</div>
 
-<script>
-(function() {
-  const overlay = document.getElementById('contactOverlay');
-  const form    = document.getElementById('contactForm');
-  const result  = document.getElementById('contactResult');
+    <!-- ── SECTION 4: PROBLEM ── -->
+    <div class="section" style="max-width: 1300px">
+      <span class="section-tag">Pain Points</span>
+      <h2>Does This Sound Familiar?</h2>
+      <p class="section-sub">Did AI adoption end up increasing costs and complexity? Every team faces the same struggle.</p>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <div class="problem-card-header">
+            <div class="problem-icon"><i data-lucide="banknote"></i></div>
+            <h3>Separate Contracts, Separate Bills for Every AI Service</h3>
+          </div>
+          <p>ChatGPT from OpenAI, images from Gemini, coding from Claude... With every department subscribing separately, nobody knows the total AI spend.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-card-header">
+            <div class="problem-icon"><i data-lucide="trending-up"></i></div>
+            <h3>Cost Overruns Only Discovered at Month End</h3>
+          </div>
+          <p>There's no real-time visibility into who used which model and how much. You only react after the invoice arrives.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-card-header">
+            <div class="problem-icon"><i data-lucide="siren"></i></div>
+            <h3>Every Model, Every Person, Requests Never End</h3>
+          </div>
+          <p>GPT keys, Claude permissions, Gemini accounts... one more model, one more place to manage.</p>
+          <p style="margin-top: 8px">More AI, more requests — admins never know where to start.</p>
+        </div>
+      </div>
+    </div>
 
-  function closeContact() { overlay.classList.remove('open'); }
-  document.getElementById('contactClose').addEventListener('click', closeContact);
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeContact(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeContact(); });
-  new MutationObserver(() => {
-    document.body.style.overflow = overlay.classList.contains('open') ? 'hidden' : '';
-  }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    <!-- ── SECTION 5: SOLUTION ── -->
+    <div class="solution-section">
+      <div class="solution-inner">
+        <span class="section-tag">Solution</span>
+        <h2>AlRouter Solves It</h2>
+        <p class="section-sub" style="margin: 0 auto 0; text-align: center">
+          One account, one bill, complete control.<br>Manage AI usage at the organization level and pay less than official prices.
+        </p>
 
-  // Scale type toggle
-  document.querySelectorAll('input[name="scale_type"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const isToken = radio.value === 'token';
-      document.getElementById('scaleHeadField').style.display = isToken ? 'none' : '';
-      document.getElementById('scaleTokenField').style.display = isToken ? '' : 'none';
-      document.querySelector('[name="headcount"]').required = !isToken;
-    });
-  });
+        <!-- 가로 트리 다이어그램 -->
+        <div
+          style="
+            width: 100%;
+            overflow: visible;
+            margin-top: 70px;
+            padding-top: 80px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0;
+              min-width: 1000px;
+            "
+          >
+            <!-- ── Level 3: Users들 ── -->
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                gap: 10px;
+                min-width: 155px;
+              "
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.1em;
+                  color: #6b7280;
+                  margin-bottom: 2px;
+                  text-align: center;
+                "
+              >
+                Users
+              </div>
+              <!-- User A -->
+              <div
+                style="
+                  background: #111827;
+                  border: 1px solid #374151;
+                  border-radius: 10px;
+                  padding: 10px 12px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 5px;
+                  "
+                >
+                  <i
+                    data-lucide="user"
+                    style="width: 13px; height: 13px; color: #9ca3af"
+                  ></i>
+                  <span
+                    style="font-size: 12px; font-weight: 700; color: #f9fafb"
+                    >User A</span
+                  >
+                </div>
+                <div
+                  style="
+                    font-size: 10px;
+                    color: #0ea5e9;
+                    font-weight: 700;
+                    text-align: left;
+                    padding-left: 20px;
+                  "
+                >
+                  Quota $50 / mo
+                </div>
+              </div>
+              <!-- User B -->
+              <div
+                style="
+                  background: #111827;
+                  border: 1px solid #374151;
+                  border-radius: 10px;
+                  padding: 10px 12px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 5px;
+                  "
+                >
+                  <i
+                    data-lucide="user"
+                    style="width: 13px; height: 13px; color: #9ca3af"
+                  ></i>
+                  <span
+                    style="font-size: 12px; font-weight: 700; color: #f9fafb"
+                    >User B</span
+                  >
+                </div>
+                <div
+                  style="
+                    font-size: 10px;
+                    color: #0ea5e9;
+                    font-weight: 700;
+                    text-align: left;
+                    padding-left: 20px;
+                  "
+                >
+                  Quota $30 / mo
+                </div>
+              </div>
+              <!-- User C -->
+              <div
+                style="
+                  background: #111827;
+                  border: 1px solid #374151;
+                  border-radius: 10px;
+                  padding: 10px 12px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-bottom: 5px;
+                  "
+                >
+                  <i
+                    data-lucide="user"
+                    style="width: 13px; height: 13px; color: #9ca3af"
+                  ></i>
+                  <span
+                    style="font-size: 12px; font-weight: 700; color: #f9fafb"
+                    >User C</span
+                  >
+                </div>
+                <div
+                  style="
+                    font-size: 10px;
+                    color: #0ea5e9;
+                    font-weight: 700;
+                    text-align: left;
+                    padding-left: 20px;
+                  "
+                >
+                  Quota $20 / mo
+                </div>
+              </div>
+            </div>
 
-  form.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = form.querySelector('.cf-submit');
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
-    result.style.display = 'none';
+            <!-- 커넥터 → API Keys -->
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                flex-shrink: 0;
+                position: relative;
+                width: 40px;
+                align-self: stretch;
+              "
+            >
+              <div
+                style="
+                  position: absolute;
+                  left: 0;
+                  top: 18%;
+                  width: 100%;
+                  height: 2px;
+                  background: #374151;
+                "
+              ></div>
+              <div
+                style="
+                  position: absolute;
+                  left: 0;
+                  top: 50%;
+                  width: 100%;
+                  height: 2px;
+                  background: #374151;
+                "
+              ></div>
+              <div
+                style="
+                  position: absolute;
+                  left: 0;
+                  top: 82%;
+                  width: 100%;
+                  height: 2px;
+                  background: #374151;
+                "
+              ></div>
+            </div>
 
-    const fd = new FormData(form);
-    const data = Object.fromEntries(fd);
-    data.features = fd.getAll('features');
-    if (data.scale_type === 'token') {
-      delete data.headcount;
-    } else {
-      delete data.input_tokens;
-      delete data.output_tokens;
-    }
+            <!-- ── Level 4: API Keys ── -->
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                gap: 10px;
+                min-width: 120px;
+              "
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.1em;
+                  color: #6b7280;
+                  margin-bottom: 2px;
+                  text-align: center;
+                "
+              >
+                API Keys
+              </div>
+              <!-- Keys for A -->
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 1
+                </div>
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 2
+                </div>
+              </div>
+              <!-- Keys for B -->
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 1
+                </div>
+              </div>
+              <!-- Keys for C -->
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 1
+                </div>
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 2
+                </div>
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 6px;
+                    padding: 5px 9px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  <i
+                    data-lucide="key"
+                    style="width: 10px; height: 10px; color: #0ea5e9"
+                  ></i
+                  >Key 3
+                </div>
+              </div>
+            </div>
 
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+            <!-- 커넥터 → AlRouter -->
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                padding: 0 10px;
+                flex-shrink: 0;
+              "
+            >
+              <div
+                style="
+                  width: 32px;
+                  height: 2px;
+                  background: linear-gradient(90deg, #374151, #0ea5e9);
+                "
+              ></div>
+              <div
+                style="
+                  font-size: 10px;
+                  color: #6b7280;
+                  margin-top: 4px;
+                  white-space: nowrap;
+                "
+              >
+                API call
+              </div>
+            </div>
+
+            <!-- ── Level 5: AlRouter (Admin는 절대위치로 위에 배치) ── -->
+            <div
+              style="
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-width: 150px;
+              "
+            >
+              <!-- Admin: AlRouter 위에 절대위치 -->
+              <div
+                style="
+                  position: absolute;
+                  bottom: 100%;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  left: 0;
+                  right: 0;
+                "
+              >
+                <div
+                  style="
+                    font-size: 10px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    color: #6b7280;
+                    margin-bottom: 10px;
+                    white-space: nowrap;
+                  "
+                >
+                  Admin
+                </div>
+                <div
+                  style="
+                    background: #1f2937;
+                    border: 2px solid #ec4899;
+                    border-radius: 12px;
+                    padding: 14px 16px;
+                    text-align: center;
+                  "
+                >
+                  <i
+                    data-lucide="shield-check"
+                    style="
+                      width: 22px;
+                      height: 22px;
+                      color: #ec4899;
+                      margin-bottom: 6px;
+                    "
+                  ></i>
+                  <div
+                    style="font-size: 12px; font-weight: 700; color: #f9fafb"
+                  >
+                    Admin
+                  </div>
+                  <div style="font-size: 10px; color: #9ca3af; margin-top: 3px">
+                    Per-user quota control
+                  </div>
+                </div>
+                <div
+                  style="width: 2px; height: 28px; background: #ec4899"
+                ></div>
+              </div>
+              <!-- AlRouter: 수직 중앙 -->
+              <div
+                class="diagram-center"
+                style="padding: 22px 32px; text-align: center"
+              >
+                <div
+                  style="font-size: 11px; color: #9ca3af; margin-bottom: 5px"
+                >
+                  ATTO Research
+                </div>
+                <div style="font-size: 20px; font-weight: 800">AlRouter</div>
+              </div>
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.1em;
+                  color: #6b7280;
+                  margin-top: 10px;
+                "
+              >
+                Gateway
+              </div>
+            </div>
+
+            <!-- 커넥터 → LLMs -->
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                padding: 0 10px;
+                flex-shrink: 0;
+              "
+            >
+              <div
+                style="
+                  width: 32px;
+                  height: 2px;
+                  background: linear-gradient(90deg, #0ea5e9, #ec4899);
+                "
+              ></div>
+              <div
+                style="
+                  font-size: 10px;
+                  color: transparent;
+                  margin-top: 4px;
+                  white-space: nowrap;
+                "
+              >
+                -
+              </div>
+            </div>
+
+            <!-- ── Level 6: LLMs ── -->
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                min-width: 130px;
+              "
+            >
+              <div
+                style="
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-transform: uppercase;
+                  letter-spacing: 0.1em;
+                  color: #6b7280;
+                  margin-bottom: 2px;
+                "
+              >
+                AI Models
+              </div>
+              <div
+                class="diagram-box"
+                style="
+                  font-size: 11px;
+                  padding: 7px 12px;
+                  width: 100%;
+                  text-align: center;
+                "
+              >
+                <i data-lucide="bot"></i> ChatGPT
+              </div>
+              <div
+                class="diagram-box"
+                style="
+                  font-size: 11px;
+                  padding: 7px 12px;
+                  width: 100%;
+                  text-align: center;
+                "
+              >
+                <i data-lucide="sparkles"></i> Claude
+              </div>
+              <div
+                class="diagram-box"
+                style="
+                  font-size: 11px;
+                  padding: 7px 12px;
+                  width: 100%;
+                  text-align: center;
+                "
+              >
+                <i data-lucide="gem"></i> Gemini
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 핵심 포인트 -->
+        <div
+          class="diagram-results"
+          style="
+            border-top: 1px solid #374151;
+            padding-top: 30px;
+            margin-top: 70px;
+          "
+        >
+          <div class="diagram-result-item">
+            <i data-lucide="circle-dollar-sign"></i> Up to 10% Cost Savings
+          </div>
+          <div class="diagram-result-item">
+            <i data-lucide="sliders-horizontal"></i> Per-user Quota Control
+          </div>
+          <div class="diagram-result-item">
+            <i data-lucide="key"></i> Multiple API Keys
+          </div>
+          <div class="diagram-result-item">
+            <i data-lucide="zap"></i> Pay-as-you-go
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 6: FEATURE - COST ── -->
+    <div class="section feature-section">
+      <div class="feature-grid">
+        <div class="feature-content">
+          <span class="section-tag">Cost Savings</span>
+          <h2>Up to 10% Cheaper<br>Than Official Prices</h2>
+          <p>Access major AI models through AlRouter at discounted rates vs. official APIs.<br>No subscription — pay only for what you use.</p>
+          <table class="price-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Price</th>
+                <th>Savings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>gpt-5-mini</td>
+                <td
+                  rowspan="3"
+                  style="text-align: center; vertical-align: middle"
+                >
+                  Official Price
+                </td>
+                <td
+                  rowspan="3"
+                  class="discount-pct"
+                  style="text-align: center; vertical-align: middle"
+                >
+                  -10%
+                </td>
+              </tr>
+              <tr>
+                <td>claude-sonnet-4.6</td>
+              </tr>
+              <tr>
+                <td>gemini-3.1-pro</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="payg-badge">💳 Pay-as-you-go — Only pay for what you use. No minimum commitment.</div>
+        </div>
+        <div class="feature-visual">
+          <div class="calc-card-header">
+            <span class="calc-card-title">AI Cost Calculator</span>
+            <a
+              href="#"
+              class="calc-card-link"
+              onclick="openPopup('Models &amp; Pricing','pricing');return false;"
+              >View All Model Prices →</a
+            >
+          </div>
+          <div class="calc-body">
+            <div class="calc-form">
+              <div class="calc-group">
+                <label>Select Model</label>
+                <select class="calc-select" id="calcModel">
+                  <option value="">Loading models…</option>
+                </select>
+              </div>
+              <div class="calc-group">
+                <label>Input Tokens</label>
+                <div class="calc-input-wrap">
+                  <input
+                    type="number"
+                    id="calcInputTokens"
+                    placeholder="0"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span class="calc-input-suffix">M tokens</span>
+                </div>
+              </div>
+              <div class="calc-group">
+                <label>Output Tokens</label>
+                <div class="calc-input-wrap">
+                  <input
+                    type="number"
+                    id="calcOutputTokens"
+                    placeholder="0"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span class="calc-input-suffix">M tokens</span>
+                </div>
+              </div>
+              <button class="calc-btn" onclick="runCalc()">
+                Calculate
+              </button>
+            </div>
+            <div class="calc-result" id="calcResult">
+              <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
+              <div
+                class="calc-result-label"
+                id="calcLabel"
+                style="display: none"
+              >
+                Estimated Cost
+              </div>
+              <div
+                class="calc-result-price"
+                id="calcPrice"
+                style="display: none"
+              ></div>
+              <div class="calc-breakdown" id="calcBreakdown"></div>
+            </div>
+          </div>
+          <p
+            style="
+              margin-top: 14px;
+              font-size: 11px;
+              color: #ec4899;
+              line-height: 1.6;
+            "
+          >
+            Prices shown are estimates based on public rates.<br>
+        Actual costs may vary depending on usage patterns.
+        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 7: FEATURE - GOVERNANCE ── -->
+    <div
+      style="
+        background: #0f172a;
+        border-top: 1px solid #1f2937;
+        border-bottom: 1px solid #1f2937;
+      "
+    >
+      <div class="section feature-section">
+        <div class="feature-grid reverse">
+          <div class="feature-content">
+            <span class="section-tag">Governance</span>
+            <h2>Manage AI Costs<br>Within Budget</h2>
+            <p>From real-time monitoring to budget limits, take complete control of AI usage.</p>
+            <div class="gov-points">
+              <div class="gov-point">
+                <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
+                <div class="gov-text">
+                  <h4>Real-time Usage Monitoring</h4>
+                  <p>View usage by model, team member, and date on a single dashboard.</p>
+                </div>
+              </div>
+              <div class="gov-point">
+                <div class="gov-icon"><i data-lucide="wallet"></i></div>
+                <div class="gov-text">
+                  <h4>Budget Limit Controls</h4>
+                  <p>Set token quotas and spending caps in advance to prevent overage charges.</p>
+                </div>
+              </div>
+              <div class="gov-point">
+                <div class="gov-icon"><i data-lucide="key-round"></i></div>
+                <div class="gov-text">
+                  <h4>Token-based API Key Management</h4>
+                  <p>Issue keys, set permissions, and assign expiry dates for each team member — all in one place.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="dashboard-mock">
+              <div class="dash-header">
+                <i data-lucide="bar-chart-2"></i> Model Call Analytics
+              </div>
+              <div class="dash-stats">
+                <div class="dash-stat">
+                  <div class="ds-label">Total Budget</div>
+                  <div class="ds-value blue">$0.39</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="ds-label">Requests</div>
+                  <div class="ds-value">34</div>
+                </div>
+                <div class="dash-stat">
+                  <div class="ds-label">Total Tokens</div>
+                  <div class="ds-value pink">31,743</div>
+                </div>
+              </div>
+              <div class="dash-chart">
+                <div class="dash-bar" style="height: 30%"></div>
+                <div class="dash-bar" style="height: 45%"></div>
+                <div class="dash-bar" style="height: 25%"></div>
+                <div class="dash-bar highlight" style="height: 95%"></div>
+                <div class="dash-bar" style="height: 40%"></div>
+                <div class="dash-bar" style="height: 55%"></div>
+                <div class="dash-bar" style="height: 30%"></div>
+              </div>
+              <div
+                style="
+                  padding: 12px 16px;
+                  font-size: 11px;
+                  color: #6b7280;
+                  border-top: 1px solid #1f2937;
+                "
+              >
+                ● claude-haiku-4-5 &nbsp; ● gemini-3-flash &nbsp; ● gpt-5-mini
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 8: FEATURE - INTEGRATION ── -->
+    <div class="integration-section">
+      <div class="integration-inner">
+        <span class="section-tag">Integration</span>
+        <h2 style="text-align: center; font-size: 28px; margin-bottom: 10px">
+          All Major AI Models, One API
+        </h2>
+        <p style="color: #9ca3af; font-size: 14px; text-align: center">
+          No separate contracts per model. Use all AI models right away with a single AlRouter API.
+        </p>
+        <div class="provider-logos">
+          <div class="provider-logo">
+            <div class="logo-box"><i data-lucide="bot"></i></div>
+            <div class="logo-name">OpenAI</div>
+          </div>
+          <div class="provider-logo">
+            <div class="logo-box"><i data-lucide="sparkles"></i></div>
+            <div class="logo-name">Anthropic</div>
+          </div>
+          <div class="provider-logo">
+            <div class="logo-box"><i data-lucide="gem"></i></div>
+            <div class="logo-name">Google</div>
+          </div>
+          <div class="provider-logo">
+            <div class="logo-box"><i data-lucide="circle-ellipsis"></i></div>
+            <div class="logo-name">Others</div>
+          </div>
+        </div>
+        <div class="modality-tags">
+          <span class="modality-tag"
+            ><i data-lucide="type"></i> Text</span
+          >
+          <span class="modality-tag"
+            ><i data-lucide="image"></i> Image</span
+          >
+          <span class="modality-tag"
+            ><i data-lucide="video"></i> Video</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 9: PRICING PREVIEW ── -->
+    <div class="pricing-section">
+      <div class="pricing-inner">
+        <span class="section-tag">Pricing</span>
+        <h2 style="font-size: 30px; margin-bottom: 10px">Transparent Pricing, No Hidden Fees</h2>
+        <p style="color: #9ca3af; font-size: 14px">Discounted rates vs. official prices. Pay only for what you use — no subscription fee.</p>
+        <div class="price-cards">
+          <div class="price-card">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                justify-content: center;
+              "
+            >
+              <div
+                class="logo-box"
+                style="
+                  width: 28px;
+                  height: 28px;
+                  min-width: 28px;
+                  border-radius: 8px;
+                "
+              >
+                <i data-lucide="bot"></i>
+              </div>
+              <div class="model-provider">OpenAI</div>
+            </div>
+            <hr class="price-card-divider" />
+            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-pct">-10%</div>
+          </div>
+          <div class="price-card">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                justify-content: center;
+              "
+            >
+              <div
+                class="logo-box"
+                style="
+                  width: 28px;
+                  height: 28px;
+                  min-width: 28px;
+                  border-radius: 8px;
+                "
+              >
+                <i data-lucide="sparkles"></i>
+              </div>
+              <div class="model-provider">Anthropic</div>
+            </div>
+            <hr class="price-card-divider" />
+            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-pct">-10%</div>
+          </div>
+          <div class="price-card">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                justify-content: center;
+              "
+            >
+              <div
+                class="logo-box"
+                style="
+                  width: 28px;
+                  height: 28px;
+                  min-width: 28px;
+                  border-radius: 8px;
+                "
+              >
+                <i data-lucide="gem"></i>
+              </div>
+              <div class="model-provider">Google</div>
+            </div>
+            <hr class="price-card-divider" />
+            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-pct">-10%</div>
+          </div>
+        </div>
+        <div class="pricing-cta">
+          <a
+            href="#"
+            onclick="openPopup('Models &amp; Pricing','pricing');return false;"
+            >View Full Pricing →</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 10: DUAL CTA ── -->
+    <div class="cta-section">
+      <div class="cta-inner">
+        <div class="cta-box left">
+          <div class="cta-icon" style="color: #0ea5e9; margin-bottom: 16px">
+            <i data-lucide="rocket"></i>
+          </div>
+          <h3>Start Your Trial Today</h3>
+          <p>Start with a trial account and get your API key right away. You only pay for what you use.</p>
+          <a href="/sign-in" class="btn-cta-primary">Get Started →</a>
+        </div>
+        <div class="cta-box">
+          <div class="cta-icon" style="color: #ec4899; margin-bottom: 16px">
+            <i data-lucide="building-2"></i>
+          </div>
+          <h3>Talk to Our Team</h3>
+          <p>Our experts will walk you through usage planning, model selection, and cost simulations.</p>
+          <button
+            class="btn-cta-secondary"
+            onclick="
+              document.getElementById('contactOverlay').classList.add('open')
+            "
+          >
+            Contact Sales →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 11: FOOTER ── -->
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 1100 1100" fill="none">
+              <path
+                d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z"
+                fill="#0EA5E9"
+              />
+              <path
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z"
+                fill="#EC4899"
+              />
+              <path
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z"
+                fill="#EC4899"
+              />
+            </svg>
+            AlRouter
+          </div>
+          <p>Smart AI cost management.<br>LLM Gateway service by ATTO Research.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li>
+              <a
+                href="https://www.atto-research.com/eng/main/main.html"
+                target="_blank"
+                rel="noopener"
+                >About ATTO Research</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#">About</a></li>
+            <li>
+              <a
+                href="#"
+                onclick="openPopup('Models &amp; Pricing','pricing');return false;"
+                >Models & Pricing</a
+              >
+            </li>
+            <li><a href="#" style="display: none">Changelog</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li>
+              <a
+                href="#"
+                onclick="openPopup('Terms of Service','terms');return false;"
+                >Terms of Service</a
+              >
+            </li>
+            <li>
+              <a
+                href="#"
+                onclick="openPopup('Privacy Policy','privacy');return false;"
+                >Privacy Policy</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 ATTO Research. All rights reserved.</span>
+      </div>
+    </footer>
+
+    <!-- Enterprise Inquiry 모달 -->
+    <div class="popup-overlay" id="contactOverlay">
+      <div class="popup-modal">
+        <div class="popup-header">
+          <h3 class="popup-title">Enterprise Inquiry</h3>
+          <button class="popup-close" id="contactClose">✕</button>
+        </div>
+        <form id="contactForm" class="contact-form">
+          <div class="popup-body">
+            <div class="cf-group">
+              <label>Organization<span class="cf-required">*</span></label>
+              <input
+                type="text"
+                name="org"
+                placeholder="Company or organization name"
+                required
+              />
+            </div>
+            <div class="cf-group">
+              <label
+                >Email<span class="cf-required">*</span></label
+              >
+              <input
+                type="email"
+                name="email"
+                placeholder="example@company.com"
+                required
+              />
+            </div>
+            <div class="cf-group">
+              <label
+                >Phone<span class="cf-optional"
+                  >(optional)</span
+                ></label
+              >
+              <input
+                type="tel"
+                name="phone"
+                placeholder="+1 000-000-0000"
+              />
+            </div>
+            <div class="cf-group">
+              <label
+                >Team Size<span class="cf-required">*</span></label
+              >
+              <div class="cf-scale-tabs">
+                <div class="cf-scale-tab">
+                  <input
+                    type="radio"
+                    name="scale_type"
+                    id="scaleTypeToken"
+                    value="token"
+                    checked
+                  />
+                  <label for="scaleTypeToken">Token Usage</label>
+                </div>
+                <div class="cf-scale-tab">
+                  <input
+                    type="radio"
+                    name="scale_type"
+                    id="scaleTypeHead"
+                    value="headcount"
+                  />
+                  <label for="scaleTypeHead">Headcount</label>
+                </div>
+              </div>
+              <div id="scaleHeadField" style="display: none">
+                <div class="cf-num-wrap">
+                  <input
+                    type="number"
+                    name="headcount"
+                    placeholder="0"
+                    min="1"
+                  />
+                  <span class="cf-num-suffix">people</span>
+                </div>
+              </div>
+              <div id="scaleTokenField">
+                <div class="cf-token-row">
+                  <div class="cf-num-wrap">
+                    <input
+                      type="number"
+                      name="input_tokens"
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                    />
+                    <span class="cf-num-suffix">M input</span>
+                  </div>
+                  <div class="cf-num-wrap">
+                    <input
+                      type="number"
+                      name="output_tokens"
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                    />
+                    <span class="cf-num-suffix">M output</span>
+                  </div>
+                </div>
+                <p class="cf-scale-hint">Enter your estimated monthly token usage from the calculator.</p>
+              </div>
+            </div>
+            <div class="cf-group">
+              <label
+                >Features Needed<span class="cf-optional"
+                  >(optional)</span
+                ></label
+              >
+              <div class="cf-checks">
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="Image Generation"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >Image Generation</span
+                  ></label
+                >
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="Video Generation"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >Video Generation</span
+                  ></label
+                >
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="Agent Builder"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >Agent Builder</span
+                  ></label
+                >
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="Document Analysis"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >Document Analysis</span
+                  ></label
+                >
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="Deep Research"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >Deep Research</span
+                  ></label
+                >
+                <label class="cf-check"
+                  ><input
+                    type="checkbox"
+                    name="features"
+                    value="AI Transformation (AX)"
+                  /><span class="cf-check-box"
+                    ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <polyline
+                        points="1,4 4,7 10,1"
+                        stroke="#fff"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg></span
+                  ><span class="cf-check-label"
+                    >AI Transformation (AX)</span
+                  ></label
+                >
+              </div>
+            </div>
+            <div class="cf-group">
+              <label
+                >Additional Comments<span class="cf-optional"
+                  >(optional)</span
+                ></label
+              >
+              <textarea
+                name="notes"
+                placeholder="Anything else you'd like to share with us."
+              ></textarea>
+            </div>
+          </div>
+          <!-- /.popup-body -->
+          <div class="popup-footer">
+            <div
+              id="contactResult"
+              class="cf-result"
+              style="display: none"
+            ></div>
+            <button type="submit" class="cf-submit">Submit →</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 팝업 -->
+    <div class="popup-overlay" id="popupOverlay">
+      <div class="popup-modal">
+        <div class="popup-header">
+          <div class="popup-header-left">
+            <h3 class="popup-title" id="popupTitle"></h3>
+            <p class="popup-note" id="popupNote" style="display: none"></p>
+          </div>
+          <button class="popup-close" id="popupClose">✕</button>
+        </div>
+        <div class="popup-body" id="popupBody"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const overlay = document.getElementById("contactOverlay");
+        const form = document.getElementById("contactForm");
+        const result = document.getElementById("contactResult");
+
+        function closeContact() {
+          overlay.classList.remove("open");
+        }
+        document
+          .getElementById("contactClose")
+          .addEventListener("click", closeContact);
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) closeContact();
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeContact();
+        });
+        new MutationObserver(() => {
+          document.body.style.overflow = overlay.classList.contains("open")
+            ? "hidden"
+            : "";
+        }).observe(overlay, { attributes: true, attributeFilter: ["class"] });
+
+        // Team Size 탭 전환
+        document
+          .querySelectorAll('input[name="scale_type"]')
+          .forEach((radio) => {
+            radio.addEventListener("change", () => {
+              const isToken = radio.value === "token";
+              document.getElementById("scaleHeadField").style.display = isToken
+                ? "none"
+                : "";
+              document.getElementById("scaleTokenField").style.display = isToken
+                ? ""
+                : "none";
+              document.querySelector('[name="headcount"]').required = !isToken;
+            });
+          });
+
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const btn = form.querySelector(".cf-submit");
+          btn.disabled = true;
+          btn.textContent = "Sending...";
+          result.style.display = "none";
+
+          const fd = new FormData(form);
+          const data = Object.fromEntries(fd);
+          data.features = fd.getAll("features");
+          // 토큰 방식일 때 headcount 제거, Headcount 방식일 때 token 필드 제거
+          if (data.scale_type === "token") {
+            delete data.headcount;
+          } else {
+            delete data.input_tokens;
+            delete data.output_tokens;
+          }
+
+          try {
+            const res = await fetch("/api/contact", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error();
+            result.className = "cf-result cf-success";
+            result.textContent = "Your inquiry has been received. We'll be in touch shortly.";
+            result.style.display = "block";
+            form.reset();
+          } catch {
+            result.className = "cf-result cf-error";
+            result.textContent = "Something went wrong. Please try again later.";
+            result.style.display = "block";
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Submit →";
+          }
+        });
+      })();
+    </script>
+
+    <script>
+      const POPUP_CONTENTS = {
+        terms:   { title: 'Terms of Service',         iframe: '/terms_en.html' },
+        privacy: { title: 'Privacy Policy', iframe: '/privacy_en.html' },
+        pricing: { title: 'Full Model & Pricing', wide: true, dynamic: true },
+      };
+
+      function openPopup(title, key) {
+        const overlay = document.getElementById('popupOverlay');
+        const modal   = overlay.querySelector('.popup-modal');
+        const body    = document.getElementById('popupBody');
+        const item    = POPUP_CONTENTS[key] || {};
+
+        document.getElementById('popupTitle').textContent = item.title || title;
+
+        if (item.iframe) {
+          modal.classList.add('wide');
+          body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
+        } else if (item.dynamic && key === 'pricing') {
+          modal.classList.add('wide');
+          renderPricingTable(body);
+        } else if (item.wide) {
+          modal.classList.add('wide');
+          body.innerHTML = item.body || '';
+        } else {
+          modal.classList.remove('wide');
+          body.innerHTML = item.body || '';
+        }
+
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      async function renderPricingTable(body) {
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
+        document.getElementById('popupTitle').innerHTML =
+          `Full Model & Pricing (as of ${dateStr}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`;
+
+        body.innerHTML = '<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">Loading…</p>';
+
+        try {
+          const res  = await fetch('/api/pricing');
+          const json = await res.json();
+          const groupRatio = 2;
+
+          function getProvider(name) {
+            if (name.startsWith('claude'))  return 'Anthropic';
+            if (name.startsWith('gemini'))  return 'Google';
+            if (name.startsWith('gpt') || name.startsWith('o1') || name.startsWith('o3') || name.startsWith('o4')) return 'OpenAI';
+            return 'Other';
+          }
+
+          function getTier(name) {
+            if (name.includes('haiku') || name.includes('flash-lite')) return 1;
+            if (name.includes('sonnet') || (name.includes('flash') && !name.includes('lite'))) return 2;
+            if (name.includes('opus') || name.includes('pro')) return 3;
+            return 2;
+          }
+
+          const sorted = [...json.data].sort((a, b) => {
+            const pa = getProvider(a.model_name), pb = getProvider(b.model_name);
+            if (pa !== pb) return pa.localeCompare(pb);
+            const ta = getTier(a.model_name), tb = getTier(b.model_name);
+            if (ta !== tb) return ta - tb;
+            return a.model_name.localeCompare(b.model_name);
+          });
+
+          let lastProvider = '';
+          const rows = sorted.map(m => {
+            const discount = (m.discount_percent || 0) / 100;
+            const inputPrice  = (m.model_ratio * groupRatio * (1 - discount)).toFixed(4);
+            const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio * (1 - discount)).toFixed(4);
+            const provider = getProvider(m.model_name);
+            const providerRow = provider !== lastProvider
+              ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
+              : '';
+            lastProvider = provider;
+            return providerRow + `
+              <tr>
+                <td style="padding:10px 14px;color:#f9fafb;font-size:13px;border-bottom:1px solid #1f2937;">${m.model_name}</td>
+                <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${inputPrice}</td>
+                <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${outputPrice}</td>
+              </tr>`;
+          }).join('');
+
+          body.innerHTML = `
+            <div style="padding:20px 24px 0;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead style="position:sticky;top:0;z-index:1;">
+                  <tr style="background:#1f2937;">
+                    <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:left;border-bottom:1px solid #374151;">Model</th>
+                    <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Input ($/M)</th>
+                    <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Output ($/M)</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            `;
+        } catch (e) {
+          body.innerHTML = '<p style="color:#f87171;font-size:13px;text-align:center;padding:24px 0;">Failed to load pricing data.</p>';
+        }
+      }
+
+      function closePopup() {
+        const overlay = document.getElementById('popupOverlay');
+        overlay.classList.remove('open');
+        overlay.querySelector('.popup-modal').classList.remove('wide');
+        document.getElementById('popupBody').innerHTML = '';
+        document.body.style.overflow = '';
+      }
+
+      document.getElementById('popupClose').addEventListener('click', closePopup);
+      document.getElementById('popupOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closePopup();
       });
-      if (!res.ok) throw new Error();
-      result.className = 'cf-result cf-success';
-      result.textContent = 'Your inquiry has been received. We\'ll be in touch shortly.';
-      result.style.display = 'block';
-      form.reset();
-    } catch {
-      result.className = 'cf-result cf-error';
-      result.textContent = 'Something went wrong. Please try again later.';
-      result.style.display = 'block';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Submit →';
-    }
-  });
-})();
-</script>
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePopup();
+      });
+    </script>
 
-<script>
-const POPUP_CONTENTS = {
-  terms:   { title: 'Terms of Service', iframe: '/terms_en.html' },
-  privacy: { title: 'Privacy Policy',   iframe: '/privacy_en.html' },
-  pricing: { title: 'Full Model & Pricing', wide: true, dynamic: true },
-};
+    <script>
+      (function () {
+        const video = document.getElementById("animVideo");
+        const prev = sessionStorage.getItem("videoVersion");
+        const ver =
+          prev === "std"
+            ? "lite"
+            : prev === "lite"
+              ? "std"
+              : Math.random() < 0.5
+                ? "std"
+                : "lite";
+        sessionStorage.setItem("videoVersion", ver);
+        window._videoVer = ver;
+        video.src = ver === "lite" ? "alrouter_en_lite.mp4" : "alrouter_en.mp4";
+        video.load();
 
-function openPopup(title, key) {
-  const overlay = document.getElementById('popupOverlay');
-  const modal   = overlay.querySelector('.popup-modal');
-  const body    = document.getElementById('popupBody');
-  const item    = POPUP_CONTENTS[key] || {};
+        function _updateDots(v) {
+          const s = document.getElementById("dotStd");
+          const l = document.getElementById("dotLite");
+          if (s) s.classList.toggle("active", v === "std");
+          if (l) l.classList.toggle("active", v === "lite");
+        }
+        _updateDots(ver);
+        window._updateDots = _updateDots;
 
-  document.getElementById('popupTitle').textContent = item.title || title;
+        // 언어 전환 링크에 스크롤 위치 저장
+        document.querySelectorAll(".lang-dropdown a").forEach((a) => {
+          a.addEventListener("click", () => {
+            sessionStorage.setItem("scrollY", window.scrollY);
+          });
+        });
 
-  if (item.iframe) {
-    modal.classList.add('wide');
-    body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
-  } else if (item.dynamic && key === 'pricing') {
-    modal.classList.add('wide');
-    renderPricingTable(body);
-  } else if (item.wide) {
-    modal.classList.add('wide');
-    body.innerHTML = item.body || '';
-  } else {
-    modal.classList.remove('wide');
-    body.innerHTML = item.body || '';
-  }
+        // 복원
+        const savedY = sessionStorage.getItem("scrollY");
+        if (savedY) {
+          sessionStorage.removeItem("scrollY");
+          window.addEventListener("load", () =>
+            window.scrollTo(0, parseInt(savedY, 10)),
+          );
+        }
+      })();
+    </script>
 
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
+    <script>
+      (function() {
+        const video       = document.getElementById('animVideo');
+        const playOverlay = document.getElementById('animPlayOverlay');
+        const hoverOverlay= document.getElementById('animHoverOverlay');
+        const pauseState  = document.getElementById('animPauseState');
+        const resumeState = document.getElementById('animResumeState');
+        const ctaWrap     = document.getElementById('animCtaWrap');
+        const ctaBtn      = document.getElementById('animCtaBtn');
+        const replayBtn   = document.getElementById('animReplayBtn');
+        const animWrap    = document.getElementById('anim');
+        const CTA_MAP = { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 };
+        let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 17.3;
 
-async function renderPricingTable(body) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
-  document.getElementById('popupTitle').innerHTML =
-    `Full Model & Pricing (as of ${dateStr}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`;
+        playOverlay.addEventListener('click', () => {
+          playOverlay.style.display = 'none';
+          video.currentTime = 0;
+          video.play();
+        });
 
-  body.innerHTML = '<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">Loading…</p>';
+        video.addEventListener('timeupdate', () => {
+          if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
+            ctaWrap.style.display = 'flex';
+            setTimeout(() => ctaBtn.classList.add('active'), 50);
+          }
+        });
 
-  try {
-    const res  = await fetch('/api/pricing');
-    const json = await res.json();
-    const groupRatio = 2;
+        video.addEventListener('ended', () => {
+          hoverOverlay.style.display = 'none';
+          replayBtn.style.display = 'flex';
+        });
 
-    function getProvider(name) {
-      if (name.startsWith('claude'))  return 'Anthropic';
-      if (name.startsWith('gemini'))  return 'Google';
-      if (name.startsWith('gpt') || name.startsWith('o1') || name.startsWith('o3') || name.startsWith('o4')) return 'OpenAI';
-      return 'Other';
-    }
+        replayBtn.addEventListener('click', () => {
+          ctaBtn.classList.remove('active');
+          ctaWrap.style.display = 'none';
+          replayBtn.style.display = 'none';
+          video.currentTime = 0;
+          video.play();
+        });
 
-    function getTier(name) {
-      if (name.includes('haiku') || name.includes('flash-lite')) return 1;
-      if (name.includes('sonnet') || (name.includes('flash') && !name.includes('lite'))) return 2;
-      if (name.includes('opus') || name.includes('pro')) return 3;
-      return 2;
-    }
+        animWrap.addEventListener('mouseenter', () => {
+          if (playOverlay.style.display !== 'none') return;
+          if (video.ended) return;
+          pauseState.style.display  = video.paused ? 'none' : 'flex';
+          resumeState.style.display = video.paused ? 'flex' : 'none';
+          hoverOverlay.style.display = 'flex';
+        });
+        animWrap.addEventListener('mouseleave', () => {
+          hoverOverlay.style.display = 'none';
+        });
 
-    const sorted = [...json.data].sort((a, b) => {
-      const pa = getProvider(a.model_name), pb = getProvider(b.model_name);
-      if (pa !== pb) return pa.localeCompare(pb);
-      const ta = getTier(a.model_name), tb = getTier(b.model_name);
-      if (ta !== tb) return ta - tb;
-      return a.model_name.localeCompare(b.model_name);
-    });
+        window.switchVideo = function(newVer) {
+          if (window._videoVer === newVer) return;
+          window._videoVer = newVer;
+          sessionStorage.setItem('videoVersion', newVer);
+          ctaBtn.classList.remove('active');
+          ctaWrap.style.display = 'none';
+          replayBtn.style.display = 'none';
+          hoverOverlay.style.display = 'none';
+          playOverlay.style.display = '';
+          video.pause();
+          video.src = newVer === 'lite' ? 'alrouter_en_lite.mp4' : 'alrouter_en.mp4';
+          video.load();
+          CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 17.3;
+          if (window._updateDots) window._updateDots(newVer);
+        };
 
-    let lastProvider = '';
-    const rows = sorted.map(m => {
-      const inputPrice  = (m.model_ratio * groupRatio).toFixed(4);
-      const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio).toFixed(4);
-      const provider = getProvider(m.model_name);
-      const providerRow = provider !== lastProvider
-        ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
-        : '';
-      lastProvider = provider;
-      return providerRow + `
-        <tr>
-          <td style="padding:10px 14px;color:#f9fafb;font-size:13px;border-bottom:1px solid #1f2937;">${m.model_name}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${inputPrice}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${outputPrice}</td>
-        </tr>`;
-    }).join('');
+        pauseState.addEventListener('click', () => {
+          video.pause();
+          pauseState.style.display  = 'none';
+          resumeState.style.display = 'flex';
+        });
 
-    body.innerHTML = `
-      <div style="padding:20px 24px 0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead style="position:sticky;top:0;z-index:1;">
-            <tr style="background:#1f2937;">
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:left;border-bottom:1px solid #374151;">Model</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Input ($/M)</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">Output ($/M)</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      `;
-  } catch (e) {
-    body.innerHTML = '<p style="color:#f87171;font-size:13px;text-align:center;padding:24px 0;">Failed to load pricing data.</p>';
-  }
-}
-
-function closePopup() {
-  const overlay = document.getElementById('popupOverlay');
-  overlay.classList.remove('open');
-  overlay.querySelector('.popup-modal').classList.remove('wide');
-  document.getElementById('popupBody').innerHTML = '';
-  document.body.style.overflow = '';
-}
-
-document.getElementById('popupClose').addEventListener('click', closePopup);
-document.getElementById('popupOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closePopup();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closePopup();
-});
-</script>
-
-<script>
-(function() {
-  const video       = document.getElementById('animVideo');
-  const playOverlay = document.getElementById('animPlayOverlay');
-  const hoverOverlay= document.getElementById('animHoverOverlay');
-  const pauseState  = document.getElementById('animPauseState');
-  const resumeState = document.getElementById('animResumeState');
-  const ctaWrap     = document.getElementById('animCtaWrap');
-  const ctaBtn      = document.getElementById('animCtaBtn');
-  const replayBtn   = document.getElementById('animReplayBtn');
-  const animWrap    = document.getElementById('anim');
-  const CTA_TIME    = 18;
-
-  playOverlay.addEventListener('click', () => {
-    playOverlay.style.display = 'none';
-    video.currentTime = 0;
-    video.play();
-  });
-
-  video.addEventListener('timeupdate', () => {
-    if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
-      ctaWrap.style.display = 'flex';
-      setTimeout(() => ctaBtn.classList.add('active'), 50);
-    }
-  });
-
-  video.addEventListener('ended', () => {
-    hoverOverlay.style.display = 'none';
-    replayBtn.style.display = 'flex';
-  });
-
-  replayBtn.addEventListener('click', () => {
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
-    replayBtn.style.display = 'none';
-    video.currentTime = 0;
-    video.play();
-  });
-
-  animWrap.addEventListener('mouseenter', () => {
-    if (playOverlay.style.display !== 'none') return;
-    if (video.ended) return;
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-  });
-  animWrap.addEventListener('mouseleave', () => {
-    hoverOverlay.style.display = 'none';
-  });
-
-  pauseState.addEventListener('click', () => {
-    video.pause();
-    pauseState.style.display  = 'none';
-    resumeState.style.display = 'flex';
-  });
-
-  resumeState.addEventListener('click', () => {
-    video.play();
-    hoverOverlay.style.display = 'none';
-  });
-})();
-</script>
-</body>
+        resumeState.addEventListener('click', () => {
+          video.play();
+          hoverOverlay.style.display = 'none';
+        });
+      })();
+    </script>
+  </body>
 </html>
 <script>
-// TODO: model list and prices will be fetched from API
-let _calcPricing = {};
-let _calcGroupRatio = 1;
+  // TODO: Model 목록 및 Pricing은 추후 API에서 가져올 예정
+  let _calcPricing = {}; // model_name → { input, output }
+  let _calcGroupRatio = 1;
 
-async function loadCalcModels() {
-  const sel = document.getElementById('calcModel');
-  try {
-    const res  = await fetch('/api/pricing');
-    const json = await res.json();
-    _calcGroupRatio = 2;
-    json.data.forEach(m => {
-      _calcPricing[m.model_name] = {
-        input:  m.model_ratio * _calcGroupRatio,
-        output: m.model_ratio * m.completion_ratio * _calcGroupRatio,
-      };
-    });
-    sel.innerHTML = json.data
-      .map(m => `<option value="${m.model_name}">${m.model_name}</option>`)
-      .join('');
-  } catch (e) {
-    sel.innerHTML = '<option value="">Failed to load models</option>';
+  async function loadCalcModels() {
+    const sel = document.getElementById("calcModel");
+    try {
+      const res = await fetch("/api/pricing");
+      const json = await res.json();
+      _calcGroupRatio = 2;
+      json.data.forEach((m) => {
+        const d = (m.discount_percent || 0) / 100;
+        _calcPricing[m.model_name] = {
+          input: m.model_ratio * _calcGroupRatio * (1 - d),
+          output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
+        };
+      });
+      sel.innerHTML = json.data
+        .map((m) => `<option value="${m.model_name}">${m.model_name}</option>`)
+        .join("");
+    } catch (e) {
+      sel.innerHTML = '<option value="">Failed to load models</option>';
+    }
   }
-}
-loadCalcModels();
+  loadCalcModels();
 
-function runCalc() {
-  const model   = document.getElementById('calcModel').value;
-  const inputM  = parseFloat(document.getElementById('calcInputTokens').value)  || 0;
-  const outputM = parseFloat(document.getElementById('calcOutputTokens').value) || 0;
-  const prices  = _calcPricing[model] || { input: 0, output: 0 };
-  const inputCost  = inputM  * prices.input;
-  const outputCost = outputM * prices.output;
-  const total      = inputCost + outputCost;
-  const fmt = v => '$' + v.toFixed(4);
-  document.getElementById('calcHint').style.display = 'none';
-  document.getElementById('calcLabel').style.display = '';
-  const priceEl = document.getElementById('calcPrice');
-  priceEl.style.display = '';
-  priceEl.textContent = '$' + total.toFixed(2);
-  document.getElementById('calcBreakdown').innerHTML =
-    `<div class="calc-breakdown-row"><span>Input tokens (${inputM}M)</span><span>${fmt(inputCost)}</span></div>` +
-    `<div class="calc-breakdown-row"><span>Output tokens (${outputM}M)</span><span>${fmt(outputCost)}</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;margin-top:4px;padding-top:4px;border-top:1px solid #374151;color:#9ca3af"><span>Input rate</span><span>$${prices.input.toFixed(4)}/M</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>Output rate</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
-}
+  function runCalc() {
+    const model = document.getElementById("calcModel").value;
+    const inputM =
+      parseFloat(document.getElementById("calcInputTokens").value) || 0;
+    const outputM =
+      parseFloat(document.getElementById("calcOutputTokens").value) || 0;
+    const prices = _calcPricing[model] || { input: 0, output: 0 };
+    const inputCost = inputM * prices.input;
+    const outputCost = outputM * prices.output;
+    const total = inputCost + outputCost;
+    const fmt = (v) => "$" + v.toFixed(4);
+    document.getElementById("calcHint").style.display = "none";
+    document.getElementById("calcLabel").style.display = "";
+    const priceEl = document.getElementById("calcPrice");
+    priceEl.style.display = "";
+    priceEl.textContent = "$" + total.toFixed(2);
+    document.getElementById("calcBreakdown").innerHTML =
+      `<div class="calc-breakdown-row"><span>Input Tokens (${inputM}M)</span><span>${fmt(inputCost)}</span></div>` +
+      `<div class="calc-breakdown-row"><span>Output Tokens (${outputM}M)</span><span>${fmt(outputCost)}</span></div>` +
+      `<div class="calc-breakdown-row" style="display:none;margin-top:4px;padding-top:4px;border-top:1px solid #374151;color:#9ca3af"><span>Input rate</span><span>$${prices.input.toFixed(4)}/M</span></div>` +
+      `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>Output rate</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
+  }
 </script>
 <script>
   lucide.createIcons();
-  document.addEventListener('click', function(e) {
-    document.querySelectorAll('.lang-switch.open').forEach(function(el) {
-      if (!el.contains(e.target)) el.classList.remove('open');
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll(".lang-switch.open").forEach(function (el) {
+      if (!el.contains(e.target)) el.classList.remove("open");
     });
   });
 </script>

@@ -61,6 +61,7 @@ import {
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
+import { discountBadgeClasses } from '../lib/discount-color'
 import { inferModelMetadata } from '../lib/model-metadata'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
 import type {
@@ -352,6 +353,18 @@ function PriceSection(props: {
   const tokenUnitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
   const baseGroupKey = '_base'
   const baseGroupRatioMap = { [baseGroupKey]: 1 }
+  const discountPercent = props.model.discount_percent ?? 0
+  const hasDiscount = discountPercent > 0
+  const discountBadge = hasDiscount ? (
+    <span
+      className={cn(
+        'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+        discountBadgeClasses(discountPercent)
+      )}
+    >
+      {discountPercent}% off
+    </span>
+  ) : null
   const dynamicSummary = getDynamicPricingSummary(props.model, {
     tokenUnit: props.tokenUnit,
     showRechargePrice: props.showRechargePrice,
@@ -500,9 +513,24 @@ function PriceSection(props: {
   }
 
   const secondaryItems = secondaryPriceTypes.filter((p) => p.available)
-  const renderPrice = (type: PriceType) => (
-    <>
-      {formatGroupPrice(
+  const renderPrice = (type: PriceType) => {
+    const original = formatGroupPrice(
+      props.model,
+      baseGroupKey,
+      type,
+      props.tokenUnit,
+      props.showRechargePrice,
+      props.priceRate,
+      props.usdExchangeRate,
+      baseGroupRatioMap
+    )
+    const unit = (
+      <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
+        / {tokenUnitLabel}
+      </span>
+    )
+    if (hasDiscount) {
+      const discounted = formatGroupPrice(
         props.model,
         baseGroupKey,
         type,
@@ -510,17 +538,33 @@ function PriceSection(props: {
         props.showRechargePrice,
         props.priceRate,
         props.usdExchangeRate,
-        baseGroupRatioMap
-      )}
-      <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
-        / {tokenUnitLabel}
-      </span>
-    </>
-  )
+        baseGroupRatioMap,
+        discountPercent
+      )
+      return (
+        <>
+          <s className='text-muted-foreground/50'>{original}</s>{' '}
+          {discounted}
+          {unit}
+        </>
+      )
+    }
+    return (
+      <>
+        {original}
+        {unit}
+      </>
+    )
+  }
 
   return (
     <section>
-      <SectionTitle>{t('Base Price')}</SectionTitle>
+      <div className='mb-3 flex items-center gap-2'>
+        <h2 className='text-muted-foreground text-xs font-semibold tracking-wider uppercase'>
+          {t('Base Price')}
+        </h2>
+        {discountBadge}
+      </div>
       <div className='grid grid-cols-2 gap-2'>
         {primaryPriceTypes.map((item) => (
           <div key={item.type} className='bg-muted/20 rounded-lg border p-3'>
@@ -601,6 +645,7 @@ function GroupPricingSection(props: {
 }) {
   const { t } = useTranslation()
   const showRechargePrice = props.showRechargePrice ?? false
+  const discountPercent = props.model.discount_percent ?? 0
 
   const availableGroups = useMemo(
     () => getAvailableGroups(props.model, props.usableGroup || {}),
@@ -823,7 +868,8 @@ function GroupPricingSection(props: {
                           showRechargePrice,
                           props.priceRate,
                           props.usdExchangeRate,
-                          props.groupRatio
+                          props.groupRatio,
+                          discountPercent
                         )}
                       </TableCell>
                       <TableCell className='py-2.5 text-right font-mono'>
@@ -835,7 +881,8 @@ function GroupPricingSection(props: {
                           showRechargePrice,
                           props.priceRate,
                           props.usdExchangeRate,
-                          props.groupRatio
+                          props.groupRatio,
+                          discountPercent
                         )}
                       </TableCell>
                       {extraPriceTypes.map((ep) => (
@@ -851,7 +898,8 @@ function GroupPricingSection(props: {
                             showRechargePrice,
                             props.priceRate,
                             props.usdExchangeRate,
-                            props.groupRatio
+                            props.groupRatio,
+                            discountPercent
                           )}
                         </TableCell>
                       ))}

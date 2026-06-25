@@ -59,6 +59,21 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
+	// 모델/벤더 할인(모델 우선)을 유효 group ratio에 접어 넣는다. HandleGroupRatio가
+	// GroupRatioInfo를 만드는 단일 지점이므로, 사전차감·정산·expr·per-call은 물론
+	// 재시도 시 재계산 경로(controller/relay.go)까지 할인이 일관되게 유지된다.
+	discountMultiplier := ratio_setting.GetEffectiveDiscountMultiplier(relayInfo.OriginModelName)
+	groupRatioInfo.GroupRatio *= discountMultiplier
+	groupRatioInfo.DiscountMultiplier = discountMultiplier
+	if discountMultiplier != 1 {
+		// 모델 할인이 있으면 모델, 없으면 벤더가 출처(GetEffectiveDiscountMultiplier와 동일 우선순위).
+		if _, ok := ratio_setting.GetModelDiscountMultiplier(relayInfo.OriginModelName); ok {
+			groupRatioInfo.DiscountSource = "model"
+		} else {
+			groupRatioInfo.DiscountSource = "vendor"
+		}
+	}
+
 	return groupRatioInfo
 }
 

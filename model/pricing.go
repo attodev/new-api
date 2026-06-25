@@ -21,6 +21,7 @@ type Pricing struct {
 	Icon                   string                  `json:"icon,omitempty"`
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
+	DiscountPercent        float64                 `json:"discount_percent,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
@@ -39,10 +40,11 @@ type Pricing struct {
 }
 
 type PricingVendor struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description,omitempty"`
+	Icon            string  `json:"icon,omitempty"`
+	DiscountPercent float64 `json:"discount_percent,omitempty"`
 }
 
 var (
@@ -83,6 +85,7 @@ func InvalidatePricingCache() {
 
 	pricingMap = nil
 	vendorsList = nil
+	modelVendorNameCache = nil
 	lastGetPricingTime = time.Time{}
 }
 
@@ -175,11 +178,16 @@ func updatePricing() {
 
 	vendorsList = make([]PricingVendor, 0, len(vendorMap))
 	for _, v := range vendorMap {
+		vendorDiscount := 0.0
+		if pct, ok := ratio_setting.GetVendorDiscountPercent(v.Name); ok {
+			vendorDiscount = pct
+		}
 		vendorsList = append(vendorsList, PricingVendor{
-			ID:          v.Id,
-			Name:        v.Name,
-			Description: v.Description,
-			Icon:        v.Icon,
+			ID:              v.Id,
+			Name:            v.Name,
+			Description:     v.Description,
+			Icon:            v.Icon,
+			DiscountPercent: vendorDiscount,
 		})
 	}
 
@@ -329,6 +337,16 @@ func updatePricing() {
 				pricing.BillingExpr = expr
 			}
 		}
+		// 유효 할인%: 모델 할인 우선, 없으면 벤더 할인.
+		discountPercent := 0.0
+		if pct, ok := ratio_setting.GetModelDiscountPercent(pricing.ModelName); ok {
+			discountPercent = pct
+		} else if v, ok := vendorMap[pricing.VendorID]; ok {
+			if pct, ok := ratio_setting.GetVendorDiscountPercent(v.Name); ok {
+				discountPercent = pct
+			}
+		}
+		pricing.DiscountPercent = discountPercent
 		pricingMap = append(pricingMap, pricing)
 	}
 
@@ -345,10 +363,41 @@ func updatePricing() {
 	}
 	modelEnableGroupsLock.Unlock()
 
+	// modelVendorNameCache(모델명 -> 벤더명)를 pricing 갱신과 같은 락 구간에서 함께
+	// 빌드한다. resolveVendorName은 이 값을 읽기만 하므로 데이터 레이스가 없다.
+	vendorIDToName := make(map[int]string)
+	for _, v := range vendorsList {
+		vendorIDToName[v.ID] = v.Name
+	}
+	rebuiltVendorCache := make(map[string]string)
+	for _, p := range pricingMap {
+		if name, ok := vendorIDToName[p.VendorID]; ok {
+			rebuiltVendorCache[p.ModelName] = name
+		}
+	}
+	modelVendorNameCache = rebuiltVendorCache
+
 	lastGetPricingTime = time.Now()
 }
 
 // GetSupportedEndpointMap
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+func init() {
+	ratio_setting.SetVendorResolver(resolveVendorName)
+}
+
+// modelVendorNameCache: 모델명 -> 벤더명. updatePricing()이 락을 쥔 채 빌드한다.
+var modelVendorNameCache map[string]string
+
+func resolveVendorName(modelName string) (string, bool) {
+	// pricingMap/modelVendorNameCache가 준비되도록 보장(필요 시 락 안에서 빌드).
+	GetPricing()
+	// InvalidatePricingCache와의 레이스를 피하려 같은 락으로 읽는다.
+	updatePricingLock.Lock()
+	defer updatePricingLock.Unlock()
+	name, ok := modelVendorNameCache[modelName]
+	return name, ok && name != ""
 }

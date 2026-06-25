@@ -2,14 +2,20 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 
 const adminUsername = process.env.E2E_ADMIN_USERNAME || 'admin'
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || 'atto1234'
-const organizationOwnerUsername =
-  process.env.E2E_ORGANIZATION_OWNER_USERNAME || 'atto.o'
-const organizationAdminUsername =
-  process.env.E2E_ORGANIZATION_ADMIN_USERNAME || 'ato.a'
-const organizationMemberUsername =
-  process.env.E2E_ORGANIZATION_MEMBER_USERNAME || 'atto.1'
-const organizationPassword =
-  process.env.E2E_ORGANIZATION_PASSWORD || adminPassword
+
+// Only the admin account relies on seeded defaults. The organization owner,
+// org-admin, and member accounts plus the test organization are created and
+// destroyed through the UI within this suite (see setup/teardown tests).
+// A run-scoped id keeps names unique so a crashed run never collides with the next.
+// Base-36 keeps it short (~8 chars) so the longest username (`e2e_member_<id>`)
+// stays within the backend's 20-char `max` validation on Username/DisplayName.
+const runId = Date.now().toString(36)
+const ownerUsername = `e2e_owner_${runId}`
+const orgAdminUsername = `e2e_admin_${runId}`
+const memberUsername = `e2e_member_${runId}`
+const createdUserPassword = adminPassword
+const organizationName = `E2E Org ${runId}`
+const planTitle = `E2E Plan ${runId}`
 
 type SavedAuthStorage = {
   user: string
@@ -17,6 +23,9 @@ type SavedAuthStorage = {
 }
 
 const authStorage = new WeakMap<Page, SavedAuthStorage>()
+// Credentials per page so openAuthenticatedPage can fully re-login (re-establishing
+// the session cookie, not just localStorage) when a page lands back on /sign-in.
+const pageCredentials = new WeakMap<Page, { username: string; password: string }>()
 
 async function signInWithUi(
   page: Page,
@@ -72,6 +81,7 @@ async function signInWithUi(
     uid: window.localStorage.getItem('uid') ?? '',
   }))
   authStorage.set(page, savedStorage)
+  pageCredentials.set(page, { username, password })
   await page.context().addInitScript((storage: SavedAuthStorage) => {
     if (storage.user) window.localStorage.setItem('user', storage.user)
     if (storage.uid) window.localStorage.setItem('uid', storage.uid)
@@ -87,31 +97,188 @@ async function restoreAuth(page: Page, saved: SavedAuthStorage) {
 
 async function openAuthenticatedPage(page: Page, path = '/') {
   const saved = authStorage.get(page)
-  // Set localStorage before navigation (same-origin persistence).
-  if (saved) {
-    await restoreAuth(page, saved).catch(() => {
-      // Ignore: page might be at about:blank on first call
-    })
-  }
-  await page.goto(path)
-  // Wait for the network to settle so the auth guard's getSelf() call completes
-  // before any assertions run. Without this, assertions can race React render.
-  await page.waitForLoadState('networkidle').catch(() => {})
-  if (saved) {
-    // After navigation, verify auth survived. On snap Chromium the context-level
-    // initScript can lose the race against the app's auth guard.
+  const creds = pageCredentials.get(page)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // Set localStorage before navigation (same-origin persistence).
+    if (saved) {
+      await restoreAuth(page, saved).catch(() => {
+        // Ignore: page might be at about:blank on the first attempt.
+      })
+    }
+    await page.goto(path)
+    // Wait for the network to settle so the auth guard's getSelf() call completes
+    // before any assertions run.
+    await page.waitForLoadState('networkidle').catch(() => {})
+    if (!saved) return page
+    // Verify auth survived. On snap Chromium the context-level initScript can lose
+    // the race against the app's auth guard, and a restored session cookie can be
+    // rejected (getSelf -> 401), both of which bounce the page to /sign-in.
     const hasUser = await page.evaluate(
       () => !!window.localStorage.getItem('user')
     )
-    if (!hasUser || page.url().includes('/sign-in')) {
-      // Restore localStorage and navigate to the intended path so the page
-      // renders with auth.
-      await restoreAuth(page, saved)
-      await page.goto(path)
-      await page.waitForLoadState('networkidle').catch(() => {})
+    if (hasUser && !page.url().includes('/sign-in')) {
+      return page
+    }
+    // Recovery: a full UI re-login deterministically re-establishes both the
+    // session cookie and localStorage. Falls back to a localStorage restore if
+    // we never captured credentials for this page.
+    if (creds) {
+      await signInWithUi(page, creds.username, creds.password)
+    } else {
+      await restoreAuth(page, saved).catch(() => {})
     }
   }
+  await page.goto(path)
+  await page.waitForLoadState('networkidle').catch(() => {})
   return page
+}
+
+async function createUserViaUi(
+  page: Page,
+  user: { username: string; password: string; displayName?: string }
+) {
+  await openAuthenticatedPage(page, '/users')
+  await page.getByRole('button', { name: /^add user$/i }).click()
+  const drawer = page.getByRole('dialog')
+  await expect(drawer).toBeVisible()
+  // Role defaults to "Common User" (role=1) — no need to touch the Role select.
+  await drawer.getByPlaceholder('Enter username').fill(user.username)
+  if (user.displayName) {
+    await drawer.getByPlaceholder('Enter display name').fill(user.displayName)
+  }
+  await drawer.getByPlaceholder(/Enter password/i).fill(user.password)
+  await page.getByRole('button', { name: /^save changes$/i }).click()
+  await expect(page.getByText(/user created successfully/i)).toBeVisible()
+}
+
+async function createOrganizationViaUi(
+  page: Page,
+  options: { name: string; ownerUsername: string }
+) {
+  await openAuthenticatedPage(page, '/organization')
+  await page.getByPlaceholder('Organization Name').fill(options.name)
+  // Owner selector is a Base UI Select whose trigger shows the "Owner User"
+  // placeholder until a user is picked. Filter by that text so we don't match
+  // the root org-scope selector that also renders as a combobox on this page.
+  await page.getByRole('combobox').filter({ hasText: 'Owner User' }).click()
+  await page
+    .getByRole('option', {
+      name: new RegExp(`^${options.ownerUsername}\\s+#\\d+$`),
+    })
+    .click()
+  await page.getByRole('button', { name: /^create$/i }).click()
+  await expect(page.getByText(/organization created/i)).toBeVisible()
+}
+
+async function assignMemberViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/organization')
+  await page.getByPlaceholder('Username', { exact: true }).fill(username)
+  // Add button label is hard-coded Korean "추가" in organization-users-table.tsx.
+  await page.getByRole('button', { name: '추가' }).click()
+  await expect(page.getByText(/organization member assigned/i)).toBeVisible()
+}
+
+async function promoteMemberToAdminViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/organization')
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  // Only the owner sees the editable Role select in the members table.
+  await row.getByRole('combobox').click()
+  // Assumes the English locale: t('admin') falls back to the literal key.
+  await page.getByRole('option', { name: /^admin$/i }).click()
+  await page.getByRole('button', { name: /^save$/i }).click()
+  await expect(page.getByText(/changes saved/i)).toBeVisible()
+}
+
+async function deleteOrganizationViaUi(page: Page, name: string) {
+  await openAuthenticatedPage(page, '/organization')
+  // The org cards and their section wrapper share the same classes, but only
+  // the wrapper and the one leaf card matching `name` survive the hasText
+  // filter; .last() picks the leaf (it appears later in the DOM than the wrapper).
+  const card = page
+    .locator('div.rounded-md.border.p-3')
+    .filter({ hasText: name })
+    .filter({ has: page.getByRole('button', { name: /^delete$/i }) })
+    .last()
+  // The trigger and (once open) the dialog's confirm button both expose the
+  // "Delete" accessible name, so target the trigger by its data-slot to avoid
+  // ambiguity.
+  await card.locator('[data-slot="alert-dialog-trigger"]').click()
+  // Scope to the dialog whose description names this organization.
+  const dialog = page.getByRole('alertdialog').filter({ hasText: name })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: /^delete$/i }).click()
+  // Assert the card disappears from the manage list rather than trusting the
+  // toast, so a backend rejection fails the test loudly.
+  await expect(card).toHaveCount(0)
+}
+
+async function deleteUserViaUi(page: Page, username: string) {
+  await openAuthenticatedPage(page, '/users')
+  await page.getByPlaceholder(/filter by username/i).fill(username)
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  await row.getByRole('button', { name: /open menu/i }).click()
+  await page.getByRole('menuitem', { name: /^delete$/i }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog.getByText(/are you sure/i)).toBeVisible()
+  await dialog.getByRole('button', { name: /^delete$/i }).click()
+  await expect(page.getByText(/user deleted successfully/i)).toBeVisible()
+}
+
+async function removeMemberFromOrganizationViaUi(page: Page, username: string) {
+  // Only an org owner/admin can remove members, so this must run on the owner's
+  // (or an org-admin's) page. Select the member's row, remove it from the org,
+  // then save the pending change.
+  await openAuthenticatedPage(page, '/organization')
+  const row = page.getByRole('row').filter({ hasText: username })
+  await expect(row).toBeVisible()
+  await row.locator('input[type="checkbox"]').check()
+  // "조직에서 제거" (remove from organization) is hard-coded Korean in
+  // organization-users-table.tsx and only shows for org admins/owners.
+  await page.getByRole('button', { name: '조직에서 제거' }).click()
+  await page.getByRole('button', { name: /^save$/i }).click()
+  await expect(page.getByText(/changes saved/i)).toBeVisible()
+}
+
+async function createOrganizationPlanViaUi(
+  page: Page,
+  plan: { title: string; quotaAmount: string }
+) {
+  await openAuthenticatedPage(page, '/organization/subscriptions')
+  // The form labels are not associated with their inputs, so scope by the
+  // "Plan configuration" card: the first textbox is Plan title and the first
+  // number input is Quota amount. Duration keeps its default (1 month).
+  const card = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Plan configuration' })
+  await card.getByRole('textbox').first().fill(plan.title)
+  await card.locator('input[type="number"]').first().fill(plan.quotaAmount)
+  await card.getByRole('button', { name: /^create$/i }).click()
+  await expect(page.getByText(/organization plan saved/i)).toBeVisible()
+  // The new plan appears in the "Organization plans" table.
+  const plansCard = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Organization plans' })
+  await expect(plansCard.getByText(plan.title, { exact: true })).toBeVisible()
+}
+
+async function assignPlanToMemberViaUi(
+  page: Page,
+  options: { memberLabel: string; planTitle: string }
+) {
+  await openAuthenticatedPage(page, '/organization/subscriptions')
+  // "Member plan assignment" uses native <select> elements: first = user,
+  // second = plan.
+  const card = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: 'Member plan assignment' })
+  await card.locator('select').first().selectOption({ label: options.memberLabel })
+  await card.locator('select').nth(1).selectOption({ label: options.planTitle })
+  await card.getByRole('button', { name: /^assign$/i }).click()
+  await expect(page.getByText(/organization plan assigned/i)).toBeVisible()
+  // The assignment shows up as a row (Plan column cell) in the member table.
+  await expect(card.getByRole('cell', { name: options.planTitle })).toBeVisible()
 }
 
 test.describe('organization browser smoke tests', () => {
@@ -134,32 +301,79 @@ test.describe('organization browser smoke tests', () => {
     ])
 
     rootPage = await contexts[0].newPage()
-    await signInWithUi(rootPage)
-
     ownerPage = await contexts[1].newPage()
-    await signInWithUi(
-      ownerPage,
-      organizationOwnerUsername,
-      organizationPassword
-    )
-
     organizationAdminPage = await contexts[2].newPage()
-    await signInWithUi(
-      organizationAdminPage,
-      organizationAdminUsername,
-      organizationPassword
+    memberPage = await contexts[3].newPage()
+
+    // The dev server renders a fixed-position "Open TanStack Router Devtools"
+    // button in the bottom corner that intercepts clicks on drawer/footer
+    // buttons (e.g. "Save changes"). Hide it on every page in every context.
+    await Promise.all(
+      contexts.map((context) =>
+        context.addInitScript(() => {
+          const inject = () => {
+            const id = 'e2e-hide-devtools'
+            if (document.getElementById(id)) return
+            const style = document.createElement('style')
+            style.id = id
+            style.textContent =
+              '[aria-label="Open TanStack Router Devtools"],[aria-label="Open Tanstack query devtools"]{display:none !important;}'
+            ;(document.head || document.documentElement)?.appendChild(style)
+          }
+          if (document.head || document.documentElement) inject()
+          document.addEventListener('DOMContentLoaded', inject)
+        })
+      )
     )
 
-    memberPage = await contexts[3].newPage()
-    await signInWithUi(
-      memberPage,
-      organizationMemberUsername,
-      organizationPassword
-    )
+    // Only the admin (root) account exists at the start. The other accounts are
+    // created in the first test ("admin provisions ...") and signed in there.
+    await signInWithUi(rootPage)
   })
 
   test.afterAll(async () => {
     await Promise.all(contexts.filter(Boolean).map((context) => context.close()))
+  })
+
+  test('admin provisions organization, users, and roles via UI', async () => {
+    // 1) root creates three Common Users.
+    await createUserViaUi(rootPage, {
+      username: ownerUsername,
+      password: createdUserPassword,
+      displayName: ownerUsername,
+    })
+    await createUserViaUi(rootPage, {
+      username: orgAdminUsername,
+      password: createdUserPassword,
+      displayName: orgAdminUsername,
+    })
+    await createUserViaUi(rootPage, {
+      username: memberUsername,
+      password: createdUserPassword,
+      displayName: memberUsername,
+    })
+
+    // 2) root creates the organization, owned by the owner user.
+    await createOrganizationViaUi(rootPage, {
+      name: organizationName,
+      ownerUsername,
+    })
+
+    // 3) owner signs in (account now exists) and assigns the other two as members.
+    await signInWithUi(ownerPage, ownerUsername, createdUserPassword)
+    await assignMemberViaUi(ownerPage, orgAdminUsername)
+    await assignMemberViaUi(ownerPage, memberUsername)
+
+    // 4) owner promotes the org-admin user from member -> admin.
+    await promoteMemberToAdminViaUi(ownerPage, orgAdminUsername)
+
+    // 5) org-admin and member sign in for the downstream tests.
+    await signInWithUi(
+      organizationAdminPage,
+      orgAdminUsername,
+      createdUserPassword
+    )
+    await signInWithUi(memberPage, memberUsername, createdUserPassword)
   })
 
   test('root admin can see organization management navigation and pages', async () => {
@@ -371,5 +585,64 @@ test.describe('organization browser smoke tests', () => {
 
     // toast with validation error should appear
     await expect(page.getByText(/plan title is required/i)).toBeVisible()
+  })
+
+  test('admin creates an organization subscription plan', async () => {
+    await createOrganizationPlanViaUi(organizationAdminPage, {
+      title: planTitle,
+      quotaAmount: '10',
+    })
+  })
+
+  test('admin assigns the organization subscription plan to a member', async () => {
+    await assignPlanToMemberViaUi(organizationAdminPage, {
+      memberLabel: memberUsername,
+      planTitle,
+    })
+  })
+
+  test('root admin can open organization users page without org_id error', async () => {
+    const page = await openAuthenticatedPage(rootPage, '/organization')
+    await expect(
+      page.getByRole('heading', { name: /organization users/i })
+    ).toBeVisible()
+    // Root is not bound to one org, so it must scope the users list to an
+    // organization; select the one created in setup. Without this scoping the
+    // backend rejected the request with "organization_id is required".
+    await page.locator('select').selectOption({ label: organizationName })
+    await expect(page.getByText(/organization_id is required/i)).toHaveCount(0)
+    // The selected org's members load (owner row is visible).
+    await expect(page.getByText(ownerUsername, { exact: true }).first()).toBeVisible()
+  })
+
+  test('admin removes organization members, organization, and users via UI', async () => {
+    // Best-effort cleanup. Order matters:
+    // 1) The owner removes the non-owner members from the organization — only an
+    //    org owner/admin may remove members. (The backend also refuses to delete
+    //    an org that still has non-owner members.)
+    // 2) Root deletes the organization, which cascades subscription plans and
+    //    user subscriptions and clears the owner's membership.
+    // 3) Root deletes all the test accounts.
+    for (const username of [orgAdminUsername, memberUsername]) {
+      try {
+        await removeMemberFromOrganizationViaUi(ownerPage, username)
+      } catch (error) {
+        console.error(`Failed to remove ${username} from organization:`, error)
+      }
+    }
+
+    try {
+      await deleteOrganizationViaUi(rootPage, organizationName)
+    } catch (error) {
+      console.error(`Failed to delete organization ${organizationName}:`, error)
+    }
+
+    for (const username of [orgAdminUsername, memberUsername, ownerUsername]) {
+      try {
+        await deleteUserViaUi(rootPage, username)
+      } catch (error) {
+        console.error(`Failed to delete user ${username}:`, error)
+      }
+    }
   })
 })

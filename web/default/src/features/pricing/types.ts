@@ -25,6 +25,7 @@ export type PricingVendor = {
   name: string
   icon?: string
   description?: string
+  discount_percent?: number
 }
 
 export type PricingModel = {
@@ -55,6 +56,8 @@ export type PricingModel = {
   billing_expr?: string
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
+  /** Discount percentage applied to this model's pricing (0-100) */
+  discount_percent?: number
   /**
    * Optional model metadata fields. These are not yet returned by the backend
    * and are populated client-side from {@link inferModelMetadata}.
