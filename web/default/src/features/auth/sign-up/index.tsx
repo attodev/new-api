@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
+import { ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useStatus } from '@/hooks/use-status'
 import { AuthLayout } from '../auth-layout'
@@ -34,6 +35,10 @@ export function SignUp() {
           <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
             {t('Create an account')}
           </h2>
+          <p className='mb-5 flex min-w-0 flex-1 items-center text-left shadow-xs transition-colors outline-none focus-visible:ring-2'>
+            <ShieldCheck className='mr-2 size-4' />
+            {t('계약된 도메인만 가입가능합니다')}
+          </p>
           <p className='text-muted-foreground text-left text-sm sm:text-base'>
             {t('Already have an account?')}{' '}
             <Link

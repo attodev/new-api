@@ -9,9 +9,9 @@
     },
     "kr": {
       "file": "kr.json",
-      "missingCount": 0,
+      "missingCount": 3,
       "extrasCount": 0,
-      "untranslatedCount": 585
+      "untranslatedCount": 588
     }
   }
 }

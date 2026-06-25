@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+import { t } from 'i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import { API_KEY_STATUS } from '@/features/keys/constants'
@@ -24,18 +25,18 @@ import { API_KEY_STATUS } from '@/features/keys/constants'
 export async function fetchActiveChatKey() {
   const result = await getApiKeys({ p: 1, size: 50 })
   if (!result.success) {
-    throw new Error(result.message || 'Failed to load API keys')
+    throw new Error(result.message || t('Failed to load API keys'))
   }
 
   const items = result.data?.items ?? []
   const active = items.find((item) => item.status === API_KEY_STATUS.ENABLED)
   if (!active) {
-    throw new Error('No enabled API keys found. Create or enable one first.')
+    throw new Error(t('No enabled API keys found. Create or enable one first.'))
   }
 
   const keyResult = await fetchTokenKey(active.id)
   if (!keyResult.success || !keyResult.data?.key) {
-    throw new Error(keyResult.message || 'Failed to load API key')
+    throw new Error(keyResult.message || t('Failed to load API key'))
   }
 
   return `sk-${keyResult.data.key}`
