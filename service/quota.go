@@ -120,6 +120,10 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
+	// Apply model/vendor discount on the resolved group ratio. This path does not
+	// read the shared PriceData.GroupRatioInfo (which Task 4 already discounted),
+	// so the discount must be folded in here.
+	actualGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(modelName)
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{

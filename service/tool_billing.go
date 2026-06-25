@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
 // ToolCallUsage captures all tool call counts from a single request.
@@ -39,6 +40,11 @@ type ToolCallResult struct {
 func ComputeToolCallQuota(usage ToolCallUsage, groupRatio float64) ToolCallResult {
 	var items []ToolCallItem
 	totalQuota := 0
+
+	// Apply model/vendor discount on the group ratio used for tool-call charges,
+	// matching the rule that wherever groupRatio is applied to this model's charge
+	// the discount must also be applied.
+	groupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(usage.ModelName)
 
 	addItem := func(toolName string, count int) {
 		if count <= 0 {

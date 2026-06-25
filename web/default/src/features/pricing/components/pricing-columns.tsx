@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { getLobeIcon } from '@/lib/lobe-icon'
+import { cn } from '@/lib/utils'
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +34,7 @@ import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../lib/dynamic-price'
+import { discountBadgeClasses } from '../lib/discount-color'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import {
@@ -207,6 +209,9 @@ export function usePricingColumns(
           )
         }
 
+        const discountPercent = model.discount_percent ?? 0
+        const hasDiscount = discountPercent > 0
+
         const isTokenBased = isTokenBasedModel(model)
 
         if (isTokenBased) {
@@ -231,6 +236,56 @@ export function usePricingColumns(
             )
           )
 
+          if (hasDiscount) {
+            const discountedInput = stripTrailingZeros(
+              formatPrice(
+                model,
+                'input',
+                tokenUnit,
+                showRechargePrice,
+                priceRate,
+                usdExchangeRate,
+                discountPercent
+              )
+            )
+            const discountedOutput = stripTrailingZeros(
+              formatPrice(
+                model,
+                'output',
+                tokenUnit,
+                showRechargePrice,
+                priceRate,
+                usdExchangeRate,
+                discountPercent
+              )
+            )
+
+            return (
+              <div className='min-w-[160px]'>
+                <span className='font-mono text-sm tabular-nums'>
+                  <s className='text-muted-foreground/50'>{inputPrice}</s>{' '}
+                  {discountedInput}
+                  <span className='text-muted-foreground/40 mx-1'>/</span>
+                  <s className='text-muted-foreground/50'>{outputPrice}</s>{' '}
+                  {discountedOutput}
+                </span>
+                <div className='text-muted-foreground/50 text-[10px]'>
+                  / {tokenUnitLabel} tokens
+                </div>
+                <div className='mt-1'>
+                  <span
+                    className={cn(
+                      'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                      discountBadgeClasses(discountPercent)
+                    )}
+                  >
+                    {discountPercent}% off
+                  </span>
+                </div>
+              </div>
+            )
+          }
+
           return (
             <div className='min-w-[160px]'>
               <span className='font-mono text-sm tabular-nums'>
@@ -253,6 +308,40 @@ export function usePricingColumns(
             usdExchangeRate
           )
         )
+
+        if (hasDiscount) {
+          const discountedPrice = stripTrailingZeros(
+            formatRequestPrice(
+              model,
+              showRechargePrice,
+              priceRate,
+              usdExchangeRate,
+              discountPercent
+            )
+          )
+
+          return (
+            <div className='min-w-[100px]'>
+              <span className='font-mono text-sm tabular-nums'>
+                <s className='text-muted-foreground/50'>{price}</s>{' '}
+                {discountedPrice}
+              </span>
+              <div className='text-muted-foreground/50 text-[10px]'>
+                / {t('request')}
+              </div>
+              <div className='mt-1'>
+                <span
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                    discountBadgeClasses(discountPercent)
+                  )}
+                >
+                  {discountPercent}% off
+                </span>
+              </div>
+            </div>
+          )
+        }
 
         return (
           <div className='min-w-[100px]'>
