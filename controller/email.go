@@ -34,7 +34,7 @@ func TestEmail(c *gin.Context) {
 
 	if err := common.SendEmail(subject, req.To, body); err != nil {
 		common.SysError(fmt.Sprintf("test email send failed: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgEmailSendFailed)})
 		return
 	}
 

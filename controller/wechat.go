@@ -22,9 +22,9 @@ type wechatLoginResponse struct {
 	Data    string `json:"data"`
 }
 
-func getWeChatIdByCode(code string) (string, error) {
+func getWeChatIdByCode(c *gin.Context, code string) (string, error) {
 	if code == "" {
-		return "", errors.New("invalid parameters")
+		return "", errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/wechat/user?code=%s", common.WeChatServerAddress, url.QueryEscape(code)), nil)
 	if err != nil {
@@ -48,7 +48,7 @@ func getWeChatIdByCode(code string) (string, error) {
 		return "", errors.New(res.Message)
 	}
 	if res.Data == "" {
-		return "", errors.New("verification code is incorrect or expired")
+		return "", errors.New(common.TranslateMessage(c, i18n.MsgUserVerificationCodeError))
 	}
 	return res.Data, nil
 }
@@ -62,7 +62,7 @@ func WeChatAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	wechatId, err := getWeChatIdByCode(code)
+	wechatId, err := getWeChatIdByCode(c, code)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"message": err.Error(),
@@ -143,7 +143,7 @@ func WeChatBind(c *gin.Context) {
 		return
 	}
 	code := req.Code
-	wechatId, err := getWeChatIdByCode(code)
+	wechatId, err := getWeChatIdByCode(c, code)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"message": err.Error(),

@@ -2,11 +2,13 @@ package common
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
@@ -128,6 +130,21 @@ func ValidateNumericCode(code string) (string, error) {
 
 	if _, err := strconv.Atoi(code); err != nil {
 		return "", fmt.Errorf("verification code can only contain digits")
+	}
+
+	return code, nil
+}
+
+// ValidateNumericCodeI18n validates a numeric code and returns a translated error if invalid
+func ValidateNumericCodeI18n(c *gin.Context, code string) (string, error) {
+	code = strings.ReplaceAll(code, " ", "")
+
+	if len(code) != 6 {
+		return "", errors.New(TranslateMessage(c, "totp.code_must_be_6_digits"))
+	}
+
+	if _, err := strconv.Atoi(code); err != nil {
+		return "", errors.New(TranslateMessage(c, "totp.code_digits_only"))
 	}
 
 	return code, nil

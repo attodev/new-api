@@ -197,7 +197,7 @@ func getModelFromJSONBody(c *gin.Context) (*ModelRequest, error) {
 		return nil, err
 	}
 	if !gjson.ValidBytes(requestBody) {
-		return nil, errors.New("invalid JSON request body")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 
 	values := gjson.GetManyBytes(requestBody, "model", "group")

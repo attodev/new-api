@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -83,7 +84,7 @@ func UpdateOrganizationSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	if len(updates) == 0 {
-		common.ApiError(c, errors.New("no organization subscription plan fields to update"))
+		common.ApiErrorI18n(c, i18n.MsgOrgSubNoFieldsToUpdate)
 		return
 	}
 	if err := model.DB.Model(&model.OrganizationSubscriptionPlan{}).
@@ -141,7 +142,7 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 		}
 		organizationId = parsedOrganizationId
 	} else if organizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -156,7 +157,7 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 		return
 	}
 	if target.OrganizationId != organizationId || target.Role >= common.RoleAdminUser {
-		common.ApiError(c, errors.New("organization target permission denied"))
+		common.ApiErrorI18n(c, i18n.MsgOrgTargetPermDenied)
 		return
 	}
 
@@ -191,7 +192,7 @@ func CancelOrganizationUserSubscription(c *gin.Context) {
 		}
 		organizationId = parsedOrganizationId
 	} else if organizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiError(c, errors.New("organization admin permission required"))
+		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 

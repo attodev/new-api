@@ -12,6 +12,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
@@ -110,13 +111,13 @@ func getImageBase64sFromForm(c *gin.Context, fieldName string) ([]string, error)
 
 			// If no image fields found at all
 			if !foundArrayImages && (len(imageFiles) == 0) {
-				return nil, errors.New("image is required")
+				return nil, errors.New(common.TranslateMessage(c, i18n.MsgAliImageRequired))
 			}
 		}
 	}
 
 	if len(imageFiles) == 0 {
-		return nil, errors.New("image is required")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgAliImageRequired))
 	}
 
 	//if len(imageFiles) > 1 {
@@ -128,12 +129,12 @@ func getImageBase64sFromForm(c *gin.Context, fieldName string) ([]string, error)
 	for _, file := range imageFiles {
 		image, err := file.Open()
 		if err != nil {
-			return nil, errors.New("failed to open image file")
+			return nil, errors.New(common.TranslateMessage(c, i18n.MsgAliImageOpenFailed))
 		}
 
 		imageData, err := io.ReadAll(image)
 		if err != nil {
-			return nil, errors.New("failed to read image file")
+			return nil, errors.New(common.TranslateMessage(c, i18n.MsgAliImageReadFailed))
 		}
 
 		// MIME
@@ -157,7 +158,7 @@ func oaiFormEdit2AliImageEdit(c *gin.Context, info *relaycommon.RelayInfo, reque
 
 	imageBase64s, err := getImageBase64sFromForm(c, "image")
 	if err != nil {
-		return nil, fmt.Errorf("get image base64s from form failed: %w", err)
+		return nil, fmt.Errorf("%s: %w", common.TranslateMessage(c, i18n.MsgAliImageBase64Failed), err)
 	}
 	//dto.MediaContent{}
 	mediaContents := make([]AliMediaContent, len(imageBase64s))
@@ -257,7 +258,7 @@ func asyncTaskWait(c *gin.Context, info *relaycommon.RelayInfo, taskID string) (
 		time.Sleep(time.Duration(waitSeconds) * time.Second)
 	}
 
-	return nil, nil, fmt.Errorf("aliAsyncTaskWait timeout")
+	return nil, nil, errors.New(common.TranslateMessage(c, i18n.MsgAliAsyncTimeout))
 }
 
 func responseAli2OpenAIImage(c *gin.Context, response *AliResponse, originBody []byte, info *relaycommon.RelayInfo, responseFormat string) *dto.ImageResponse {

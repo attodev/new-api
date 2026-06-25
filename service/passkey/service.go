@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/gin-gonic/gin"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	webauthn "github.com/go-webauthn/webauthn/webauthn"
@@ -23,12 +25,13 @@ const (
 )
 
 // BuildWebAuthn constructs a WebAuthn instance using the current passkey settings and request context.
-func BuildWebAuthn(r *http.Request) (*webauthn.WebAuthn, error) {
+func BuildWebAuthn(c *gin.Context) (*webauthn.WebAuthn, error) {
 	settings := system_setting.GetPasskeySettings()
 	if settings == nil {
-		return nil, errors.New("passkey settings not found")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgPasskeySettingsNotFound))
 	}
 
+	r := c.Request
 	displayName := strings.TrimSpace(settings.RPDisplayName)
 	if displayName == "" {
 		displayName = common.SystemName

@@ -28,9 +28,9 @@ type GitHubUser struct {
 	Email string `json:"email"`
 }
 
-func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
+func getGitHubUserInfoByCode(c *gin.Context, code string) (*GitHubUser, error) {
 	if code == "" {
-		return nil, errors.New("invalid parameters")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgInvalidParams))
 	}
 	values := map[string]string{"client_id": common.GitHubClientId, "client_secret": common.GitHubClientSecret, "code": code}
 	jsonData, err := common.Marshal(values)
@@ -49,7 +49,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	res, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to GitHub server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "GitHub"}))
 	}
 	defer res.Body.Close()
 	var oAuthResponse GitHubOAuthResponse
@@ -65,7 +65,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	res2, err := client.Do(req)
 	if err != nil {
 		common.SysLog(err.Error())
-		return nil, errors.New("unable to connect to GitHub server, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthConnectFailed, map[string]any{"Provider": "GitHub"}))
 	}
 	defer res2.Body.Close()
 	var githubUser GitHubUser
@@ -74,7 +74,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 		return nil, err
 	}
 	if githubUser.Login == "" {
-		return nil, errors.New("invalid response, user field is empty, please try again later")
+		return nil, errors.New(common.TranslateMessage(c, i18n.MsgOAuthUserInfoEmpty, map[string]any{"Provider": "GitHub"}))
 	}
 	return &githubUser, nil
 }
@@ -103,7 +103,7 @@ func GitHubOAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	githubUser, err := getGitHubUserInfoByCode(code)
+	githubUser, err := getGitHubUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -182,7 +182,7 @@ func GitHubBind(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	githubUser, err := getGitHubUserInfoByCode(code)
+	githubUser, err := getGitHubUserInfoByCode(c, code)
 	if err != nil {
 		common.ApiError(c, err)
 		return

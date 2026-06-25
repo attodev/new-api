@@ -433,6 +433,9 @@ const (
 	MsgPasskeyNeedVerification   = "passkey.need_verification"
 	MsgPasskeyNeedSpecificVerify = "passkey.need_specific_verification"
 	MsgPasskeyInvalidState       = "passkey.invalid_state"
+	MsgPasskeySettingsNotFound   = "passkey.settings_not_found"
+	MsgPasskeySessionExpired     = "passkey.session_expired"
+	MsgPasskeySessionFormatInvalid = "passkey.session_format_invalid"
 )
 
 // Secure verification messages
@@ -500,6 +503,15 @@ const (
 	MsgTaskVideoGetChannelFailed = "task_video.get_channel_failed"
 	MsgTaskVideoGetModelFailed   = "task_video.get_model_failed"
 	MsgTaskVideoUpstreamFailed   = "task_video.upstream_failed"
+)
+
+// Ali relay messages
+const (
+	MsgAliImageRequired     = "relay.ali.image_required"
+	MsgAliImageOpenFailed   = "relay.ali.image_open_failed"
+	MsgAliImageReadFailed   = "relay.ali.image_read_failed"
+	MsgAliImageBase64Failed = "relay.ali.image_base64_failed"
+	MsgAliAsyncTimeout      = "relay.ali.async_timeout"
 )
 
 // 2FA extended messages
@@ -615,6 +627,11 @@ const (
 	MsgCodexAccountIdRequired    = "codex.account_id_required"
 )
 
+// Email sending messages
+const (
+	MsgEmailSendFailed = "email.send_failed"
+)
+
 // Misc messages
 const (
 	MsgMigrated               = "common.migrated"
@@ -635,10 +652,33 @@ const (
 
 // Passkey controller messages
 const (
-	MsgPasskeyNotEnabled = "passkey.not_enabled"
-	MsgPasskeyRegistered = "passkey.registered"
-	MsgPasskeyUnbound    = "passkey.unbound"
-	MsgPasskeyNotBound   = "passkey.not_bound"
-	MsgPasskeyReset      = "passkey.reset"
-	MsgPasskeyVerified   = "passkey.verified"
+	MsgPasskeyNotEnabled   = "passkey.not_enabled"
+	MsgPasskeyRegistered   = "passkey.registered"
+	MsgPasskeyUnbound      = "passkey.unbound"
+	MsgPasskeyNotBound     = "passkey.not_bound"
+	MsgPasskeyReset        = "passkey.reset"
+	MsgPasskeyVerified     = "passkey.verified"
+	MsgPasskeyNotLoggedIn  = "passkey.not_logged_in"
+)
+
+// Organization controller messages
+const (
+	MsgOrgRootRequired        = "org.root_required"
+	MsgOrgOwnerRequired       = "org.owner_required"
+	MsgOrgAdminRequired       = "org.admin_required"
+	MsgOrgNoFieldsToUpdate    = "org.no_fields_to_update"
+	MsgOrgNoUserFieldsToUpdate = "org.no_user_fields_to_update"
+	MsgOrgInvalidStartTs      = "org.invalid_start_timestamp"
+	MsgOrgInvalidEndTs        = "org.invalid_end_timestamp"
+	MsgOrgInvalidPreset       = "org.invalid_preset"
+	MsgOrgTimestampOrder      = "org.timestamp_order"
+	MsgOrgIdRequired          = "org.id_required"
+	MsgOrgSubNoFieldsToUpdate = "org.subscription_no_fields_to_update"
+	MsgOrgTargetPermDenied    = "org.target_permission_denied"
+	MsgOrgGlobalAdminUnmanageable = "org.global_admin_unmanageable"
+	MsgOrgCannotReassignSelf  = "org.cannot_reassign_self"
+	MsgOrgInvalidRole         = "org.invalid_role"
+	MsgOrgOnlyOwnerCanAssignOwner = "org.only_owner_can_assign_owner"
+	MsgOrgUserNotInOrg        = "org.user_not_in_org"
+	MsgOrgOwnerCannotBeRemoved = "org.owner_cannot_be_removed"
 )

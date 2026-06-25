@@ -1016,7 +1016,7 @@ type emailBindRequest struct {
 func EmailBind(c *gin.Context) {
 	var req emailBindRequest
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
-		common.ApiError(c, errors.New("invalid request body"))
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
 	email := req.Email
