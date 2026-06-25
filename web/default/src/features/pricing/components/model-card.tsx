@@ -306,32 +306,33 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
 
       {/* Footer: metadata rows (group label and perf summary removed) */}
       <div className='mt-2 flex flex-col gap-y-1 sm:mt-4'>
-        <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
-          <span className='text-muted-foreground text-xs font-medium'>
-            {isTokenBased ? t('Token-based') : t('Per Request')}
-          </span>
-          {isDynamicPricing && (
-            <StatusBadge
-              label={t('Dynamic Pricing')}
-              variant='warning'
-              copyable={false}
-              size='sm'
-            />
-          )}
-        </div>
-
-        {hasDiscount ? (
-          <div className='flex min-w-0 items-center'>
+        <div className='flex min-w-0 items-center justify-between gap-2'>
+          <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+            <span className='text-muted-foreground text-xs font-medium'>
+              {isTokenBased ? t('Token-based') : t('Per Request')}
+            </span>
+            {isDynamicPricing && (
+              <StatusBadge
+                label={t('Dynamic Pricing')}
+                variant='warning'
+                copyable={false}
+                size='sm'
+              />
+            )}
+          </div>
+          {hasDiscount && (
             <span
               className={cn(
-                'rounded-md px-2 py-0.5 text-sm font-bold',
+                'shrink-0 rounded-md px-2 py-0.5 text-sm font-bold',
                 discountBadgeClasses(discountPercent)
               )}
             >
               {discountPercent}% off
             </span>
-          </div>
-        ) : (
+          )}
+        </div>
+
+        {!hasDiscount && (
           <div className='flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 sm:gap-x-3 sm:gap-y-1'>
             {bottomTags.map((item) => (
               <span key={item} className='text-muted-foreground/70 text-xs'>
