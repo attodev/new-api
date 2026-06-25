@@ -868,7 +868,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
   /* wrapper: absolute-positioned fade overlay가 content 위에 표시됨 */
   .diagram-scroll-outer {
     position: relative;
-    margin-top: 32px;
+    margin-top: 20px;
   }
   .diagram-scroll-outer::after {
     content: '';
@@ -880,12 +880,17 @@ backdrop-filter: blur(6px); white-space: nowrap;
     background: linear-gradient(to left, #111827 20%, transparent);
     pointer-events: none;
   }
-  /* scroll container: padding-top !important 제거 → 원본 80px inline 유지 */
   .diagram-outer {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     margin-top: 0 !important;
+    /* padding-top 80px은 Admin(position:absolute; bottom:100%) 클리핑 방지용 — 축소 불가 */
+    padding-bottom: 16px !important;
+  }
+  /* 아래 핵심 포인트 간격 축소 */
+  .diagram-results {
+    margin-top: 28px !important;
   }
   .diagram-outer::-webkit-scrollbar {
     display: none;
