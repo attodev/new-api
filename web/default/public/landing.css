@@ -809,8 +809,8 @@ backdrop-filter: blur(6px); white-space: nowrap;
   /* Hero */
   .hero {
     grid-template-columns: 1fr;
-    padding: 72px 20px 48px;
-    gap: 40px;
+    padding: 48px 20px 40px;
+    gap: 36px;
   }
   .hero h1 {
     font-size: 30px;
@@ -819,8 +819,12 @@ backdrop-filter: blur(6px); white-space: nowrap;
     font-size: 14px;
   }
   .hero-stats {
-    gap: 16px;
+    gap: 24px;
     flex-wrap: wrap;
+  }
+  .stat-item {
+    flex: 1;
+    min-width: 80px;
   }
   .stat-item .stat-value {
     font-size: 24px;
@@ -864,11 +868,26 @@ backdrop-filter: blur(6px); white-space: nowrap;
   .diagram-outer {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .diagram-outer::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 비용 계산기 — 1열 스택 */
+  .calc-body {
+    flex-direction: column;
+  }
+  .calc-result {
+    min-height: 120px;
   }
 
   /* Pricing */
   .price-cards {
     grid-template-columns: 1fr;
+  }
+  .price-card {
+    padding: 20px 24px;
   }
   .price-card-pct {
     font-size: 36px;
@@ -893,7 +912,6 @@ backdrop-filter: blur(6px); white-space: nowrap;
     border-right: none;
     border-bottom: 1px solid #1f2937;
   }
-
   /* Footer */
   footer {
     padding: 32px 20px;
@@ -901,6 +919,13 @@ backdrop-filter: blur(6px); white-space: nowrap;
   .footer-inner {
     grid-template-columns: 1fr 1fr;
     gap: 32px;
+  }
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+  .footer-brand p {
+    max-width: 260px;
+    word-break: keep-all;
   }
   .footer-bottom {
     flex-direction: column;
