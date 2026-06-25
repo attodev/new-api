@@ -905,6 +905,20 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
 
   /* Pricing — 가로 스크롤 카드 슬라이더 */
+  .price-cards-outer {
+    position: relative;
+  }
+  .price-cards-outer::after {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 0;
+    bottom: 8px;
+    width: 72px;
+    background: linear-gradient(to left, #111827 20%, transparent);
+    pointer-events: none;
+    z-index: 1;
+  }
   .price-cards {
     display: flex;
     overflow-x: auto;
