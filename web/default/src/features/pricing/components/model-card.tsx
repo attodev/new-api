@@ -64,6 +64,8 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     props.model.billing_mode === 'tiered_expr' &&
     Boolean(props.model.billing_expr)
   const hasCachedPrice = isTokenBased && props.model.cache_ratio != null
+  const discountPercent = props.model.discount_percent ?? 0
+  const hasDiscount = discountPercent > 0
   const dynamicSummary = isDynamicPricing
     ? getDynamicPricingSummary(props.model, {
         tokenUnit,
@@ -142,30 +144,82 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 <>
                   <span className='text-muted-foreground whitespace-nowrap'>
                     {t('Input')}{' '}
-                    <span className='text-foreground font-mono font-semibold'>
-                      {formatPrice(
-                        props.model,
-                        'input',
-                        tokenUnit,
-                        showRechargePrice,
-                        priceRate,
-                        usdExchangeRate
-                      )}
-                    </span>
+                    {hasDiscount && !isDynamicPricing ? (
+                      <>
+                        <s className='text-muted-foreground/50'>
+                          {formatPrice(
+                            props.model,
+                            'input',
+                            tokenUnit,
+                            showRechargePrice,
+                            priceRate,
+                            usdExchangeRate
+                          )}
+                        </s>{' '}
+                        <span className='text-foreground font-mono font-semibold'>
+                          {formatPrice(
+                            props.model,
+                            'input',
+                            tokenUnit,
+                            showRechargePrice,
+                            priceRate,
+                            usdExchangeRate,
+                            discountPercent
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      <span className='text-foreground font-mono font-semibold'>
+                        {formatPrice(
+                          props.model,
+                          'input',
+                          tokenUnit,
+                          showRechargePrice,
+                          priceRate,
+                          usdExchangeRate
+                        )}
+                      </span>
+                    )}
                     /{tokenUnitLabel}
                   </span>
                   <span className='text-muted-foreground whitespace-nowrap'>
                     {t('Output')}{' '}
-                    <span className='text-foreground font-mono font-semibold'>
-                      {formatPrice(
-                        props.model,
-                        'output',
-                        tokenUnit,
-                        showRechargePrice,
-                        priceRate,
-                        usdExchangeRate
-                      )}
-                    </span>
+                    {hasDiscount && !isDynamicPricing ? (
+                      <>
+                        <s className='text-muted-foreground/50'>
+                          {formatPrice(
+                            props.model,
+                            'output',
+                            tokenUnit,
+                            showRechargePrice,
+                            priceRate,
+                            usdExchangeRate
+                          )}
+                        </s>{' '}
+                        <span className='text-foreground font-mono font-semibold'>
+                          {formatPrice(
+                            props.model,
+                            'output',
+                            tokenUnit,
+                            showRechargePrice,
+                            priceRate,
+                            usdExchangeRate,
+                            discountPercent
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      <span className='text-foreground font-mono font-semibold'>
+                        {formatPrice(
+                          props.model,
+                          'output',
+                          tokenUnit,
+                          showRechargePrice,
+                          priceRate,
+                          usdExchangeRate
+                        )}
+                      </span>
+                    )}
                     /{tokenUnitLabel}
                   </span>
                   {hasCachedPrice && (
@@ -186,14 +240,36 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 </>
               ) : (
                 <span className='text-muted-foreground whitespace-nowrap'>
-                  <span className='text-foreground font-mono font-semibold'>
-                    {formatRequestPrice(
-                      props.model,
-                      showRechargePrice,
-                      priceRate,
-                      usdExchangeRate
-                    )}
-                  </span>{' '}
+                  {hasDiscount && !isDynamicPricing ? (
+                    <>
+                      <s className='text-muted-foreground/50'>
+                        {formatRequestPrice(
+                          props.model,
+                          showRechargePrice,
+                          priceRate,
+                          usdExchangeRate
+                        )}
+                      </s>{' '}
+                      <span className='text-foreground font-mono font-semibold'>
+                        {formatRequestPrice(
+                          props.model,
+                          showRechargePrice,
+                          priceRate,
+                          usdExchangeRate,
+                          discountPercent
+                        )}
+                      </span>
+                    </>
+                  ) : (
+                    <span className='text-foreground font-mono font-semibold'>
+                      {formatRequestPrice(
+                        props.model,
+                        showRechargePrice,
+                        priceRate,
+                        usdExchangeRate
+                      )}
+                    </span>
+                  )}{' '}
                   / {t('request')}
                 </span>
               )}
@@ -241,6 +317,14 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             <StatusBadge
               label={t('Dynamic Pricing')}
               variant='warning'
+              copyable={false}
+              size='sm'
+            />
+          )}
+          {hasDiscount && (
+            <StatusBadge
+              label={`${discountPercent}% off`}
+              variant='success'
               copyable={false}
               size='sm'
             />
