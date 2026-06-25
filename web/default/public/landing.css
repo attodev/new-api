@@ -809,7 +809,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
   /* Hero */
   .hero {
     grid-template-columns: 1fr;
-    padding: 48px 20px 40px;
+    padding: 48px 20px 24px;
     gap: 36px;
   }
   .hero h1 {
@@ -864,14 +864,30 @@ backdrop-filter: blur(6px); white-space: nowrap;
     font-size: 22px;
   }
 
-  /* Solution diagram — 가로 스크롤 허용 */
+  /* Solution diagram — 가로 스크롤, 공백 축소, 스크롤 힌트 페이드 */
   .diagram-outer {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: relative;
+    margin-top: 32px !important;
+    padding-top: 32px !important;
   }
   .diagram-outer::-webkit-scrollbar {
     display: none;
+  }
+  .diagram-outer::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    display: block;
+    width: 40px;
+    min-width: 40px;
+    height: 100%;
+    background: linear-gradient(to left, #111827 30%, transparent);
+    pointer-events: none;
+    margin-left: -40px;
   }
 
   /* 비용 계산기 — 1열 스택 */
@@ -882,15 +898,28 @@ backdrop-filter: blur(6px); white-space: nowrap;
     min-height: 120px;
   }
 
-  /* Pricing */
+  /* Pricing — 가로 스크롤 카드 슬라이더 */
   .price-cards {
-    grid-template-columns: 1fr;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 16px;
+    margin-left: -20px;
+    margin-right: -20px;
+    padding: 0 20px 8px;
+  }
+  .price-cards::-webkit-scrollbar {
+    display: none;
   }
   .price-card {
-    padding: 20px 24px;
+    flex: 0 0 calc(85vw);
+    scroll-snap-align: start;
+    padding: 24px;
   }
   .price-card-pct {
-    font-size: 36px;
+    font-size: 40px;
   }
 
   /* Integration */
@@ -900,7 +929,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
 
   /* CTA */
   .cta-section {
-    padding: 80px 0;
+    padding: 60px 0;
   }
   .cta-inner {
     grid-template-columns: 1fr;
@@ -912,13 +941,14 @@ backdrop-filter: blur(6px); white-space: nowrap;
     border-right: none;
     border-bottom: 1px solid #1f2937;
   }
+
   /* Footer */
   footer {
     padding: 32px 20px;
   }
   .footer-inner {
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px 16px;
   }
   .footer-brand {
     grid-column: 1 / -1;
@@ -934,3 +964,28 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
 
 } /* @media 종료 */
+
+/* 가격 섹션 타이틀 — 인라인 스타일 대체용 */
+.pricing-title {
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  color: #f9fafb;
+}
+@media (max-width: 768px) {
+  .pricing-title {
+    font-size: 24px;
+  }
+}
+
+/* 극소형 화면(≤360px) — 히어로 CTA 버튼 세로 스택 */
+@media (max-width: 360px) {
+  .hero-cta {
+    flex-direction: column;
+  }
+  .btn-hero-primary,
+  .btn-hero-secondary {
+    width: 100%;
+    text-align: center;
+  }
+}
