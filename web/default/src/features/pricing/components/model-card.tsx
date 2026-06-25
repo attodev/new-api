@@ -28,6 +28,7 @@ import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../lib/dynamic-price'
+import { discountBadgeClasses } from '../lib/discount-color'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
@@ -321,32 +322,37 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               size='sm'
             />
           )}
-          {hasDiscount && (
-            <StatusBadge
-              label={`${discountPercent}% off`}
-              variant='success'
-              copyable={false}
-              size='sm'
-            />
-          )}
         </div>
         <ModelPerfBadge perf={props.perf} className='row-span-2 self-start' />
 
-        <div className='flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 sm:gap-x-3 sm:gap-y-1'>
-          {bottomTags.map((item) => (
-            <span key={item} className='text-muted-foreground/70 text-xs'>
-              {item}
+        {hasDiscount ? (
+          <div className='flex min-w-0 items-center'>
+            <span
+              className={cn(
+                'rounded-md px-2 py-0.5 text-sm font-bold',
+                discountBadgeClasses(discountPercent)
+              )}
+            >
+              {discountPercent}% off
             </span>
-          ))}
-          <span className='text-muted-foreground/50 text-xs'>
-            {tokenUnitLabel}
-          </span>
-          {hiddenCount > 0 && (
-            <span className='text-muted-foreground/40 text-xs'>
-              +{hiddenCount}
+          </div>
+        ) : (
+          <div className='flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 sm:gap-x-3 sm:gap-y-1'>
+            {bottomTags.map((item) => (
+              <span key={item} className='text-muted-foreground/70 text-xs'>
+                {item}
+              </span>
+            ))}
+            <span className='text-muted-foreground/50 text-xs'>
+              {tokenUnitLabel}
             </span>
-          )}
-        </div>
+            {hiddenCount > 0 && (
+              <span className='text-muted-foreground/40 text-xs'>
+                +{hiddenCount}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

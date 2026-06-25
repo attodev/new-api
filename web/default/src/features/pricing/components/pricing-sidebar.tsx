@@ -35,6 +35,7 @@ import {
   getEndpointTypeLabels,
   getQuotaTypeLabels,
 } from '../constants'
+import { discountBadgeClasses } from '../lib/discount-color'
 import { parseTags } from '../lib/filters'
 import type { PricingModel, PricingVendor } from '../types'
 
@@ -44,6 +45,7 @@ type FilterOption = {
   count?: number
   suffix?: string
   discountSuffix?: string
+  discountPercent?: number
   icon?: ReactNode
 }
 
@@ -124,7 +126,12 @@ function FilterChip(props: {
         </span>
       )}
       {props.option.discountSuffix && (
-        <span className='rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400'>
+        <span
+          className={cn(
+            'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+            discountBadgeClasses(props.option.discountPercent ?? 0)
+          )}
+        >
           {props.option.discountSuffix}
         </span>
       )}
@@ -183,6 +190,7 @@ export function PricingSidebar(props: PricingSidebarProps) {
           vendor.discount_percent && vendor.discount_percent > 0
             ? `${vendor.discount_percent}% off`
             : undefined,
+        discountPercent: vendor.discount_percent ?? 0,
         icon: vendor.icon ? getLobeIcon(vendor.icon, 14) : undefined,
       }))
       .filter((vendor) => vendor.count > 0),

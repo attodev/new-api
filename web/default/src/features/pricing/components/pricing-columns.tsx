@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { getLobeIcon } from '@/lib/lobe-icon'
+import { cn } from '@/lib/utils'
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +34,7 @@ import {
   getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
 } from '../lib/dynamic-price'
+import { discountBadgeClasses } from '../lib/discount-color'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import {
@@ -271,12 +273,14 @@ export function usePricingColumns(
                   / {tokenUnitLabel} tokens
                 </div>
                 <div className='mt-1'>
-                  <StatusBadge
-                    label={`${discountPercent}% off`}
-                    variant='success'
-                    size='sm'
-                    copyable={false}
-                  />
+                  <span
+                    className={cn(
+                      'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                      discountBadgeClasses(discountPercent)
+                    )}
+                  >
+                    {discountPercent}% off
+                  </span>
                 </div>
               </div>
             )
@@ -326,12 +330,14 @@ export function usePricingColumns(
                 / {t('request')}
               </div>
               <div className='mt-1'>
-                <StatusBadge
-                  label={`${discountPercent}% off`}
-                  variant='success'
-                  size='sm'
-                  copyable={false}
-                />
+                <span
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                    discountBadgeClasses(discountPercent)
+                  )}
+                >
+                  {discountPercent}% off
+                </span>
               </div>
             </div>
           )
