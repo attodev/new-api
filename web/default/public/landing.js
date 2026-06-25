@@ -336,13 +336,14 @@ document.addEventListener('keydown', function(e) {
   animWrap.addEventListener('touchend', (e) => {
     const dx = e.changedTouches[0].clientX - _touchStartX;
     if (Math.abs(dx) < 50) return;
-    const next = dx < 0
+    const swipeDir = dx < 0 ? 'left' : 'right';
+    const next = swipeDir === 'left'
       ? (window._videoVer === 'std' ? 'lite' : 'std')
       : (window._videoVer === 'lite' ? 'std' : 'lite');
-    window.switchVideo(next);
+    window.switchVideo(next, swipeDir);
   }, { passive: true });
 
-  window.switchVideo = function(newVer) {
+  window.switchVideo = function(newVer, swipeDir) {
     if (window._videoVer === newVer) return;
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
@@ -356,6 +357,14 @@ document.addEventListener('keydown', function(e) {
     video.load();
     CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
+    if (swipeDir) {
+      animWrap.classList.remove('swipe-left', 'swipe-right');
+      void animWrap.offsetWidth; // reflow to restart animation
+      animWrap.classList.add('swipe-' + swipeDir);
+      animWrap.addEventListener('animationend', () => {
+        animWrap.classList.remove('swipe-left', 'swipe-right');
+      }, { once: true });
+    }
   };
 
   pauseState.addEventListener('click', () => {
