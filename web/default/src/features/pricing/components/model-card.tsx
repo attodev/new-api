@@ -298,7 +298,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       </div>
 
       {/* Description */}
-      <p className='text-muted-foreground mt-2 line-clamp-1 flex-1 text-[13px] leading-relaxed sm:mt-4 sm:line-clamp-2 sm:min-h-[2.5rem]'>
+      <p className='text-muted-foreground mt-2 line-clamp-1 text-[13px] leading-relaxed sm:mt-4'>
         {props.model.description || t('No description available.')}
       </p>
 
