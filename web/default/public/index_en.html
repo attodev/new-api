@@ -284,21 +284,14 @@
                 overflow: hidden;
                 transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
               }
-              .problem-card::before {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; right: 0;
-                height: 2px;
-                background: linear-gradient(90deg, #f43f5e, rgba(244,63,94,0.2));
-              }
               .problem-card:hover {
-                border-color: rgba(244,63,94,0.3);
+                border-color: #4b5563;
                 transform: translateY(-3px);
                 box-shadow: 0 8px 24px rgba(0,0,0,0.3);
               }
       .problem-card-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-              .problem-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.2); display: flex; align-items: center; justify-content: center; }
-              .problem-icon i[data-lucide] { width: 18px; height: 18px; color: #f43f5e; }
+              .problem-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid #374151; display: flex; align-items: center; justify-content: center; }
+              .problem-icon i[data-lucide] { width: 18px; height: 18px; color: #9ca3af; }
               .problem-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 0; color: #f9fafb; line-height: 1.45; padding-top: 2px; }
               .problem-card p { font-size: 13px; color: #9ca3af; line-height: 1.75; }
 
@@ -2417,8 +2410,9 @@
 
           let lastProvider = '';
           const rows = sorted.map(m => {
-            const inputPrice  = (m.model_ratio * groupRatio).toFixed(4);
-            const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio).toFixed(4);
+            const discount = (m.discount_percent || 0) / 100;
+            const inputPrice  = (m.model_ratio * groupRatio * (1 - discount)).toFixed(4);
+            const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio * (1 - discount)).toFixed(4);
             const provider = getProvider(m.model_name);
             const providerRow = provider !== lastProvider
               ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
@@ -2605,9 +2599,10 @@
       const json = await res.json();
       _calcGroupRatio = 2;
       json.data.forEach((m) => {
+        const d = (m.discount_percent || 0) / 100;
         _calcPricing[m.model_name] = {
-          input: m.model_ratio * _calcGroupRatio,
-          output: m.model_ratio * m.completion_ratio * _calcGroupRatio,
+          input: m.model_ratio * _calcGroupRatio * (1 - d),
+          output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
         };
       });
       sel.innerHTML = json.data
