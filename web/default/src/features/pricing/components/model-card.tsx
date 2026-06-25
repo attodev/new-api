@@ -33,7 +33,7 @@ import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
-import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { type ModelPerfBadgeData } from './model-perf-badge'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -77,7 +77,6 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       })
     : null
 
-  const primaryGroup = groups[0]
   const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)]
   const hiddenCount =
     Math.max(groups.length - 1, 0) +
@@ -303,14 +302,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         {props.model.description || t('No description available.')}
       </p>
 
-      {/* Footer: left metadata and right performance summary share row alignment */}
-      <div className='mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 sm:mt-4'>
+      {/* Footer: metadata rows (group label and perf summary removed) */}
+      <div className='mt-2 flex flex-col gap-y-1 sm:mt-4'>
         <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
-          {primaryGroup && (
-            <span className='text-muted-foreground text-xs font-medium'>
-              {primaryGroup} {t('Groups')}
-            </span>
-          )}
           <span className='text-muted-foreground text-xs font-medium'>
             {isTokenBased ? t('Token-based') : t('Per Request')}
           </span>
@@ -323,7 +317,6 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             />
           )}
         </div>
-        <ModelPerfBadge perf={props.perf} className='row-span-2 self-start' />
 
         {hasDiscount ? (
           <div className='flex min-w-0 items-center'>
