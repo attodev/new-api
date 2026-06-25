@@ -757,3 +757,140 @@ backdrop-filter: blur(6px); white-space: nowrap;
 .gnb-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .gnb-hamburger.open span:nth-child(2) { opacity: 0; }
 .gnb-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — max-width: 768px
+════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* GNB */
+  .gnb {
+    padding: 14px 20px;
+    flex-wrap: wrap;
+  }
+  .gnb-menu {
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(17, 24, 39, 0.98);
+    border-bottom: 1px solid #1f2937;
+    padding: 12px 20px 20px;
+    gap: 0;
+  }
+  .gnb-menu.open {
+    display: flex;
+  }
+  .gnb-menu li a {
+    display: block;
+    padding: 10px 0;
+    font-size: 15px;
+    border-bottom: 1px solid #1f2937;
+  }
+  .gnb-hamburger {
+    display: flex;
+  }
+  .gnb-divider {
+    display: none;
+  }
+  .btn-login {
+    display: none;
+  }
+
+  /* Hero */
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 72px 20px 48px;
+    gap: 40px;
+  }
+  .hero h1 {
+    font-size: 30px;
+  }
+  .hero-sub {
+    font-size: 14px;
+  }
+  .hero-stats {
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .stat-item .stat-value {
+    font-size: 24px;
+  }
+
+  /* Section 공통 */
+  .section {
+    padding: 48px 20px;
+  }
+  .section h2 {
+    font-size: 24px;
+  }
+  .solution-inner {
+    padding: 48px 20px;
+  }
+  .pricing-inner {
+    padding: 48px 20px;
+  }
+
+  /* Problem */
+  .problem-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Feature */
+  .feature-section {
+    padding: 48px 0;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .feature-grid.reverse {
+    direction: ltr;
+  }
+  .feature-content h2 {
+    font-size: 22px;
+  }
+
+  /* Solution diagram — 가로 스크롤 허용 */
+  .diagram-box {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Pricing */
+  .price-cards {
+    grid-template-columns: 1fr;
+  }
+  .price-card-pct {
+    font-size: 36px;
+  }
+
+  /* CTA */
+  .cta-inner {
+    grid-template-columns: 1fr;
+  }
+  .cta-box {
+    padding: 32px 20px;
+  }
+  .cta-box.left {
+    border-right: none;
+    border-bottom: 1px solid #1f2937;
+  }
+
+  /* Footer */
+  footer {
+    padding: 32px 20px;
+  }
+  .footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+
+} /* @media 종료 */
