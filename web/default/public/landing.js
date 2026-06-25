@@ -317,7 +317,10 @@ document.addEventListener('keydown', function(e) {
     video.play();
   });
 
+  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
   animWrap.addEventListener('mouseenter', () => {
+    if (isTouch()) return;
     if (playOverlay.style.display !== 'none') return;
     if (video.ended) return;
     pauseState.style.display  = video.paused ? 'none' : 'flex';
@@ -325,7 +328,28 @@ document.addEventListener('keydown', function(e) {
     hoverOverlay.style.display = 'flex';
   });
   animWrap.addEventListener('mouseleave', () => {
+    if (isTouch()) return;
     hoverOverlay.style.display = 'none';
+  });
+
+  // Mobile: tap to show controls, auto-hide after 2.5s
+  let _hideControlsTimer = null;
+  animWrap.addEventListener('click', () => {
+    if (!isTouch()) return;
+    if (_isSwiping) return;
+    if (playOverlay.style.display !== 'none') return; // play overlay handles this tap
+    if (video.ended) return;
+    clearTimeout(_hideControlsTimer);
+    if (hoverOverlay.style.display === 'flex') {
+      hoverOverlay.style.display = 'none';
+      return;
+    }
+    pauseState.style.display  = video.paused ? 'none' : 'flex';
+    resumeState.style.display = video.paused ? 'flex' : 'none';
+    hoverOverlay.style.display = 'flex';
+    _hideControlsTimer = setTimeout(() => {
+      hoverOverlay.style.display = 'none';
+    }, 2500);
   });
 
   // Mobile swipe to switch video (std ↔ lite)
