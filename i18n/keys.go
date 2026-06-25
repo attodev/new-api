@@ -433,6 +433,9 @@ const (
 	MsgPasskeyNeedVerification   = "passkey.need_verification"
 	MsgPasskeyNeedSpecificVerify = "passkey.need_specific_verification"
 	MsgPasskeyInvalidState       = "passkey.invalid_state"
+	MsgPasskeySettingsNotFound   = "passkey.settings_not_found"
+	MsgPasskeySessionExpired     = "passkey.session_expired"
+	MsgPasskeySessionFormatInvalid = "passkey.session_format_invalid"
 )
 
 // Secure verification messages

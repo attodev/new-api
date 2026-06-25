@@ -50,7 +50,7 @@ func PasskeyRegisterBegin(c *gin.Context) {
 		credential = nil
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -105,7 +105,7 @@ func PasskeyRegisterFinish(c *gin.Context) {
 		return
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -222,7 +222,7 @@ func PasskeyLoginBegin(c *gin.Context) {
 		return
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -257,7 +257,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 		return
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -404,7 +404,7 @@ func PasskeyVerifyBegin(c *gin.Context) {
 		return
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -449,7 +449,7 @@ func PasskeyVerifyFinish(c *gin.Context) {
 		return
 	}
 
-	wa, err := passkeysvc.BuildWebAuthn(c.Request)
+	wa, err := passkeysvc.BuildWebAuthn(c)
 	if err != nil {
 		common.ApiError(c, err)
 		return

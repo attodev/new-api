@@ -16,14 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
 export function NotFoundError() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { history } = useRouter()
   return (
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
@@ -34,12 +33,20 @@ export function NotFoundError() {
           {t('does not exist or might have been removed.')}
         </p>
         <div className='mt-6 flex gap-4'>
-          <Button variant='outline' onClick={() => history.go(-1)}>
-            {t('Go Back')}
-          </Button>
-          <Button onClick={() => navigate({ to: '/' })}>
-            {t('Back to Home')}
-          </Button>
+          {window.history.length > 1 ? (
+            <>
+              <Button variant='outline' onClick={() => window.history.back()}>
+                {t('Go Back')}
+              </Button>
+              <Button onClick={() => navigate({ to: '/' })}>
+                {t('Back to Home')}
+              </Button>
+            </>
+          ) : (
+            <Button variant='outline' onClick={() => window.close()}>
+              {t('Close Tab')}
+            </Button>
+          )}
         </div>
       </div>
     </div>

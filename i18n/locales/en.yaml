@@ -540,6 +540,9 @@ passkey.not_bound: "User has not bound a Passkey"
 passkey.reset: "Passkey reset successfully"
 passkey.verified: "Passkey verification successful"
 passkey.not_logged_in: "Not logged in"
+passkey.settings_not_found: "Passkey settings not found"
+passkey.session_expired: "Passkey session not found or expired"
+passkey.session_format_invalid: "Passkey session format invalid"
 
 # Organization controller messages
 org.root_required: "Root permission required"
