@@ -763,6 +763,11 @@ backdrop-filter: blur(6px); white-space: nowrap;
 ════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
+  /* Prevent page-level horizontal scroll (fixes sticky GNB on iOS Safari) */
+  html {
+    overflow-x: clip;
+  }
+
   /* GNB */
   .gnb {
     padding: 14px 20px;
@@ -791,6 +796,8 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
   .gnb-hamburger {
     display: flex;
+    margin-left: auto;
+    margin-right: 8px;
   }
   .gnb-divider {
     display: none;
@@ -854,7 +861,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
 
   /* Solution diagram — 가로 스크롤 허용 */
-  .diagram-box {
+  .diagram-outer {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
