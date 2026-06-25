@@ -847,7 +847,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
 
   /* Feature */
   .feature-section {
-    padding: 48px 0;
+    padding: 48px 20px;
   }
   .feature-grid {
     grid-template-columns: 1fr;
