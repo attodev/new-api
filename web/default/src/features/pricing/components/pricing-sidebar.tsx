@@ -43,6 +43,7 @@ type FilterOption = {
   label: string
   count?: number
   suffix?: string
+  discountSuffix?: string
   icon?: ReactNode
 }
 
@@ -110,7 +111,7 @@ function FilterChip(props: {
         <span className='shrink-0'>{props.option.icon}</span>
       )}
       <span className='truncate'>{props.option.label}</span>
-      {props.option.count != null && (
+      {(props.option.suffix != null || props.option.count != null) && (
         <span
           className={cn(
             'rounded-md px-1.5 py-0.5 text-[10px]',
@@ -119,12 +120,12 @@ function FilterChip(props: {
               : 'bg-muted text-muted-foreground'
           )}
         >
-          {props.option.count}
+          {props.option.suffix ?? props.option.count}
         </span>
       )}
-      {props.option.suffix && (
+      {props.option.discountSuffix && (
         <span className='rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400'>
-          {props.option.suffix}
+          {props.option.discountSuffix}
         </span>
       )}
     </button>
@@ -178,7 +179,7 @@ export function PricingSidebar(props: PricingSidebarProps) {
           props.models,
           (model) => model.vendor_name === vendor.name
         ),
-        suffix:
+        discountSuffix:
           vendor.discount_percent && vendor.discount_percent > 0
             ? `${vendor.discount_percent}% off`
             : undefined,
