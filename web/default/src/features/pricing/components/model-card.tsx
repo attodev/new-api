@@ -297,10 +297,12 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         </div>
       </div>
 
-      {/* Description */}
-      <p className='text-muted-foreground mt-2 line-clamp-1 text-[13px] leading-relaxed sm:mt-4'>
-        {props.model.description || t('No description available.')}
-      </p>
+      {/* Description (설명이 있을 때만 표시 — 없으면 줄 자체를 숨김) */}
+      {props.model.description ? (
+        <p className='text-muted-foreground mt-2 line-clamp-1 text-[13px] leading-relaxed sm:mt-4'>
+          {props.model.description}
+        </p>
+      ) : null}
 
       {/* Footer: metadata rows (group label and perf summary removed) */}
       <div className='mt-2 flex flex-col gap-y-1 sm:mt-4'>
