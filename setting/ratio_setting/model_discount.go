@@ -66,6 +66,16 @@ func GetVendorDiscountMultiplier(vendorName string) (float64, bool) {
 	return percentToMultiplier(percent), true
 }
 
+// GetModelDiscountPercent: 저장된 모델 할인율(percent)을 반환. 미설정 시 (0,false).
+func GetModelDiscountPercent(modelName string) (float64, bool) {
+	return modelDiscountMap.Get(FormatMatchingModelName(modelName))
+}
+
+// GetVendorDiscountPercent: 저장된 벤더 할인율(percent)을 반환. 미설정 시 (0,false).
+func GetVendorDiscountPercent(vendorName string) (float64, bool) {
+	return vendorDiscountMap.Get(vendorName)
+}
+
 // vendorResolver: 모델명 -> 벤더명. model 패키지가 init 시 주입(순환 의존 회피).
 var vendorResolver func(modelName string) (string, bool)
 

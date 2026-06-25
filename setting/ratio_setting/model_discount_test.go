@@ -65,3 +65,21 @@ func TestEffectiveMultiplierCombinesWithGroupConceptually(t *testing.T) {
 		t.Fatalf("want 0.4 got %v", final)
 	}
 }
+
+func TestDiscountPercentAccessors(t *testing.T) {
+	_ = UpdateModelDiscountByJSONString(`{"pct-model":25}`)
+	_ = UpdateVendorDiscountByJSONString(`{"pct-vendor":15}`)
+
+	if p, ok := GetModelDiscountPercent("pct-model"); !ok || p != 25 {
+		t.Fatalf("model percent want 25,true got %v,%v", p, ok)
+	}
+	if _, ok := GetModelDiscountPercent("nope"); ok {
+		t.Fatalf("unset model should be false")
+	}
+	if p, ok := GetVendorDiscountPercent("pct-vendor"); !ok || p != 15 {
+		t.Fatalf("vendor percent want 15,true got %v,%v", p, ok)
+	}
+	if _, ok := GetVendorDiscountPercent("nope"); ok {
+		t.Fatalf("unset vendor should be false")
+	}
+}
