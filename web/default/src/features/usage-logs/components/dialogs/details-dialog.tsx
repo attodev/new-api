@@ -161,11 +161,15 @@ function buildBillingFormula(
     : (other.group_ratio ?? 1)
   const ratioLabel = isUserGR ? 'User Ratio' : 'Group Ratio'
 
+  const discountPercent = other.discount_percent ?? 0
+  const discountMul = discountPercent > 0 ? 1 - discountPercent / 100 : 1
+  const off = discountPercent > 0 ? ` × ${discountPercent}% off` : ''
+
   if (isPerCall) {
     const price = other.model_price as number
-    const total = price * groupRatio
+    const total = price * groupRatio * discountMul
     return [
-      `${fmtAmount(price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(total)}`,
+      `${fmtAmount(price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(total)}`,
     ]
   }
 
@@ -199,86 +203,86 @@ function buildBillingFormula(
   const lines: string[] = []
 
   if (textInput > 0) {
-    const amount = (textInput / 1_000_000) * basePrice * groupRatio
+    const amount = (textInput / 1_000_000) * basePrice * groupRatio * discountMul
     lines.push(
-      `Input: ${textInput.toLocaleString()} / 1M × ${fmtAmount(basePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Input: ${textInput.toLocaleString()} / 1M × ${fmtAmount(basePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (cacheReadTokens > 0) {
     const cachePrice = basePrice * cacheRatio
-    const amount = (cacheReadTokens / 1_000_000) * cachePrice * groupRatio
+    const amount = (cacheReadTokens / 1_000_000) * cachePrice * groupRatio * discountMul
     lines.push(
-      `Cache Read: ${cacheReadTokens.toLocaleString()} / 1M × ${fmtAmount(cachePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Cache Read: ${cacheReadTokens.toLocaleString()} / 1M × ${fmtAmount(cachePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (cacheWrite > 0 && other.cache_creation_ratio != null) {
     const writePrice = basePrice * other.cache_creation_ratio
-    const amount = (cacheWrite / 1_000_000) * writePrice * groupRatio
+    const amount = (cacheWrite / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write: ${cacheWrite.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Cache Write: ${cacheWrite.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (cacheWrite5m > 0 && other.cache_creation_ratio_5m != null) {
     const writePrice = basePrice * other.cache_creation_ratio_5m
-    const amount = (cacheWrite5m / 1_000_000) * writePrice * groupRatio
+    const amount = (cacheWrite5m / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write (5m): ${cacheWrite5m.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Cache Write (5m): ${cacheWrite5m.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (cacheWrite1h > 0 && other.cache_creation_ratio_1h != null) {
     const writePrice = basePrice * other.cache_creation_ratio_1h
-    const amount = (cacheWrite1h / 1_000_000) * writePrice * groupRatio
+    const amount = (cacheWrite1h / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write (1h): ${cacheWrite1h.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Cache Write (1h): ${cacheWrite1h.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (imageTokens > 0) {
     const imgPrice = basePrice * imageRatio
-    const amount = (imageTokens / 1_000_000) * imgPrice * groupRatio
+    const amount = (imageTokens / 1_000_000) * imgPrice * groupRatio * discountMul
     lines.push(
-      `Image Input: ${imageTokens.toLocaleString()} / 1M × ${fmtAmount(imgPrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Image Input: ${imageTokens.toLocaleString()} / 1M × ${fmtAmount(imgPrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (audioInputSeperatePrice && audioInputTokens > 0 && other.audio_input_price != null) {
-    const amount = (audioInputTokens / 1_000_000) * other.audio_input_price * groupRatio
+    const amount = (audioInputTokens / 1_000_000) * other.audio_input_price * groupRatio * discountMul
     lines.push(
-      `Audio Input: ${audioInputTokens.toLocaleString()} / 1M × ${fmtAmount(other.audio_input_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Audio Input: ${audioInputTokens.toLocaleString()} / 1M × ${fmtAmount(other.audio_input_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (completionTokens > 0) {
-    const amount = (completionTokens / 1_000_000) * outputPrice * groupRatio
+    const amount = (completionTokens / 1_000_000) * outputPrice * groupRatio * discountMul
     lines.push(
-      `Output: ${completionTokens.toLocaleString()} / 1M × ${fmtAmount(outputPrice)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Output: ${completionTokens.toLocaleString()} / 1M × ${fmtAmount(outputPrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (other.web_search && (other.web_search_call_count ?? 0) > 0 && other.web_search_price) {
     const count = other.web_search_call_count as number
-    const amount = (count / 1000) * other.web_search_price * groupRatio
+    const amount = (count / 1000) * other.web_search_price * groupRatio * discountMul
     lines.push(
-      `Web Search: ${count} / 1K × ${fmtAmount(other.web_search_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Web Search: ${count} / 1K × ${fmtAmount(other.web_search_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (other.file_search && (other.file_search_call_count ?? 0) > 0 && other.file_search_price) {
     const count = other.file_search_call_count as number
-    const amount = (count / 1000) * other.file_search_price * groupRatio
+    const amount = (count / 1000) * other.file_search_price * groupRatio * discountMul
     lines.push(
-      `File Search: ${count} / 1K × ${fmtAmount(other.file_search_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `File Search: ${count} / 1K × ${fmtAmount(other.file_search_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (other.image_generation_call && other.image_generation_call_price) {
-    const amount = other.image_generation_call_price * groupRatio
+    const amount = other.image_generation_call_price * groupRatio * discountMul
     lines.push(
-      `Image Generation: 1 × ${fmtAmount(other.image_generation_call_price)} × ${ratioLabel} ${groupRatio} = ${fmtAmount(amount)}`
+      `Image Generation: 1 × ${fmtAmount(other.image_generation_call_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
     )
   }
 
