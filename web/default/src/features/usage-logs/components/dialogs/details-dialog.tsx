@@ -172,12 +172,14 @@ function buildBillingFormula(
     discountMul > 0 && discountMul !== 1
       ? ` × ${discountLabel} ${Number(discountMul.toFixed(4))}`
       : ''
+  // 그룹/유저 비율이 기본값(1)이면 계산식에서 생략한다.
+  const ratioFactor = groupRatio !== 1 ? ` × ${ratioLabel} ${groupRatio}` : ''
 
   if (isPerCall) {
     const price = other.model_price as number
     const total = price * groupRatio * discountMul
     return [
-      `${fmtAmount(price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(total)}`,
+      `${fmtAmount(price)}${ratioFactor}${off} = ${fmtAmount(total)}`,
     ]
   }
 
@@ -213,7 +215,7 @@ function buildBillingFormula(
   if (textInput > 0) {
     const amount = (textInput / 1_000_000) * basePrice * groupRatio * discountMul
     lines.push(
-      `Input: ${textInput.toLocaleString()} / 1M × ${fmtAmount(basePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Input: ${textInput.toLocaleString()} / 1M × ${fmtAmount(basePrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -221,7 +223,7 @@ function buildBillingFormula(
     const cachePrice = basePrice * cacheRatio
     const amount = (cacheReadTokens / 1_000_000) * cachePrice * groupRatio * discountMul
     lines.push(
-      `Cache Read: ${cacheReadTokens.toLocaleString()} / 1M × ${fmtAmount(cachePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Cache Read: ${cacheReadTokens.toLocaleString()} / 1M × ${fmtAmount(cachePrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -229,7 +231,7 @@ function buildBillingFormula(
     const writePrice = basePrice * other.cache_creation_ratio
     const amount = (cacheWrite / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write: ${cacheWrite.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Cache Write: ${cacheWrite.toLocaleString()} / 1M × ${fmtAmount(writePrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -237,7 +239,7 @@ function buildBillingFormula(
     const writePrice = basePrice * other.cache_creation_ratio_5m
     const amount = (cacheWrite5m / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write (5m): ${cacheWrite5m.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Cache Write (5m): ${cacheWrite5m.toLocaleString()} / 1M × ${fmtAmount(writePrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -245,7 +247,7 @@ function buildBillingFormula(
     const writePrice = basePrice * other.cache_creation_ratio_1h
     const amount = (cacheWrite1h / 1_000_000) * writePrice * groupRatio * discountMul
     lines.push(
-      `Cache Write (1h): ${cacheWrite1h.toLocaleString()} / 1M × ${fmtAmount(writePrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Cache Write (1h): ${cacheWrite1h.toLocaleString()} / 1M × ${fmtAmount(writePrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -253,21 +255,21 @@ function buildBillingFormula(
     const imgPrice = basePrice * imageRatio
     const amount = (imageTokens / 1_000_000) * imgPrice * groupRatio * discountMul
     lines.push(
-      `Image Input: ${imageTokens.toLocaleString()} / 1M × ${fmtAmount(imgPrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Image Input: ${imageTokens.toLocaleString()} / 1M × ${fmtAmount(imgPrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (audioInputSeperatePrice && audioInputTokens > 0 && other.audio_input_price != null) {
     const amount = (audioInputTokens / 1_000_000) * other.audio_input_price * groupRatio * discountMul
     lines.push(
-      `Audio Input: ${audioInputTokens.toLocaleString()} / 1M × ${fmtAmount(other.audio_input_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Audio Input: ${audioInputTokens.toLocaleString()} / 1M × ${fmtAmount(other.audio_input_price)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (completionTokens > 0) {
     const amount = (completionTokens / 1_000_000) * outputPrice * groupRatio * discountMul
     lines.push(
-      `Output: ${completionTokens.toLocaleString()} / 1M × ${fmtAmount(outputPrice)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Output: ${completionTokens.toLocaleString()} / 1M × ${fmtAmount(outputPrice)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -275,7 +277,7 @@ function buildBillingFormula(
     const count = other.web_search_call_count as number
     const amount = (count / 1000) * other.web_search_price * groupRatio * discountMul
     lines.push(
-      `Web Search: ${count} / 1K × ${fmtAmount(other.web_search_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Web Search: ${count} / 1K × ${fmtAmount(other.web_search_price)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
@@ -283,14 +285,14 @@ function buildBillingFormula(
     const count = other.file_search_call_count as number
     const amount = (count / 1000) * other.file_search_price * groupRatio * discountMul
     lines.push(
-      `File Search: ${count} / 1K × ${fmtAmount(other.file_search_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `File Search: ${count} / 1K × ${fmtAmount(other.file_search_price)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
   if (other.image_generation_call && other.image_generation_call_price) {
     const amount = other.image_generation_call_price * groupRatio * discountMul
     lines.push(
-      `Image Generation: 1 × ${fmtAmount(other.image_generation_call_price)} × ${ratioLabel} ${groupRatio}${off} = ${fmtAmount(amount)}`
+      `Image Generation: 1 × ${fmtAmount(other.image_generation_call_price)}${ratioFactor}${off} = ${fmtAmount(amount)}`
     )
   }
 
