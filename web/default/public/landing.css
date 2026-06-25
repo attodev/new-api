@@ -826,12 +826,6 @@ backdrop-filter: blur(6px); white-space: nowrap;
     gap: 24px;
     flex-wrap: wrap;
   }
-  .video-dot {
-    width: 7px;
-    height: 7px;
-    padding: 4px;
-    box-sizing: content-box;
-  }
   .stat-item {
     flex: 1;
     min-width: 80px;

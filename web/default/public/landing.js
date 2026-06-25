@@ -329,13 +329,24 @@ document.addEventListener('keydown', function(e) {
   });
 
   // Mobile swipe to switch video (std ↔ lite)
-  let _touchStartX = 0;
+  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
   animWrap.addEventListener('touchstart', (e) => {
     _touchStartX = e.touches[0].clientX;
+    _touchStartY = e.touches[0].clientY;
+    _isSwiping = false;
   }, { passive: true });
+  animWrap.addEventListener('touchmove', (e) => {
+    const dx = Math.abs(e.touches[0].clientX - _touchStartX);
+    const dy = Math.abs(e.touches[0].clientY - _touchStartY);
+    if (dx > dy && dx > 8) {
+      _isSwiping = true;
+      e.preventDefault(); // prevent iOS from hijacking as vertical scroll
+    }
+  }, { passive: false });
   animWrap.addEventListener('touchend', (e) => {
+    if (!_isSwiping) return;
     const dx = e.changedTouches[0].clientX - _touchStartX;
-    if (Math.abs(dx) < 50) return;
+    if (Math.abs(dx) < 30) return;
     const swipeDir = dx < 0 ? 'left' : 'right';
     const next = swipeDir === 'left'
       ? (window._videoVer === 'std' ? 'lite' : 'std')
