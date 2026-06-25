@@ -869,25 +869,13 @@ backdrop-filter: blur(6px); white-space: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    position: relative;
     margin-top: 32px !important;
-    padding-top: 32px !important;
+    padding-top: 40px !important;
+    /* inset shadow = 우측 fade 힌트, 스크롤해도 항상 고정 */
+    box-shadow: inset -80px 0 24px 0px #111827;
   }
   .diagram-outer::-webkit-scrollbar {
     display: none;
-  }
-  .diagram-outer::after {
-    content: '';
-    position: sticky;
-    right: 0;
-    top: 0;
-    display: block;
-    width: 40px;
-    min-width: 40px;
-    height: 100%;
-    background: linear-gradient(to left, #111827 30%, transparent);
-    pointer-events: none;
-    margin-left: -40px;
   }
 
   /* 비용 계산기 — 1열 스택 */
