@@ -874,7 +874,15 @@ backdrop-filter: blur(6px); white-space: nowrap;
     font-size: 36px;
   }
 
+  /* Integration */
+  .integration-inner {
+    padding: 48px 20px;
+  }
+
   /* CTA */
+  .cta-section {
+    padding: 80px 0;
+  }
   .cta-inner {
     grid-template-columns: 1fr;
   }
