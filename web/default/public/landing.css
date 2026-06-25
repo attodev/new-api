@@ -885,7 +885,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     margin-top: 0 !important;
-    /* padding-top 80px은 Admin(position:absolute; bottom:100%) 클리핑 방지용 — 축소 불가 */
+    padding-top: 20px !important;
     padding-bottom: 16px !important;
   }
   /* 아래 핵심 포인트 간격 축소 */

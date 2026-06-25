@@ -613,10 +613,9 @@
               </div>
             </div>
 
-            <!-- ── Level 5: AlRouter (관리자는 절대위치로 위에 배치) ── -->
+            <!-- ── Level 5: AlRouter (관리자 → 커넥터 → 라우터 순 normal flow) ── -->
             <div
               style="
-                position: relative;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -624,16 +623,13 @@
                 min-width: 150px;
               "
             >
-              <!-- 관리자: AlRouter 위에 절대위치 -->
+              <!-- 관리자: normal flow (absolute 제거 → overflow-y clip 방지) -->
               <div
                 style="
-                  position: absolute;
-                  bottom: 100%;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
-                  left: 0;
-                  right: 0;
+                  width: 100%;
                 "
               >
                 <div
