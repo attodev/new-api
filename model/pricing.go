@@ -21,6 +21,7 @@ type Pricing struct {
 	Icon                   string                  `json:"icon,omitempty"`
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
+	DiscountPercent        float64                 `json:"discount_percent,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
@@ -39,10 +40,11 @@ type Pricing struct {
 }
 
 type PricingVendor struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description,omitempty"`
+	Icon            string  `json:"icon,omitempty"`
+	DiscountPercent float64 `json:"discount_percent,omitempty"`
 }
 
 var (
@@ -176,11 +178,16 @@ func updatePricing() {
 
 	vendorsList = make([]PricingVendor, 0, len(vendorMap))
 	for _, v := range vendorMap {
+		vendorDiscount := 0.0
+		if pct, ok := ratio_setting.GetVendorDiscountPercent(v.Name); ok {
+			vendorDiscount = pct
+		}
 		vendorsList = append(vendorsList, PricingVendor{
-			ID:          v.Id,
-			Name:        v.Name,
-			Description: v.Description,
-			Icon:        v.Icon,
+			ID:              v.Id,
+			Name:            v.Name,
+			Description:     v.Description,
+			Icon:            v.Icon,
+			DiscountPercent: vendorDiscount,
 		})
 	}
 
@@ -330,6 +337,16 @@ func updatePricing() {
 				pricing.BillingExpr = expr
 			}
 		}
+		// 유효 할인%: 모델 할인 우선, 없으면 벤더 할인.
+		discountPercent := 0.0
+		if pct, ok := ratio_setting.GetModelDiscountPercent(pricing.ModelName); ok {
+			discountPercent = pct
+		} else if v, ok := vendorMap[pricing.VendorID]; ok {
+			if pct, ok := ratio_setting.GetVendorDiscountPercent(v.Name); ok {
+				discountPercent = pct
+			}
+		}
+		pricing.DiscountPercent = discountPercent
 		pricingMap = append(pricingMap, pricing)
 	}
 

@@ -546,8 +546,14 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateGroupGroupRatioByJSONString(value)
 	case "ModelDiscount":
 		err = ratio_setting.UpdateModelDiscountByJSONString(value)
+		if err == nil {
+			InvalidatePricingCache()
+		}
 	case "VendorDiscount":
 		err = ratio_setting.UpdateVendorDiscountByJSONString(value)
+		if err == nil {
+			InvalidatePricingCache()
+		}
 	case "UserUsableGroups":
 		err = setting.UpdateUserUsableGroupsByJSONString(value)
 	case "CompletionRatio":
