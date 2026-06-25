@@ -110,7 +110,7 @@ function FilterChip(props: {
         <span className='shrink-0'>{props.option.icon}</span>
       )}
       <span className='truncate'>{props.option.label}</span>
-      {(props.option.suffix || props.option.count != null) && (
+      {props.option.count != null && (
         <span
           className={cn(
             'rounded-md px-1.5 py-0.5 text-[10px]',
@@ -119,7 +119,12 @@ function FilterChip(props: {
               : 'bg-muted text-muted-foreground'
           )}
         >
-          {props.option.suffix ?? props.option.count}
+          {props.option.count}
+        </span>
+      )}
+      {props.option.suffix && (
+        <span className='rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400'>
+          {props.option.suffix}
         </span>
       )}
     </button>
@@ -173,6 +178,10 @@ export function PricingSidebar(props: PricingSidebarProps) {
           props.models,
           (model) => model.vendor_name === vendor.name
         ),
+        suffix:
+          vendor.discount_percent && vendor.discount_percent > 0
+            ? `${vendor.discount_percent}% off`
+            : undefined,
         icon: vendor.icon ? getLobeIcon(vendor.icon, 14) : undefined,
       }))
       .filter((vendor) => vendor.count > 0),
