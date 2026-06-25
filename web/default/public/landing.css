@@ -865,14 +865,27 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
 
   /* Solution diagram — 가로 스크롤, 공백 축소, 스크롤 힌트 페이드 */
+  /* wrapper: absolute-positioned fade overlay가 content 위에 표시됨 */
+  .diagram-scroll-outer {
+    position: relative;
+    margin-top: 32px;
+  }
+  .diagram-scroll-outer::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 72px;
+    background: linear-gradient(to left, #111827 20%, transparent);
+    pointer-events: none;
+  }
+  /* scroll container: padding-top !important 제거 → 원본 80px inline 유지 */
   .diagram-outer {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    margin-top: 32px !important;
-    padding-top: 40px !important;
-    /* inset shadow = 우측 fade 힌트, 스크롤해도 항상 고정 */
-    box-shadow: inset -80px 0 24px 0px #111827;
+    margin-top: 0 !important;
   }
   .diagram-outer::-webkit-scrollbar {
     display: none;
