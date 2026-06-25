@@ -3,10 +3,11 @@ package types
 import "fmt"
 
 type GroupRatioInfo struct {
-	GroupRatio        float64
-	GroupSpecialRatio float64
-	HasSpecialRatio   bool
-	DiscountPercent   float64
+	GroupRatio         float64
+	GroupSpecialRatio  float64
+	HasSpecialRatio    bool
+	DiscountMultiplier float64 // 적용된 할인 배수(1.0 = 할인 없음)
+	DiscountSource     string  // "model" | "vendor" | "" (할인 출처)
 }
 
 type PriceData struct {

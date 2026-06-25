@@ -161,9 +161,17 @@ function buildBillingFormula(
     : (other.group_ratio ?? 1)
   const ratioLabel = isUserGR ? 'User Ratio' : 'Group Ratio'
 
-  const discountPercent = other.discount_percent ?? 0
-  const discountMul = discountPercent > 0 ? 1 - discountPercent / 100 : 1
-  const off = discountPercent > 0 ? ` × ${discountPercent}% off` : ''
+  const discountMul = other.discount_multiplier ?? 1
+  const discountLabel =
+    other.discount_source === 'vendor'
+      ? 'Vendor discount'
+      : other.discount_source === 'model'
+        ? 'Model discount'
+        : 'Discount'
+  const off =
+    discountMul > 0 && discountMul !== 1
+      ? ` × ${discountLabel} ${Number(discountMul.toFixed(4))}`
+      : ''
 
   if (isPerCall) {
     const price = other.model_price as number

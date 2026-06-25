@@ -64,7 +64,15 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 	// 재시도 시 재계산 경로(controller/relay.go)까지 할인이 일관되게 유지된다.
 	discountMultiplier := ratio_setting.GetEffectiveDiscountMultiplier(relayInfo.OriginModelName)
 	groupRatioInfo.GroupRatio *= discountMultiplier
-	groupRatioInfo.DiscountPercent = (1 - discountMultiplier) * 100
+	groupRatioInfo.DiscountMultiplier = discountMultiplier
+	if discountMultiplier != 1 {
+		// 모델 할인이 있으면 모델, 없으면 벤더가 출처(GetEffectiveDiscountMultiplier와 동일 우선순위).
+		if _, ok := ratio_setting.GetModelDiscountMultiplier(relayInfo.OriginModelName); ok {
+			groupRatioInfo.DiscountSource = "model"
+		} else {
+			groupRatioInfo.DiscountSource = "vendor"
+		}
+	}
 
 	return groupRatioInfo
 }
