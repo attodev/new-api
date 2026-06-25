@@ -328,6 +328,20 @@ document.addEventListener('keydown', function(e) {
     hoverOverlay.style.display = 'none';
   });
 
+  // Mobile swipe to switch video (std ↔ lite)
+  let _touchStartX = 0;
+  animWrap.addEventListener('touchstart', (e) => {
+    _touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  animWrap.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - _touchStartX;
+    if (Math.abs(dx) < 50) return;
+    const next = dx < 0
+      ? (window._videoVer === 'std' ? 'lite' : 'std')
+      : (window._videoVer === 'lite' ? 'std' : 'lite');
+    window.switchVideo(next);
+  }, { passive: true });
+
   window.switchVideo = function(newVer) {
     if (window._videoVer === newVer) return;
     window._videoVer = newVer;

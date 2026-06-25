@@ -822,6 +822,13 @@ backdrop-filter: blur(6px); white-space: nowrap;
     gap: 24px;
     flex-wrap: wrap;
   }
+  .video-dot {
+    width: 10px;
+    height: 10px;
+    /* larger hit target on touch */
+    padding: 6px;
+    box-sizing: content-box;
+  }
   .stat-item {
     flex: 1;
     min-width: 80px;
