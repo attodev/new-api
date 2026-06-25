@@ -166,7 +166,8 @@ export function formatPrice(
   tokenUnit: TokenUnit,
   showWithRecharge = false,
   priceRate = 1,
-  usdExchangeRate = 1
+  usdExchangeRate = 1,
+  discountPercent = 0
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -185,6 +186,10 @@ export function formatPrice(
     priceRate,
     usdExchangeRate
   )
+
+  if (discountPercent > 0) {
+    priceInUSD = priceInUSD * (1 - discountPercent / 100)
+  }
 
   const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
   return formatCurrencyFromUSD(price, {
@@ -268,7 +273,8 @@ export function formatRequestPrice(
   model: PricingModel,
   showWithRecharge = false,
   priceRate = 1,
-  usdExchangeRate = 1
+  usdExchangeRate = 1,
+  discountPercent = 0
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -288,6 +294,10 @@ export function formatRequestPrice(
     priceRate,
     usdExchangeRate
   )
+
+  if (discountPercent > 0) {
+    priceInUSD = priceInUSD * (1 - discountPercent / 100)
+  }
 
   return formatCurrencyFromUSD(priceInUSD, {
     digitsLarge: 4,
