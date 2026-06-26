@@ -239,6 +239,7 @@ document.addEventListener('keydown', function(e) {
 // ── Video version check ──
 (function () {
   const video = document.getElementById("animVideo");
+  const posterImg = document.getElementById("animPosterImg");
   const prev = sessionStorage.getItem("videoVersion");
   const ver =
     prev === "std"
@@ -251,6 +252,7 @@ document.addEventListener('keydown', function(e) {
   sessionStorage.setItem("videoVersion", ver);
   window._videoVer = ver;
   video.src = ver === "lite" ? STRINGS.videoLite : STRINGS.videoStd;
+  if (posterImg) posterImg.src = ver === "lite" ? STRINGS.posterLite : STRINGS.posterStd;
   video.load();
 
   function _updateDots(v) {
@@ -282,6 +284,7 @@ document.addEventListener('keydown', function(e) {
 // ── Video play/pause controls ──
 (function() {
   const video       = document.getElementById('animVideo');
+  const posterImg   = document.getElementById('animPosterImg');
   const playOverlay = document.getElementById('animPlayOverlay');
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
@@ -295,6 +298,7 @@ document.addEventListener('keydown', function(e) {
 
   playOverlay.addEventListener('click', () => {
     playOverlay.style.display = 'none';
+    if (posterImg) posterImg.style.display = 'none';
     video.currentTime = 0;
     video.play();
   });
@@ -389,9 +393,9 @@ document.addEventListener('keydown', function(e) {
     replayBtn.style.display = 'none';
     hoverOverlay.style.display = 'none';
     playOverlay.style.display = '';
+    if (posterImg) { posterImg.src = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd; posterImg.style.display = ''; }
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
-    video.poster = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd;
     video.load();
     CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
