@@ -91,6 +91,7 @@ body {
   cursor: pointer;
   background: none;
   border: none;
+  text-decoration: none;
   transition: color 0.2s;
 }
 .btn-login:hover { color: #f9fafb; }
@@ -161,7 +162,7 @@ body {
   color: white;
   border: none;
   padding: 14px 28px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -177,7 +178,7 @@ body {
   color: #f9fafb;
   border: 1px solid #374151;
   padding: 14px 28px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -297,7 +298,7 @@ body {
 }
 .solution-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
 .solution-inner h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
-.solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin-bottom: 0; }
+.solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin: 0 auto; text-align: center; }
 .diagram-box {
   display: flex;
   align-items: center;
@@ -348,7 +349,7 @@ body {
 .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .feature-grid.reverse { direction: rtl; }
 .feature-grid.reverse > * { direction: ltr; }
-.feature-content h2 { font-size: 30px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
+.feature-content h2 { font-size: 32px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
 .feature-content p { font-size: 15px; color: #9ca3af; line-height: 1.7; margin-bottom: 24px; }
 .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .price-table th {
@@ -490,7 +491,8 @@ i[data-lucide] { display: inline-flex; }
 
 /* ── 8. INTEGRATION ── */
 .integration-section { background: #0f172a; border-top: 1px solid #1f2937; }
-.integration-inner { max-width: 1200px; margin: 0 auto; padding: 64px 48px; text-align: center; }
+.integration-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
+.integration-inner h2 { font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 10px; color: #f9fafb; }
 .provider-logos { display: flex; justify-content: center; align-items: center; gap: 50px; flex-wrap: wrap; margin-top: 36px; }
 .provider-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: default; }
 .provider-logo .logo-box {
@@ -560,14 +562,14 @@ i[data-lucide] { display: inline-flex; }
 .btn-cta-primary {
   background: linear-gradient(135deg, #0EA5E9, #EC4899);
   color: white; border: none; padding: 14px 32px;
-  border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
+  border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 .btn-cta-primary:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,0.35); }
 .btn-cta-secondary {
   background: transparent; color: #f9fafb;
   border: 1px solid #374151; padding: 14px 32px;
-  border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+  border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
 .btn-cta-secondary:hover { border-color: #6b7280; background: rgba(255,255,255,0.04); transform: translateY(-1px); }
@@ -950,10 +952,18 @@ backdrop-filter: blur(6px); white-space: nowrap;
   .integration-inner {
     padding: 48px 20px;
   }
+  .integration-inner h2 {
+    font-size: 22px;
+  }
+
+  /* Pricing title */
+  .pricing-title {
+    font-size: 24px;
+  }
 
   /* CTA */
   .cta-section {
-    padding: 60px 0;
+    padding: 48px 0;
   }
   .cta-inner {
     grid-template-columns: 1fr;
@@ -971,7 +981,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
     padding: 32px 20px;
   }
   .footer-inner {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 24px 16px;
   }
   .footer-brand {
@@ -991,15 +1001,10 @@ backdrop-filter: blur(6px); white-space: nowrap;
 
 /* 가격 섹션 타이틀 — 인라인 스타일 대체용 */
 .pricing-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   margin-bottom: 10px;
   color: #f9fafb;
-}
-@media (max-width: 768px) {
-  .pricing-title {
-    font-size: 24px;
-  }
 }
 
 /* 극소형 화면(≤360px) — 히어로 CTA 버튼 세로 스택 */
