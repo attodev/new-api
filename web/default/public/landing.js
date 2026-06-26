@@ -10,8 +10,8 @@ const STRINGS = {
   popupTerms:     isKo ? '이용약관'                                                     : 'Terms of Service',
   popupPrivacy:   isKo ? '개인정보처리방침'                                              : 'Privacy Policy',
   popupPricing:   isKo ? '전체 모델 및 가격표'                                           : 'Full Model & Pricing Table',
-  popupTermsUrl:  isKo ? '/terms.html'                                                  : '/terms_en.html',
-  popupPrivacyUrl:isKo ? '/privacy.html'                                                : '/privacy_en.html',
+  popupTermsUrl:  isKo ? './terms.html'                                                 : './terms_en.html',
+  popupPrivacyUrl:isKo ? './privacy.html'                                               : './privacy_en.html',
   // renderPricingTable strings
   pricingTitleFn: isKo
     ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">단가는 현재 시점 기준이며 추후 변동될 수 있음</span>)`
