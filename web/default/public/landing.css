@@ -502,6 +502,12 @@ i[data-lucide] { display: inline-flex; }
   background: #1f2937;
   display: flex; align-items: center; justify-content: center;
   font-size: 22px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.provider-logo:hover .logo-box {
+  border-color: rgba(14, 165, 233, 0.45);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.12);
 }
 .provider-logo .logo-name { font-size: 11px; color: #6b7280; font-weight: 600; }
 .modality-tags { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 24px; }
@@ -752,6 +758,32 @@ backdrop-filter: blur(6px); white-space: nowrap;
   border: none;
   cursor: pointer;
   padding: 4px;
+}
+.gnb--scrolled {
+  box-shadow: 0 1px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Scroll reveal stagger ── */
+.problem-card:nth-child(1).reveal { transition-delay: 0s; }
+.problem-card:nth-child(2).reveal { transition-delay: 0.1s; }
+.problem-card:nth-child(3).reveal { transition-delay: 0.2s; }
+
+.gov-point:nth-child(1).reveal { transition-delay: 0s; }
+.gov-point:nth-child(2).reveal { transition-delay: 0.12s; }
+.gov-point:nth-child(3).reveal { transition-delay: 0.24s; }
+
+.cta-box:nth-child(1).reveal { transition-delay: 0s; }
+.cta-box:nth-child(2).reveal { transition-delay: 0.12s; }
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .gnb-hamburger span {
   display: block;

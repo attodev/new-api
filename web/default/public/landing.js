@@ -479,6 +479,49 @@ document.addEventListener("click", function (e) {
   });
 });
 
+// ── Scroll reveal ──
+(function () {
+  const SELECTORS = [
+    // 섹션 헤더 (tag + h2 + sub 묶음을 wrapper로)
+    '#about .section-tag', '#about h2', '#about .section-sub',
+    '.solution-inner .section-tag', '.solution-inner h2', '.solution-inner .section-sub',
+    '.feature-section .section-tag', '.feature-section h2', '.feature-section > .feature-grid > *',
+    '.integration-inner .section-tag', '.integration-inner h2', '.integration-inner .section-sub',
+    '.integration-inner .provider-logos', '.integration-inner .modality-tags',
+    '.pricing-inner .section-tag', '.pricing-inner .pricing-title', '.pricing-inner .section-sub',
+    '.pricing-inner .price-cards-outer', '.pricing-inner .pricing-cta',
+    '.problem-card',
+    '.gov-point',
+    '.cta-box',
+  ];
+
+  const els = SELECTORS.flatMap(sel => [...document.querySelectorAll(sel)]);
+  // 중복 제거
+  const unique = [...new Set(els)];
+
+  unique.forEach(el => el.classList.add('reveal'));
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  unique.forEach(el => io.observe(el));
+})();
+
+// ── GNB scroll shadow ──
+(function () {
+  const gnb = document.querySelector('.gnb');
+  if (!gnb) return;
+  window.addEventListener('scroll', () => {
+    gnb.classList.toggle('gnb--scrolled', window.scrollY > 50);
+  }, { passive: true });
+})();
+
 // ── Hamburger menu ──
 (function () {
   const hamburger = document.querySelector('.gnb-hamburger');
