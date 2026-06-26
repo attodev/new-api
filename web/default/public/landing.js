@@ -30,6 +30,8 @@ const STRINGS = {
   // video filenames
   videoStd:       isKo ? 'alrouter_ko.mp4'                                              : 'alrouter_en.mp4',
   videoLite:      isKo ? 'alrouter_ko_lite.mp4'                                         : 'alrouter_en_lite.mp4',
+  posterStd:      isKo ? './alrouter_ko_poster.png'                                     : './alrouter_en_poster.png',
+  posterLite:     isKo ? './alrouter_ko_lite_poster.png'                                : './alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
@@ -389,6 +391,7 @@ document.addEventListener('keydown', function(e) {
     playOverlay.style.display = '';
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
+    video.poster = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd;
     video.load();
     CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
