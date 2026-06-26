@@ -384,8 +384,7 @@ document.addEventListener('keydown', function(e) {
     window.switchVideo(next, swipeDir);
   }, { passive: true });
 
-  window.switchVideo = function(newVer, swipeDir) {
-    if (window._videoVer === newVer) return;
+  function _doSwitch(newVer) {
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
     ctaBtn.classList.remove('active');
@@ -399,10 +398,27 @@ document.addEventListener('keydown', function(e) {
     video.load();
     CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
+  }
+
+  window.switchVideo = function(newVer, swipeDir) {
+    if (window._videoVer === newVer) return;
+
     if (swipeDir) {
+      // 스와이프: 기존 슬라이드 애니메이션
+      _doSwitch(newVer);
       animWrap.classList.remove('swipe-left', 'swipe-right');
-      void animWrap.offsetWidth; // reflow to restart animation
+      void animWrap.offsetWidth;
       animWrap.classList.add('swipe-' + swipeDir);
+      animWrap.addEventListener('animationend', () => {
+        animWrap.classList.remove('swipe-left', 'swipe-right');
+      }, { once: true });
+    } else {
+      // 도트 클릭: std→lite 는 왼쪽, lite→std 는 오른쪽
+      const dir = newVer === 'lite' ? 'left' : 'right';
+      animWrap.classList.remove('swipe-left', 'swipe-right');
+      void animWrap.offsetWidth;
+      _doSwitch(newVer);
+      animWrap.classList.add('swipe-' + dir);
       animWrap.addEventListener('animationend', () => {
         animWrap.classList.remove('swipe-left', 'swipe-right');
       }, { once: true });
