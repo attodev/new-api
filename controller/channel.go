@@ -1752,7 +1752,7 @@ func OllamaPullModel(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("Failed to pull model: %s", err.Error()),
+			"message": common.TranslateMessage(c, i18n.MsgChannelModelPullFailed, map[string]any{"Error": err.Error()}),
 		})
 		return
 	}
@@ -1892,7 +1892,7 @@ func OllamaDeleteModel(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("Failed to delete model: %s", err.Error()),
+			"message": common.TranslateMessage(c, i18n.MsgChannelModelDeleteFailed, map[string]any{"Error": err.Error()}),
 		})
 		return
 	}

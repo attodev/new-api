@@ -341,7 +341,7 @@ func AdminBindSubscription(c *gin.Context) {
 		return
 	}
 	if msg != "" {
-		common.ApiSuccess(c, gin.H{"message": msg})
+		common.ApiSuccess(c, gin.H{"message": common.TranslateMessage(c, i18n.MsgSubscriptionGroupUpgraded, map[string]any{"Group": msg})})
 		return
 	}
 	common.ApiSuccess(c, nil)
@@ -389,7 +389,7 @@ func AdminCreateUserSubscription(c *gin.Context) {
 		return
 	}
 	if msg != "" {
-		common.ApiSuccess(c, gin.H{"message": msg})
+		common.ApiSuccess(c, gin.H{"message": common.TranslateMessage(c, i18n.MsgSubscriptionGroupUpgraded, map[string]any{"Group": msg})})
 		return
 	}
 	common.ApiSuccess(c, nil)
@@ -408,7 +408,7 @@ func AdminInvalidateUserSubscription(c *gin.Context) {
 		return
 	}
 	if msg != "" {
-		common.ApiSuccess(c, gin.H{"message": msg})
+		common.ApiSuccess(c, gin.H{"message": common.TranslateMessage(c, i18n.MsgSubscriptionGroupReverted, map[string]any{"Group": msg})})
 		return
 	}
 	common.ApiSuccess(c, nil)
@@ -427,7 +427,7 @@ func AdminDeleteUserSubscription(c *gin.Context) {
 		return
 	}
 	if msg != "" {
-		common.ApiSuccess(c, gin.H{"message": msg})
+		common.ApiSuccess(c, gin.H{"message": common.TranslateMessage(c, i18n.MsgSubscriptionGroupReverted, map[string]any{"Group": msg})})
 		return
 	}
 	common.ApiSuccess(c, nil)

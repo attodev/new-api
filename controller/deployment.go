@@ -91,7 +91,7 @@ func TestIoNetConnection(c *gin.Context) {
 		if apiErr, ok := err.(*ionet.APIError); ok {
 			message := strings.TrimSpace(apiErr.Message)
 			if message == "" {
-				message = "failed to validate api key"
+				message = common.TranslateMessage(c, i18n.MsgDeploymentApiKeyInvalid)
 			}
 			common.ApiErrorMsg(c, message)
 			return
@@ -487,7 +487,7 @@ func DeleteDeployment(c *gin.Context) {
 	data := gin.H{
 		"status":        resp.Status,
 		"deployment_id": resp.DeploymentID,
-		"message":       "Deployment termination requested successfully",
+		"message":       common.TranslateMessage(c, i18n.MsgDeploymentTerminateSuccess),
 	}
 	common.ApiSuccess(c, data)
 }
@@ -513,7 +513,7 @@ func CreateDeployment(c *gin.Context) {
 	data := gin.H{
 		"deployment_id": resp.DeploymentID,
 		"status":        resp.Status,
-		"message":       "Deployment created successfully",
+		"message":       common.TranslateMessage(c, i18n.MsgDeploymentCreateSuccess),
 	}
 	common.ApiSuccess(c, data)
 }

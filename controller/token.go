@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -195,7 +194,7 @@ func AddToken(c *gin.Context) {
 	if int(count) >= maxTokens {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
-			"message": fmt.Sprintf("maximum token count limit reached (%d)", maxTokens),
+			"message": common.TranslateMessage(c, i18n.MsgTokenCountLimitReached, map[string]any{"Max": maxTokens}),
 		})
 		return
 	}

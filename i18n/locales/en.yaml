@@ -47,6 +47,7 @@ token.expired: "This token has expired"
 token.exhausted: "This token quota is exhausted TokenStatusExhausted[sk-{{.Prefix}}***{{.Suffix}}]"
 token.status_unavailable: "This token status is unavailable"
 token.db_error: "Invalid token, database query error, please contact administrator"
+token.count_limit_reached: "Maximum token count limit reached ({{.Max}})"
 
 # Redemption messages
 redemption.name_length: "Redemption code name length must be between 1-20"
@@ -122,6 +123,8 @@ subscription.reset_cycle_gt_zero: "Custom reset cycle must be greater than 0 sec
 subscription.purchase_max: "Purchase limit for this plan has been reached"
 subscription.invalid_id: "Invalid subscription ID"
 subscription.invalid_user_id: "Invalid user ID"
+subscription.group_upgraded: "User group will be upgraded to {{.Group}}"
+subscription.group_reverted: "User group will be reverted to {{.Group}}"
 
 # Payment messages
 payment.not_configured: "Payment information has not been configured by administrator"
@@ -223,6 +226,9 @@ deployment.hardware_invalid_id: "Invalid hardware_id parameter"
 deployment.api_key_required: "api_key is required"
 deployment.invalid_payload: "Invalid request payload"
 deployment.not_found: "Container details not found"
+deployment.terminate_success: "Deployment termination requested successfully"
+deployment.create_success: "Deployment created successfully"
+deployment.api_key_invalid: "Failed to validate API key"
 
 # Performance messages
 performance.disk_cache_cleared: "Inactive disk cache has been cleared"
@@ -329,6 +335,8 @@ channel.ollama_only: "This operation is only supported for Ollama channels"
 channel.model_pull_success: "Model {{.Model}} pulled successfully"
 channel.model_delete_success: "Model {{.Model}} deleted successfully"
 channel.fetch_models_failed: "Failed to fetch models"
+channel.model_pull_failed: "Failed to pull model: {{.Error}}"
+channel.model_delete_failed: "Failed to delete model: {{.Error}}"
 
 # Codex messages
 codex.parse_auth_failed: "Failed to parse authorization info, please check input format"
@@ -438,6 +446,7 @@ twofa.get_count_failed: "Failed to get backup code count: {{.Error}}"
 # Model sync messages
 model_sync.get_failed: "Failed to get model list, please try again later"
 model_sync.get_upstream_failed: "Failed to get upstream models: {{.Error}}"
+model_sync.fetch_upstream_failed: "Failed to fetch upstream models: {{.Error}}"
 
 # Console messages
 console.get_config_failed: "Failed to get config, please try again later"
@@ -469,6 +478,11 @@ setup.username_max_length: "Username cannot exceed 12 characters"
 setup.password_mismatch: "Passwords do not match"
 setup.password_min_length: "Password must be at least 8 characters"
 setup.success: "System initialized successfully"
+setup.system_error: "System error: {{.Error}}"
+setup.admin_create_failed: "Failed to create admin account: {{.Error}}"
+setup.self_use_save_failed: "Failed to save self-use mode setting: {{.Error}}"
+setup.demo_mode_save_failed: "Failed to save demo site mode setting: {{.Error}}"
+setup.init_failed_error: "System initialization failed: {{.Error}}"
 
 # Middleware messages
 middleware.turnstile_token_empty: "Turnstile token is empty"
@@ -501,6 +515,10 @@ twofa.privilege_error: "Cannot modify 2FA settings of a user with equal or highe
 twofa.force_disabled: "User's 2FA has been force-disabled"
 
 # Option controller messages
+option.image_ratio_failed: "Failed to set image ratio: {{.Error}}"
+option.audio_ratio_failed: "Failed to set audio ratio: {{.Error}}"
+option.audio_completion_ratio_failed: "Failed to set audio completion ratio: {{.Error}}"
+option.cache_creation_ratio_failed: "Failed to set cache creation ratio: {{.Error}}"
 option.github_config_missing: "Cannot enable GitHub OAuth, please fill in GitHub Client Id and GitHub Client Secret first"
 option.discord_config_missing: "Cannot enable Discord OAuth, please fill in Discord Client Id and Discord Client Secret first"
 option.oidc_config_missing: "Cannot enable OIDC login, please fill in OIDC Client Id and OIDC Client Secret first"
@@ -517,6 +535,7 @@ codex.access_token_required: "Codex channel: access_token is required"
 codex.account_id_required: "Codex channel: account_id is required"
 
 # Misc / common messages
+misc.server_running: "Server is running"
 common.migrated: "Migrated"
 contact.not_configured: "Contact recipient email is not configured"
 email.recipient_required: "Recipient email is required"

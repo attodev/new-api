@@ -55,6 +55,7 @@ const (
 	MsgTokenExhausted            = "token.exhausted"
 	MsgTokenStatusUnavailable    = "token.status_unavailable"
 	MsgTokenDbError              = "token.db_error"
+	MsgTokenCountLimitReached    = "token.count_limit_reached"
 )
 
 // Redemption related messages
@@ -138,6 +139,8 @@ const (
 	MsgSubscriptionPurchaseMax      = "subscription.purchase_max"
 	MsgSubscriptionInvalidId        = "subscription.invalid_id"
 	MsgSubscriptionInvalidUserId    = "subscription.invalid_user_id"
+	MsgSubscriptionGroupUpgraded    = "subscription.group_upgraded"
+	MsgSubscriptionGroupReverted    = "subscription.group_reverted"
 )
 
 // Payment related messages
@@ -253,16 +256,19 @@ const (
 
 // Deployment related messages (io.net)
 const (
-	MsgDeploymentNotEnabled     = "deployment.not_enabled"
-	MsgDeploymentIdRequired     = "deployment.id_required"
-	MsgDeploymentContainerIdReq = "deployment.container_id_required"
-	MsgDeploymentNameEmpty      = "deployment.name_empty"
-	MsgDeploymentNameTaken      = "deployment.name_taken"
-	MsgDeploymentHardwareIdReq  = "deployment.hardware_id_required"
-	MsgDeploymentHardwareInvId  = "deployment.hardware_invalid_id"
-	MsgDeploymentApiKeyRequired = "deployment.api_key_required"
-	MsgDeploymentInvalidPayload = "deployment.invalid_payload"
-	MsgDeploymentNotFound       = "deployment.not_found"
+	MsgDeploymentNotEnabled      = "deployment.not_enabled"
+	MsgDeploymentIdRequired      = "deployment.id_required"
+	MsgDeploymentContainerIdReq  = "deployment.container_id_required"
+	MsgDeploymentNameEmpty       = "deployment.name_empty"
+	MsgDeploymentNameTaken       = "deployment.name_taken"
+	MsgDeploymentHardwareIdReq   = "deployment.hardware_id_required"
+	MsgDeploymentHardwareInvId   = "deployment.hardware_invalid_id"
+	MsgDeploymentApiKeyRequired  = "deployment.api_key_required"
+	MsgDeploymentInvalidPayload  = "deployment.invalid_payload"
+	MsgDeploymentNotFound        = "deployment.not_found"
+	MsgDeploymentTerminateSuccess = "deployment.terminate_success"
+	MsgDeploymentCreateSuccess   = "deployment.create_success"
+	MsgDeploymentApiKeyInvalid   = "deployment.api_key_invalid"
 )
 
 // Performance related messages
@@ -391,6 +397,8 @@ const (
 	MsgChannelModelPullSuccess      = "channel.model_pull_success"
 	MsgChannelModelDeleteSuccess    = "channel.model_delete_success"
 	MsgChannelFetchModelsFailed     = "channel.fetch_models_failed"
+	MsgChannelModelPullFailed       = "channel.model_pull_failed"
+	MsgChannelModelDeleteFailed     = "channel.model_delete_failed"
 )
 
 // Codex messages
@@ -524,8 +532,9 @@ const (
 
 // Model sync messages
 const (
-	MsgModelSyncGetFailed         = "model_sync.get_failed"
-	MsgModelSyncGetUpstreamFailed = "model_sync.get_upstream_failed"
+	MsgModelSyncGetFailed           = "model_sync.get_failed"
+	MsgModelSyncGetUpstreamFailed   = "model_sync.get_upstream_failed"
+	MsgModelSyncFetchUpstreamFailed = "model_sync.fetch_upstream_failed"
 )
 
 // Console config messages
@@ -566,11 +575,16 @@ const (
 
 // Setup messages
 const (
-	MsgSetupAlreadyInitialized   = "setup.already_initialized"
-	MsgSetupUsernameMaxLength    = "setup.username_max_length"
-	MsgSetupPasswordMismatch     = "setup.password_mismatch"
-	MsgSetupPasswordMinLength    = "setup.password_min_length"
-	MsgSetupSuccess              = "setup.success"
+	MsgSetupAlreadyInitialized  = "setup.already_initialized"
+	MsgSetupUsernameMaxLength   = "setup.username_max_length"
+	MsgSetupPasswordMismatch    = "setup.password_mismatch"
+	MsgSetupPasswordMinLength   = "setup.password_min_length"
+	MsgSetupSuccess             = "setup.success"
+	MsgSetupSystemError         = "setup.system_error"
+	MsgSetupAdminCreateFailed   = "setup.admin_create_failed"
+	MsgSetupSelfUseSaveFailed   = "setup.self_use_save_failed"
+	MsgSetupDemoModeSaveFailed  = "setup.demo_mode_save_failed"
+	MsgSetupInitFailedError     = "setup.init_failed_error"
 )
 
 // 2FA controller messages
@@ -609,15 +623,19 @@ const (
 
 // Option controller messages
 const (
-	MsgOptionGitHubConfigMissing   = "option.github_config_missing"
-	MsgOptionDiscordConfigMissing  = "option.discord_config_missing"
-	MsgOptionOIDCConfigMissing     = "option.oidc_config_missing"
-	MsgOptionLinuxDOConfigMissing  = "option.linuxdo_config_missing"
-	MsgOptionEmailDomainMissing    = "option.email_domain_missing"
-	MsgOptionWeChatConfigMissing   = "option.wechat_config_missing"
-	MsgOptionTurnstileConfigMissing = "option.turnstile_config_missing"
-	MsgOptionTelegramConfigMissing = "option.telegram_config_missing"
-	MsgOptionInvalidTheme          = "option.invalid_theme"
+	MsgOptionGitHubConfigMissing        = "option.github_config_missing"
+	MsgOptionDiscordConfigMissing       = "option.discord_config_missing"
+	MsgOptionOIDCConfigMissing          = "option.oidc_config_missing"
+	MsgOptionLinuxDOConfigMissing       = "option.linuxdo_config_missing"
+	MsgOptionEmailDomainMissing         = "option.email_domain_missing"
+	MsgOptionWeChatConfigMissing        = "option.wechat_config_missing"
+	MsgOptionTurnstileConfigMissing     = "option.turnstile_config_missing"
+	MsgOptionTelegramConfigMissing      = "option.telegram_config_missing"
+	MsgOptionInvalidTheme               = "option.invalid_theme"
+	MsgOptionImageRatioFailed           = "option.image_ratio_failed"
+	MsgOptionAudioRatioFailed           = "option.audio_ratio_failed"
+	MsgOptionAudioCompletionRatioFailed = "option.audio_completion_ratio_failed"
+	MsgOptionCacheCreationRatioFailed   = "option.cache_creation_ratio_failed"
 )
 
 // Codex usage messages
@@ -634,6 +652,7 @@ const (
 
 // Misc messages
 const (
+	MsgServerRunning          = "misc.server_running"
 	MsgMigrated               = "common.migrated"
 	MsgContactNotConfigured   = "contact.not_configured"
 	MsgEmailRecipientRequired = "email.recipient_required"
