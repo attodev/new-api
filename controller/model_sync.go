@@ -514,7 +514,7 @@ func SyncUpstreamPreview(c *gin.Context) {
 	}()
 	wg.Wait()
 	if fetchErr != nil {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": "failed to fetch upstream models: " + fetchErr.Error(), "locale": locale, "source_urls": gin.H{"models_url": modelsURL, "vendors_url": vendorsURL}})
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": common.TranslateMessage(c, i18n.MsgModelSyncFetchUpstreamFailed, map[string]any{"Error": fetchErr.Error()}), "locale": locale, "source_urls": gin.H{"models_url": modelsURL, "vendors_url": vendorsURL}})
 		return
 	}
 

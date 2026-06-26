@@ -678,7 +678,7 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 	}
 	if strings.TrimSpace(plan.UpgradeGroup) != "" {
 		_ = UpdateUserGroupCache(userId, plan.UpgradeGroup)
-		return fmt.Sprintf("user group will be upgraded to %s", plan.UpgradeGroup), nil
+		return plan.UpgradeGroup, nil
 	}
 	return "", nil
 }
@@ -884,7 +884,7 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 		_ = UpdateUserGroupCache(userId, cacheGroup)
 	}
 	if downgradeGroup != "" {
-		return fmt.Sprintf("user group will be reverted to %s", downgradeGroup), nil
+		return downgradeGroup, nil
 	}
 	return "", nil
 }
@@ -925,7 +925,7 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 		_ = UpdateUserGroupCache(userId, cacheGroup)
 	}
 	if downgradeGroup != "" {
-		return fmt.Sprintf("user group will be reverted to %s", downgradeGroup), nil
+		return downgradeGroup, nil
 	}
 	return "", nil
 }

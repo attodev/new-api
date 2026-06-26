@@ -237,7 +237,7 @@ func UpdateOption(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "failed to set image ratio: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgOptionImageRatioFailed, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}
@@ -246,7 +246,7 @@ func UpdateOption(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "failed to set audio ratio: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgOptionAudioRatioFailed, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}
@@ -255,7 +255,7 @@ func UpdateOption(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "failed to set audio completion ratio: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgOptionAudioCompletionRatioFailed, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}
@@ -264,7 +264,7 @@ func UpdateOption(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "failed to set cache creation ratio: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgOptionCacheCreationRatioFailed, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}

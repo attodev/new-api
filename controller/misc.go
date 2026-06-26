@@ -33,7 +33,7 @@ func TestStatus(c *gin.Context) {
 	httpStats := middleware.GetStats()
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
-		"message":    "Server is running",
+		"message":    common.TranslateMessage(c, i18n.MsgServerRunning),
 		"http_stats": httpStats,
 	})
 	return

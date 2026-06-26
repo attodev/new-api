@@ -47,12 +47,12 @@ export function Logo({
       className={cn('flex items-center gap-2 text-sm font-medium', className)}
       {...props}
     >
-      {/* <SvgImage
+      <SvgImage
         width={width}
         height={height}
         aria-hidden='true'
         className='max-h-full max-w-full opacity-70'
-      /> */}
+      />
       <span className={cn(!showName && 'sr-only')}>{name}</span>
       {version && <span className='text-muted-foreground'>{version}</span>}
       {badge && <Badge variant='secondary'>{badge}</Badge>}

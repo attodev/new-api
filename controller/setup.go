@@ -107,7 +107,7 @@ func PostSetup(c *gin.Context) {
 		if err != nil {
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": "system error: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgSetupSystemError, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}
@@ -124,7 +124,7 @@ func PostSetup(c *gin.Context) {
 		if err != nil {
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": "failed to create admin account: " + err.Error(),
+				"message": common.TranslateMessage(c, i18n.MsgSetupAdminCreateFailed, map[string]any{"Error": err.Error()}),
 			})
 			return
 		}
@@ -139,7 +139,7 @@ func PostSetup(c *gin.Context) {
 	if err != nil {
 		c.JSON(200, gin.H{
 			"success": false,
-			"message": "failed to save self-use mode setting: " + err.Error(),
+			"message": common.TranslateMessage(c, i18n.MsgSetupSelfUseSaveFailed, map[string]any{"Error": err.Error()}),
 		})
 		return
 	}
@@ -148,7 +148,7 @@ func PostSetup(c *gin.Context) {
 	if err != nil {
 		c.JSON(200, gin.H{
 			"success": false,
-			"message": "failed to save demo site mode setting: " + err.Error(),
+			"message": common.TranslateMessage(c, i18n.MsgSetupDemoModeSaveFailed, map[string]any{"Error": err.Error()}),
 		})
 		return
 	}
@@ -164,7 +164,7 @@ func PostSetup(c *gin.Context) {
 	if err != nil {
 		c.JSON(200, gin.H{
 			"success": false,
-			"message": "system initialization failed: " + err.Error(),
+			"message": common.TranslateMessage(c, i18n.MsgSetupInitFailedError, map[string]any{"Error": err.Error()}),
 		})
 		return
 	}
