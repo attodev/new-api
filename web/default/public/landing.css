@@ -334,6 +334,7 @@ body {
 .diagram-result-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: rgba(14,165,233,0.08);
   border: 1px solid rgba(14,165,233,0.2);
@@ -342,6 +343,7 @@ body {
   font-size: 12px;
   color: #0EA5E9;
   font-weight: 600;
+  flex: 0 0 160px;
 }
 
 /* ── 6. FEATURE: COST ── */
@@ -493,7 +495,7 @@ i[data-lucide] { display: inline-flex; }
 .integration-section { background: #0f172a; border-top: 1px solid #1f2937; }
 .integration-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
 .integration-inner h2 { font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 10px; color: #f9fafb; }
-.provider-logos { display: flex; justify-content: center; align-items: center; gap: 50px; flex-wrap: wrap; margin-top: 36px; }
+.provider-logos { display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap; margin-top: 36px; }
 .provider-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: default; }
 .provider-logo .logo-box {
   width: 56px; height: 56px;
@@ -862,11 +864,11 @@ backdrop-filter: blur(6px); white-space: nowrap;
     flex-wrap: wrap;
   }
   .stat-item {
-    flex: 1;
-    min-width: 80px;
+    flex: 0 0 auto;
+    width: 100px;
   }
   .stat-item .stat-value {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   /* Section 공통 */
@@ -903,36 +905,24 @@ backdrop-filter: blur(6px); white-space: nowrap;
     font-size: 22px;
   }
 
-  /* Solution diagram — 가로 스크롤, 공백 축소, 스크롤 힌트 페이드 */
-  /* wrapper: absolute-positioned fade overlay가 content 위에 표시됨 */
+  /* Solution diagram — 스크롤 없이 비율 그대로 축소 */
   .diagram-scroll-outer {
     position: relative;
     margin-top: 20px;
+    overflow: hidden;
   }
   .diagram-scroll-outer::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 72px;
-    background: linear-gradient(to left, #111827 20%, transparent);
-    pointer-events: none;
+    display: none;
   }
   .diagram-outer {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    overflow: visible !important;
+    /* zoom: 비율 유지하며 레이아웃 공간도 함께 줄어듦 */
+    zoom: 0.46;
     margin-top: 0 !important;
-    /* padding-top 80px은 Admin(position:absolute; bottom:100%) 클리핑 방지용 — 축소 불가 */
-    padding-bottom: 16px !important;
+    padding-bottom: 0 !important;
   }
-  /* 아래 핵심 포인트 간격 축소 */
   .diagram-results {
     margin-top: 28px !important;
-  }
-  .diagram-outer::-webkit-scrollbar {
-    display: none;
   }
 
   /* 비용 계산기 — 1열 스택 */
@@ -943,43 +933,33 @@ backdrop-filter: blur(6px); white-space: nowrap;
     min-height: 120px;
   }
 
-  /* Pricing — 가로 스크롤 카드 슬라이더 */
-  .price-cards-outer {
-    position: relative;
-  }
+  /* Pricing — 세로 스택 */
   .price-cards-outer::after {
-    content: '';
-    position: absolute;
-    right: -20px;
-    top: 0;
-    bottom: 8px;
-    width: 72px;
-    background: linear-gradient(to left, #111827 20%, transparent);
-    pointer-events: none;
-    z-index: 1;
+    display: none;
   }
   .price-cards {
     display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 16px;
-    margin-left: -20px;
-    margin-right: -20px;
-    padding: 0 20px 8px;
-  }
-  .price-cards::-webkit-scrollbar {
-    display: none;
+    flex-direction: column;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    gap: 12px;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
   }
   .price-card {
-    flex: 0 0 calc(85vw);
-    scroll-snap-align: start;
-    padding: 24px;
+    flex: none;
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 12px;
   }
+  .price-card .model-provider { font-size: 11px; }
+  .price-card .model-name { font-size: 13px; margin-bottom: 10px; }
+  .price-card-divider { margin: 12px 0; }
   .price-card-pct {
-    font-size: 40px;
+    font-size: 30px;
   }
+  .price-card-label { font-size: 11px; margin-bottom: 6px; }
 
   /* Integration */
   .integration-inner {
