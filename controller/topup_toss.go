@@ -498,6 +498,14 @@ func TossWebhook(c *gin.Context) {
 			c.Status(http.StatusOK)
 			return
 		}
+		// Persist the paymentKey before crediting (committed independently of the credit txn) so
+		// the stale-pending sweep can't expire this approved order if RechargeToss rolls back or a
+		// webhook retry is delayed past the sweep window. provider_order_id must != trade_no first.
+		if err := model.RecordTossPaymentKey(orderId, auth.PaymentKey); err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Toss webhook record paymentKey failed order_id=%s error=%q", orderId, err.Error()))
+			c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
+			return
+		}
 		if err := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); err != nil {
 			c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
 			return
