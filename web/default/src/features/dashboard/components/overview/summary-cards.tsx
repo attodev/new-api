@@ -22,6 +22,7 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight, Flame, ShieldCheck, TrendingDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
+import { getSelf } from '@/lib/api'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
@@ -140,9 +141,20 @@ export function SummaryCards() {
   const { status, loading } = useStatus()
 
   const summaryTimeRange = useMemo(() => computeTimeRange(1), [])
-  const remainQuota = Number(user?.quota ?? 0)
-  const usedQuota = Number(user?.used_quota ?? 0)
-  const requestCount = Number(user?.request_count ?? 0)
+
+  const selfQuery = useQuery({
+    queryKey: ['user', 'self'],
+    queryFn: async () => {
+      const result = await getSelf()
+      return result.success && result.data ? result.data : null
+    },
+    staleTime: 0,
+  })
+
+  const liveUser = selfQuery.data ?? user
+  const remainQuota = Number(liveUser?.quota ?? 0)
+  const usedQuota = Number(liveUser?.used_quota ?? 0)
+  const requestCount = Number(liveUser?.request_count ?? 0)
 
   const usageTrendQuery = useQuery({
     queryKey: [
