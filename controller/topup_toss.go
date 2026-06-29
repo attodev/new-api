@@ -307,6 +307,13 @@ func TossConfirm(c *gin.Context) {
 		return
 	}
 
+	// Persist the paymentKey BEFORE confirming so the order remains reconcilable
+	// even if the process dies right after Toss approves the payment.
+	if err := model.RecordTossPaymentKey(orderId, paymentKey); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss record paymentKey (pre-confirm) failed order_id=%s error=%q", orderId, err.Error()))
+		// non-fatal: continue; RechargeToss also stores it idempotently
+	}
+
 	result, err := confirmTossPayment(ctx, paymentKey, orderId, amount)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss confirm API failed order_id=%s error=%q", orderId, err.Error()))
@@ -319,13 +326,6 @@ func TossConfirm(c *gin.Context) {
 		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm validation failed order_id=%s status=%s total=%d resp_order=%s currency=%s", orderId, result.Status, result.TotalAmount, result.OrderId, result.Currency))
 		tossRedirect(c, "/console/topup")
 		return
-	}
-
-	// Persist the paymentKey immediately so the order can be reconciled/cancelled
-	// even if the credit transaction below fails.
-	if err := model.RecordTossPaymentKey(orderId, result.PaymentKey); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss record paymentKey failed order_id=%s error=%q", orderId, err.Error()))
-		// non-fatal: RechargeToss also stores it within its transaction
 	}
 
 	if err := model.RechargeToss(orderId, result.PaymentKey, c.ClientIP()); err != nil {

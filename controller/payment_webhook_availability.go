@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 )
 
 func isPaymentComplianceConfirmed() bool {
@@ -34,7 +35,8 @@ func isTossTopUpEnabled() bool {
 		return false
 	}
 	return strings.TrimSpace(setting.TossActiveClientKey()) != "" &&
-		strings.TrimSpace(setting.TossActiveSecretKey()) != ""
+		strings.TrimSpace(setting.TossActiveSecretKey()) != "" &&
+		isValidServerAddress(system_setting.ServerAddress)
 }
 
 func isStripeWebhookConfigured() bool {
