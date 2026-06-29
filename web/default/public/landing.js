@@ -30,6 +30,8 @@ const STRINGS = {
   // video filenames
   videoStd:       isKo ? 'alrouter_ko.mp4'                                              : 'alrouter_en.mp4',
   videoLite:      isKo ? 'alrouter_ko_lite.mp4'                                         : 'alrouter_en_lite.mp4',
+  posterStd:      isKo ? './alrouter_ko_poster.png'                                     : './alrouter_en_poster.png',
+  posterLite:     isKo ? './alrouter_ko_lite_poster.png'                                : './alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
@@ -237,6 +239,7 @@ document.addEventListener('keydown', function(e) {
 // ── Video version check ──
 (function () {
   const video = document.getElementById("animVideo");
+  const posterImg = document.getElementById("animPosterImg");
   const prev = sessionStorage.getItem("videoVersion");
   const ver =
     prev === "std"
@@ -249,6 +252,7 @@ document.addEventListener('keydown', function(e) {
   sessionStorage.setItem("videoVersion", ver);
   window._videoVer = ver;
   video.src = ver === "lite" ? STRINGS.videoLite : STRINGS.videoStd;
+  if (posterImg) posterImg.src = ver === "lite" ? STRINGS.posterLite : STRINGS.posterStd;
   video.load();
 
   function _updateDots(v) {
@@ -280,6 +284,7 @@ document.addEventListener('keydown', function(e) {
 // ── Video play/pause controls ──
 (function() {
   const video       = document.getElementById('animVideo');
+  const posterImg   = document.getElementById('animPosterImg');
   const playOverlay = document.getElementById('animPlayOverlay');
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
@@ -293,6 +298,7 @@ document.addEventListener('keydown', function(e) {
 
   playOverlay.addEventListener('click', () => {
     playOverlay.style.display = 'none';
+    if (posterImg) posterImg.style.display = 'none';
     video.currentTime = 0;
     video.play();
   });
@@ -378,8 +384,7 @@ document.addEventListener('keydown', function(e) {
     window.switchVideo(next, swipeDir);
   }, { passive: true });
 
-  window.switchVideo = function(newVer, swipeDir) {
-    if (window._videoVer === newVer) return;
+  function _doSwitch(newVer) {
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
     ctaBtn.classList.remove('active');
@@ -387,15 +392,33 @@ document.addEventListener('keydown', function(e) {
     replayBtn.style.display = 'none';
     hoverOverlay.style.display = 'none';
     playOverlay.style.display = '';
+    if (posterImg) { posterImg.src = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd; posterImg.style.display = ''; }
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
     video.load();
     CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
+  }
+
+  window.switchVideo = function(newVer, swipeDir) {
+    if (window._videoVer === newVer) return;
+
     if (swipeDir) {
+      // 스와이프: 기존 슬라이드 애니메이션
+      _doSwitch(newVer);
       animWrap.classList.remove('swipe-left', 'swipe-right');
-      void animWrap.offsetWidth; // reflow to restart animation
+      void animWrap.offsetWidth;
       animWrap.classList.add('swipe-' + swipeDir);
+      animWrap.addEventListener('animationend', () => {
+        animWrap.classList.remove('swipe-left', 'swipe-right');
+      }, { once: true });
+    } else {
+      // 도트 클릭: std→lite 는 왼쪽, lite→std 는 오른쪽
+      const dir = newVer === 'lite' ? 'left' : 'right';
+      animWrap.classList.remove('swipe-left', 'swipe-right');
+      void animWrap.offsetWidth;
+      _doSwitch(newVer);
+      animWrap.classList.add('swipe-' + dir);
       animWrap.addEventListener('animationend', () => {
         animWrap.classList.remove('swipe-left', 'swipe-right');
       }, { once: true });
@@ -471,6 +494,49 @@ document.addEventListener("click", function (e) {
     if (!el.contains(e.target)) el.classList.remove("open");
   });
 });
+
+// ── Scroll reveal ──
+(function () {
+  const SELECTORS = [
+    // 섹션 헤더 (tag + h2 + sub 묶음을 wrapper로)
+    '#about .section-tag', '#about h2', '#about .section-sub',
+    '.solution-inner .section-tag', '.solution-inner h2', '.solution-inner .section-sub',
+    '.feature-section .section-tag', '.feature-section h2', '.feature-section > .feature-grid > *',
+    '.integration-inner .section-tag', '.integration-inner h2', '.integration-inner .section-sub',
+    '.integration-inner .provider-logos', '.integration-inner .modality-tags',
+    '.pricing-inner .section-tag', '.pricing-inner .pricing-title', '.pricing-inner .section-sub',
+    '.pricing-inner .price-cards-outer', '.pricing-inner .pricing-cta',
+    '.problem-card',
+    '.gov-point',
+    '.cta-box',
+  ];
+
+  const els = SELECTORS.flatMap(sel => [...document.querySelectorAll(sel)]);
+  // 중복 제거
+  const unique = [...new Set(els)];
+
+  unique.forEach(el => el.classList.add('reveal'));
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  unique.forEach(el => io.observe(el));
+})();
+
+// ── GNB scroll shadow ──
+(function () {
+  const gnb = document.querySelector('.gnb');
+  if (!gnb) return;
+  window.addEventListener('scroll', () => {
+    gnb.classList.toggle('gnb--scrolled', window.scrollY > 50);
+  }, { passive: true });
+})();
 
 // ── Hamburger menu ──
 (function () {

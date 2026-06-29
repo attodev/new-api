@@ -91,6 +91,7 @@ body {
   cursor: pointer;
   background: none;
   border: none;
+  text-decoration: none;
   transition: color 0.2s;
 }
 .btn-login:hover { color: #f9fafb; }
@@ -161,7 +162,7 @@ body {
   color: white;
   border: none;
   padding: 14px 28px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -177,7 +178,7 @@ body {
   color: #f9fafb;
   border: 1px solid #374151;
   padding: 14px 28px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -297,7 +298,7 @@ body {
 }
 .solution-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
 .solution-inner h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
-.solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin-bottom: 0; }
+.solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin: 0 auto; text-align: center; }
 .diagram-box {
   display: flex;
   align-items: center;
@@ -333,6 +334,7 @@ body {
 .diagram-result-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: rgba(14,165,233,0.08);
   border: 1px solid rgba(14,165,233,0.2);
@@ -341,6 +343,7 @@ body {
   font-size: 12px;
   color: #0EA5E9;
   font-weight: 600;
+  flex: 0 0 160px;
 }
 
 /* ── 6. FEATURE: COST ── */
@@ -348,7 +351,7 @@ body {
 .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .feature-grid.reverse { direction: rtl; }
 .feature-grid.reverse > * { direction: ltr; }
-.feature-content h2 { font-size: 30px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
+.feature-content h2 { font-size: 32px; font-weight: 800; margin-bottom: 14px; color: #f9fafb; }
 .feature-content p { font-size: 15px; color: #9ca3af; line-height: 1.7; margin-bottom: 24px; }
 .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .price-table th {
@@ -490,8 +493,9 @@ i[data-lucide] { display: inline-flex; }
 
 /* ── 8. INTEGRATION ── */
 .integration-section { background: #0f172a; border-top: 1px solid #1f2937; }
-.integration-inner { max-width: 1200px; margin: 0 auto; padding: 64px 48px; text-align: center; }
-.provider-logos { display: flex; justify-content: center; align-items: center; gap: 50px; flex-wrap: wrap; margin-top: 36px; }
+.integration-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
+.integration-inner h2 { font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 10px; color: #f9fafb; }
+.provider-logos { display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap; margin-top: 36px; }
 .provider-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: default; }
 .provider-logo .logo-box {
   width: 56px; height: 56px;
@@ -500,6 +504,12 @@ i[data-lucide] { display: inline-flex; }
   background: #1f2937;
   display: flex; align-items: center; justify-content: center;
   font-size: 22px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.provider-logo:hover .logo-box {
+  border-color: rgba(14, 165, 233, 0.45);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.12);
 }
 .provider-logo .logo-name { font-size: 11px; color: #6b7280; font-weight: 600; }
 .modality-tags { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 24px; }
@@ -560,14 +570,14 @@ i[data-lucide] { display: inline-flex; }
 .btn-cta-primary {
   background: linear-gradient(135deg, #0EA5E9, #EC4899);
   color: white; border: none; padding: 14px 32px;
-  border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
+  border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 .btn-cta-primary:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,0.35); }
 .btn-cta-secondary {
   background: transparent; color: #f9fafb;
   border: 1px solid #374151; padding: 14px 32px;
-  border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+  border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
 .btn-cta-secondary:hover { border-color: #6b7280; background: rgba(255,255,255,0.04); transform: translateY(-1px); }
@@ -670,6 +680,7 @@ cursor:pointer; transition:opacity 0.2s, transform 0.15s;
         .video-dot:hover { background: rgba(255,255,255,0.5); transform: scale(1.2); }
         .video-dot.active { background: rgba(255,255,255,0.85); transform: scale(1.35); }
         .anim-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .anim-poster-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 24px; z-index: 5; pointer-events: none; }
         .anim-wrap.swipe-left  { animation: swipeLeft  0.28s ease both; }
         .anim-wrap.swipe-right { animation: swipeRight 0.28s ease both; }
         @keyframes swipeLeft  { 0%{transform:translateX(18px);opacity:.4} 100%{transform:translateX(0);opacity:1} }
@@ -750,6 +761,32 @@ backdrop-filter: blur(6px); white-space: nowrap;
   cursor: pointer;
   padding: 4px;
 }
+.gnb--scrolled {
+  box-shadow: 0 1px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Scroll reveal stagger ── */
+.problem-card:nth-child(1).reveal { transition-delay: 0s; }
+.problem-card:nth-child(2).reveal { transition-delay: 0.1s; }
+.problem-card:nth-child(3).reveal { transition-delay: 0.2s; }
+
+.gov-point:nth-child(1).reveal { transition-delay: 0s; }
+.gov-point:nth-child(2).reveal { transition-delay: 0.12s; }
+.gov-point:nth-child(3).reveal { transition-delay: 0.24s; }
+
+.cta-box:nth-child(1).reveal { transition-delay: 0s; }
+.cta-box:nth-child(2).reveal { transition-delay: 0.12s; }
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
 .gnb-hamburger span {
   display: block;
   width: 22px;
@@ -827,11 +864,11 @@ backdrop-filter: blur(6px); white-space: nowrap;
     flex-wrap: wrap;
   }
   .stat-item {
-    flex: 1;
-    min-width: 80px;
+    flex: 0 0 auto;
+    width: 100px;
   }
   .stat-item .stat-value {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   /* Section 공통 */
@@ -868,36 +905,24 @@ backdrop-filter: blur(6px); white-space: nowrap;
     font-size: 22px;
   }
 
-  /* Solution diagram — 가로 스크롤, 공백 축소, 스크롤 힌트 페이드 */
-  /* wrapper: absolute-positioned fade overlay가 content 위에 표시됨 */
+  /* Solution diagram — 스크롤 없이 비율 그대로 축소 */
   .diagram-scroll-outer {
     position: relative;
     margin-top: 20px;
+    overflow: hidden;
   }
   .diagram-scroll-outer::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 72px;
-    background: linear-gradient(to left, #111827 20%, transparent);
-    pointer-events: none;
+    display: none;
   }
   .diagram-outer {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    overflow: visible !important;
+    /* zoom: 비율 유지하며 레이아웃 공간도 함께 줄어듦 */
+    zoom: 0.46;
     margin-top: 0 !important;
-    /* padding-top 80px은 Admin(position:absolute; bottom:100%) 클리핑 방지용 — 축소 불가 */
-    padding-bottom: 16px !important;
+    padding-bottom: 0 !important;
   }
-  /* 아래 핵심 포인트 간격 축소 */
   .diagram-results {
     margin-top: 28px !important;
-  }
-  .diagram-outer::-webkit-scrollbar {
-    display: none;
   }
 
   /* 비용 계산기 — 1열 스택 */
@@ -908,52 +933,50 @@ backdrop-filter: blur(6px); white-space: nowrap;
     min-height: 120px;
   }
 
-  /* Pricing — 가로 스크롤 카드 슬라이더 */
-  .price-cards-outer {
-    position: relative;
-  }
+  /* Pricing — 세로 스택 */
   .price-cards-outer::after {
-    content: '';
-    position: absolute;
-    right: -20px;
-    top: 0;
-    bottom: 8px;
-    width: 72px;
-    background: linear-gradient(to left, #111827 20%, transparent);
-    pointer-events: none;
-    z-index: 1;
+    display: none;
   }
   .price-cards {
     display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 16px;
-    margin-left: -20px;
-    margin-right: -20px;
-    padding: 0 20px 8px;
-  }
-  .price-cards::-webkit-scrollbar {
-    display: none;
+    flex-direction: column;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    gap: 12px;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
   }
   .price-card {
-    flex: 0 0 calc(85vw);
-    scroll-snap-align: start;
-    padding: 24px;
+    flex: none;
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 12px;
   }
+  .price-card .model-provider { font-size: 11px; }
+  .price-card .model-name { font-size: 13px; margin-bottom: 10px; }
+  .price-card-divider { margin: 12px 0; }
   .price-card-pct {
-    font-size: 40px;
+    font-size: 30px;
   }
+  .price-card-label { font-size: 11px; margin-bottom: 6px; }
 
   /* Integration */
   .integration-inner {
     padding: 48px 20px;
   }
+  .integration-inner h2 {
+    font-size: 22px;
+  }
+
+  /* Pricing title */
+  .pricing-title {
+    font-size: 24px;
+  }
 
   /* CTA */
   .cta-section {
-    padding: 60px 0;
+    padding: 48px 0;
   }
   .cta-inner {
     grid-template-columns: 1fr;
@@ -971,7 +994,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
     padding: 32px 20px;
   }
   .footer-inner {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 24px 16px;
   }
   .footer-brand {
@@ -991,15 +1014,10 @@ backdrop-filter: blur(6px); white-space: nowrap;
 
 /* 가격 섹션 타이틀 — 인라인 스타일 대체용 */
 .pricing-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   margin-bottom: 10px;
   color: #f9fafb;
-}
-@media (max-width: 768px) {
-  .pricing-title {
-    font-size: 24px;
-  }
 }
 
 /* 극소형 화면(≤360px) — 히어로 CTA 버튼 세로 스택 */

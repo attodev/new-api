@@ -38,7 +38,7 @@
         AlRouter
       </div>
       <ul class="gnb-menu">
-        <li><a href="#">서비스 소개</a></li>
+        <li><a href="#about">서비스 소개</a></li>
         <li>
           <a
             href="#"
@@ -113,6 +113,7 @@
                 playsinline
                 preload="auto"
               ></video>
+              <img id="animPosterImg" class="anim-poster-img" src="./alrouter_ko_poster.png" alt="" />
               <div class="anim-hover-overlay" id="animHoverOverlay">
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
@@ -195,7 +196,7 @@
     </div>
 
     <!-- ── SECTION 4: PROBLEM ── -->
-    <div class="section" style="max-width: 1300px">
+    <div class="section" id="about">
       <span class="section-tag">문제 인식</span>
       <h2>이런 상황, 익숙하지 않으신가요?</h2>
       <p class="section-sub">AI 도입했는데 비용은 늘고 관리는 더 복잡해졌나요? 모두 그런 어려움을 겪고 있습니다.</p>
@@ -230,7 +231,7 @@
       <div class="solution-inner">
         <span class="section-tag">해결책</span>
         <h2>AlRouter가 해결합니다</h2>
-        <p class="section-sub" style="margin: 0 auto 0; text-align: center">
+        <p class="section-sub">
           하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 관리하고, 공식 가격보다 저렴하게 쓰세요.
         </p>
 
@@ -933,7 +934,7 @@
             style="
               margin-top: 14px;
               font-size: 11px;
-              color: #ec4899;
+              color: #6b7280;
               line-height: 1.6;
             "
           >
@@ -1032,10 +1033,8 @@
     <div class="integration-section">
       <div class="integration-inner">
         <span class="section-tag">통합</span>
-        <h2 style="text-align: center; font-size: 28px; margin-bottom: 10px">
-          주요 AI 모델을 하나의 API로
-        </h2>
-        <p style="color: #9ca3af; font-size: 14px; text-align: center">
+        <h2>주요 AI 모델을 하나의 API로</h2>
+        <p class="section-sub" style="margin: 0 auto; text-align: center">
           모델마다 별도 계약 없이, AlRouter API 하나로 바로 사용하세요.
         </p>
         <div class="provider-logos">
@@ -1075,7 +1074,7 @@
       <div class="pricing-inner">
         <span class="section-tag">가격</span>
         <h2 class="pricing-title">투명한 가격, 숨겨진 비용 없음</h2>
-        <p style="color: #9ca3af; font-size: 14px">공식 가격 대비 할인된 요금으로, 사용한 만큼만 청구됩니다.</p>
+        <p class="section-sub" style="margin: 0 auto; text-align: center">공식 가격 대비 할인된 요금으로, 사용한 만큼만 청구됩니다.</p>
         <div class="price-cards-outer">
         <div class="price-cards">
           <div class="price-card">
@@ -1240,7 +1239,7 @@
         <div class="footer-col">
           <h4>제품</h4>
           <ul>
-            <li><a href="#">서비스 소개</a></li>
+            <li><a href="#about">서비스 소개</a></li>
             <li>
               <a
                 href="#"
@@ -1248,7 +1247,6 @@
                 >모델 & 가격</a
               >
             </li>
-            <li><a href="#" style="display: none">변경 이력</a></li>
           </ul>
         </div>
         <div class="footer-col">
