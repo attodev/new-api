@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
@@ -40,12 +41,22 @@ type tossConfirmResponse struct {
 }
 
 // getTossPayMoney returns the KRW amount to charge for the given entered amount.
+// It applies both the group top-up ratio and the amount-based discount (keyed on
+// the entered amount), mirroring getPayPalPayMoney for provider parity.
 func getTossPayMoney(amountKRW int64, group string) int64 {
 	ratio := common.GetTopupGroupRatio(group)
 	if ratio == 0 {
 		ratio = 1
 	}
-	return decimal.NewFromInt(amountKRW).Mul(decimal.NewFromFloat(ratio)).Round(0).IntPart()
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountKRW)]; ok && ds > 0 {
+		discount = ds
+	}
+	return decimal.NewFromInt(amountKRW).
+		Mul(decimal.NewFromFloat(ratio)).
+		Mul(decimal.NewFromFloat(discount)).
+		Round(0).
+		IntPart()
 }
 
 // tossUSDEquivalent converts charged KRW to the USD-equivalent stored in Money.

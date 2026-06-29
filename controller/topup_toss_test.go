@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 func TestGetTossPayMoney(t *testing.T) {
@@ -12,6 +13,18 @@ func TestGetTossPayMoney(t *testing.T) {
 	got := getTossPayMoney(13000, "default")
 	if got != 13000 {
 		t.Fatalf("getTossPayMoney(13000) = %d want 13000", got)
+	}
+}
+
+func TestGetTossPayMoneyAppliesDiscount(t *testing.T) {
+	ps := operation_setting.GetPaymentSetting()
+	prev := ps.AmountDiscount
+	ps.AmountDiscount = map[int]float64{13000: 0.9}
+	defer func() { ps.AmountDiscount = prev }()
+
+	got := getTossPayMoney(13000, "default")
+	if got != 11700 { // 13000 * 0.9
+		t.Fatalf("getTossPayMoney with discount = %d want 11700", got)
 	}
 }
 
