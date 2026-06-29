@@ -171,6 +171,32 @@ func OidcAuth(c *gin.Context) {
 		}
 	}
 
+	if common.EmailDomainRestrictionEnabled {
+		parts := strings.Split(oidcUser.Email, "@")
+		if len(parts) != 2 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgInvalidEmail),
+			})
+			return
+		}
+		domainPart := parts[1]
+		allowed := false
+		for _, domain := range common.EmailDomainWhitelist {
+			if domainPart == domain {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgEmailDomainRestricted),
+			})
+			return
+		}
+	}
+
 	if user.Status != common.UserStatusEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
