@@ -39,6 +39,7 @@ const (
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
 	PaymentMethodPayPal       = "paypal"
+	PaymentMethodToss         = "toss"
 )
 
 const (
@@ -49,6 +50,7 @@ const (
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderBalance      = "balance"
 	PaymentProviderPayPal       = "paypal"
+	PaymentProviderToss         = "toss"
 )
 
 var (
@@ -629,6 +631,64 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	}
 
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("PayPal top-up successful — quota: %v, payment amount: %.2f USD", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderPayPal)
+
+	return nil
+}
+
+// RechargeToss credits a successful Toss top-up idempotently.
+// The caller must validate the Toss confirm response (status DONE, amount match)
+// before calling this, and must hold the order lock.
+func RechargeToss(tradeNo string, callerIp string) (err error) {
+	if tradeNo == "" {
+		return errors.New("payment order number not provided")
+	}
+
+	var quotaToAdd int
+	topUp := &TopUp{}
+
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+			return errors.New("top-up order not found")
+		}
+
+		if topUp.PaymentProvider != PaymentProviderToss {
+			return ErrPaymentMethodMismatch
+		}
+
+		if topUp.Status == common.TopUpStatusSuccess {
+			return nil // idempotent: already credited
+		}
+
+		if topUp.Status != common.TopUpStatusPending {
+			return errors.New("top-up order status error")
+		}
+
+		topUp.CompleteTime = common.GetTimestamp()
+		topUp.Status = common.TopUpStatusSuccess
+		if err := tx.Save(topUp).Error; err != nil {
+			return err
+		}
+
+		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		if quotaToAdd <= 0 {
+			return errors.New("invalid top-up quota")
+		}
+		return CreditTopUpTarget(tx, topUp, quotaToAdd)
+	})
+
+	if err != nil {
+		common.SysError("toss topup failed: " + err.Error())
+		return errors.New("top-up failed, please try again later")
+	}
+
+	if quotaToAdd > 0 {
+		RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss top-up successful — quota: %v, payment amount: %d KRW", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentProviderToss)
+	}
 
 	return nil
 }
