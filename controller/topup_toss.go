@@ -309,11 +309,14 @@ func TossConfirm(c *gin.Context) {
 		return
 	}
 
-	// Persist the paymentKey BEFORE confirming so the order remains reconcilable
-	// even if the process dies right after Toss approves the payment.
+	// Persist the paymentKey BEFORE approving the payment. This MUST succeed: the stale-pending
+	// sweep treats provider_order_id == trade_no as "never approved" and expires such orders, so
+	// approving without first recording the paymentKey could let a real paid order be wrongly
+	// expired with no credit.
 	if err := model.RecordTossPaymentKey(orderId, paymentKey); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss record paymentKey (pre-confirm) failed order_id=%s error=%q", orderId, err.Error()))
-		// non-fatal: continue; RechargeToss also stores it idempotently
+		logger.LogError(ctx, fmt.Sprintf("Toss record paymentKey (pre-confirm) failed order_id=%s error=%q — aborting confirm", orderId, err.Error()))
+		tossRedirect(c, "/console/topup")
+		return
 	}
 
 	result, err := confirmTossPayment(ctx, paymentKey, orderId, amount)

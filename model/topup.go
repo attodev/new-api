@@ -654,19 +654,34 @@ func ExpireStaleTossPendingTopUps(cutoffUnix int64) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// RecordTossPaymentKey stores the Toss paymentKey on a Toss order so it is
-// persisted even if crediting later fails. Best-effort; no-op on empty key.
+// RecordTossPaymentKey persists the Toss paymentKey onto the order's provider_order_id.
+// This MUST succeed before the payment is approved: the stale-pending sweep treats
+// provider_order_id == trade_no as "never approved" and expires such orders, so an
+// approved-but-unrecorded order could otherwise be wrongly expired with no credit.
+// Returns an error if the value was not persisted (row missing or update lost).
 func RecordTossPaymentKey(tradeNo string, paymentKey string) error {
 	if tradeNo == "" || paymentKey == "" {
-		return nil
+		return errors.New("toss paymentKey persist: missing tradeNo or paymentKey")
 	}
 	refCol := "`trade_no`"
 	if common.UsingPostgreSQL {
 		refCol = `"trade_no"`
 	}
-	return DB.Model(&TopUp{}).
+	if err := DB.Model(&TopUp{}).
 		Where(refCol+" = ? AND payment_provider = ?", tradeNo, PaymentProviderToss).
-		Update("provider_order_id", paymentKey).Error
+		Update("provider_order_id", paymentKey).Error; err != nil {
+		return err
+	}
+	// RowsAffected is unreliable across DBs for unchanged-value updates (MySQL returns 0),
+	// so verify the persisted value directly.
+	var topUp TopUp
+	if err := DB.Select("provider_order_id").Where(refCol+" = ?", tradeNo).First(&topUp).Error; err != nil {
+		return err
+	}
+	if topUp.ProviderOrderId != paymentKey {
+		return errors.New("toss paymentKey persist: value not stored")
+	}
+	return nil
 }
 
 // RechargeToss credits a successful Toss top-up idempotently.
