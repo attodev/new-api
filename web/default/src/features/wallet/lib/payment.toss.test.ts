@@ -18,8 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { isTossPayment } from './payment'
-import { PAYMENT_TYPES } from '../constants'
+import {
+  isTossPayment,
+  getDefaultPaymentType,
+  getMinTopupAmount,
+} from './payment'
+import { PAYMENT_TYPES, DEFAULT_MIN_TOPUP } from '../constants'
+import type { TopupInfo } from '../types'
 
 describe('isTossPayment', () => {
   test('true for toss', () => {
@@ -27,5 +32,29 @@ describe('isTossPayment', () => {
   })
   test('false for others', () => {
     assert.equal(isTossPayment(PAYMENT_TYPES.STRIPE), false)
+  })
+})
+
+describe('getDefaultPaymentType (toss)', () => {
+  test('returns toss when only toss is enabled', () => {
+    const info = { enable_toss_topup: true, pay_methods: [] } as unknown as TopupInfo
+    assert.equal(getDefaultPaymentType(info), PAYMENT_TYPES.TOSS)
+  })
+})
+
+describe('getMinTopupAmount (toss)', () => {
+  test('returns toss_min_topup when set', () => {
+    const info = {
+      enable_toss_topup: true,
+      toss_min_topup: 5000,
+    } as unknown as TopupInfo
+    assert.equal(getMinTopupAmount(info), 5000)
+  })
+  test('falls back to DEFAULT_MIN_TOPUP when toss_min_topup is 0', () => {
+    const info = {
+      enable_toss_topup: true,
+      toss_min_topup: 0,
+    } as unknown as TopupInfo
+    assert.equal(getMinTopupAmount(info), DEFAULT_MIN_TOPUP)
   })
 })

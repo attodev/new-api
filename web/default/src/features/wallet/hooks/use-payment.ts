@@ -95,6 +95,9 @@ export function usePayment() {
       try {
         setProcessing(true)
 
+        // Toss is handled by useTossPayment in the component, not here.
+        if (isTossPayment(paymentType)) return false
+
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const amount = Math.floor(topupAmount)

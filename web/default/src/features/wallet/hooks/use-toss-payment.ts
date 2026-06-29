@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useCallback } from 'react'
 import i18next from 'i18next'
 import { toast } from 'sonner'
-import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import { requestTossPayment, isApiSuccess } from '../api'
 
 // ============================================================================
@@ -41,11 +41,18 @@ export function useTossPayment() {
         return false
       }
 
-      const { client_key, order_id, order_name, amount: chargeAmount, success_url, fail_url } =
-        response.data
+      const {
+        client_key,
+        customer_key,
+        order_id,
+        order_name,
+        amount: chargeAmount,
+        success_url,
+        fail_url,
+      } = response.data
 
       const tossPayments = await loadTossPayments(client_key)
-      const payment = tossPayments.payment({ customerKey: ANONYMOUS })
+      const payment = tossPayments.payment({ customerKey: customer_key })
 
       await payment.requestPayment({
         method: 'CARD',
@@ -58,9 +65,11 @@ export function useTossPayment() {
       // requestPayment가 결제창으로 리다이렉트하므로 이 지점 이후는 도달하지 않는다.
       return true
     } catch (err) {
-      // 유저가 결제창을 닫으면 SDK가 reject한다 — 조용히 실패 처리.
-      const message = (err as { message?: string })?.message
-      if (message) toast.error(message)
+      // 유저가 결제창을 닫으면 SDK가 PAY_PROCESS_CANCELED로 reject한다 — 조용히 실패 처리.
+      const e = err as { code?: string; message?: string }
+      if (e?.code && e.code !== 'PAY_PROCESS_CANCELED') {
+        toast.error(i18next.t('Payment request failed'))
+      }
       return false
     } finally {
       setProcessing(false)

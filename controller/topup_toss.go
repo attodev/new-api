@@ -130,8 +130,9 @@ func RequestTossPay(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"client_key": setting.TossActiveClientKey(),
-			"order_id":   orderId,
+			"client_key":   setting.TossActiveClientKey(),
+			"customer_key": fmt.Sprintf("cust_%d", id),
+			"order_id":     orderId,
 			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
 			"amount":     chargedKRW,
 			"success_url": system_setting.ServerAddress + "/api/toss/confirm",
