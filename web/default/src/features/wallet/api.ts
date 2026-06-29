@@ -40,6 +40,7 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  TossPaymentResponse,
 } from './types'
 
 // ============================================================================
@@ -177,6 +178,30 @@ export async function calculateWaffoPancakeAmount(
   request: AmountRequest
 ): Promise<AmountResponse> {
   const res = await api.post('/api/user/waffo-pancake/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * Calculate payment amount for Toss payment
+ */
+export async function calculateTossAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/user/toss/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * Request Toss payment session
+ */
+export async function requestTossPayment(
+  request: PaymentRequest
+): Promise<TossPaymentResponse> {
+  const res = await api.post('/api/user/toss/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
