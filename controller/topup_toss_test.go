@@ -58,3 +58,20 @@ func TestValidateTossConfirmAmount(t *testing.T) {
 		t.Fatalf("provider mismatch should fail")
 	}
 }
+
+func TestIsTossTerminalFailStatus(t *testing.T) {
+	cases := map[string]bool{
+		"EXPIRED":     true,
+		"ABORTED":     true,
+		"CANCELED":    true,
+		"DONE":        false,
+		"READY":       false,
+		"IN_PROGRESS": false,
+		"":            false,
+	}
+	for status, want := range cases {
+		if got := isTossTerminalFailStatus(status); got != want {
+			t.Errorf("isTossTerminalFailStatus(%q)=%v want %v", status, got, want)
+		}
+	}
+}

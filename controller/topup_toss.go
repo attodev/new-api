@@ -224,7 +224,8 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 
 // getTossPayment fetches the authoritative payment object from Toss.
 func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	// Webhook-only path: stay under Toss's ~10s webhook response window.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+paymentKey, nil)
 	if err != nil {
@@ -355,19 +356,31 @@ func TossFail(c *gin.Context) {
 	tossRedirect(c, "/console/topup")
 }
 
-// TossWebhook is a defensive, re-verifying stub for FUTURE asynchronous payment methods.
+// isTossTerminalFailStatus reports whether a Toss payment status is a terminal failure.
+func isTossTerminalFailStatus(status string) bool {
+	switch status {
+	case "EXPIRED", "ABORTED", "CANCELED":
+		return true
+	default:
+		return false
+	}
+}
+
+// TossWebhook handles Toss PAYMENT_STATUS_CHANGED events for card payments.
 //
-// Phase 1 scope: CARD payments only. CARD payments are credited synchronously in
-// TossConfirm; this handler is never invoked for them under normal operation.
+//   - DONE → credit the order (re-verified against the authoritative payment, idempotent).
+//   - EXPIRED / ABORTED / CANCELED → close the lingering pending order (re-verified).
 //
-// This endpoint does NOT yet implement Toss's actual DEPOSIT_CALLBACK shape
-// (top-level "secret"/"status"/"orderId") nor does it store the deposit secret.
-// Virtual-account enablement and async DEPOSIT_CALLBACK handling must be added
-// when asynchronous payment methods are introduced.
+// Card payments are normally credited synchronously in TossConfirm; this endpoint
+// provides defensive crediting plus closure of pending orders whose approval/window
+// lapsed (Toss emits EXPIRED for card payments when the 30-min/10-min windows lapse).
 //
-// The existing re-verification logic (re-fetching the authoritative payment from Toss
-// before crediting) is intentionally kept: it ensures any future async handler
-// never credits based solely on an unauthenticated webhook payload.
+// Every action is re-verified by re-fetching the authoritative payment from Toss, so
+// nothing is ever decided from the unauthenticated webhook payload alone.
+//
+// This endpoint does NOT implement Toss's virtual-account DEPOSIT_CALLBACK shape
+// (top-level "secret"/"status"/"orderId") nor store the deposit secret; that is
+// deferred until virtual-account support lands.
 func TossWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
 	body, err := io.ReadAll(c.Request.Body)
@@ -391,31 +404,40 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	if event.Data.Status != "DONE" || event.Data.OrderId == "" {
+	orderId := event.Data.OrderId
+	if orderId == "" {
 		c.Status(http.StatusOK)
 		return
 	}
 
-	orderId := event.Data.OrderId
+	isDone := event.Data.Status == "DONE"
+	isTerminalFail := isTossTerminalFailStatus(event.Data.Status)
+	if !isDone && !isTerminalFail {
+		// Intermediate states (READY / IN_PROGRESS / WAITING_FOR_DEPOSIT / ...) — nothing to do.
+		c.Status(http.StatusOK)
+		return
+	}
+
 	LockOrder(orderId)
 	defer UnlockOrder(orderId)
 
 	topUp := model.GetTopUpByTradeNo(orderId)
-	if err := validateTossConfirm(topUp, orderId, event.Data.TotalAmount); err != nil {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook validation failed error=%q", err.Error()))
+	if topUp == nil || topUp.PaymentProvider != model.PaymentProviderToss {
 		c.Status(http.StatusOK)
 		return
 	}
 	if topUp.Status == common.TopUpStatusSuccess {
-		c.Status(http.StatusOK)
+		c.Status(http.StatusOK) // already credited
+		return
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		c.Status(http.StatusOK) // already closed (failed/expired)
 		return
 	}
 
-	// The webhook payload is unauthenticated, so never credit based on it.
-	// Re-fetch the authoritative payment object from Toss and credit only if
-	// Toss itself confirms a DONE payment for this exact order and amount.
+	// Never act on the unauthenticated payload alone — re-fetch the authoritative payment.
 	if event.Data.PaymentKey == "" {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook missing paymentKey order_id=%s", orderId))
+		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook missing paymentKey order_id=%s status=%s", orderId, event.Data.Status))
 		c.Status(http.StatusOK)
 		return
 	}
@@ -425,17 +447,44 @@ func TossWebhook(c *gin.Context) {
 		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
 		return
 	}
-	if auth.Status != "DONE" || auth.TotalAmount != topUp.Amount || auth.OrderId != orderId {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook authoritative mismatch order_id=%s status=%s total=%d auth_order=%s", orderId, auth.Status, auth.TotalAmount, auth.OrderId))
+	if auth.OrderId != orderId {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook order mismatch order_id=%s auth_order=%s", orderId, auth.OrderId))
 		c.Status(http.StatusOK)
 		return
 	}
 
-	if err := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); err != nil {
-		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
+	if isDone {
+		if auth.Status != "DONE" || auth.TotalAmount != topUp.Amount {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook DONE authoritative mismatch order_id=%s status=%s total=%d", orderId, auth.Status, auth.TotalAmount))
+			c.Status(http.StatusOK)
+			return
+		}
+		if err := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); err != nil {
+			c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
+			return
+		}
+		logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded (webhook) order_id=%s", orderId))
+		c.Status(http.StatusOK)
 		return
 	}
-	logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded order_id=%s", orderId))
+
+	// Terminal failure: close the lingering pending order, but only if Toss itself reports a terminal state.
+	if isTossTerminalFailStatus(auth.Status) {
+		target := common.TopUpStatusFailed
+		if auth.Status == "EXPIRED" {
+			target = common.TopUpStatusExpired
+		}
+		if err := model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, target); err != nil {
+			// Non-fatal housekeeping (e.g. raced to closed); do not trigger retries.
+			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook close pending order_id=%s status=%s error=%q", orderId, auth.Status, err.Error()))
+		} else {
+			logger.LogInfo(ctx, fmt.Sprintf("Toss webhook closed pending order order_id=%s status=%s", orderId, auth.Status))
+		}
+		c.Status(http.StatusOK)
+		return
+	}
+
+	// Authoritative status is not terminal — payload was stale/forged; ignore.
 	c.Status(http.StatusOK)
 }
 
