@@ -1742,6 +1742,23 @@ export function PaymentSettingsSection({
               </p>
             </div>
 
+            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+              <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
+              <ul className='list-inside list-disc space-y-1'>
+                <li>
+                  {t('Webhook URL:')}{' '}
+                  <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                    {'<ServerAddress>/api/toss/webhook'}
+                  </code>
+                </li>
+                <li>
+                  {t(
+                    'In the Toss developer console, register this URL for the PAYMENT_STATUS_CHANGED event (used for recovery crediting, EXPIRED/ABORTED cleanup, and cancel detection)',
+                  )}
+                </li>
+              </ul>
+            </div>
+
             <div className='grid gap-6 md:grid-cols-2'>
               <FormField
                 control={form.control}

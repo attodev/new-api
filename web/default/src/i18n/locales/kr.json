@@ -4657,6 +4657,7 @@
     "Quick Start Guide(PDF)": "퀵스타트 가이드(PDF)",
     "Toss Gateway": "Toss 결제",
     "Configuration for Toss Payments integration": "Toss 페이먼츠 연동 설정",
+    "In the Toss developer console, register this URL for the PAYMENT_STATUS_CHANGED event (used for recovery crediting, EXPIRED/ABORTED cleanup, and cancel detection)": "Toss 개발자센터에서 이 URL을 PAYMENT_STATUS_CHANGED 이벤트로 등록하세요 (복구 충전, EXPIRED/ABORTED 정리, 취소 감지에 사용됩니다)",
     "Toss": "Toss",
     "Enable Toss payment gateway": "Toss 결제 게이트웨이 활성화",
     "Test Client Key": "테스트 Client Key",
