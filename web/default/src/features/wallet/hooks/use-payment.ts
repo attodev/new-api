@@ -24,6 +24,7 @@ import {
   calculateStripeAmount,
   calculatePayPalAmount,
   calculateWaffoPancakeAmount,
+  calculateTossAmount,
   requestPayment,
   requestStripePayment,
   requestPayPalPayment,
@@ -33,6 +34,7 @@ import {
   isStripePayment,
   isPayPalPayment,
   isWaffoPancakePayment,
+  isTossPayment,
   submitPaymentForm,
 } from '../lib'
 
@@ -54,6 +56,7 @@ export function usePayment() {
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const isPancake = isWaffoPancakePayment(paymentType)
+        const isToss = isTossPayment(paymentType)
         let response: Awaited<ReturnType<typeof calculateAmount>>
         if (isStripe) {
           response = await calculateStripeAmount({ amount: topupAmount })
@@ -61,6 +64,8 @@ export function usePayment() {
           response = await calculatePayPalAmount({ amount: topupAmount })
         } else if (isPancake) {
           response = await calculateWaffoPancakeAmount({ amount: topupAmount })
+        } else if (isToss) {
+          response = await calculateTossAmount({ amount: topupAmount })
         } else {
           response = await calculateAmount({ amount: topupAmount })
         }

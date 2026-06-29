@@ -40,11 +40,13 @@ import {
   useCreemPayment,
   useWaffoPayment,
   useWaffoPancakePayment,
+  useTossPayment,
 } from './hooks'
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
   isWaffoPancakePayment,
+  isTossPayment,
 } from './lib'
 import type {
   UserWalletData,
@@ -104,6 +106,7 @@ export function Wallet(props: WalletProps) {
   const { processWaffoPayment } = useWaffoPayment()
   const { processing: pancakeProcessing, processWaffoPancakePayment } =
     useWaffoPancakePayment()
+  const { processing: tossProcessing, processTossPayment } = useTossPayment()
 
   // Fetch and refresh user data
   const fetchUser = useCallback(async () => {
@@ -189,10 +192,15 @@ export function Wallet(props: WalletProps) {
   const handlePaymentConfirm = async () => {
     if (!selectedPaymentMethod) return
 
-    const isPancake = isWaffoPancakePayment(selectedPaymentMethod.type)
-    const success = isPancake
-      ? await processWaffoPancakePayment(topupAmount)
-      : await processPayment(topupAmount, selectedPaymentMethod.type)
+    const type = selectedPaymentMethod.type
+    let success = false
+    if (isWaffoPancakePayment(type)) {
+      success = await processWaffoPancakePayment(topupAmount)
+    } else if (isTossPayment(type)) {
+      success = await processTossPayment(topupAmount)
+    } else {
+      success = await processPayment(topupAmount, type)
+    }
 
     if (success) {
       setConfirmDialogOpen(false)
@@ -339,7 +347,7 @@ export function Wallet(props: WalletProps) {
         paymentAmount={paymentAmount}
         paymentMethod={selectedPaymentMethod}
         calculating={calculating}
-        processing={processing || pancakeProcessing}
+        processing={processing || pancakeProcessing || tossProcessing}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}
       />
