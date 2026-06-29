@@ -64,8 +64,8 @@ import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
 import { UptimePanel } from './uptime-panel'
 
-// Add lang code here when a dedicated PDF exists: public/AlRouter Quick Start Guide_v1.0.{lang}.pdf
-const QUICKSTART_PDF_LANGS: string[] = []
+// Add lang code when placing public/AlRouter Quick Start Guide_{LANG}_v1.0.pdf (e.g. EN, JA)
+const QUICKSTART_PDF_LANGS = ['en']
 
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
@@ -458,7 +458,7 @@ function CompactQuickAction(props: { action: QuickAction }) {
 export function OverviewDashboard() {
   const { t, i18n } = useTranslation()
   const quickstartPdfUrl = QUICKSTART_PDF_LANGS.includes(i18n.language)
-    ? `/AlRouter Quick Start Guide_v1.0.${i18n.language}.pdf`
+    ? `/AlRouter Quick Start Guide_${i18n.language.toUpperCase()}_v1.0.pdf`
     : `/AlRouter Quick Start Guide_v1.0.pdf`
   const user = useAuthStore((state) => state.auth.user)
   const { items: apiInfoItems } = useApiInfo()
@@ -655,7 +655,6 @@ export function OverviewDashboard() {
                             href={quickstartPdfUrl}
                             target='_blank'
                             rel='noopener noreferrer'
-                            download
                           />
                         }
                       >
