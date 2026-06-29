@@ -5,7 +5,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting"
 )
 
 func TestGetTossPayMoney(t *testing.T) {
@@ -13,16 +12,6 @@ func TestGetTossPayMoney(t *testing.T) {
 	got := getTossPayMoney(13000, "default")
 	if got != 13000 {
 		t.Fatalf("getTossPayMoney(13000) = %d want 13000", got)
-	}
-}
-
-func TestTossMinTopupGuard(t *testing.T) {
-	prev := setting.TossMinTopUp
-	setting.TossMinTopUp = 1000
-	defer func() { setting.TossMinTopUp = prev }()
-
-	if int64(setting.TossMinTopUp) != 1000 {
-		t.Fatalf("min topup not set")
 	}
 }
 

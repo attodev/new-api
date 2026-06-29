@@ -63,6 +63,10 @@ func RequestTossAmount(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if !isTossTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
+		return
+	}
 	if req.Amount < int64(setting.TossMinTopUp) {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
 		return
@@ -128,7 +132,7 @@ func RequestTossPay(c *gin.Context) {
 		"data": gin.H{
 			"client_key": setting.TossActiveClientKey(),
 			"order_id":   orderId,
-			"order_name": fmt.Sprintf("Credit top-up %d KRW", chargedKRW),
+			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
 			"amount":     chargedKRW,
 			"success_url": system_setting.ServerAddress + "/api/toss/confirm",
 			"fail_url":    system_setting.ServerAddress + "/api/toss/fail",
@@ -172,6 +176,34 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 
 	var result tossConfirmResponse
 	if err := common.Unmarshal(respBody, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// getTossPayment fetches the authoritative payment object from Toss.
+func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+paymentKey, nil)
+	if err != nil {
+		return nil, err
+	}
+	credentials := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
+	req.Header.Set("Authorization", "Basic "+credentials)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("toss get payment failed: status=%d body=%s", resp.StatusCode, string(body))
+	}
+	var result tossConfirmResponse
+	if err := common.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -249,6 +281,7 @@ func TossConfirm(c *gin.Context) {
 		tossRedirect(c, "/console/topup")
 		return
 	}
+	logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded order_id=%s", orderId))
 	tossRedirect(c, "/console/log")
 }
 
@@ -278,6 +311,7 @@ func TossWebhook(c *gin.Context) {
 		EventType string `json:"eventType"`
 		Data      struct {
 			OrderId     string `json:"orderId"`
+			PaymentKey  string `json:"paymentKey"`
 			Status      string `json:"status"`
 			TotalAmount int64  `json:"totalAmount"`
 		} `json:"data"`
@@ -307,10 +341,32 @@ func TossWebhook(c *gin.Context) {
 		c.Status(http.StatusOK)
 		return
 	}
+
+	// The webhook payload is unauthenticated, so never credit based on it.
+	// Re-fetch the authoritative payment object from Toss and credit only if
+	// Toss itself confirms a DONE payment for this exact order and amount.
+	if event.Data.PaymentKey == "" {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook missing paymentKey order_id=%s", orderId))
+		c.Status(http.StatusOK)
+		return
+	}
+	auth, err := getTossPayment(ctx, event.Data.PaymentKey)
+	if err != nil {
+		logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed order_id=%s error=%q", orderId, err.Error()))
+		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
+		return
+	}
+	if auth.Status != "DONE" || auth.TotalAmount != topUp.Amount || auth.OrderId != orderId {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook authoritative mismatch order_id=%s status=%s total=%d auth_order=%s", orderId, auth.Status, auth.TotalAmount, auth.OrderId))
+		c.Status(http.StatusOK)
+		return
+	}
+
 	if err := model.RechargeToss(orderId, c.ClientIP()); err != nil {
 		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
 		return
 	}
+	logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded order_id=%s", orderId))
 	c.Status(http.StatusOK)
 }
 
@@ -319,4 +375,11 @@ func RequestOrganizationTossPay(c *gin.Context) {
 		return
 	}
 	RequestTossPay(c)
+}
+
+func RequestOrganizationTossAmount(c *gin.Context) {
+	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+		return
+	}
+	RequestTossAmount(c)
 }

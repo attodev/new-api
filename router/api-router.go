@@ -203,6 +203,7 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.POST("/paypal/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationPayPalPay)
 			organizationRoute.POST("/paypal/amount", controller.RequestOrganizationPayPalAmount)
 			organizationRoute.POST("/toss/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationTossPay)
+			organizationRoute.POST("/toss/amount", controller.RequestOrganizationTossAmount)
 			organizationRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationCreemPay)
 			organizationRoute.POST("/waffo/amount", controller.RequestOrganizationWaffoAmount)
 			organizationRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationWaffoPay)
