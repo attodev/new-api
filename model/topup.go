@@ -476,9 +476,9 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		}
 
 		// calculate quota to credit:
-		// - Stripe/PayPal orders: Money is USD amount after group-rate conversion, multiply by QuotaPerUnit
+		// - Stripe/PayPal/Toss orders: Money is USD amount after group-rate conversion, multiply by QuotaPerUnit
 		// - Other orders (e.g. Epay): Amount is USD amount, multiply by QuotaPerUnit
-		if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal {
+		if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal || topUp.PaymentProvider == PaymentProviderToss {
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 			quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(dQuotaPerUnit).IntPart())
 		} else {
