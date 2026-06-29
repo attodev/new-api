@@ -226,34 +226,36 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 }
 
 // getTossPayment fetches the authoritative payment object from Toss.
-func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, error) {
+// It returns the HTTP status code so callers can distinguish a definitive
+// 404 (no such payment) from transient (network/5xx) failures.
+func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, int, error) {
 	// Webhook-only path: stay under Toss's ~10s webhook response window.
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+paymentKey, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	credentials := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
 	req.Header.Set("Authorization", "Basic "+credentials)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("toss get payment failed: status=%d body=%s", resp.StatusCode, string(body))
+		return nil, resp.StatusCode, fmt.Errorf("toss get payment failed: status=%d body=%s", resp.StatusCode, string(body))
 	}
 	var result tossConfirmResponse
 	if err := common.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
-	return &result, nil
+	return &result, resp.StatusCode, nil
 }
 
 func tossRedirect(c *gin.Context, path string) {
@@ -326,17 +328,30 @@ func TossConfirm(c *gin.Context) {
 		// Don't infer terminal-vs-transient from the HTTP status (e.g. 409 IDEMPOTENT_REQUEST_PROCESSING
 		// is transient, not a rejection). Ask Toss authoritatively what actually happened.
 		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm API failed order_id=%s status=%d error=%q — re-verifying", orderId, statusCode, err.Error()))
-		auth, gerr := getTossPayment(ctx, paymentKey)
+		auth, verifyStatus, gerr := getTossPayment(ctx, paymentKey)
 		if gerr != nil {
-			// Can't determine state — leave pending; the PAYMENT_STATUS_CHANGED webhook will resolve it.
-			logger.LogError(ctx, fmt.Sprintf("Toss confirm verify failed order_id=%s verify_error=%q", orderId, gerr.Error()))
+			if verifyStatus == http.StatusNotFound {
+				// Toss has no payment for this paymentKey (forged/invalid key, or no payment ever made)
+				// → definitively no payment → close so it isn't stranded pending.
+				_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
+				logger.LogWarn(ctx, fmt.Sprintf("Toss confirm verify: payment not found order_id=%s — closed as failed", orderId))
+				tossRedirect(c, "/console/topup")
+				return
+			}
+			// Network / 5xx / other → transient; leave pending for the webhook/retry to resolve.
+			logger.LogError(ctx, fmt.Sprintf("Toss confirm verify failed (transient) order_id=%s status=%d error=%q", orderId, verifyStatus, gerr.Error()))
 			tossRedirect(c, "/console/topup")
 			return
 		}
 		switch {
-		case auth.OrderId == orderId && auth.Status == "DONE" && auth.TotalAmount == amount && strings.ToUpper(auth.Currency) == "KRW":
-			// Payment was actually approved (confirm response lost, or a concurrent idempotent confirm
-			// completed). Credit it. (paymentKey was already persisted before confirm.)
+		case auth.OrderId != orderId:
+			// paymentKey resolves to a different order (tampering) → our order has no payment → close.
+			_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
+			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm verify: order mismatch order_id=%s auth_order=%s — closed as failed", orderId, auth.OrderId))
+			tossRedirect(c, "/console/topup")
+			return
+		case auth.Status == "DONE" && auth.TotalAmount == amount && strings.ToUpper(auth.Currency) == "KRW":
+			// Actually approved (confirm response lost / concurrent idempotent confirm). Credit it.
 			if rerr := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); rerr != nil {
 				logger.LogError(ctx, fmt.Sprintf("Toss confirm-verify recharge failed order_id=%s error=%q", orderId, rerr.Error()))
 				tossRedirect(c, "/console/topup")
@@ -345,8 +360,8 @@ func TossConfirm(c *gin.Context) {
 			logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded (confirm-verify) order_id=%s", orderId))
 			tossRedirect(c, "/console/log")
 			return
-		case auth.OrderId == orderId && isTossTerminalFailStatus(auth.Status):
-			// Genuinely terminal (EXPIRED / ABORTED) — close it so it isn't stranded pending.
+		case isTossTerminalFailStatus(auth.Status):
+			// EXPIRED / ABORTED → close so it isn't stranded pending.
 			target := common.TopUpStatusFailed
 			if auth.Status == "EXPIRED" {
 				target = common.TopUpStatusExpired
@@ -356,8 +371,8 @@ func TossConfirm(c *gin.Context) {
 			tossRedirect(c, "/console/topup")
 			return
 		default:
-			// Still processing (READY / IN_PROGRESS), canceled, or order mismatch — leave pending; the
-			// webhook (DONE credit / EXPIRED cleanup / cancel reconciliation) resolves it.
+			// READY / IN_PROGRESS / CANCELED (incl. the HTTP 409 idempotent-processing case) — leave
+			// pending; the PAYMENT_STATUS_CHANGED webhook resolves it.
 			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm failed, authoritative status=%s order_id=%s — left pending", auth.Status, orderId))
 			tossRedirect(c, "/console/topup")
 			return
@@ -493,7 +508,7 @@ func TossWebhook(c *gin.Context) {
 				c.Status(http.StatusOK)
 				return
 			}
-			auth, err := getTossPayment(ctx, event.Data.PaymentKey)
+			auth, _, err := getTossPayment(ctx, event.Data.PaymentKey)
 			if err != nil {
 				logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed (cancel) order_id=%s error=%q", orderId, err.Error()))
 				c.Status(http.StatusServiceUnavailable) // retry so a real refund isn't missed
@@ -518,7 +533,7 @@ func TossWebhook(c *gin.Context) {
 		c.Status(http.StatusOK)
 		return
 	}
-	auth, err := getTossPayment(ctx, event.Data.PaymentKey)
+	auth, _, err := getTossPayment(ctx, event.Data.PaymentKey)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed order_id=%s error=%q", orderId, err.Error()))
 		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
