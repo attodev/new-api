@@ -4654,6 +4654,24 @@
     "tokenInOut": "토큰 (입력/출력)",
     "Critical": "심각",
     "Send reset email": "비밀번호 재설정 이메일 전송",
-    "Quick Start Guide(PDF)": "퀵스타트 가이드(PDF)"
+    "Quick Start Guide(PDF)": "퀵스타트 가이드(PDF)",
+    "Toss Gateway": "Toss 결제",
+    "Configuration for Toss Payments integration": "Toss 페이먼츠 연동 설정",
+    "Toss": "Toss",
+    "Enable Toss payment gateway": "Toss 결제 게이트웨이 활성화",
+    "Test Client Key": "테스트 Client Key",
+    "Test Secret Key": "테스트 Secret Key",
+    "Unit Price (KRW/unit)": "단가(원/unit)",
+    "Min Top-Up (KRW)": "최소 충전(원)",
+    "Use Toss test environment": "Toss 테스트 환경 사용",
+    "Client Key": "Client Key",
+    "Enter Toss Client Key": "Toss Client Key 입력",
+    "Enter Toss Secret Key": "Toss Secret Key 입력",
+    "Enter Toss test client key": "Toss 테스트 Client Key 입력",
+    "Enter Toss test secret key": "Toss 테스트 Secret Key 입력",
+    "Toss live client key (leave blank unless updating)": "Toss 실제 Client Key (변경 시에만 입력)",
+    "Toss live secret key (leave blank unless updating)": "Toss 실제 Secret Key (변경 시에만 입력)",
+    "KRW amount charged per unit of balance": "잔액 1 unit당 청구되는 금액(원)",
+    "Minimum recharge amount in KRW": "최소 충전 금액(원)"
   }
 }

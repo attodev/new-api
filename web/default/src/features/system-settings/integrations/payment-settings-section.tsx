@@ -1770,7 +1770,7 @@ export function PaymentSettingsSection({
                 render={({ field }) => (
                   <SettingsSwitchItem>
                     <SettingsSwitchContent>
-                      <FormLabel>{t('테스트 모드')}</FormLabel>
+                      <FormLabel>{t('Test Mode')}</FormLabel>
                       <FormDescription>
                         {t('Use Toss test environment')}
                       </FormDescription>
@@ -1839,7 +1839,7 @@ export function PaymentSettingsSection({
                 name='TossTestClientKey'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('테스트 Client Key')}</FormLabel>
+                    <FormLabel>{t('Test Client Key')}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder={t('Enter Toss test client key')}
@@ -1863,7 +1863,7 @@ export function PaymentSettingsSection({
                 name='TossTestSecretKey'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('테스트 Secret Key')}</FormLabel>
+                    <FormLabel>{t('Test Secret Key')}</FormLabel>
                     <FormControl>
                       <Input
                         type='password'
@@ -1890,7 +1890,7 @@ export function PaymentSettingsSection({
                 name='TossUnitPrice'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('단가(원/unit)')}</FormLabel>
+                    <FormLabel>{t('Unit Price (KRW/unit)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -1912,7 +1912,7 @@ export function PaymentSettingsSection({
                 name='TossMinTopUp'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('최소 충전(원)')}</FormLabel>
+                    <FormLabel>{t('Min Top-Up (KRW)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
