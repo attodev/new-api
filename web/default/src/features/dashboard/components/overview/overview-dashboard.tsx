@@ -64,6 +64,9 @@ import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
 import { UptimePanel } from './uptime-panel'
 
+// Add lang code here when a dedicated PDF exists: public/AlRouter Quick Start Guide_v1.0.{lang}.pdf
+const QUICKSTART_PDF_LANGS: string[] = []
+
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
 
@@ -453,7 +456,10 @@ function CompactQuickAction(props: { action: QuickAction }) {
 }
 
 export function OverviewDashboard() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const quickstartPdfUrl = QUICKSTART_PDF_LANGS.includes(i18n.language)
+    ? `/AlRouter Quick Start Guide_v1.0.${i18n.language}.pdf`
+    : `/AlRouter Quick Start Guide_v1.0.pdf`
   const user = useAuthStore((state) => state.auth.user)
   const { items: apiInfoItems } = useApiInfo()
   const {
@@ -642,9 +648,19 @@ export function OverviewDashboard() {
                         <ChevronUp data-icon='inline-start' />
                         {t('Hide setup guide')}
                       </Button>
-                      <Button size='sm' render={<Link to='/keys' />}>
-                        <KeyRound data-icon='inline-start' />
-                        {t('Create API Key')}
+                      <Button
+                        size='sm'
+                        render={
+                          <a
+                            href={quickstartPdfUrl}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            download
+                          />
+                        }
+                      >
+                        <BookOpen data-icon='inline-start' />
+                        {t('Quick Start Guide(PDF)')}
                       </Button>
                     </div>
                   </div>
