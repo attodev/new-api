@@ -136,6 +136,14 @@ const paymentSchema = z.object({
   PayPalSandbox: z.boolean(),
   PayPalUnitPrice: z.coerce.number().min(0),
   PayPalMinTopUp: z.coerce.number().min(0),
+  TossEnabled: z.boolean(),
+  TossTestMode: z.boolean(),
+  TossClientKey: z.string(),
+  TossSecretKey: z.string(),
+  TossTestClientKey: z.string(),
+  TossTestSecretKey: z.string(),
+  TossUnitPrice: z.coerce.number().min(0),
+  TossMinTopUp: z.coerce.number().min(0),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -427,6 +435,14 @@ export function PaymentSettingsSection({
       PayPalSandbox: values.PayPalSandbox,
       PayPalUnitPrice: values.PayPalUnitPrice,
       PayPalMinTopUp: values.PayPalMinTopUp,
+      TossEnabled: values.TossEnabled,
+      TossTestMode: values.TossTestMode,
+      TossClientKey: values.TossClientKey.trim(),
+      TossSecretKey: values.TossSecretKey.trim(),
+      TossTestClientKey: values.TossTestClientKey.trim(),
+      TossTestSecretKey: values.TossTestSecretKey.trim(),
+      TossUnitPrice: values.TossUnitPrice,
+      TossMinTopUp: values.TossMinTopUp,
       CreemApiKey: values.CreemApiKey.trim(),
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
@@ -478,6 +494,14 @@ export function PaymentSettingsSection({
       PayPalSandbox: initialRef.current.PayPalSandbox,
       PayPalUnitPrice: initialRef.current.PayPalUnitPrice,
       PayPalMinTopUp: initialRef.current.PayPalMinTopUp,
+      TossEnabled: initialRef.current.TossEnabled,
+      TossTestMode: initialRef.current.TossTestMode,
+      TossClientKey: initialRef.current.TossClientKey.trim(),
+      TossSecretKey: initialRef.current.TossSecretKey.trim(),
+      TossTestClientKey: initialRef.current.TossTestClientKey.trim(),
+      TossTestSecretKey: initialRef.current.TossTestSecretKey.trim(),
+      TossUnitPrice: initialRef.current.TossUnitPrice,
+      TossMinTopUp: initialRef.current.TossMinTopUp,
       CreemApiKey: initialRef.current.CreemApiKey.trim(),
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
@@ -632,6 +656,56 @@ export function PaymentSettingsSection({
 
     if (sanitized.PayPalMinTopUp !== initial.PayPalMinTopUp) {
       updates.push({ key: 'PayPalMinTopUp', value: sanitized.PayPalMinTopUp })
+    }
+
+    if (sanitized.TossEnabled !== initial.TossEnabled) {
+      updates.push({ key: 'TossEnabled', value: sanitized.TossEnabled })
+    }
+
+    if (sanitized.TossTestMode !== initial.TossTestMode) {
+      updates.push({ key: 'TossTestMode', value: sanitized.TossTestMode })
+    }
+
+    if (
+      sanitized.TossClientKey &&
+      sanitized.TossClientKey !== initial.TossClientKey
+    ) {
+      updates.push({ key: 'TossClientKey', value: sanitized.TossClientKey })
+    }
+
+    if (
+      sanitized.TossSecretKey &&
+      sanitized.TossSecretKey !== initial.TossSecretKey
+    ) {
+      updates.push({ key: 'TossSecretKey', value: sanitized.TossSecretKey })
+    }
+
+    if (
+      sanitized.TossTestClientKey &&
+      sanitized.TossTestClientKey !== initial.TossTestClientKey
+    ) {
+      updates.push({
+        key: 'TossTestClientKey',
+        value: sanitized.TossTestClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossTestSecretKey &&
+      sanitized.TossTestSecretKey !== initial.TossTestSecretKey
+    ) {
+      updates.push({
+        key: 'TossTestSecretKey',
+        value: sanitized.TossTestSecretKey,
+      })
+    }
+
+    if (sanitized.TossUnitPrice !== initial.TossUnitPrice) {
+      updates.push({ key: 'TossUnitPrice', value: sanitized.TossUnitPrice })
+    }
+
+    if (sanitized.TossMinTopUp !== initial.TossMinTopUp) {
+      updates.push({ key: 'TossMinTopUp', value: sanitized.TossMinTopUp })
     }
 
     if (
@@ -1655,6 +1729,205 @@ export function PaymentSettingsSection({
               >
                 {t('Clear')}
               </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-4'>
+            <div>
+              <h3 className='text-lg font-medium'>{t('Toss Gateway')}</h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configuration for Toss Payments integration')}
+              </p>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Toss')}</FormLabel>
+                      <FormDescription>
+                        {t('Enable Toss payment gateway')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossTestMode'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('테스트 모드')}</FormLabel>
+                      <FormDescription>
+                        {t('Use Toss test environment')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss Client Key')}
+                        autoComplete='off'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Toss live client key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss Secret Key')}
+                        autoComplete='new-password'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Toss live secret key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossTestClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('테스트 Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss test client key')}
+                        autoComplete='off'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Toss test client key (leave blank unless updating)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossTestSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('테스트 Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss test secret key')}
+                        autoComplete='new-password'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Toss test secret key (leave blank unless updating)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossUnitPrice'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('단가(원/unit)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='1'
+                        min={0}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('KRW amount charged per unit of balance')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossMinTopUp'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('최소 충전(원)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='1'
+                        min={0}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Minimum recharge amount in KRW')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
 

@@ -245,6 +245,14 @@ export type BillingSettings = {
   PayPalSandbox: boolean
   PayPalUnitPrice: number
   PayPalMinTopUp: number
+  TossEnabled: boolean
+  TossTestMode: boolean
+  TossClientKey: string
+  TossSecretKey: string
+  TossTestClientKey: string
+  TossTestSecretKey: string
+  TossUnitPrice: number
+  TossMinTopUp: number
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean
