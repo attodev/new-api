@@ -636,6 +636,17 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	return nil
 }
 
+// ExpireStaleTossPendingTopUps marks Toss pending orders created before cutoffUnix as expired.
+// Toss's payment window is ~30 minutes; checkout sessions the user closes (PAY_PROCESS_CANCELED)
+// send no webhook, so without this sweep their pending orders would linger forever.
+func ExpireStaleTossPendingTopUps(cutoffUnix int64) (int64, error) {
+	res := DB.Model(&TopUp{}).
+		Where("payment_provider = ? AND status = ? AND create_time < ?",
+			PaymentProviderToss, common.TopUpStatusPending, cutoffUnix).
+		Update("status", common.TopUpStatusExpired)
+	return res.RowsAffected, res.Error
+}
+
 // RecordTossPaymentKey stores the Toss paymentKey on a Toss order so it is
 // persisted even if crediting later fails. Best-effort; no-op on empty key.
 func RecordTossPaymentKey(tradeNo string, paymentKey string) error {

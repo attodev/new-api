@@ -504,8 +504,8 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	// Non-DONE terminal/cancel on a still-pending order → close it (re-verified).
-	if isTossTerminalFailStatus(auth.Status) || isTossCancelStatus(auth.Status) {
+	// EXPIRED / ABORTED on a still-pending order: payment never completed (no money) → close quietly.
+	if isTossTerminalFailStatus(auth.Status) {
 		target := common.TopUpStatusFailed
 		if auth.Status == "EXPIRED" {
 			target = common.TopUpStatusExpired
@@ -515,6 +515,17 @@ func TossWebhook(c *gin.Context) {
 		} else {
 			logger.LogInfo(ctx, fmt.Sprintf("Toss webhook closed pending order order_id=%s status=%s", orderId, auth.Status))
 		}
+		c.Status(http.StatusOK)
+		return
+	}
+
+	// CANCELED / PARTIAL_CANCELED on a still-pending order: the payment was completed at Toss
+	// (PARTIAL_CANCELED may retain a balance) but we never credited it. Do NOT close silently —
+	// flag for manual reconciliation, then mark failed so it doesn't linger.
+	if isTossCancelStatus(auth.Status) {
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: %s on uncredited pending order order_id=%s user_id=%d amount=%d KRW — verify Toss balance and adjust manually", auth.Status, orderId, topUp.UserId, topUp.Amount))
+		model.RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss %s on uncredited order (amount: %d KRW) — manual reconciliation required", auth.Status, topUp.Amount), c.ClientIP(), topUp.PaymentMethod, "toss-cancel")
+		_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
 		c.Status(http.StatusOK)
 		return
 	}
