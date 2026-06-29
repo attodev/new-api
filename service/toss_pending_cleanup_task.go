@@ -16,7 +16,7 @@ import (
 
 const (
 	tossPendingCleanupTickInterval = 10 * time.Minute
-	tossPendingMaxAge              = 35 * time.Minute // Toss payment window (~30m) + buffer
+	tossPendingMaxAge              = 50 * time.Minute // past worst-case legit flow (~30m window + ~10m approval); only never-approved orders are swept
 )
 
 var (
