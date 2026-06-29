@@ -1,6 +1,8 @@
 package model
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -26,5 +28,21 @@ func TestTossPaymentConstants(t *testing.T) {
 	}
 	if PaymentProviderToss != "toss" {
 		t.Fatalf("PaymentProviderToss = %q want toss", PaymentProviderToss)
+	}
+}
+
+func TestGenerateTossCustomerKey(t *testing.T) {
+	pattern := regexp.MustCompile(`^cust_[A-Za-z0-9]{32}$`)
+	for i := 0; i < 20; i++ {
+		key := generateTossCustomerKey()
+		if !strings.HasPrefix(key, "cust_") {
+			t.Fatalf("key %q does not start with cust_", key)
+		}
+		if len(key) < 2 || len(key) > 50 {
+			t.Fatalf("key %q length %d is outside Toss allowed range 2..50", key, len(key))
+		}
+		if !pattern.MatchString(key) {
+			t.Fatalf("key %q does not match ^cust_[A-Za-z0-9]{32}$", key)
+		}
 	}
 }

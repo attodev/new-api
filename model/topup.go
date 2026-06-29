@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/shopspring/decimal"
+	"github.com/thanhpk/randstr"
 	"gorm.io/gorm"
 )
 
@@ -638,7 +639,8 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 // RechargeToss credits a successful Toss top-up idempotently.
 // The caller must validate the Toss confirm response (status DONE, amount match)
 // before calling this, and must hold the order lock.
-func RechargeToss(tradeNo string, callerIp string) (err error) {
+// paymentKey, if non-empty, is stored as ProviderOrderId for audit traceability.
+func RechargeToss(tradeNo string, paymentKey string, callerIp string) (err error) {
 	if tradeNo == "" {
 		return errors.New("payment order number not provided")
 	}
@@ -668,6 +670,9 @@ func RechargeToss(tradeNo string, callerIp string) (err error) {
 			return errors.New("top-up order status error")
 		}
 
+		if paymentKey != "" {
+			topUp.ProviderOrderId = paymentKey
+		}
 		topUp.CompleteTime = common.GetTimestamp()
 		topUp.Status = common.TopUpStatusSuccess
 		if err := tx.Save(topUp).Error; err != nil {
@@ -815,4 +820,38 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	return nil
+}
+
+// generateTossCustomerKey returns a random Toss-compatible customerKey.
+// Toss requires customerKey to be 2–50 chars from [A-Za-z0-9_\-=.@].
+// "cust_" + 32 random alphanumeric chars = 37 chars, well within limits.
+func generateTossCustomerKey() string {
+	return "cust_" + randstr.String(32)
+}
+
+// GetOrCreateTossCustomerKey returns the user's stable Toss customerKey,
+// generating and persisting a random one on first use (race-safe via conditional update).
+func GetOrCreateTossCustomerKey(userId int) (string, error) {
+	var user User
+	if err := DB.Select("id", "toss_customer_key").Where("id = ?", userId).First(&user).Error; err != nil {
+		return "", err
+	}
+	if user.TossCustomerKey != "" {
+		return user.TossCustomerKey, nil
+	}
+	key := generateTossCustomerKey()
+	res := DB.Model(&User{}).
+		Where("id = ? AND (toss_customer_key = '' OR toss_customer_key IS NULL)", userId).
+		Update("toss_customer_key", key)
+	if res.Error != nil {
+		return "", res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Another concurrent request set it first — re-read the winner.
+		if err := DB.Select("toss_customer_key").Where("id = ?", userId).First(&user).Error; err != nil {
+			return "", err
+		}
+		return user.TossCustomerKey, nil
+	}
+	return key, nil
 }

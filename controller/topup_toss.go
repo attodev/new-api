@@ -36,6 +36,7 @@ type tossConfirmResponse struct {
 	OrderId     string `json:"orderId"`
 	Status      string `json:"status"`
 	TotalAmount int64  `json:"totalAmount"`
+	Currency    string `json:"currency"`
 	Method      string `json:"method"`
 	ApprovedAt  string `json:"approvedAt"`
 }
@@ -138,11 +139,18 @@ func RequestTossPay(c *gin.Context) {
 		return
 	}
 
+	customerKey, err := model.GetOrCreateTossCustomerKey(id)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss get customerKey failed user_id=%d error=%q", id, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
 			"client_key":   setting.TossActiveClientKey(),
-			"customer_key": fmt.Sprintf("cust_%d", id),
+			"customer_key": customerKey,
 			"order_id":     orderId,
 			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
 			"amount":     chargedKRW,
@@ -282,13 +290,15 @@ func TossConfirm(c *gin.Context) {
 		tossRedirect(c, "/console/topup")
 		return
 	}
-	if result.Status != "DONE" || result.TotalAmount != amount {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm not done order_id=%s status=%s total=%d", orderId, result.Status, result.TotalAmount))
+	if result.Status != "DONE" || result.TotalAmount != amount ||
+		result.OrderId != orderId || result.PaymentKey != paymentKey ||
+		strings.ToUpper(result.Currency) != "KRW" {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm validation failed order_id=%s status=%s total=%d resp_order=%s currency=%s", orderId, result.Status, result.TotalAmount, result.OrderId, result.Currency))
 		tossRedirect(c, "/console/topup")
 		return
 	}
 
-	if err := model.RechargeToss(orderId, c.ClientIP()); err != nil {
+	if err := model.RechargeToss(orderId, result.PaymentKey, c.ClientIP()); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss recharge failed order_id=%s error=%q", orderId, err.Error()))
 		tossRedirect(c, "/console/topup")
 		return
@@ -305,12 +315,29 @@ func TossFail(c *gin.Context) {
 	message := c.Query("message")
 	logger.LogWarn(ctx, fmt.Sprintf("Toss payment failed order_id=%s code=%s message=%q client_ip=%s", orderId, code, message, c.ClientIP()))
 	if orderId != "" {
+		// Immediate pending→failed transition is correct for synchronous CARD payments:
+		// the fail redirect fires only when the card flow itself fails/is cancelled.
+		// When asynchronous methods (e.g. virtual account) are added, this must be gated
+		// per payment method so that a later success webhook isn't blocked — RechargeToss
+		// credits only orders that are still in pending status.
 		_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
 	}
 	tossRedirect(c, "/console/topup")
 }
 
-// TossWebhook handles async settlement notifications (e.g. virtual account DONE).
+// TossWebhook is a defensive, re-verifying stub for FUTURE asynchronous payment methods.
+//
+// Phase 1 scope: CARD payments only. CARD payments are credited synchronously in
+// TossConfirm; this handler is never invoked for them under normal operation.
+//
+// This endpoint does NOT yet implement Toss's actual DEPOSIT_CALLBACK shape
+// (top-level "secret"/"status"/"orderId") nor does it store the deposit secret.
+// Virtual-account enablement and async DEPOSIT_CALLBACK handling must be added
+// when asynchronous payment methods are introduced.
+//
+// The existing re-verification logic (re-fetching the authoritative payment from Toss
+// before crediting) is intentionally kept: it ensures any future async handler
+// never credits based solely on an unauthenticated webhook payload.
 func TossWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
 	body, err := io.ReadAll(c.Request.Body)
@@ -374,7 +401,7 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := model.RechargeToss(orderId, c.ClientIP()); err != nil {
+	if err := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); err != nil {
 		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
 		return
 	}
