@@ -26,6 +26,17 @@ func isPayPalTopUpEnabled() bool {
 		strings.TrimSpace(setting.PayPalWebhookID) != ""
 }
 
+func isTossTopUpEnabled() bool {
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	if !setting.TossEnabled {
+		return false
+	}
+	return strings.TrimSpace(setting.TossActiveClientKey()) != "" &&
+		strings.TrimSpace(setting.TossActiveSecretKey()) != ""
+}
+
 func isStripeWebhookConfigured() bool {
 	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
 }
