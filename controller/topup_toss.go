@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +90,16 @@ func RequestTossAmount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatInt(charged, 10)})
 }
 
+// isValidServerAddress reports whether addr is an absolute http(s) URL with a host.
+func isValidServerAddress(addr string) bool {
+	addr = strings.TrimSpace(addr)
+	u, err := url.Parse(addr)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
+}
+
 func RequestTossPay(c *gin.Context) {
 	var req TossPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -100,6 +111,11 @@ func RequestTossPay(c *gin.Context) {
 		return
 	}
 	if !isTossTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
+		return
+	}
+	if !isValidServerAddress(system_setting.ServerAddress) {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss pay blocked: invalid ServerAddress=%q", system_setting.ServerAddress))
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
@@ -164,6 +180,8 @@ func RequestTossPay(c *gin.Context) {
 
 // confirmTossPayment calls Toss POST /v1/payments/confirm.
 func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount int64) (*tossConfirmResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	payload := map[string]interface{}{
 		"paymentKey": paymentKey,
 		"orderId":    orderId,
@@ -181,6 +199,7 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 	credentials := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
 	req.Header.Set("Authorization", "Basic "+credentials)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", orderId)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -205,6 +224,8 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 
 // getTossPayment fetches the authoritative payment object from Toss.
 func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+paymentKey, nil)
 	if err != nil {
 		return nil, err
@@ -298,6 +319,13 @@ func TossConfirm(c *gin.Context) {
 		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm validation failed order_id=%s status=%s total=%d resp_order=%s currency=%s", orderId, result.Status, result.TotalAmount, result.OrderId, result.Currency))
 		tossRedirect(c, "/console/topup")
 		return
+	}
+
+	// Persist the paymentKey immediately so the order can be reconciled/cancelled
+	// even if the credit transaction below fails.
+	if err := model.RecordTossPaymentKey(orderId, result.PaymentKey); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss record paymentKey failed order_id=%s error=%q", orderId, err.Error()))
+		// non-fatal: RechargeToss also stores it within its transaction
 	}
 
 	if err := model.RechargeToss(orderId, result.PaymentKey, c.ClientIP()); err != nil {

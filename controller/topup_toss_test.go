@@ -28,6 +28,22 @@ func TestGetTossPayMoneyAppliesDiscount(t *testing.T) {
 	}
 }
 
+func TestIsValidServerAddress(t *testing.T) {
+	cases := map[string]bool{
+		"https://pay.example.com": true,
+		"http://localhost:3000":   true,
+		"":                        false,
+		"example.com":             false,
+		"ftp://x.com":             false,
+		"   ":                     false,
+	}
+	for addr, want := range cases {
+		if got := isValidServerAddress(addr); got != want {
+			t.Errorf("isValidServerAddress(%q)=%v want %v", addr, got, want)
+		}
+	}
+}
+
 func TestValidateTossConfirmAmount(t *testing.T) {
 	// 저장된 주문 금액과 Toss가 돌려준 금액이 다르면 거부되어야 한다.
 	topUp := &model.TopUp{Amount: 13000, PaymentProvider: model.PaymentProviderToss, Status: common.TopUpStatusPending}

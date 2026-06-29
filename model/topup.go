@@ -636,6 +636,21 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	return nil
 }
 
+// RecordTossPaymentKey stores the Toss paymentKey on a Toss order so it is
+// persisted even if crediting later fails. Best-effort; no-op on empty key.
+func RecordTossPaymentKey(tradeNo string, paymentKey string) error {
+	if tradeNo == "" || paymentKey == "" {
+		return nil
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	return DB.Model(&TopUp{}).
+		Where(refCol+" = ? AND payment_provider = ?", tradeNo, PaymentProviderToss).
+		Update("provider_order_id", paymentKey).Error
+}
+
 // RechargeToss credits a successful Toss top-up idempotently.
 // The caller must validate the Toss confirm response (status DONE, amount match)
 // before calling this, and must hold the order lock.
