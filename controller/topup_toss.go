@@ -323,18 +323,45 @@ func TossConfirm(c *gin.Context) {
 
 	result, statusCode, err := confirmTossPayment(ctx, paymentKey, orderId, amount)
 	if err != nil {
-		if statusCode >= 400 && statusCode < 500 {
-			// Terminal rejection (invalid/expired/mismatched payment) — will never succeed; close it
-			// so it isn't stranded pending (the sweep skips it because provider_order_id != trade_no).
-			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm rejected (terminal) order_id=%s status=%d error=%q", orderId, statusCode, err.Error()))
-			_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
-		} else {
-			// Transient (network / 5xx) — leave pending; the PAYMENT_STATUS_CHANGED webhook (DONE or
-			// EXPIRED) will resolve it.
-			logger.LogError(ctx, fmt.Sprintf("Toss confirm API failed (transient) order_id=%s status=%d error=%q", orderId, statusCode, err.Error()))
+		// Don't infer terminal-vs-transient from the HTTP status (e.g. 409 IDEMPOTENT_REQUEST_PROCESSING
+		// is transient, not a rejection). Ask Toss authoritatively what actually happened.
+		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm API failed order_id=%s status=%d error=%q — re-verifying", orderId, statusCode, err.Error()))
+		auth, gerr := getTossPayment(ctx, paymentKey)
+		if gerr != nil {
+			// Can't determine state — leave pending; the PAYMENT_STATUS_CHANGED webhook will resolve it.
+			logger.LogError(ctx, fmt.Sprintf("Toss confirm verify failed order_id=%s verify_error=%q", orderId, gerr.Error()))
+			tossRedirect(c, "/console/topup")
+			return
 		}
-		tossRedirect(c, "/console/topup")
-		return
+		switch {
+		case auth.OrderId == orderId && auth.Status == "DONE" && auth.TotalAmount == amount && strings.ToUpper(auth.Currency) == "KRW":
+			// Payment was actually approved (confirm response lost, or a concurrent idempotent confirm
+			// completed). Credit it. (paymentKey was already persisted before confirm.)
+			if rerr := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); rerr != nil {
+				logger.LogError(ctx, fmt.Sprintf("Toss confirm-verify recharge failed order_id=%s error=%q", orderId, rerr.Error()))
+				tossRedirect(c, "/console/topup")
+				return
+			}
+			logger.LogInfo(ctx, fmt.Sprintf("Toss recharge succeeded (confirm-verify) order_id=%s", orderId))
+			tossRedirect(c, "/console/log")
+			return
+		case auth.OrderId == orderId && isTossTerminalFailStatus(auth.Status):
+			// Genuinely terminal (EXPIRED / ABORTED) — close it so it isn't stranded pending.
+			target := common.TopUpStatusFailed
+			if auth.Status == "EXPIRED" {
+				target = common.TopUpStatusExpired
+			}
+			_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, target)
+			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm failed, authoritative %s order_id=%s — closed", auth.Status, orderId))
+			tossRedirect(c, "/console/topup")
+			return
+		default:
+			// Still processing (READY / IN_PROGRESS), canceled, or order mismatch — leave pending; the
+			// webhook (DONE credit / EXPIRED cleanup / cancel reconciliation) resolves it.
+			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm failed, authoritative status=%s order_id=%s — left pending", auth.Status, orderId))
+			tossRedirect(c, "/console/topup")
+			return
+		}
 	}
 	if result.Status != "DONE" || result.TotalAmount != amount ||
 		result.OrderId != orderId || result.PaymentKey != paymentKey ||
