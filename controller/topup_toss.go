@@ -117,6 +117,15 @@ func RequestTossPay(c *gin.Context) {
 		return
 	}
 
+	// Fetch (or create) the stable customerKey first so a failure here does not
+	// orphan a pending TopUp order.
+	customerKey, err := model.GetOrCreateTossCustomerKey(id)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss get customerKey failed user_id=%d error=%q", id, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
+		return
+	}
+
 	reference := fmt.Sprintf("new-api-toss-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	orderId := "toss_" + common.Sha1([]byte(reference))
 
@@ -135,13 +144,6 @@ func RequestTossPay(c *gin.Context) {
 	}
 	if err := topUp.Insert(); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss create topup order failed user_id=%d order_id=%s error=%q", id, orderId, err.Error()))
-		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
-		return
-	}
-
-	customerKey, err := model.GetOrCreateTossCustomerKey(id)
-	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss get customerKey failed user_id=%d error=%q", id, err.Error()))
 		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
 		return
 	}
