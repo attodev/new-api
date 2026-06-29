@@ -164,6 +164,7 @@ func RequestTossPay(c *gin.Context) {
 		return
 	}
 
+	serverBase := strings.TrimRight(strings.TrimSpace(system_setting.ServerAddress), "/")
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
@@ -172,8 +173,8 @@ func RequestTossPay(c *gin.Context) {
 			"order_id":     orderId,
 			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
 			"amount":     chargedKRW,
-			"success_url": system_setting.ServerAddress + "/api/toss/confirm",
-			"fail_url":    system_setting.ServerAddress + "/api/toss/fail",
+			"success_url": serverBase + "/api/toss/confirm",
+			"fail_url":    serverBase + "/api/toss/fail",
 		},
 	})
 }
@@ -356,10 +357,20 @@ func TossFail(c *gin.Context) {
 	tossRedirect(c, "/console/topup")
 }
 
-// isTossTerminalFailStatus reports whether a Toss payment status is a terminal failure.
+// isTossTerminalFailStatus reports whether a Toss status means the payment never completed.
 func isTossTerminalFailStatus(status string) bool {
 	switch status {
-	case "EXPIRED", "ABORTED", "CANCELED":
+	case "EXPIRED", "ABORTED":
+		return true
+	default:
+		return false
+	}
+}
+
+// isTossCancelStatus reports whether a Toss status means a completed payment was (partially) canceled/refunded.
+func isTossCancelStatus(status string) bool {
+	switch status {
+	case "CANCELED", "PARTIAL_CANCELED":
 		return true
 	default:
 		return false
@@ -369,11 +380,15 @@ func isTossTerminalFailStatus(status string) bool {
 // TossWebhook handles Toss PAYMENT_STATUS_CHANGED events for card payments.
 //
 //   - DONE → credit the order (re-verified against the authoritative payment, idempotent).
-//   - EXPIRED / ABORTED / CANCELED → close the lingering pending order (re-verified).
+//   - EXPIRED / ABORTED → close the lingering pending order (re-verified).
+//   - CANCELED / PARTIAL_CANCELED on an already-credited order → flag for manual
+//     reconciliation (re-verified). We deliberately do NOT auto-claw back quota
+//     (spent quota and partial refunds make automatic reversal unsafe).
 //
 // Card payments are normally credited synchronously in TossConfirm; this endpoint
-// provides defensive crediting plus closure of pending orders whose approval/window
-// lapsed (Toss emits EXPIRED for card payments when the 30-min/10-min windows lapse).
+// provides defensive crediting, closure of pending orders whose approval/window
+// lapsed (Toss emits EXPIRED for card payments when the 30-min/10-min windows lapse),
+// and post-credit refund detection.
 //
 // Every action is re-verified by re-fetching the authoritative payment from Toss, so
 // nothing is ever decided from the unauthenticated webhook payload alone.
@@ -410,9 +425,11 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	isDone := event.Data.Status == "DONE"
-	isTerminalFail := isTossTerminalFailStatus(event.Data.Status)
-	if !isDone && !isTerminalFail {
+	status := event.Data.Status
+	isDone := status == "DONE"
+	isCancel := isTossCancelStatus(status)
+	isFailTerminal := isTossTerminalFailStatus(status)
+	if !isDone && !isCancel && !isFailTerminal {
 		// Intermediate states (READY / IN_PROGRESS / WAITING_FOR_DEPOSIT / ...) — nothing to do.
 		c.Status(http.StatusOK)
 		return
@@ -426,8 +443,27 @@ func TossWebhook(c *gin.Context) {
 		c.Status(http.StatusOK)
 		return
 	}
+
+	// Already credited: only a genuine post-credit cancel/refund needs attention.
 	if topUp.Status == common.TopUpStatusSuccess {
-		c.Status(http.StatusOK) // already credited
+		if isCancel {
+			if event.Data.PaymentKey == "" {
+				logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION: cancel webhook on credited order with no paymentKey order_id=%s status=%s", orderId, status))
+				c.Status(http.StatusOK)
+				return
+			}
+			auth, err := getTossPayment(ctx, event.Data.PaymentKey)
+			if err != nil {
+				logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed (cancel) order_id=%s error=%q", orderId, err.Error()))
+				c.Status(http.StatusServiceUnavailable) // retry so a real refund isn't missed
+				return
+			}
+			if auth.OrderId == orderId && isTossCancelStatus(auth.Status) {
+				logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: payment %s after credit order_id=%s user_id=%d amount=%d KRW — local quota NOT reverted, manual adjustment needed", auth.Status, orderId, topUp.UserId, topUp.Amount))
+				model.RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss payment %s after credit (amount: %d KRW) — manual quota reconciliation required", auth.Status, topUp.Amount), c.ClientIP(), topUp.PaymentMethod, "toss-cancel")
+			}
+		}
+		c.Status(http.StatusOK)
 		return
 	}
 	if topUp.Status != common.TopUpStatusPending {
@@ -435,9 +471,9 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	// Never act on the unauthenticated payload alone — re-fetch the authoritative payment.
+	// Pending order: never act on the unauthenticated payload alone — re-fetch the authoritative payment.
 	if event.Data.PaymentKey == "" {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook missing paymentKey order_id=%s status=%s", orderId, event.Data.Status))
+		logger.LogWarn(ctx, fmt.Sprintf("Toss webhook missing paymentKey order_id=%s status=%s", orderId, status))
 		c.Status(http.StatusOK)
 		return
 	}
@@ -453,9 +489,9 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	if isDone {
-		if auth.Status != "DONE" || auth.TotalAmount != topUp.Amount {
-			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook DONE authoritative mismatch order_id=%s status=%s total=%d", orderId, auth.Status, auth.TotalAmount))
+	if auth.Status == "DONE" {
+		if auth.TotalAmount != topUp.Amount {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook DONE authoritative mismatch order_id=%s total=%d", orderId, auth.TotalAmount))
 			c.Status(http.StatusOK)
 			return
 		}
@@ -468,14 +504,13 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	// Terminal failure: close the lingering pending order, but only if Toss itself reports a terminal state.
-	if isTossTerminalFailStatus(auth.Status) {
+	// Non-DONE terminal/cancel on a still-pending order → close it (re-verified).
+	if isTossTerminalFailStatus(auth.Status) || isTossCancelStatus(auth.Status) {
 		target := common.TopUpStatusFailed
 		if auth.Status == "EXPIRED" {
 			target = common.TopUpStatusExpired
 		}
 		if err := model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, target); err != nil {
-			// Non-fatal housekeeping (e.g. raced to closed); do not trigger retries.
 			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook close pending order_id=%s status=%s error=%q", orderId, auth.Status, err.Error()))
 		} else {
 			logger.LogInfo(ctx, fmt.Sprintf("Toss webhook closed pending order order_id=%s status=%s", orderId, auth.Status))
@@ -484,7 +519,6 @@ func TossWebhook(c *gin.Context) {
 		return
 	}
 
-	// Authoritative status is not terminal — payload was stale/forged; ignore.
 	c.Status(http.StatusOK)
 }
 
