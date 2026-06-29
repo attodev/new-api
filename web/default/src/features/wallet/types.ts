@@ -46,6 +46,15 @@ export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
 >
+export type TossPaymentResponse = ApiResponse<{
+  client_key: string
+  order_id: string
+  order_name: string
+  amount: number
+  success_url: string
+  fail_url: string
+}>
+
 export type WaffoPancakePaymentResponse = ApiResponse<
   | {
       checkout_url?: string
@@ -165,6 +174,12 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Whether Toss topup is enabled */
+  enable_toss_topup?: boolean
+  /** Minimum topup amount for Toss (KRW) */
+  toss_min_topup?: number
+  /** Toss client key (public, safe to expose) */
+  toss_client_key?: string
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
