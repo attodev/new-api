@@ -37,7 +37,10 @@ export function useTossBilling() {
     try {
       setProcessing(true)
       const resp = await paySubscriptionToss({ plan_id: planId })
-      if (!resp?.success || !resp?.data) {
+      // Backend returns { message: "success", data: {...} } without a `success` field
+      // (same shape as the other subscription-pay endpoints), so accept either signal.
+      const ok = resp?.success === true || resp?.message === 'success'
+      if (!ok || !resp?.data) {
         toast.error(resp?.message || i18next.t('Payment request failed'))
         return false
       }
