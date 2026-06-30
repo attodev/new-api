@@ -20,12 +20,7 @@ import (
 const organizationOwnerPermissionRequired = "organization owner permission required"
 
 type walletAutoRechargeRequest struct {
-	Amount            float64 `json:"amount"`
-	ThresholdAmount   float64 `json:"threshold_amount"`
-	IntervalUnit      string  `json:"interval_unit"`
-	IntervalValue     int     `json:"interval_value"`
-	CustomSeconds     int64   `json:"custom_seconds"`
-	ChargeImmediately bool    `json:"charge_immediately"`
+	PresetId int `json:"preset_id"`
 }
 
 type walletAutoRechargeTossResponse struct {
@@ -112,6 +107,15 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if req.PresetId <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	preset, err := model.GetWalletAutoRechargePresetForTarget(req.PresetId, policyType, target.TargetType)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 
 	customerKey, err := model.GetOrCreateTossCustomerKey(target.OwnerUserId)
 	if err != nil {
@@ -121,18 +125,19 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 
 	reference := fmt.Sprintf("wallet_auto_auth_%d_%d_%s", target.OwnerUserId, time.Now().UnixMilli(), randstr.String(4))
 	policy, err := model.CreatePendingWalletAutoRecharge(model.CreateWalletAutoRechargeRequest{
+		PresetId:          preset.Id,
 		Type:              policyType,
 		TargetType:        target.TargetType,
 		TargetId:          target.TargetId,
 		OwnerUserId:       target.OwnerUserId,
 		CustomerKey:       customerKey,
 		AuthTradeNo:       reference,
-		Amount:            req.Amount,
-		ThresholdAmount:   req.ThresholdAmount,
-		IntervalUnit:      req.IntervalUnit,
-		IntervalValue:     req.IntervalValue,
-		CustomSeconds:     req.CustomSeconds,
-		ChargeImmediately: req.ChargeImmediately,
+		Amount:            preset.Amount,
+		ThresholdAmount:   preset.ThresholdAmount,
+		IntervalUnit:      preset.IntervalUnit,
+		IntervalValue:     preset.IntervalValue,
+		CustomSeconds:     preset.CustomSeconds,
+		ChargeImmediately: preset.ChargeImmediately,
 	})
 	if err != nil {
 		common.ApiError(c, err)

@@ -38,6 +38,7 @@ const (
 
 type WalletAutoRecharge struct {
 	Id                int     `json:"id"`
+	PresetId          int     `json:"preset_id" gorm:"index"`
 	Type              string  `json:"type" gorm:"type:varchar(32);index"`
 	TargetType        string  `json:"target_type" gorm:"type:varchar(32);index"`
 	TargetId          int     `json:"target_id" gorm:"index"`
@@ -69,6 +70,7 @@ type WalletAutoRecharge struct {
 }
 
 type CreateWalletAutoRechargeRequest struct {
+	PresetId          int
 	Type              string
 	TargetType        string
 	TargetId          int
@@ -133,6 +135,7 @@ func CreatePendingWalletAutoRecharge(req CreateWalletAutoRechargeRequest) (*Wall
 	now := time.Now()
 	activeKey := walletAutoRechargeActiveKey(req.TargetType, req.TargetId, req.Type)
 	policy := &WalletAutoRecharge{
+		PresetId:          req.PresetId,
 		Type:              req.Type,
 		TargetType:        req.TargetType,
 		TargetId:          req.TargetId,

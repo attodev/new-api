@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -22,6 +23,7 @@ func setupWalletAutoRechargeControllerTestDB(t *testing.T) {
 		&model.TopUp{},
 		&model.UserBillingKey{},
 		&model.WalletAutoRecharge{},
+		&model.WalletAutoRechargePreset{},
 	))
 }
 
@@ -49,6 +51,13 @@ func enableTossBillingForTest(t *testing.T) {
 	system_setting.ServerAddress = "https://wallet.example.com"
 }
 
+func createWalletAutoRechargePresetForTest(t *testing.T, req model.WalletAutoRechargePresetRequest) *model.WalletAutoRechargePreset {
+	t.Helper()
+	preset, err := model.CreateWalletAutoRechargePreset(req)
+	require.NoError(t, err)
+	return preset
+}
+
 func TestOrganizationMemberCannotCreateWalletAutoRecharge(t *testing.T) {
 	setupWalletAutoRechargeControllerTestDB(t)
 	enableTossBillingForTest(t)
@@ -71,13 +80,22 @@ func TestOrganizationMemberCannotCreateWalletAutoRecharge(t *testing.T) {
 	}
 	require.NoError(t, model.DB.Create(&member).Error)
 	require.NoError(t, model.DB.Create(&org).Error)
+	preset := createWalletAutoRechargePresetForTest(t, model.WalletAutoRechargePresetRequest{
+		Type:          model.WalletAutoRechargeTypeScheduled,
+		TargetScope:   model.WalletAutoRechargePresetTargetOrganization,
+		Name:          "org-scheduled-member",
+		Amount:        10000,
+		IntervalUnit:  model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+		Enabled:       true,
+	})
 
 	res := performOrganizationRequest(
 		RequestOrganizationWalletScheduledRecharge,
 		member,
 		http.MethodPost,
 		"/api/organization/wallet/auto-recharge/scheduled",
-		`{"amount":10000,"interval_unit":"month","interval_value":1,"charge_immediately":false}`,
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`}`,
 	)
 
 	requireOrganizationApiError(t, res, "organization owner permission required")
@@ -105,13 +123,22 @@ func TestOrganizationUserWithoutOwnerRoleCannotCreateWalletAutoRechargeEvenIfOrg
 	}
 	require.NoError(t, model.DB.Create(&member).Error)
 	require.NoError(t, model.DB.Create(&org).Error)
+	preset := createWalletAutoRechargePresetForTest(t, model.WalletAutoRechargePresetRequest{
+		Type:          model.WalletAutoRechargeTypeScheduled,
+		TargetScope:   model.WalletAutoRechargePresetTargetOrganization,
+		Name:          "org-scheduled-owner-mismatch",
+		Amount:        10000,
+		IntervalUnit:  model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+		Enabled:       true,
+	})
 
 	res := performOrganizationRequest(
 		RequestOrganizationWalletScheduledRecharge,
 		member,
 		http.MethodPost,
 		"/api/organization/wallet/auto-recharge/scheduled",
-		`{"amount":10000,"interval_unit":"month","interval_value":1,"charge_immediately":false}`,
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`}`,
 	)
 
 	requireOrganizationApiError(t, res, "organization owner permission required")
@@ -139,13 +166,23 @@ func TestOrganizationOwnerCanCreateScheduledWalletAutoRecharge(t *testing.T) {
 	}
 	require.NoError(t, model.DB.Create(&owner).Error)
 	require.NoError(t, model.DB.Create(&org).Error)
+	preset := createWalletAutoRechargePresetForTest(t, model.WalletAutoRechargePresetRequest{
+		Type:              model.WalletAutoRechargeTypeScheduled,
+		TargetScope:       model.WalletAutoRechargePresetTargetOrganization,
+		Name:              "org-scheduled-owner",
+		Amount:            10000,
+		IntervalUnit:      model.WalletAutoRechargeIntervalMonth,
+		IntervalValue:     1,
+		ChargeImmediately: true,
+		Enabled:           true,
+	})
 
 	res := performOrganizationRequest(
 		RequestOrganizationWalletScheduledRecharge,
 		owner,
 		http.MethodPost,
 		"/api/organization/wallet/auto-recharge/scheduled",
-		`{"amount":10000,"interval_unit":"month","interval_value":1,"charge_immediately":true}`,
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`}`,
 	)
 
 	require.Equal(t, http.StatusOK, res.Code)
@@ -191,13 +228,23 @@ func TestWalletAutoRechargeRejectsInvalidServerAddressBeforePendingCreate(t *tes
 		AffCode:  "invalid-server-wallet-auto",
 	}
 	require.NoError(t, model.DB.Create(&user).Error)
+	preset := createWalletAutoRechargePresetForTest(t, model.WalletAutoRechargePresetRequest{
+		Type:              model.WalletAutoRechargeTypeScheduled,
+		TargetScope:       model.WalletAutoRechargePresetTargetUser,
+		Name:              "user-scheduled-invalid-server",
+		Amount:            10000,
+		IntervalUnit:      model.WalletAutoRechargeIntervalMonth,
+		IntervalValue:     1,
+		ChargeImmediately: true,
+		Enabled:           true,
+	})
 
 	res := performOrganizationRequest(
 		RequestWalletScheduledRecharge,
 		user,
 		http.MethodPost,
 		"/api/user/wallet/auto-recharge/scheduled",
-		`{"amount":10000,"interval_unit":"month","interval_value":1,"charge_immediately":true}`,
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`}`,
 	)
 
 	require.Equal(t, http.StatusOK, res.Code)
