@@ -117,6 +117,22 @@ export function getScheduledPeriodLabelKey(period: ScheduledPeriodOption) {
   return 'Custom period'
 }
 
+export function formatScheduledPeriodSummary(
+  period: ScheduledPeriodOption,
+  t: (key: string, options?: Record<string, unknown>) => string = (key) => key
+) {
+  if (period.kind === 'custom') {
+    return t('{{seconds}}s', { seconds: period.custom_seconds })
+  }
+  if (period.kind === 'daily') return t('Every day')
+  if (period.kind === 'weekly') return t('Every week')
+  if (period.kind === 'monthly') return t('Every month')
+  return t('{{value}} {{unit}}', {
+    value: period.interval_value,
+    unit: period.interval_unit,
+  })
+}
+
 export function groupScheduledPresetOptions(
   presets: WalletAutoRechargePreset[]
 ): ScheduledPresetGroup[] {

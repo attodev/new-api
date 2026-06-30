@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -7,24 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -32,15 +14,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -62,7 +35,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useForm } from 'react-hook-form'
 import { SettingsSection } from '../components/settings-section'
 import {
   createAdminWalletAutoRechargePreset,
@@ -71,6 +43,14 @@ import {
   listAdminWalletAutoRechargePresets,
   updateAdminWalletAutoRechargePreset,
 } from '@/features/wallet/api'
+import {
+  buildAdminOptionState,
+  buildPresetSavePlan,
+  formatScheduledPeriodSummary,
+  getScheduledPeriodLabelKey,
+  type AdminAutoRechargeOptionState,
+  type ScheduledPeriodOption,
+} from '@/features/wallet/lib/auto-recharge-options'
 import type {
   WalletAutoRechargeIntervalUnit,
   WalletAutoRechargePreset,
@@ -214,6 +194,68 @@ export function normalizePresetForm(
     charge_immediately: false,
     sort_order: sortOrder,
     enabled: form.enabled,
+  }
+}
+
+export function parseOptionAmountList(value: string): number[] {
+  return [
+    ...new Set(
+      value
+        .split(/[\s,]+/)
+        .map((item) => Math.floor(Number(item.trim())))
+        .filter((item) => Number.isFinite(item) && item >= 0)
+    ),
+  ].sort((left, right) => left - right)
+}
+
+export function formatOptionAmountList(values: number[]): string {
+  return [
+    ...new Set(
+      values
+        .map((item) => Math.floor(Number(item)))
+        .filter((item) => Number.isFinite(item) && item >= 0)
+    ),
+  ]
+    .sort((left, right) => left - right)
+    .join(', ')
+}
+
+function makeQuickPeriod(kind: 'daily' | 'weekly' | 'monthly'): ScheduledPeriodOption {
+  if (kind === 'daily') {
+    return {
+      key: 'daily',
+      kind,
+      interval_unit: 'day',
+      interval_value: 1,
+      custom_seconds: 0,
+    }
+  }
+  if (kind === 'weekly') {
+    return {
+      key: 'weekly',
+      kind,
+      interval_unit: 'day',
+      interval_value: 7,
+      custom_seconds: 0,
+    }
+  }
+  return {
+    key: 'monthly',
+    kind,
+    interval_unit: 'month',
+    interval_value: 1,
+    custom_seconds: 0,
+  }
+}
+
+function makeCustomPeriod(customSeconds: number): ScheduledPeriodOption {
+  const seconds = Math.max(Math.floor(customSeconds), 1)
+  return {
+    key: `custom:1:${seconds}`,
+    kind: 'custom',
+    interval_unit: 'custom',
+    interval_value: 1,
+    custom_seconds: seconds,
   }
 }
 
@@ -367,14 +409,9 @@ function PresetTable({
 export function WalletAutoRechargePresetsSection() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingPreset, setEditingPreset] =
-    useState<WalletAutoRechargePreset | null>(null)
-  const [deletingPreset, setDeletingPreset] =
-    useState<WalletAutoRechargePreset | null>(null)
-  const form = useForm<WalletAutoRechargePresetFormState>({
-    defaultValues: createEmptyPresetFormState(),
-  })
+  const [optionState, setOptionState] = useState<AdminAutoRechargeOptionState>(
+    () => buildAdminOptionState([])
+  )
 
   const presetQuery = useQuery({
     queryKey: PRESET_QUERY_KEY,
@@ -393,32 +430,12 @@ export function WalletAutoRechargePresetsSection() {
     [presetQuery.data?.data]
   )
 
-  const scheduledPresets = useMemo(
-    () => presets.filter((preset) => preset.type === 'scheduled'),
-    [presets]
-  )
-  const thresholdPresets = useMemo(
-    () => presets.filter((preset) => preset.type === 'threshold'),
-    [presets]
-  )
+  useEffect(() => {
+    setOptionState(buildAdminOptionState(presets))
+  }, [presets])
 
   const createMutation = useMutation({
     mutationFn: createAdminWalletAutoRechargePreset,
-    onSuccess: async (response) => {
-      if (!isApiSuccess(response)) {
-        throw new Error(response.message || t('Failed to create preset'))
-      }
-      await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
-      toast.success(t('Preset created'))
-      setDialogOpen(false)
-      setEditingPreset(null)
-      form.reset(createEmptyPresetFormState())
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : t('Failed to create preset')
-      )
-    },
   })
 
   const updateMutation = useMutation({
@@ -429,76 +446,125 @@ export function WalletAutoRechargePresetsSection() {
       id: number
       payload: WalletAutoRechargePresetRequest
     }) => updateAdminWalletAutoRechargePreset(id, payload),
-    onSuccess: async (response) => {
-      if (!isApiSuccess(response)) {
-        throw new Error(response.message || t('Failed to update preset'))
-      }
-      await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
-      toast.success(t('Preset updated'))
-      setDialogOpen(false)
-      setEditingPreset(null)
-      form.reset(createEmptyPresetFormState())
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : t('Failed to update preset')
-      )
-    },
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteAdminWalletAutoRechargePreset,
-    onSuccess: async (response) => {
-      if (!isApiSuccess(response)) {
-        throw new Error(response.message || t('Failed to delete preset'))
-      }
-      await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
-      toast.success(t('Preset deleted'))
-      setDeletingPreset(null)
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : t('Failed to delete preset')
-      )
-    },
   })
 
-  const watchedType = form.watch('type')
-  const watchedIntervalUnit = form.watch('interval_unit')
-  const isSaving = createMutation.isPending || updateMutation.isPending
+  const isSaving =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending
 
-  const openCreateDialog = () => {
-    setEditingPreset(null)
-    form.reset(createEmptyPresetFormState())
-    setDialogOpen(true)
+  const setScheduledTargetScope = (scope: WalletAutoRechargeTargetScope) => {
+    setOptionState((current) => ({
+      ...current,
+      scheduled: { ...current.scheduled, targetScope: scope },
+    }))
   }
 
-  const openEditDialog = (preset: WalletAutoRechargePreset) => {
-    setEditingPreset(preset)
-    form.reset(toPresetFormState(preset))
-    setDialogOpen(true)
+  const setThresholdTargetScope = (scope: WalletAutoRechargeTargetScope) => {
+    setOptionState((current) => ({
+      ...current,
+      threshold: { ...current.threshold, targetScope: scope },
+    }))
   }
 
-  const handleDialogChange = (open: boolean) => {
-    setDialogOpen(open)
-    if (!open) {
-      setEditingPreset(null)
-      form.reset(createEmptyPresetFormState())
-    }
+  const addScheduledPeriod = (period: ScheduledPeriodOption) => {
+    setOptionState((current) => {
+      if (
+        current.scheduled.periods.some(
+          (item) => item.period.key === period.key
+        )
+      ) {
+        return current
+      }
+      return {
+        ...current,
+        scheduled: {
+          ...current.scheduled,
+          periods: [...current.scheduled.periods, { period, amounts: [] }],
+        },
+      }
+    })
   }
 
-  const handleSubmit = async (values: WalletAutoRechargePresetFormState) => {
-    const payload = normalizePresetForm(values)
-    if (!payload.name) {
-      form.setError('name', { message: t('Preset name is required') })
-      return
-    }
+  const removeScheduledPeriod = (periodKey: string) => {
+    setOptionState((current) => ({
+      ...current,
+      scheduled: {
+        ...current.scheduled,
+        periods: current.scheduled.periods.filter(
+          (item) => item.period.key !== periodKey
+        ),
+      },
+    }))
+  }
 
-    if (editingPreset) {
-      await updateMutation.mutateAsync({ id: editingPreset.id, payload })
-      return
+  const updateScheduledPeriodAmounts = (
+    periodKey: string,
+    value: string
+  ) => {
+    const amounts = parseOptionAmountList(value).filter((item) => item > 0)
+    setOptionState((current) => ({
+      ...current,
+      scheduled: {
+        ...current.scheduled,
+        periods: current.scheduled.periods.map((item) =>
+          item.period.key === periodKey ? { ...item, amounts } : item
+        ),
+      },
+    }))
+  }
+
+  const updateCustomPeriodSeconds = (periodKey: string, value: string) => {
+    const seconds = Math.max(Math.floor(Number(value || 0)), 1)
+    setOptionState((current) => ({
+      ...current,
+      scheduled: {
+        ...current.scheduled,
+        periods: current.scheduled.periods.map((item) =>
+          item.period.key === periodKey
+            ? { ...item, period: makeCustomPeriod(seconds) }
+            : item
+        ),
+      },
+    }))
+  }
+
+  const handleSaveOptions = async () => {
+    const plan = buildPresetSavePlan(presets, optionState)
+    try {
+      for (const payload of plan.create) {
+        const response = await createMutation.mutateAsync(payload)
+        if (!isApiSuccess(response)) {
+          throw new Error(response.message || t('Failed to create preset'))
+        }
+      }
+      for (const item of plan.update) {
+        const response = await updateMutation.mutateAsync({
+          id: item.id,
+          payload: item.request,
+        })
+        if (!isApiSuccess(response)) {
+          throw new Error(response.message || t('Failed to update preset'))
+        }
+      }
+      for (const preset of plan.disable) {
+        const response = await deleteMutation.mutateAsync(preset.id)
+        if (!isApiSuccess(response)) {
+          throw new Error(response.message || t('Failed to delete preset'))
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
+      toast.success(t('Options saved'))
+    } catch (error) {
+      await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
+      toast.error(
+        error instanceof Error ? error.message : t('Failed to update preset')
+      )
     }
-    await createMutation.mutateAsync(payload)
   }
 
   return (
@@ -508,13 +574,13 @@ export function WalletAutoRechargePresetsSection() {
           <div className='text-sm font-medium'>{t('Admin preset library')}</div>
           <div className='text-muted-foreground text-sm'>
             {t(
-              'Manage the scheduled and threshold presets shown in wallet auto recharge flows.'
+              'Manage the scheduled and threshold options shown in wallet auto recharge flows.'
             )}
           </div>
         </div>
-        <Button type='button' onClick={openCreateDialog}>
-          <Plus data-icon='inline-start' />
-          {t('Add preset')}
+        <Button type='button' disabled={isSaving} onClick={handleSaveOptions}>
+          {isSaving ? <Spinner data-icon='inline-start' /> : null}
+          {t('Save options')}
         </Button>
       </div>
 
@@ -527,382 +593,255 @@ export function WalletAutoRechargePresetsSection() {
         </div>
       ) : (
         <div className='flex flex-col gap-4'>
-          <PresetTable
-            title={t('Scheduled presets')}
-            presets={scheduledPresets}
-            onEdit={openEditDialog}
-            onDelete={setDeletingPreset}
-            isDeleting={deleteMutation.isPending}
-          />
-          <PresetTable
-            title={t('Threshold presets')}
-            presets={thresholdPresets}
-            onEdit={openEditDialog}
-            onDelete={setDeletingPreset}
-            isDeleting={deleteMutation.isPending}
-          />
-        </div>
-      )}
-
-      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className='sm:max-w-[640px]'>
-          <DialogHeader>
-            <DialogTitle>
-              {editingPreset ? t('Edit preset') : t('Create preset')}
-            </DialogTitle>
-            <DialogDescription>
-              {t(
-                'These presets are available to wallet auto recharge flows for users and organizations.'
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className='flex flex-col gap-4'
-            >
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>
+                {t('Scheduled recharge options')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-4'>
               <div className='grid gap-4 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='type'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Preset type')}</FormLabel>
-                      <Select
-                        items={TYPE_OPTIONS}
-                        value={field.value}
-                        onValueChange={(value) =>
-                          field.onChange(value as WalletAutoRechargeType)
-                        }
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('Select preset type')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {TYPE_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {t(option.label)}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='target_scope'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Target scope')}</FormLabel>
-                      <Select
-                        items={TARGET_SCOPE_OPTIONS}
-                        value={field.value}
-                        onValueChange={(value) =>
-                          field.onChange(value as WalletAutoRechargeTargetScope)
-                        }
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t('Select target scope')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {TARGET_SCOPE_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {t(option.label)}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className='grid gap-4 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='name'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Preset name')}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t('e.g., Monthly recharge')} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='sort_order'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Sort order')}</FormLabel>
-                      <FormControl>
-                        <Input type='number' min={0} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        {t('Lower values appear first in wallet UI.')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name='description'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Description')}</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={t('Optional help text shown with the preset')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className='grid gap-4 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='amount'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Recharge amount')}</FormLabel>
-                      <FormControl>
-                        <Input type='number' min={0} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {watchedType === 'threshold' ? (
-                  <FormField
-                    control={form.control}
-                    name='threshold_amount'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Threshold amount')}</FormLabel>
-                        <FormControl>
-                          <Input type='number' min={0} {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Recharge when balance falls to this amount or below.')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                <div className='space-y-2'>
+                  <div className='text-sm font-medium'>{t('Target scope')}</div>
+                  <Select
+                    items={TARGET_SCOPE_OPTIONS}
+                    value={optionState.scheduled.targetScope}
+                    onValueChange={(value) =>
+                      setScheduledTargetScope(
+                        value as WalletAutoRechargeTargetScope
+                      )
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('Select target scope')} />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {TARGET_SCOPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(option.label)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='flex items-center justify-between gap-4 rounded-lg border p-4'>
+                  <div className='flex flex-col gap-1'>
+                    <div className='text-sm font-medium'>
+                      {t('Charge immediately')}
+                    </div>
+                    <div className='text-muted-foreground text-sm'>
+                      {t(
+                        'Start the first scheduled charge as soon as the preset is selected.'
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={optionState.scheduled.chargeImmediately}
+                    onCheckedChange={(checked) =>
+                      setOptionState((current) => ({
+                        ...current,
+                        scheduled: {
+                          ...current.scheduled,
+                          chargeImmediately: checked,
+                        },
+                      }))
+                    }
                   />
-                ) : (
-                  <div className='grid gap-4 sm:grid-cols-2 sm:col-span-1'>
-                    <FormField
-                      control={form.control}
-                      name='interval_unit'
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('Interval unit')}</FormLabel>
-                          <Select
-                            items={INTERVAL_UNIT_OPTIONS}
-                            value={field.value}
-                            onValueChange={(value) =>
-                              field.onChange(value as WalletAutoRechargeIntervalUnit)
-                            }
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue
-                                  placeholder={t('Select interval unit')}
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent alignItemWithTrigger={false}>
-                              <SelectGroup>
-                                {INTERVAL_UNIT_OPTIONS.map((option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {t(option.label)}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name='interval_value'
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('Interval value')}</FormLabel>
-                          <FormControl>
-                            <Input type='number' min={1} {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            {watchedIntervalUnit === 'custom'
-                              ? t('Keep this as 1 unless you need an advanced multiplier.')
-                              : t('Number of units between charges.')}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {watchedType === 'scheduled' && watchedIntervalUnit === 'custom' ? (
-                <FormField
-                  control={form.control}
-                  name='custom_seconds'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Custom seconds')}</FormLabel>
-                      <FormControl>
-                        <Input type='number' min={1} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        {t('Set the custom interval in seconds.')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ) : null}
-
-              {watchedType === 'scheduled' ? (
-                <FormField
-                  control={form.control}
-                  name='charge_immediately'
-                  render={({ field }) => (
-                    <FormItem className='flex items-center justify-between gap-4 rounded-lg border p-4'>
-                      <div className='flex flex-col gap-1'>
-                        <FormLabel>{t('Charge immediately')}</FormLabel>
-                        <FormDescription>
-                          {t('Start the first scheduled charge as soon as the preset is selected.')}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              ) : null}
-
-              <div className='grid gap-4 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='enabled'
-                  render={({ field }) => (
-                    <FormItem className='flex items-center justify-between gap-4 rounded-lg border p-4'>
-                      <div className='flex flex-col gap-1'>
-                        <FormLabel>{t('Enabled')}</FormLabel>
-                        <FormDescription>
-                          {t('Disable a preset without deleting its configuration.')}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <div className='rounded-lg border p-4'>
-                  <div className='text-sm font-medium'>{t('Preview')}</div>
-                  <div className='text-muted-foreground mt-2 text-sm'>
-                    {t(getTypeLabel(watchedType))}:{' '}
-                    {getPresetSummary(
-                      {
-                        id: editingPreset?.id ?? 0,
-                        ...normalizePresetForm(form.getValues()),
-                      },
-                      t
-                    )}
-                  </div>
                 </div>
               </div>
 
-              <DialogFooter>
+              <div className='flex flex-wrap gap-2'>
                 <Button
                   type='button'
                   variant='outline'
-                  onClick={() => handleDialogChange(false)}
+                  size='sm'
+                  onClick={() => addScheduledPeriod(makeQuickPeriod('daily'))}
                 >
-                  {t('Cancel')}
+                  <Plus data-icon='inline-start' />
+                  {t('Add daily')}
                 </Button>
-                <Button type='submit' disabled={isSaving}>
-                  {isSaving ? <Spinner data-icon='inline-start' /> : null}
-                  {editingPreset ? t('Update preset') : t('Create preset')}
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => addScheduledPeriod(makeQuickPeriod('weekly'))}
+                >
+                  <Plus data-icon='inline-start' />
+                  {t('Add weekly')}
                 </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => addScheduledPeriod(makeQuickPeriod('monthly'))}
+                >
+                  <Plus data-icon='inline-start' />
+                  {t('Add monthly')}
+                </Button>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => addScheduledPeriod(makeCustomPeriod(86400))}
+                >
+                  <Plus data-icon='inline-start' />
+                  {t('Add custom period')}
+                </Button>
+              </div>
 
-      <AlertDialog
-        open={!!deletingPreset}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeletingPreset(null)
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('Delete preset')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('Cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMutation.isPending || !deletingPreset}
-              onClick={() => {
-                if (!deletingPreset) return
-                void deleteMutation.mutateAsync(deletingPreset.id)
-              }}
-            >
-              {deleteMutation.isPending ? (
-                <Spinner data-icon='inline-start' />
-              ) : null}
-              {t('Delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className='space-y-3'>
+                {optionState.scheduled.periods.length === 0 ? (
+                  <Empty className='rounded-lg border'>
+                    <EmptyHeader>
+                      <EmptyMedia variant='icon'>
+                        <Plus />
+                      </EmptyMedia>
+                      <EmptyTitle>{t('No scheduled periods')}</EmptyTitle>
+                      <EmptyDescription>
+                        {t('Add a period and assign recharge amounts.')}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                ) : null}
+                {optionState.scheduled.periods.map((item) => (
+                  <div
+                    key={item.period.key}
+                    className='grid gap-3 rounded-lg border p-3 md:grid-cols-[180px_1fr_auto]'
+                  >
+                    <div className='space-y-1'>
+                      <div className='text-sm font-medium'>
+                        {t(getScheduledPeriodLabelKey(item.period))}
+                      </div>
+                      <div className='text-muted-foreground text-xs'>
+                        {formatScheduledPeriodSummary(item.period, t)}
+                      </div>
+                    </div>
+                    <div className='grid gap-2 sm:grid-cols-2'>
+                      <Input
+                        value={formatOptionAmountList(item.amounts)}
+                        onChange={(event) =>
+                          updateScheduledPeriodAmounts(
+                            item.period.key,
+                            event.target.value
+                          )
+                        }
+                        placeholder={t('Recharge amounts')}
+                      />
+                      {item.period.kind === 'custom' ? (
+                        <Input
+                          type='number'
+                          min={1}
+                          value={item.period.custom_seconds}
+                          onChange={(event) =>
+                            updateCustomPeriodSeconds(
+                              item.period.key,
+                              event.target.value
+                            )
+                          }
+                          placeholder={t('Custom seconds')}
+                        />
+                      ) : null}
+                    </div>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='icon'
+                      onClick={() => removeScheduledPeriod(item.period.key)}
+                      aria-label={t('Remove')}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>
+                {t('Auto recharge options')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              <div className='space-y-2'>
+                <div className='text-sm font-medium'>{t('Target scope')}</div>
+                <Select
+                  items={TARGET_SCOPE_OPTIONS}
+                  value={optionState.threshold.targetScope}
+                  onValueChange={(value) =>
+                    setThresholdTargetScope(
+                      value as WalletAutoRechargeTargetScope
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('Select target scope')} />
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {TARGET_SCOPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {t(option.label)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className='grid gap-4 sm:grid-cols-2'>
+                <div className='space-y-2'>
+                  <div className='text-sm font-medium'>
+                    {t('Recharge amounts')}
+                  </div>
+                  <Input
+                    value={formatOptionAmountList(
+                      optionState.threshold.rechargeAmounts
+                    )}
+                    onChange={(event) =>
+                      setOptionState((current) => ({
+                        ...current,
+                        threshold: {
+                          ...current.threshold,
+                          rechargeAmounts: parseOptionAmountList(
+                            event.target.value
+                          ).filter((item) => item > 0),
+                        },
+                      }))
+                    }
+                    placeholder='10000, 30000, 50000'
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <div className='text-sm font-medium'>
+                    {t('Threshold balances')}
+                  </div>
+                  <Input
+                    value={formatOptionAmountList(
+                      optionState.threshold.thresholdAmounts
+                    )}
+                    onChange={(event) =>
+                      setOptionState((current) => ({
+                        ...current,
+                        threshold: {
+                          ...current.threshold,
+                          thresholdAmounts: parseOptionAmountList(
+                            event.target.value
+                          ),
+                        },
+                      }))
+                    }
+                    placeholder='1000, 3000, 5000'
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </SettingsSection>
   )
 }

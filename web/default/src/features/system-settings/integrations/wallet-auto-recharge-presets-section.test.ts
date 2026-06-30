@@ -1,8 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  formatOptionAmountList,
   getPresetSummary,
   normalizePresetForm,
+  parseOptionAmountList,
 } from './wallet-auto-recharge-presets-section'
+import {
+  buildAdminOptionState,
+  buildPresetSavePlan,
+} from '@/features/wallet/lib/auto-recharge-options'
 
 const identityT = (key: string, options?: Record<string, unknown>) => {
   if (!options) return key
@@ -167,5 +173,72 @@ describe('wallet auto recharge preset admin helpers', () => {
     ).toBe('30000 / 2 meses')
     expect(seenKeys).toContain('Month(s)')
     expect(seenKeys).not.toContain('month')
+  })
+
+  test('parses option amount lists into sorted unique numbers', () => {
+    expect(parseOptionAmountList('30000, 10000 10000\n5000')).toEqual([
+      5000,
+      10000,
+      30000,
+    ])
+  })
+
+  test('formats option amount lists for editing', () => {
+    expect(formatOptionAmountList([30000, 10000, 10000, 5000])).toBe(
+      '5000, 10000, 30000'
+    )
+  })
+
+  test('converts preset rows into admin option state', () => {
+    const state = buildAdminOptionState([
+      {
+        id: 1,
+        type: 'scheduled',
+        target_scope: 'all',
+        name: 'Monthly',
+        amount: 10000,
+        interval_unit: 'month',
+        interval_value: 1,
+        custom_seconds: 0,
+        enabled: true,
+      },
+      {
+        id: 2,
+        type: 'threshold',
+        target_scope: 'all',
+        name: 'Auto',
+        amount: 30000,
+        threshold_amount: 5000,
+        enabled: true,
+      },
+    ])
+
+    expect(state.scheduled.periods[0].amounts).toEqual([10000])
+    expect(state.threshold.rechargeAmounts).toEqual([30000])
+    expect(state.threshold.thresholdAmounts).toEqual([5000])
+  })
+
+  test('builds save plan that disables removed admin combinations', () => {
+    const current = [
+      {
+        id: 1,
+        type: 'scheduled' as const,
+        target_scope: 'all' as const,
+        name: 'Monthly',
+        amount: 10000,
+        interval_unit: 'month' as const,
+        interval_value: 1,
+        custom_seconds: 0,
+        charge_immediately: true,
+        enabled: true,
+        sort_order: 0,
+      },
+    ]
+    const desired = buildAdminOptionState(current)
+    desired.scheduled.periods = []
+
+    const plan = buildPresetSavePlan(current, desired)
+
+    expect(plan.disable.map((preset) => preset.id)).toEqual([1])
   })
 })
