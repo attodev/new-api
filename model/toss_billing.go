@@ -7,6 +7,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -37,6 +38,34 @@ func TossPlanKRW(priceAmount float64) int64 {
 		unit = 1
 	}
 	return decimal.NewFromFloat(priceAmount).Mul(decimal.NewFromFloat(unit)).Round(0).IntPart()
+}
+
+// TossTopUpChargedKRW returns the KRW amount charged for a Toss top-up amount.
+// The input amount is the user-entered KRW/quota-equivalent amount; group
+// top-up ratios and amount discounts are applied to the actual card charge.
+func TossTopUpChargedKRW(amountKRW int64, group string) int64 {
+	ratio := common.GetTopupGroupRatio(group)
+	if ratio == 0 {
+		ratio = 1
+	}
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountKRW)]; ok && ds > 0 {
+		discount = ds
+	}
+	return decimal.NewFromInt(amountKRW).
+		Mul(decimal.NewFromFloat(ratio)).
+		Mul(decimal.NewFromFloat(discount)).
+		Round(0).
+		IntPart()
+}
+
+// TossUSDEquivalent converts charged KRW to the USD-equivalent stored in TopUp.Money.
+func TossUSDEquivalent(chargedKRW int64) float64 {
+	unit := setting.TossUnitPrice
+	if unit <= 0 {
+		unit = 1
+	}
+	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
 }
 
 // tossNextBillingTime returns when to charge the next period: a lead BEFORE endUnix so the

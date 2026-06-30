@@ -4711,6 +4711,7 @@
     "Applies to all wallets": "모든 지갑에 적용",
     "No auto recharge presets are available.": "사용 가능한 자동충전 프리셋이 없습니다.",
     "This preset is no longer available. Existing policy values are preserved.": "이 프리셋은 더 이상 사용할 수 없습니다. 기존 정책 값은 유지됩니다.",
+    "This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.": "이 프리셋을 지갑 자동충전 흐름에서 제거합니다. 기존 지갑 자동충전 정책은 변경되지 않습니다.",
     "Select this preset": "이 프리셋 선택",
     "Disable preset": "프리셋 비활성화"
   }

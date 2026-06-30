@@ -85,6 +85,16 @@ type CreateWalletAutoRechargeRequest struct {
 	ChargeImmediately bool
 }
 
+type walletAutoRechargeCharge struct {
+	policy       WalletAutoRecharge
+	billingKey   string
+	customerKey  string
+	tradeNo      string
+	chargeKRW    int64
+	alreadyDone  bool
+	shouldCharge bool
+}
+
 func (req CreateWalletAutoRechargeRequest) normalizeAndValidate() (CreateWalletAutoRechargeRequest, error) {
 	if req.Type != WalletAutoRechargeTypeScheduled && req.Type != WalletAutoRechargeTypeThreshold {
 		return req, errors.New("invalid wallet auto recharge type")
@@ -317,40 +327,30 @@ func ProcessWalletAutoRecharge(ctx context.Context, policyId int, now time.Time,
 		maxFails = 1
 	}
 
-	return DB.Transaction(func(tx *gorm.DB) error {
-		var policy WalletAutoRecharge
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
-			return err
-		}
-		if policy.Status != WalletAutoRechargeStatusActive {
-			return nil
-		}
-		if policy.Type == WalletAutoRechargeTypeScheduled && policy.NextChargeTime > now.Unix() {
-			return nil
-		}
-		if policy.Type == WalletAutoRechargeTypeThreshold {
-			ok, err := walletThresholdShouldCharge(tx, &policy, now)
-			if err != nil || !ok {
-				return err
-			}
-		}
+	charge, err := prepareWalletAutoRechargeCharge(policyId, now, maxFails)
+	if err != nil || !charge.shouldCharge {
+		return err
+	}
 
-		billingKey, customerKey, err := getTossBillingKeyPlainTx(tx, policy.BillingKeyId)
-		if err != nil {
-			return markWalletAutoRechargeFailure(tx, &policy, maxFails, err)
-		}
-
-		chargeKRW := walletAutoRechargeKRW(policy.Amount)
-		tradeNo := walletAutoRechargeTradeNo(policy, now)
-		done, total, err := charger(ctx, billingKey, customerKey, tradeNo, "지갑 자동충전", chargeKRW)
-		if err != nil || !done || total != chargeKRW {
+	if !charge.alreadyDone {
+		done, total, err := charger(ctx, charge.billingKey, charge.customerKey, charge.tradeNo, "지갑 자동충전", charge.chargeKRW)
+		if err != nil || !done || total != charge.chargeKRW {
 			if err == nil {
 				err = fmt.Errorf("toss wallet auto recharge amount mismatch")
 			}
-			return markWalletAutoRechargeFailure(tx, &policy, maxFails, err)
+			return markWalletAutoRechargeFailureById(policyId, maxFails, err)
 		}
-		return creditWalletAutoRecharge(tx, &policy, tradeNo, chargeKRW, now)
-	})
+		if err := markWalletAutoRechargeTopUpCharged(charge.tradeNo); err != nil {
+			_ = markWalletAutoRechargeReconciliationPending(policyId, charge.tradeNo, err)
+			return err
+		}
+	}
+
+	if err := completeWalletAutoRechargeTopUp(policyId, charge.tradeNo, now); err != nil {
+		_ = markWalletAutoRechargeReconciliationPending(policyId, charge.tradeNo, err)
+		return err
+	}
+	return nil
 }
 
 func ProcessWalletAutoRechargeWithConfiguredCharger(ctx context.Context, policyId int, now time.Time, maxFails int) error {
@@ -362,11 +362,7 @@ func walletAutoRechargeKRW(amount float64) int64 {
 }
 
 func walletAutoRechargeMoney(amountKRW float64) float64 {
-	unit := setting.TossUnitPrice
-	if unit <= 0 {
-		unit = 1
-	}
-	return decimal.NewFromFloat(amountKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
+	return TossUSDEquivalent(decimal.NewFromFloat(amountKRW).Round(0).IntPart())
 }
 
 func walletAutoRechargeQuota(amount float64) int {
@@ -432,34 +428,151 @@ func walletThresholdShouldCharge(tx *gorm.DB, policy *WalletAutoRecharge, now ti
 	}
 }
 
-func creditWalletAutoRecharge(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, chargeKRW int64, now time.Time) error {
-	quotaToAdd := walletAutoRechargeQuota(float64(chargeKRW))
-	if quotaToAdd <= 0 {
-		return errors.New("invalid wallet auto recharge quota")
+func prepareWalletAutoRechargeCharge(policyId int, now time.Time, maxFails int) (walletAutoRechargeCharge, error) {
+	var charge walletAutoRechargeCharge
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var policy WalletAutoRecharge
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
+			return err
+		}
+		if policy.Status != WalletAutoRechargeStatusActive {
+			return nil
+		}
+		if policy.Type == WalletAutoRechargeTypeScheduled && policy.NextChargeTime > now.Unix() {
+			return nil
+		}
+		if policy.Type == WalletAutoRechargeTypeThreshold {
+			ok, err := walletThresholdShouldCharge(tx, &policy, now)
+			if err != nil || !ok {
+				return err
+			}
+		}
+
+		billingKey, customerKey, err := getTossBillingKeyPlainTx(tx, policy.BillingKeyId)
+		if err != nil {
+			return markWalletAutoRechargeFailure(tx, &policy, maxFails, err)
+		}
+
+		var owner User
+		if err := tx.Select("id", "group").Where("id = ?", policy.OwnerUserId).First(&owner).Error; err != nil {
+			return markWalletAutoRechargeFailure(tx, &policy, maxFails, err)
+		}
+
+		inputKRW := walletAutoRechargeKRW(policy.Amount)
+		chargeKRW := TossTopUpChargedKRW(inputKRW, owner.Group)
+		if chargeKRW <= 0 {
+			return markWalletAutoRechargeFailure(tx, &policy, maxFails, errors.New("invalid wallet auto recharge charge amount"))
+		}
+		tradeNo := walletAutoRechargeTradeNo(policy, now)
+		alreadyDone, err := ensureWalletAutoRechargePendingTopUp(tx, &policy, tradeNo, chargeKRW, now)
+		if err != nil {
+			return err
+		}
+
+		charge = walletAutoRechargeCharge{
+			policy:       policy,
+			billingKey:   billingKey,
+			customerKey:  customerKey,
+			tradeNo:      tradeNo,
+			chargeKRW:    chargeKRW,
+			alreadyDone:  alreadyDone,
+			shouldCharge: true,
+		}
+		return nil
+	})
+	return charge, err
+}
+
+func ensureWalletAutoRechargePendingTopUp(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, chargeKRW int64, now time.Time) (bool, error) {
+	var existing TopUp
+	err := tx.Where("trade_no = ?", tradeNo).First(&existing).Error
+	if err == nil {
+		if existing.PaymentProvider != PaymentProviderToss || existing.PaymentMethod != PaymentMethodToss || existing.Amount != chargeKRW {
+			return false, errors.New("wallet auto recharge top-up conflict")
+		}
+		if existing.Status == common.TopUpStatusSuccess {
+			return true, nil
+		}
+		if existing.Status != common.TopUpStatusPending {
+			return false, errors.New("wallet auto recharge top-up status invalid")
+		}
+		return existing.ProviderOrderId != "" && existing.ProviderOrderId != tradeNo, nil
 	}
-	money := walletAutoRechargeMoney(float64(chargeKRW))
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
 
 	topUp := &TopUp{
 		UserId:          policy.OwnerUserId,
 		TargetType:      policy.TargetType,
 		TargetId:        policy.TargetId,
 		Amount:          chargeKRW,
-		Money:           money,
+		Money:           TossUSDEquivalent(chargeKRW),
 		TradeNo:         tradeNo,
 		ProviderOrderId: tradeNo,
 		PaymentMethod:   PaymentMethodToss,
 		PaymentProvider: PaymentProviderToss,
 		CreateTime:      now.Unix(),
-		CompleteTime:    now.Unix(),
-		Status:          common.TopUpStatusSuccess,
+		Status:          common.TopUpStatusPending,
 	}
 	if err := tx.Create(topUp).Error; err != nil {
-		return err
+		return false, err
 	}
-	if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
-		return err
-	}
+	return false, nil
+}
 
+func markWalletAutoRechargeTopUpCharged(tradeNo string) error {
+	result := DB.Model(&TopUp{}).
+		Where("trade_no = ? AND status = ? AND provider_order_id = ?", tradeNo, common.TopUpStatusPending, tradeNo).
+		Update("provider_order_id", tradeNo+":charged")
+	return result.Error
+}
+
+func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var policy WalletAutoRecharge
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
+			return err
+		}
+		if policy.Status != WalletAutoRechargeStatusActive {
+			return nil
+		}
+
+		var topUp TopUp
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
+			return err
+		}
+		if topUp.PaymentProvider != PaymentProviderToss || topUp.PaymentMethod != PaymentMethodToss {
+			return ErrPaymentMethodMismatch
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+		}
+		if topUp.Status != common.TopUpStatusPending {
+			return ErrTopUpStatusInvalid
+		}
+
+		quotaToAdd := int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		if quotaToAdd <= 0 {
+			return errors.New("invalid wallet auto recharge quota")
+		}
+		topUp.CompleteTime = now.Unix()
+		topUp.Status = common.TopUpStatusSuccess
+		if err := tx.Save(&topUp).Error; err != nil {
+			return err
+		}
+		if err := CreditTopUpTarget(tx, &topUp, quotaToAdd); err != nil {
+			return err
+		}
+		return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+	})
+}
+
+func updateWalletAutoRechargeSuccess(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, now time.Time) error {
+	var topUp TopUp
+	if err := tx.Select("trade_no").Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
+		return err
+	}
 	updates := map[string]interface{}{
 		"last_charge_time": now.Unix(),
 		"last_trade_no":    tradeNo,
@@ -476,6 +589,33 @@ func creditWalletAutoRecharge(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo s
 		updates["daily_charge_count"] = policy.DailyChargeCount + 1
 	}
 	return tx.Model(policy).Updates(updates).Error
+}
+
+func markWalletAutoRechargeFailureById(policyId int, maxFails int, cause error) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var policy WalletAutoRecharge
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
+			return err
+		}
+		if policy.Status != WalletAutoRechargeStatusActive {
+			return nil
+		}
+		return markWalletAutoRechargeFailure(tx, &policy, maxFails, cause)
+	})
+}
+
+func markWalletAutoRechargeReconciliationPending(policyId int, tradeNo string, cause error) error {
+	message := "wallet auto recharge reconciliation pending: " + cause.Error()
+	if len(message) > 255 {
+		message = message[:255]
+	}
+	return DB.Model(&WalletAutoRecharge{}).
+		Where("id = ? AND status = ?", policyId, WalletAutoRechargeStatusActive).
+		Updates(map[string]interface{}{
+			"last_trade_no": tradeNo,
+			"last_error":    message,
+			"update_time":   time.Now().Unix(),
+		}).Error
 }
 
 func markWalletAutoRechargeFailure(tx *gorm.DB, policy *WalletAutoRecharge, maxFails int, cause error) error {

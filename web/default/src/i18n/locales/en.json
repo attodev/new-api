@@ -4711,6 +4711,7 @@
     "Applies to all wallets": "Applies to all wallets",
     "No auto recharge presets are available.": "No auto recharge presets are available.",
     "This preset is no longer available. Existing policy values are preserved.": "This preset is no longer available. Existing policy values are preserved.",
+    "This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.": "This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.",
     "Select this preset": "Select this preset",
     "Disable preset": "Disable preset"
   }

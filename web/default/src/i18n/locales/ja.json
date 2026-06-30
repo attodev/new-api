@@ -4711,6 +4711,7 @@
     "Applies to all wallets": "すべてのウォレットに適用",
     "No auto recharge presets are available.": "利用可能な自動チャージプリセットはありません。",
     "This preset is no longer available. Existing policy values are preserved.": "このプリセットは利用できなくなりました。既存のポリシー値は保持されます。",
+    "This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.": "このプリセットをウォレット自動チャージのフローから削除します。既存のウォレット自動チャージポリシーは変更されません。",
     "Select this preset": "このプリセットを選択",
     "Disable preset": "プリセットを無効化"
   }

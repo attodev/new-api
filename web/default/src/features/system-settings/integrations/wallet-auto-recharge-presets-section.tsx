@@ -883,7 +883,7 @@ export function WalletAutoRechargePresetsSection() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('Delete preset')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('This removes the preset from wallet auto recharge flows. Existing subscriptions are not changed.')}
+              {t('This removes the preset from wallet auto recharge flows. Existing wallet auto recharge policies are not changed.')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

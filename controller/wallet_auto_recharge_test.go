@@ -442,6 +442,81 @@ func TestWalletAutoRechargeTossConfirmIssueFailureReleasesPendingPolicy(t *testi
 	require.NotZero(t, retryPolicy.Id)
 }
 
+func TestWalletAutoRechargeTossConfirmDoesNotCancelWhenImmediateChargeNeedsReconciliation(t *testing.T) {
+	setupWalletAutoRechargeControllerTestDB(t)
+	originalUnitPrice := setting.TossUnitPrice
+	setting.TossUnitPrice = 1000
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+	})
+
+	originalIssuer := walletAutoRechargeBillingKeyIssuer
+	originalCharger := walletAutoRechargeTossCharger
+	walletAutoRechargeBillingKeyIssuer = func(ctx context.Context, authKey, customerKey string) (*tossBillingIssueResponse, int, error) {
+		return &tossBillingIssueResponse{
+			BillingKey:  "billing-key",
+			CustomerKey: customerKey,
+			Card: struct {
+				Company string `json:"company"`
+				Number  string `json:"number"`
+			}{Company: "card", Number: "****1234"},
+		}, http.StatusOK, nil
+	}
+	walletAutoRechargeTossCharger = func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		return true, amount, nil
+	}
+	t.Cleanup(func() {
+		walletAutoRechargeBillingKeyIssuer = originalIssuer
+		walletAutoRechargeTossCharger = originalCharger
+	})
+
+	user := model.User{
+		Id:       7,
+		Username: "activation-reconcile-owner",
+		Password: "x",
+		Role:     common.RoleCommonUser,
+		Group:    "default",
+		AffCode:  "wallet-auto-controller-reconcile",
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+
+	policy, err := model.CreatePendingWalletAutoRecharge(model.CreateWalletAutoRechargeRequest{
+		Type:              model.WalletAutoRechargeTypeScheduled,
+		TargetType:        model.TopUpTargetTypeOrganization,
+		TargetId:          407,
+		OwnerUserId:       user.Id,
+		CustomerKey:       "customer-7",
+		AuthTradeNo:       "wallet-auto-controller-reconcile",
+		Amount:            10000,
+		IntervalUnit:      model.WalletAutoRechargeIntervalMonth,
+		IntervalValue:     1,
+		ChargeImmediately: true,
+	})
+	require.NoError(t, err)
+
+	res := performOrganizationRequest(
+		WalletAutoRechargeTossConfirm,
+		user,
+		http.MethodGet,
+		"/api/wallet/auto-recharge/toss/confirm?trade_no=wallet-auto-controller-reconcile&authKey=fake-auth&customerKey=customer-7",
+		"",
+	)
+
+	require.Equal(t, http.StatusFound, res.Code)
+	location, err := url.QueryUnescape(res.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "/organization/wallet?wallet_auto_recharge=failed", location)
+
+	var reloaded model.WalletAutoRecharge
+	require.NoError(t, model.DB.First(&reloaded, policy.Id).Error)
+	require.Equal(t, model.WalletAutoRechargeStatusActive, reloaded.Status)
+	require.NotNil(t, reloaded.ActiveKey)
+
+	var topUp model.TopUp
+	require.NoError(t, model.DB.First(&topUp, "trade_no = ?", reloaded.LastTradeNo).Error)
+	require.Equal(t, common.TopUpStatusPending, topUp.Status)
+}
+
 func TestWalletAutoRechargeTossFailCancelsPendingPolicy(t *testing.T) {
 	setupWalletAutoRechargeControllerTestDB(t)
 

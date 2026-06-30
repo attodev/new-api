@@ -16,11 +16,9 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -42,32 +40,8 @@ type tossConfirmResponse struct {
 	ApprovedAt  string `json:"approvedAt"`
 }
 
-// getTossPayMoney returns the KRW amount to charge for the given entered amount.
-// It applies both the group top-up ratio and the amount-based discount (keyed on
-// the entered amount), mirroring getPayPalPayMoney for provider parity.
 func getTossPayMoney(amountKRW int64, group string) int64 {
-	ratio := common.GetTopupGroupRatio(group)
-	if ratio == 0 {
-		ratio = 1
-	}
-	discount := 1.0
-	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountKRW)]; ok && ds > 0 {
-		discount = ds
-	}
-	return decimal.NewFromInt(amountKRW).
-		Mul(decimal.NewFromFloat(ratio)).
-		Mul(decimal.NewFromFloat(discount)).
-		Round(0).
-		IntPart()
-}
-
-// tossUSDEquivalent converts charged KRW to the USD-equivalent stored in Money.
-func tossUSDEquivalent(chargedKRW int64) float64 {
-	unit := setting.TossUnitPrice
-	if unit <= 0 {
-		unit = 1
-	}
-	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
+	return model.TossTopUpChargedKRW(amountKRW, group)
 }
 
 func RequestTossAmount(c *gin.Context) {
@@ -150,7 +124,7 @@ func RequestTossPay(c *gin.Context) {
 		TargetType:      getTopUpTargetType(c),
 		TargetId:        getTopUpTargetId(c),
 		Amount:          chargedKRW,
-		Money:           tossUSDEquivalent(chargedKRW),
+		Money:           model.TossUSDEquivalent(chargedKRW),
 		TradeNo:         orderId,
 		ProviderOrderId: orderId,
 		PaymentMethod:   model.PaymentMethodToss,
@@ -171,10 +145,10 @@ func RequestTossPay(c *gin.Context) {
 			"client_key":   setting.TossActiveClientKey(),
 			"customer_key": customerKey,
 			"order_id":     orderId,
-			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
-			"amount":     chargedKRW,
-			"success_url": serverBase + "/api/toss/confirm",
-			"fail_url":    serverBase + "/api/toss/fail",
+			"order_name":   fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
+			"amount":       chargedKRW,
+			"success_url":  serverBase + "/api/toss/confirm",
+			"fail_url":     serverBase + "/api/toss/fail",
 		},
 	})
 }

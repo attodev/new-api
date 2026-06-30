@@ -39,7 +39,7 @@ type walletRechargeTarget struct {
 
 var walletAutoRechargeBillingKeyIssuer = issueTossBillingKey
 
-func walletAutoRechargeTossCharger(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+var walletAutoRechargeTossCharger = func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
 	res, _, err := chargeTossBilling(ctx, billingKey, customerKey, orderID, orderName, amount)
 	if err != nil {
 		return false, 0, err
@@ -360,7 +360,6 @@ func WalletAutoRechargeTossConfirm(c *gin.Context) {
 
 	if _, err := model.ActivateWalletAutoRechargeFromToss(tradeNo, billingKeyID, issued.Card.Company, issued.Card.Number, false, walletAutoRechargeTossCharger); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("wallet auto recharge activation failed trade_no=%s err=%v", tradeNo, err))
-		cancelPendingWalletAutoRecharge(policy)
 		redirectWalletAutoRechargeResult(c, policy, "failed")
 		return
 	}
