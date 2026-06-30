@@ -161,10 +161,17 @@ func UpdateWalletAutoRechargePreset(id int, req WalletAutoRechargePresetRequest)
 }
 
 func DisableWalletAutoRechargePreset(id int) error {
-	return DB.Model(&WalletAutoRechargePreset{}).Where("id = ?", id).Updates(map[string]interface{}{
+	result := DB.Model(&WalletAutoRechargePreset{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"enabled":     false,
 		"update_time": time.Now().Unix(),
-	}).Error
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("wallet auto recharge preset not found")
+	}
+	return nil
 }
 
 func ListWalletAutoRechargePresets(includeDisabled bool) ([]WalletAutoRechargePreset, error) {
