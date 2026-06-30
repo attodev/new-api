@@ -4690,6 +4690,7 @@
     "Card": "カード",
     "No policy configured": "設定されたポリシーはありません",
     "You do not have permission to manage this.": "これを管理する権限がありません。",
+    "Only the organization owner can change auto payments": "組織の所有者のみが自動支払いを変更できます",
     "Interval value": "間隔値",
     "Minimum recharge amount is {{amount}}.": "最低チャージ金額は {{amount}} です。",
     "Please enter a valid interval value.": "有効な間隔値を入力してください。",

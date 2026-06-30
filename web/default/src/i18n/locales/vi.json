@@ -4690,6 +4690,7 @@
     "Card": "The",
     "No policy configured": "Chua cau hinh chinh sach",
     "You do not have permission to manage this.": "Ban khong co quyen quan ly muc nay.",
+    "Only the organization owner can change auto payments": "Chi chu so huu to chuc moi co the thay doi thanh toan tu dong",
     "Interval value": "Gia tri chu ky",
     "Minimum recharge amount is {{amount}}.": "So tien nap toi thieu la {{amount}}.",
     "Please enter a valid interval value.": "Vui long nhap gia tri chu ky hop le.",

@@ -16,13 +16,51 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import React from 'react'
+import i18next from 'i18next'
 import assert from 'node:assert/strict'
-import { describe, test } from 'node:test'
+import { readFileSync } from 'node:fs'
+import { before, describe, test } from 'node:test'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { I18nextProvider, initReactI18next } from 'react-i18next'
 import {
+  AutoRechargeCard,
   getAutoRechargeModeTitleKey,
   getInitialAutoRechargeFormState,
   parseMoneyInput,
 } from './auto-recharge-card'
+
+const enMessages = (
+  JSON.parse(
+    readFileSync(
+      new URL('../../../i18n/locales/en.json', import.meta.url),
+      'utf8'
+    )
+  ) as { translation: Record<string, string> }
+).translation
+
+before(async () => {
+  if (!i18next.isInitialized) {
+    await i18next.use(initReactI18next).init({
+      lng: 'en',
+      fallbackLng: 'en',
+      resources: {
+        en: {
+          translation: enMessages,
+        },
+      },
+      interpolation: {
+        escapeValue: false,
+      },
+    })
+  }
+})
+
+function renderWithI18n(element: React.ReactElement) {
+  return renderToStaticMarkup(
+    React.createElement(I18nextProvider, { i18n: i18next }, element)
+  )
+}
 
 describe('auto recharge card helpers', () => {
   test('uses English source i18n keys for mode titles', () => {
@@ -60,5 +98,34 @@ describe('auto recharge card helpers', () => {
         chargeImmediately: false,
       }
     )
+  })
+
+  test('keeps existing Toss English locale values in en.json', () => {
+    assert.equal(enMessages['Toss Gateway'], 'Toss Gateway')
+    assert.equal(
+      enMessages['Configuration for Toss Payments integration'],
+      'Configuration for Toss Payments integration'
+    )
+  })
+
+  test('renders organization-specific permission copy when provided', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'threshold',
+        policies: [],
+        loading: false,
+        processing: false,
+        canManage: false,
+        minTopup: 1,
+        permissionMessageKey:
+          'Only the organization owner can change auto payments',
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Only the organization owner can change auto payments/)
+    assert.doesNotMatch(html, /You do not have permission to manage this\./)
   })
 })

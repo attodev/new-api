@@ -4690,6 +4690,7 @@
     "Card": "Карта",
     "No policy configured": "Политика не настроена",
     "You do not have permission to manage this.": "У вас нет прав для управления этим.",
+    "Only the organization owner can change auto payments": "Только владелец организации может изменять автоплатежи",
     "Interval value": "Значение интервала",
     "Minimum recharge amount is {{amount}}.": "Минимальная сумма пополнения: {{amount}}.",
     "Please enter a valid interval value.": "Введите корректное значение интервала.",

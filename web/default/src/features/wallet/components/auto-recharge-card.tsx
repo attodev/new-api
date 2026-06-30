@@ -45,6 +45,7 @@ interface AutoRechargeCardProps {
   processing: boolean
   canManage: boolean
   minTopup: number
+  permissionMessageKey?: string
   onCreateScheduled: (payload: WalletAutoRechargeRequest) => Promise<boolean>
   onCreateThreshold: (payload: WalletAutoRechargeRequest) => Promise<boolean>
   onCancel: (id: number) => Promise<boolean>
@@ -63,7 +64,10 @@ export function getAutoRechargeModeTitleKey(mode: WalletAutoRechargeType) {
   return mode === 'scheduled' ? 'Scheduled recharge' : 'Auto recharge'
 }
 
-function getModeTitle(mode: WalletAutoRechargeType, t: (key: string) => string) {
+function getModeTitle(
+  mode: WalletAutoRechargeType,
+  t: (key: string) => string
+) {
   return t(getAutoRechargeModeTitleKey(mode))
 }
 
@@ -113,6 +117,7 @@ export function AutoRechargeCard({
   processing,
   canManage,
   minTopup,
+  permissionMessageKey = 'You do not have permission to manage this.',
   onCreateScheduled,
   onCreateThreshold,
   onCancel,
@@ -204,21 +209,27 @@ export function AutoRechargeCard({
                   </div>
                   {mode === 'scheduled' ? (
                     <div className='text-muted-foreground text-sm'>
-                      {t('Charge interval')}:{' '}
-                      {activePolicy.interval_value || 1}
-                      {activePolicy.interval_unit === 'day' ? t('day') : t('month')}
+                      {t('Charge interval')}: {activePolicy.interval_value || 1}
+                      {activePolicy.interval_unit === 'day'
+                        ? t('day')
+                        : t('month')}
                     </div>
                   ) : (
                     <div className='text-muted-foreground text-sm'>
-                      {t('Threshold balance')}: {activePolicy.threshold_amount ?? 0}
+                      {t('Threshold balance')}:{' '}
+                      {activePolicy.threshold_amount ?? 0}
                     </div>
                   )}
                   <div className='text-muted-foreground text-sm'>
-                    {t('Next charge')}: {formatTimestamp(activePolicy.next_charge_time)}
+                    {t('Next charge')}:{' '}
+                    {formatTimestamp(activePolicy.next_charge_time)}
                   </div>
                   <div className='text-muted-foreground text-sm'>
                     {t('Card')}:{' '}
-                    {[activePolicy.card_company, activePolicy.card_number_masked]
+                    {[
+                      activePolicy.card_company,
+                      activePolicy.card_number_masked,
+                    ]
                       .filter(Boolean)
                       .join(' ') || '-'}
                   </div>
@@ -245,7 +256,7 @@ export function AutoRechargeCard({
 
         {!canManage ? (
           <div className='text-muted-foreground text-sm'>
-            {t('You do not have permission to manage this.')}
+            {t(permissionMessageKey)}
           </div>
         ) : null}
 
@@ -315,7 +326,9 @@ export function AutoRechargeCard({
             </>
           ) : (
             <div className='space-y-2'>
-              <Label htmlFor={`${mode}-threshold`}>{t('Threshold balance')}</Label>
+              <Label htmlFor={`${mode}-threshold`}>
+                {t('Threshold balance')}
+              </Label>
               <Input
                 id={`${mode}-threshold`}
                 inputMode='numeric'
@@ -326,7 +339,12 @@ export function AutoRechargeCard({
             </div>
           )}
 
-          <Button type='button' className='w-full' disabled={disabled} onClick={handleSubmit}>
+          <Button
+            type='button'
+            className='w-full'
+            disabled={disabled}
+            onClick={handleSubmit}
+          >
             {getModeTitle(mode, t)}
           </Button>
         </div>

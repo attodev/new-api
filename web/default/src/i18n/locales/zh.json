@@ -4690,6 +4690,7 @@
     "Card": "银行卡",
     "No policy configured": "未配置策略",
     "You do not have permission to manage this.": "您没有权限管理此项。",
+    "Only the organization owner can change auto payments": "只有组织所有者才能更改自动付款",
     "Interval value": "周期值",
     "Minimum recharge amount is {{amount}}.": "最低充值金额为 {{amount}}。",
     "Please enter a valid interval value.": "请输入有效的周期值。",

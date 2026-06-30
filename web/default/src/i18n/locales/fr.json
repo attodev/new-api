@@ -4690,6 +4690,7 @@
     "Card": "Carte",
     "No policy configured": "Aucune politique configuree",
     "You do not have permission to manage this.": "Vous n'avez pas l'autorisation de gerer ceci.",
+    "Only the organization owner can change auto payments": "Seul le proprietaire de l'organisation peut modifier les paiements automatiques",
     "Interval value": "Valeur de l'intervalle",
     "Minimum recharge amount is {{amount}}.": "Le montant minimum de recharge est de {{amount}}.",
     "Please enter a valid interval value.": "Veuillez saisir une valeur d'intervalle valide.",

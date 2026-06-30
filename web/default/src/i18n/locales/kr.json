@@ -4690,6 +4690,7 @@
     "Card": "카드",
     "No policy configured": "설정된 정책 없음",
     "You do not have permission to manage this.": "관리 권한이 없습니다.",
+    "Only the organization owner can change auto payments": "조직 소유자만 자동 결제를 변경할 수 있습니다",
     "Interval value": "주기 값",
     "Minimum recharge amount is {{amount}}.": "최소 충전 금액은 {{amount}}입니다.",
     "Please enter a valid interval value.": "유효한 주기 값을 입력하세요.",

@@ -448,6 +448,7 @@ export function OrganizationWallet() {
                   loading={walletAutoRecharge.loading}
                   processing={walletAutoRecharge.processing}
                   canManage={canManageAutoRecharge}
+                  permissionMessageKey='Only the organization owner can change auto payments'
                   minTopup={
                     topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
                   }
@@ -464,6 +465,7 @@ export function OrganizationWallet() {
                   loading={walletAutoRecharge.loading}
                   processing={walletAutoRecharge.processing}
                   canManage={canManageAutoRecharge}
+                  permissionMessageKey='Only the organization owner can change auto payments'
                   minTopup={
                     topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
                   }
