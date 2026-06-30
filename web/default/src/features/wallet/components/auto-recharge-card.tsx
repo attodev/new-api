@@ -59,8 +59,20 @@ function formatTimestamp(timestamp?: number) {
   }).format(new Date(value))
 }
 
+export function getAutoRechargeModeTitleKey(mode: WalletAutoRechargeType) {
+  return mode === 'scheduled' ? 'Scheduled recharge' : 'Auto recharge'
+}
+
 function getModeTitle(mode: WalletAutoRechargeType, t: (key: string) => string) {
-  return mode === 'scheduled' ? t('정기결제') : t('자동결제')
+  return t(getAutoRechargeModeTitleKey(mode))
+}
+
+export function parseMoneyInput(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const normalized = Math.floor(Number(trimmed))
+  return Number.isFinite(normalized) ? normalized : null
 }
 
 export function AutoRechargeCard({
@@ -110,10 +122,10 @@ export function AutoRechargeCard({
   const disabled = loading || processing || !canManage
 
   const handleSubmit = async () => {
-    const normalizedAmount = Math.floor(Number(amount))
-    if (!Number.isFinite(normalizedAmount) || normalizedAmount < minTopup) {
+    const normalizedAmount = parseMoneyInput(amount)
+    if (normalizedAmount === null || normalizedAmount < minTopup) {
       toast.error(
-        t('최소 충전 금액은 {{amount}}입니다.', {
+        t('Minimum recharge amount is {{amount}}.', {
           amount: String(minTopup),
         })
       )
@@ -123,9 +135,9 @@ export function AutoRechargeCard({
     const payload: WalletAutoRechargeRequest = { amount: normalizedAmount }
 
     if (mode === 'scheduled') {
-      const normalizedInterval = Math.floor(Number(intervalValue))
-      if (!Number.isFinite(normalizedInterval) || normalizedInterval <= 0) {
-        toast.error(t('올바른 주기 값을 입력해주세요.'))
+      const normalizedInterval = parseMoneyInput(intervalValue)
+      if (normalizedInterval === null || normalizedInterval <= 0) {
+        toast.error(t('Please enter a valid interval value.'))
         return
       }
       payload.interval_unit = intervalUnit
@@ -135,9 +147,9 @@ export function AutoRechargeCard({
       return
     }
 
-    const normalizedThreshold = Math.floor(Number(thresholdAmount))
-    if (!Number.isFinite(normalizedThreshold) || normalizedThreshold < 0) {
-      toast.error(t('올바른 기준 잔액을 입력해주세요.'))
+    const normalizedThreshold = parseMoneyInput(thresholdAmount)
+    if (normalizedThreshold === null || normalizedThreshold < 0) {
+      toast.error(t('Please enter a valid threshold balance.'))
       return
     }
     payload.threshold_amount = normalizedThreshold
@@ -158,30 +170,28 @@ export function AutoRechargeCard({
         <div className='rounded-md border p-3'>
           <div className='flex items-start justify-between gap-3'>
             <div className='space-y-1'>
-              <div className='text-sm font-medium'>{t('현재 설정')}</div>
+              <div className='text-sm font-medium'>{t('Current policy')}</div>
               {activePolicy ? (
                 <>
                   <div className='text-muted-foreground text-sm'>
-                    {t('충전 금액')}: {activePolicy.amount}
+                    {t('Recharge amount')}: {activePolicy.amount}
                   </div>
                   {mode === 'scheduled' ? (
                     <div className='text-muted-foreground text-sm'>
-                      {t('결제 주기')}:{' '}
+                      {t('Charge interval')}:{' '}
                       {activePolicy.interval_value || 1}
-                      {activePolicy.interval_unit === 'day'
-                        ? t('일')
-                        : t('개월')}
+                      {activePolicy.interval_unit === 'day' ? t('day') : t('month')}
                     </div>
                   ) : (
                     <div className='text-muted-foreground text-sm'>
-                      {t('기준 잔액')}: {activePolicy.threshold_amount ?? 0}
+                      {t('Threshold balance')}: {activePolicy.threshold_amount ?? 0}
                     </div>
                   )}
                   <div className='text-muted-foreground text-sm'>
-                    {t('다음 결제')}: {formatTimestamp(activePolicy.next_charge_time)}
+                    {t('Next charge')}: {formatTimestamp(activePolicy.next_charge_time)}
                   </div>
                   <div className='text-muted-foreground text-sm'>
-                    {t('카드')}:{' '}
+                    {t('Card')}:{' '}
                     {[activePolicy.card_company, activePolicy.card_number_masked]
                       .filter(Boolean)
                       .join(' ') || '-'}
@@ -189,7 +199,7 @@ export function AutoRechargeCard({
                 </>
               ) : (
                 <div className='text-muted-foreground text-sm'>
-                  {t('설정 없음')}
+                  {t('No policy configured')}
                 </div>
               )}
             </div>
@@ -201,7 +211,7 @@ export function AutoRechargeCard({
                 disabled={disabled}
                 onClick={handleCancel}
               >
-                {t('해지')}
+                {t('Cancel')}
               </Button>
             ) : null}
           </div>
@@ -209,13 +219,13 @@ export function AutoRechargeCard({
 
         {!canManage ? (
           <div className='text-muted-foreground text-sm'>
-            {t('관리 권한이 없습니다.')}
+            {t('You do not have permission to manage this.')}
           </div>
         ) : null}
 
         <div className={cn('space-y-4', !canManage && 'opacity-60')}>
           <div className='space-y-2'>
-            <Label htmlFor={`${mode}-amount`}>{t('충전 금액')}</Label>
+            <Label htmlFor={`${mode}-amount`}>{t('Recharge amount')}</Label>
             <Input
               id={`${mode}-amount`}
               inputMode='numeric'
@@ -230,7 +240,7 @@ export function AutoRechargeCard({
               <div className='grid gap-4 sm:grid-cols-2'>
                 <div className='space-y-2'>
                   <Label htmlFor={`${mode}-interval-unit`}>
-                    {t('결제 주기')}
+                    {t('Charge interval')}
                   </Label>
                   <Select
                     value={intervalUnit}
@@ -243,14 +253,14 @@ export function AutoRechargeCard({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='month'>{t('월')}</SelectItem>
-                      <SelectItem value='day'>{t('일')}</SelectItem>
+                      <SelectItem value='month'>{t('month')}</SelectItem>
+                      <SelectItem value='day'>{t('day')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className='space-y-2'>
                   <Label htmlFor={`${mode}-interval-value`}>
-                    {t('주기 값')}
+                    {t('Interval value')}
                   </Label>
                   <Input
                     id={`${mode}-interval-value`}
@@ -267,7 +277,7 @@ export function AutoRechargeCard({
                   htmlFor={`${mode}-charge-immediately`}
                   className='cursor-pointer'
                 >
-                  {t('즉시 첫 충전')}
+                  {t('Charge immediately')}
                 </Label>
                 <Switch
                   id={`${mode}-charge-immediately`}
@@ -279,7 +289,7 @@ export function AutoRechargeCard({
             </>
           ) : (
             <div className='space-y-2'>
-              <Label htmlFor={`${mode}-threshold`}>{t('기준 잔액')}</Label>
+              <Label htmlFor={`${mode}-threshold`}>{t('Threshold balance')}</Label>
               <Input
                 id={`${mode}-threshold`}
                 inputMode='numeric'

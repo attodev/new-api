@@ -47,11 +47,7 @@ export function useWalletAutoRecharge(
       const response = await getWalletAutoRecharge(scope)
       if (isApiSuccess(response) && Array.isArray(response.data)) {
         setPolicies(response.data)
-        return
       }
-      setPolicies([])
-    } catch {
-      setPolicies([])
     } finally {
       setLoading(false)
     }
