@@ -226,24 +226,32 @@ function StartStepItem(props: {
   const StatusIcon = props.step.completed ? Check : Circle
 
   return (
-    <li className='relative flex gap-3 pb-2.5 last:pb-0'>
-      {!props.isLast && (
-        <span
-          className='bg-border absolute top-9 bottom-0 left-4 w-px'
-          aria-hidden='true'
-        />
-      )}
-      <span
-        className={cn(
-          'bg-background relative z-10 flex size-8 shrink-0 items-center justify-center rounded-lg border shadow-xs',
-          props.step.completed && 'border-success/30 bg-success/10'
+    <li className='flex gap-3 pb-2.5 last:pb-0'>
+      <div className='relative flex w-8 shrink-0 self-stretch items-center justify-center'>
+        {props.index > 0 && (
+          <span
+            className='bg-border absolute top-0 left-1/2 w-px -translate-x-1/2 bottom-[calc(50%+1rem)]'
+            aria-hidden='true'
+          />
         )}
-      >
-        <StatusIcon
-          className={props.step.completed ? 'text-success size-4' : 'size-4'}
-          aria-hidden='true'
-        />
-      </span>
+        {!props.isLast && (
+          <span
+            className='bg-border absolute left-1/2 w-px -translate-x-1/2 top-[calc(50%+1rem)] -bottom-2.5'
+            aria-hidden='true'
+          />
+        )}
+        <span
+          className={cn(
+            'bg-background relative z-10 flex size-8 shrink-0 items-center justify-center rounded-lg border shadow-xs',
+            props.step.completed && 'border-success/30 bg-success/10'
+          )}
+        >
+          <StatusIcon
+            className={props.step.completed ? 'text-success size-4' : 'size-4'}
+            aria-hidden='true'
+          />
+        </span>
+      </div>
 
       <Link
         to={props.step.to}
