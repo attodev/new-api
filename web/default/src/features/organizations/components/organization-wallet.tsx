@@ -27,7 +27,10 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import { isApiSuccess } from '@/features/wallet/api'
-import { AutoRechargeCard } from '@/features/wallet/components/auto-recharge-card'
+import {
+  AutoRechargeCard,
+  getVisibleAutoRechargeModes,
+} from '@/features/wallet/components/auto-recharge-card'
 import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from '@/features/wallet/components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from '@/features/wallet/components/dialogs/payment-confirm-dialog'
@@ -110,6 +113,7 @@ export function canManageOrganizationAutoRecharge(
 
 export function OrganizationWallet() {
   const { t } = useTranslation()
+  const [activeTab, setActiveTab] = useState('topup')
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizationLoading, setOrganizationLoading] = useState(true)
   const [topupAmount, setTopupAmount] = useState(0)
@@ -379,6 +383,32 @@ export function OrganizationWallet() {
     return topupInfo?.discount?.[topupAmount] || DEFAULT_DISCOUNT_RATE
   }, [topupAmount, topupInfo])
 
+  const visibleAutoRechargeModes = useMemo(
+    () =>
+      getVisibleAutoRechargeModes(
+        walletAutoRecharge.presets.filter((preset) => preset.enabled),
+        walletAutoRecharge.policies
+      ),
+    [walletAutoRecharge.policies, walletAutoRecharge.presets]
+  )
+
+  useEffect(() => {
+    if (
+      activeTab !== 'topup' &&
+      !visibleAutoRechargeModes.includes(activeTab as 'scheduled' | 'threshold')
+    ) {
+      setActiveTab('topup')
+    }
+  }, [activeTab, visibleAutoRechargeModes])
+
+  const tabValues = ['topup', ...visibleAutoRechargeModes]
+  const tabsListClassName =
+    tabValues.length >= 3
+      ? 'grid w-full grid-cols-3 sm:w-fit'
+      : tabValues.length === 2
+        ? 'grid w-full grid-cols-2 sm:w-fit'
+        : 'grid w-full grid-cols-1 sm:w-fit'
+
   return (
     <>
       <SectionPageLayout>
@@ -394,15 +424,23 @@ export function OrganizationWallet() {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={walletUser} loading={organizationLoading} />
 
-            <Tabs defaultValue='topup' className='w-full gap-4'>
-              <TabsList className='grid w-full grid-cols-3 sm:w-fit'>
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className='w-full gap-4'
+            >
+              <TabsList className={tabsListClassName}>
                 <TabsTrigger value='topup'>{t('Top up')}</TabsTrigger>
-                <TabsTrigger value='scheduled'>
-                  {t('Scheduled recharge')}
-                </TabsTrigger>
-                <TabsTrigger value='threshold'>
-                  {t('Auto recharge')}
-                </TabsTrigger>
+                {visibleAutoRechargeModes.includes('scheduled') ? (
+                  <TabsTrigger value='scheduled'>
+                    {t('Scheduled recharge')}
+                  </TabsTrigger>
+                ) : null}
+                {visibleAutoRechargeModes.includes('threshold') ? (
+                  <TabsTrigger value='threshold'>
+                    {t('Auto recharge')}
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
 
               <TabsContent value='topup'>
@@ -441,39 +479,39 @@ export function OrganizationWallet() {
                 </div>
               </TabsContent>
 
-              <TabsContent value='scheduled'>
-                <AutoRechargeCard
-                  mode='scheduled'
-                  policies={walletAutoRecharge.policies}
-                  loading={walletAutoRecharge.loading}
-                  processing={walletAutoRecharge.processing}
-                  canManage={canManageAutoRecharge}
-                  permissionMessageKey='Only the organization owner can change auto payments'
-                  minTopup={
-                    topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
-                  }
-                  onCreateScheduled={walletAutoRecharge.createScheduled}
-                  onCreateThreshold={walletAutoRecharge.createThreshold}
-                  onCancel={walletAutoRecharge.cancel}
-                />
-              </TabsContent>
+              {visibleAutoRechargeModes.includes('scheduled') ? (
+                <TabsContent value='scheduled'>
+                  <AutoRechargeCard
+                    mode='scheduled'
+                    policies={walletAutoRecharge.policies}
+                    presets={walletAutoRecharge.presets}
+                    loading={walletAutoRecharge.loading}
+                    processing={walletAutoRecharge.processing}
+                    canManage={canManageAutoRecharge}
+                    permissionMessageKey='Only the organization owner can change auto payments'
+                    onCreateScheduled={walletAutoRecharge.createScheduled}
+                    onCreateThreshold={walletAutoRecharge.createThreshold}
+                    onCancel={walletAutoRecharge.cancel}
+                  />
+                </TabsContent>
+              ) : null}
 
-              <TabsContent value='threshold'>
-                <AutoRechargeCard
-                  mode='threshold'
-                  policies={walletAutoRecharge.policies}
-                  loading={walletAutoRecharge.loading}
-                  processing={walletAutoRecharge.processing}
-                  canManage={canManageAutoRecharge}
-                  permissionMessageKey='Only the organization owner can change auto payments'
-                  minTopup={
-                    topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
-                  }
-                  onCreateScheduled={walletAutoRecharge.createScheduled}
-                  onCreateThreshold={walletAutoRecharge.createThreshold}
-                  onCancel={walletAutoRecharge.cancel}
-                />
-              </TabsContent>
+              {visibleAutoRechargeModes.includes('threshold') ? (
+                <TabsContent value='threshold'>
+                  <AutoRechargeCard
+                    mode='threshold'
+                    policies={walletAutoRecharge.policies}
+                    presets={walletAutoRecharge.presets}
+                    loading={walletAutoRecharge.loading}
+                    processing={walletAutoRecharge.processing}
+                    canManage={canManageAutoRecharge}
+                    permissionMessageKey='Only the organization owner can change auto payments'
+                    onCreateScheduled={walletAutoRecharge.createScheduled}
+                    onCreateThreshold={walletAutoRecharge.createThreshold}
+                    onCancel={walletAutoRecharge.cancel}
+                  />
+                </TabsContent>
+              ) : null}
             </Tabs>
           </div>
         </SectionPageLayout.Content>

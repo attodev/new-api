@@ -321,6 +321,8 @@ export interface CompleteOrderRequest {
 
 export type WalletAutoRechargeType = 'scheduled' | 'threshold'
 
+export type WalletAutoRechargeTargetScope = 'user' | 'organization' | 'all'
+
 export type WalletAutoRechargeStatus =
   | 'pending'
   | 'active'
@@ -350,17 +352,31 @@ export interface WalletAutoRechargePolicy {
   card_number_masked?: string
 }
 
-export interface WalletAutoRechargeRequest {
+export interface WalletAutoRechargePreset {
+  id: number
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description?: string
   amount: number
   threshold_amount?: number
   interval_unit?: 'month' | 'day' | 'custom'
   interval_value?: number
   custom_seconds?: number
   charge_immediately?: boolean
+  sort_order?: number
+  enabled: boolean
+}
+
+export interface WalletAutoRechargeRequest {
+  preset_id: number
 }
 
 export type WalletAutoRechargeResponse =
   ApiResponse<WalletAutoRechargePolicy[]>
+
+export type WalletAutoRechargePresetResponse =
+  ApiResponse<WalletAutoRechargePreset[]>
 
 export type WalletAutoRechargeTossResponse = ApiResponse<{
   client_key: string

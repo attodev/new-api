@@ -25,8 +25,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
 import {
   AutoRechargeCard,
+  buildPresetCreatePayload,
   getAutoRechargeModeTitleKey,
   getInitialAutoRechargeFormState,
+  getVisibleAutoRechargeModes,
   parseMoneyInput,
 } from './auto-recharge-card'
 
@@ -113,10 +115,10 @@ describe('auto recharge card helpers', () => {
       React.createElement(AutoRechargeCard, {
         mode: 'threshold',
         policies: [],
+        presets: [],
         loading: false,
         processing: false,
         canManage: false,
-        minTopup: 1,
         permissionMessageKey:
           'Only the organization owner can change auto payments',
         onCreateScheduled: async () => false,
@@ -127,5 +129,44 @@ describe('auto recharge card helpers', () => {
 
     assert.match(html, /Only the organization owner can change auto payments/)
     assert.doesNotMatch(html, /You do not have permission to manage this\./)
+  })
+})
+
+describe('auto recharge preset UI helpers', () => {
+  test('hides mode without preset and without existing policy', () => {
+    assert.deepEqual(getVisibleAutoRechargeModes([], []), [])
+  })
+
+  test('shows mode when preset exists', () => {
+    assert.deepEqual(
+      getVisibleAutoRechargeModes(
+        [
+          {
+            id: 1,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: '월 1회',
+            amount: 10000,
+            enabled: true,
+          },
+        ],
+        []
+      ),
+      ['scheduled']
+    )
+  })
+
+  test('shows mode when existing policy exists even without preset', () => {
+    assert.deepEqual(
+      getVisibleAutoRechargeModes(
+        [],
+        [{ id: 7, type: 'threshold', status: 'active', amount: 10000 } as never]
+      ),
+      ['threshold']
+    )
+  })
+
+  test('builds create payload with preset id only', () => {
+    assert.deepEqual(buildPresetCreatePayload(12), { preset_id: 12 })
   })
 })

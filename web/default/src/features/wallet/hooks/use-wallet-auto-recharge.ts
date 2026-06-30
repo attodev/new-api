@@ -24,12 +24,14 @@ import {
   cancelPendingWalletAutoRecharge,
   cancelWalletAutoRecharge,
   getWalletAutoRecharge,
+  getWalletAutoRechargePresets,
   isApiSuccess,
   requestWalletScheduledRecharge,
   requestWalletThresholdRecharge,
 } from '../api'
 import type {
   WalletAutoRechargePolicy,
+  WalletAutoRechargePreset,
   WalletAutoRechargeRequest,
   WalletAutoRechargeTossResponse,
 } from '../types'
@@ -39,6 +41,7 @@ export function useWalletAutoRecharge(
   canManage: boolean
 ) {
   const [policies, setPolicies] = useState<WalletAutoRechargePolicy[]>([])
+  const [presets, setPresets] = useState<WalletAutoRechargePreset[]>([])
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
 
@@ -54,9 +57,17 @@ export function useWalletAutoRecharge(
     }
   }, [scope])
 
+  const refreshPresets = useCallback(async () => {
+    const response = await getWalletAutoRechargePresets(scope)
+    if (isApiSuccess(response) && Array.isArray(response.data)) {
+      setPresets(response.data)
+    }
+  }, [scope])
+
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void refreshPresets()
+  }, [refresh, refreshPresets])
 
   const startBillingAuth = useCallback(
     async (response: WalletAutoRechargeTossResponse) => {
@@ -151,6 +162,7 @@ export function useWalletAutoRecharge(
 
   return {
     policies,
+    presets,
     loading,
     processing,
     refresh,

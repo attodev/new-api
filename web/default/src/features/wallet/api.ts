@@ -43,6 +43,7 @@ import type {
   TossPaymentResponse,
   WalletAutoRechargeRequest,
   WalletAutoRechargeResponse,
+  WalletAutoRechargePresetResponse,
   WalletAutoRechargeTossResponse,
 } from './types'
 
@@ -298,6 +299,13 @@ export async function getWalletAutoRecharge(
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargeResponse> {
   const res = await api.get(walletAutoRechargeBase(scope))
+  return res.data
+}
+
+export async function getWalletAutoRechargePresets(
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargePresetResponse> {
+  const res = await api.get(`${walletAutoRechargeBase(scope)}/presets`)
   return res.data
 }
 
