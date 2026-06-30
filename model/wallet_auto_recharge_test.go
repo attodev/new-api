@@ -384,6 +384,79 @@ func TestProcessThresholdWalletAutoRechargeReusesChargedTopUpAfterHourChanges(t 
 	require.Equal(t, int(10*common.QuotaPerUnit), org.Quota)
 }
 
+func TestProcessThresholdWalletAutoRechargeResumesReconciliationTopUpWithoutChargedMarkerAfterHourChanges(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	originalUnitPrice := setting.TossUnitPrice
+	setting.TossUnitPrice = 1000
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+	})
+	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", Group: "default", AffCode: "wallet-threshold-marker-owner"}).Error)
+	require.NoError(t, DB.Create(&Organization{Id: 505, Name: "threshold-marker-org", OwnerUserId: 1, Status: OrganizationStatusEnabled}).Error)
+
+	enc, err := common.EncryptString("billing-key")
+	require.NoError(t, err)
+	require.NoError(t, DB.Create(&UserBillingKey{
+		Id:           35,
+		UserId:       1,
+		CustomerKey:  "customer-35",
+		EncryptedKey: enc,
+		Status:       BillingKeyStatusActive,
+	}).Error)
+
+	now := time.Date(2026, 6, 30, 10, 15, 0, 0, time.UTC)
+	policy := WalletAutoRecharge{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetType:      TopUpTargetTypeOrganization,
+		TargetId:        505,
+		OwnerUserId:     1,
+		BillingKeyId:    35,
+		Amount:          10000,
+		ThresholdAmount: 5000,
+		ThresholdQuota:  walletAutoRechargeQuota(5000),
+		Status:          WalletAutoRechargeStatusActive,
+	}
+	require.NoError(t, DB.Create(&policy).Error)
+
+	calls := 0
+	chargeErr := ProcessWalletAutoRecharge(context.Background(), policy.Id, now, 1, func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		calls++
+		require.NoError(t, DB.Delete(&Organization{}, 505).Error)
+		return true, amount, nil
+	})
+	require.Error(t, chargeErr)
+	require.Equal(t, 1, calls)
+
+	tradeNo := walletAutoRechargeTradeNo(policy, now)
+	require.NoError(t, DB.Model(&TopUp{}).Where("trade_no = ?", tradeNo).Update("provider_order_id", tradeNo).Error)
+
+	var reloaded WalletAutoRecharge
+	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
+	require.Equal(t, tradeNo, reloaded.LastTradeNo)
+	require.Contains(t, reloaded.LastError, "reconciliation")
+
+	require.NoError(t, DB.Create(&Organization{Id: 505, Name: "threshold-marker-org", OwnerUserId: 1, Status: OrganizationStatusEnabled}).Error)
+	err = ProcessWalletAutoRecharge(context.Background(), policy.Id, now.Add(2*time.Hour), 1, func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		calls++
+		return true, amount, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+
+	var topUp TopUp
+	require.NoError(t, DB.First(&topUp, "trade_no = ?", tradeNo).Error)
+	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
+	require.Equal(t, tradeNo+":charged", topUp.ProviderOrderId)
+
+	var topUpCount int64
+	require.NoError(t, DB.Model(&TopUp{}).Count(&topUpCount).Error)
+	require.Equal(t, int64(1), topUpCount)
+
+	var org Organization
+	require.NoError(t, DB.First(&org, 505).Error)
+	require.Equal(t, int(10*common.QuotaPerUnit), org.Quota)
+}
+
 func TestCompleteWalletAutoRechargeTopUpCreditsCancelledPolicy(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", Group: "default", AffCode: "wallet-cancelled-reconcile-owner"}).Error)

@@ -34,6 +34,8 @@ const (
 const (
 	WalletAutoRechargeThresholdCooldownSeconds = 3600
 	WalletAutoRechargeDailyLimit               = 3
+
+	walletAutoRechargeReconciliationPendingPrefix = "wallet auto recharge reconciliation pending: "
 )
 
 type WalletAutoRecharge struct {
@@ -344,6 +346,11 @@ func ProcessWalletAutoRecharge(ctx context.Context, policyId int, now time.Time,
 			_ = markWalletAutoRechargeReconciliationPending(policyId, charge.tradeNo, err)
 			return err
 		}
+	} else {
+		if err := markWalletAutoRechargeTopUpCharged(charge.tradeNo); err != nil {
+			_ = markWalletAutoRechargeReconciliationPending(policyId, charge.tradeNo, err)
+			return err
+		}
 	}
 
 	if err := completeWalletAutoRechargeTopUp(policyId, charge.tradeNo, now); err != nil {
@@ -498,7 +505,7 @@ func prepareWalletAutoRechargeCharge(policyId int, now time.Time, maxFails int) 
 
 func findWalletAutoRechargePendingChargedTopUp(tx *gorm.DB, policy *WalletAutoRecharge) (*TopUp, error) {
 	if policy.LastTradeNo != "" {
-		topUp, err := findPendingChargedWalletAutoRechargeTopUpByTradeNo(tx, policy.LastTradeNo)
+		topUp, err := findPendingChargedWalletAutoRechargeTopUpByLastTradeNo(tx, policy)
 		if err != nil || topUp != nil {
 			return topUp, err
 		}
@@ -526,19 +533,19 @@ func findWalletAutoRechargePendingChargedTopUp(tx *gorm.DB, policy *WalletAutoRe
 	return nil, nil
 }
 
-func findPendingChargedWalletAutoRechargeTopUpByTradeNo(tx *gorm.DB, tradeNo string) (*TopUp, error) {
+func findPendingChargedWalletAutoRechargeTopUpByLastTradeNo(tx *gorm.DB, policy *WalletAutoRecharge) (*TopUp, error) {
 	var topUp TopUp
-	err := tx.Where("trade_no = ?", tradeNo).First(&topUp).Error
+	err := tx.Where("trade_no = ?", policy.LastTradeNo).First(&topUp).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !isPendingChargedWalletAutoRechargeTopUp(&topUp) {
-		return nil, nil
+	if isPendingChargedWalletAutoRechargeTopUp(&topUp) || isPendingReconciliationMarkedWalletAutoRechargeTopUp(policy, &topUp) {
+		return &topUp, nil
 	}
-	return &topUp, nil
+	return nil, nil
 }
 
 func isPendingChargedWalletAutoRechargeTopUp(topUp *TopUp) bool {
@@ -546,6 +553,21 @@ func isPendingChargedWalletAutoRechargeTopUp(topUp *TopUp) bool {
 		topUp.PaymentMethod == PaymentMethodToss &&
 		topUp.Status == common.TopUpStatusPending &&
 		topUp.ProviderOrderId == topUp.TradeNo+":charged"
+}
+
+func isPendingReconciliationMarkedWalletAutoRechargeTopUp(policy *WalletAutoRecharge, topUp *TopUp) bool {
+	if !strings.HasPrefix(policy.LastError, walletAutoRechargeReconciliationPendingPrefix) {
+		return false
+	}
+	prefix := fmt.Sprintf("wallet_auto_%d_", policy.Id)
+	return topUp.PaymentProvider == PaymentProviderToss &&
+		topUp.PaymentMethod == PaymentMethodToss &&
+		topUp.Status == common.TopUpStatusPending &&
+		topUp.TargetType == policy.TargetType &&
+		topUp.TargetId == policy.TargetId &&
+		topUp.TradeNo == policy.LastTradeNo &&
+		strings.HasPrefix(topUp.TradeNo, prefix) &&
+		topUp.ProviderOrderId == topUp.TradeNo
 }
 
 func ensureWalletAutoRechargePendingTopUp(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, chargeKRW int64, now time.Time) (bool, error) {
@@ -673,7 +695,7 @@ func markWalletAutoRechargeFailureById(policyId int, maxFails int, cause error) 
 }
 
 func markWalletAutoRechargeReconciliationPending(policyId int, tradeNo string, cause error) error {
-	message := "wallet auto recharge reconciliation pending: " + cause.Error()
+	message := walletAutoRechargeReconciliationPendingPrefix + cause.Error()
 	if len(message) > 255 {
 		message = message[:255]
 	}
