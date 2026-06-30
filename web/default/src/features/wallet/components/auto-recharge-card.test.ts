@@ -187,4 +187,126 @@ describe('auto recharge preset UI helpers', () => {
   test('builds create payload with preset id only', () => {
     assert.deepEqual(buildPresetCreatePayload(12), { preset_id: 12 })
   })
+
+  test('renders scheduled presets as period then amount buttons', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'scheduled',
+        policies: [],
+        presets: [
+          {
+            id: 1,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Daily 10000',
+            amount: 10000,
+            interval_unit: 'day',
+            interval_value: 1,
+            enabled: true,
+          },
+          {
+            id: 2,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Monthly 30000',
+            amount: 30000,
+            interval_unit: 'month',
+            interval_value: 1,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Choose recharge period/)
+    assert.match(html, /Daily/)
+    assert.match(html, /Monthly/)
+  })
+
+  test('hides scheduled period selector when only one period exists', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'scheduled',
+        policies: [],
+        presets: [
+          {
+            id: 1,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Monthly 10000',
+            amount: 10000,
+            interval_unit: 'month',
+            interval_value: 1,
+            enabled: true,
+          },
+          {
+            id: 2,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Monthly 30000',
+            amount: 30000,
+            interval_unit: 'month',
+            interval_value: 1,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.doesNotMatch(html, /Choose recharge period/)
+    assert.match(html, /Choose recharge amount/)
+    assert.match(html, /10000/)
+    assert.match(html, /30000/)
+  })
+
+  test('renders threshold presets as recharge amount choices', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'threshold',
+        policies: [],
+        presets: [
+          {
+            id: 3,
+            type: 'threshold',
+            target_scope: 'all',
+            name: 'Auto 10000',
+            amount: 10000,
+            threshold_amount: 1000,
+            enabled: true,
+          },
+          {
+            id: 4,
+            type: 'threshold',
+            target_scope: 'all',
+            name: 'Auto 30000',
+            amount: 30000,
+            threshold_amount: 5000,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Choose recharge amount/)
+    assert.match(html, /10000/)
+    assert.match(html, /30000/)
+  })
 })

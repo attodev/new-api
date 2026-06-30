@@ -16,11 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  getScheduledPeriodLabelKey,
+  groupScheduledPresetOptions,
+  groupThresholdPresetOptions,
+} from '../lib/auto-recharge-options'
 import type {
   WalletAutoRechargePolicy,
   WalletAutoRechargePreset,
@@ -140,6 +145,11 @@ export function AutoRechargeCard({
   onCancel,
 }: AutoRechargeCardProps) {
   const { t } = useTranslation()
+  const [selectedScheduledPeriodKey, setSelectedScheduledPeriodKey] =
+    useState<string | null>(null)
+  const [selectedThresholdAmount, setSelectedThresholdAmount] = useState<
+    number | null
+  >(null)
 
   const activePolicy = useMemo(
     () =>
@@ -164,6 +174,20 @@ export function AutoRechargeCard({
   )
 
   const disabled = loading || processing || !canManage
+  const scheduledGroups = useMemo(
+    () => groupScheduledPresetOptions(availablePresets),
+    [availablePresets]
+  )
+  const thresholdGroups = useMemo(
+    () => groupThresholdPresetOptions(availablePresets),
+    [availablePresets]
+  )
+  const selectedScheduledGroup =
+    scheduledGroups.find((group) => group.period.key === selectedScheduledPeriodKey) ??
+    scheduledGroups[0]
+  const selectedThresholdGroup =
+    thresholdGroups.find((group) => group.amount === selectedThresholdAmount) ??
+    null
 
   const handleSelectPreset = async (presetId: number) => {
     const payload = buildPresetCreatePayload(presetId)
@@ -177,6 +201,16 @@ export function AutoRechargeCard({
   const handleCancel = async () => {
     if (!activePolicy) return
     await onCancel(activePolicy.id)
+  }
+
+  const handleThresholdAmountClick = async (
+    group: (typeof thresholdGroups)[number]
+  ) => {
+    if (group.thresholds.length === 1) {
+      await handleSelectPreset(group.thresholds[0].preset.id)
+      return
+    }
+    setSelectedThresholdAmount(group.amount)
   }
 
   return (
@@ -247,45 +281,115 @@ export function AutoRechargeCard({
           </div>
         ) : null}
 
-        {availablePresets.length > 0 ? (
+        {!activePolicy && availablePresets.length > 0 ? (
           <div className={cn('space-y-3', !canManage && 'opacity-60')}>
-            <div className='text-sm font-medium'>{t('Available presets')}</div>
-            <div className='space-y-3'>
-              {availablePresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type='button'
-                  disabled={disabled}
-                  onClick={() => void handleSelectPreset(preset.id)}
-                  className='hover:bg-muted w-full rounded-md border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60'
-                >
-                  <div className='font-medium'>{preset.name}</div>
-                  {preset.description ? (
-                    <div className='text-muted-foreground text-sm'>
-                      {preset.description}
+            {mode === 'scheduled' ? (
+              <>
+                {scheduledGroups.length > 1 ? (
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>
+                      {t('Choose recharge period')}
                     </div>
-                  ) : null}
-                  <div className='text-muted-foreground text-sm'>
-                    {t('Recharge amount')}: {preset.amount}
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      {scheduledGroups.map((group) => (
+                        <Button
+                          key={group.period.key}
+                          type='button'
+                          variant={
+                            selectedScheduledGroup?.period.key ===
+                            group.period.key
+                              ? 'default'
+                              : 'outline'
+                          }
+                          disabled={disabled}
+                          onClick={() =>
+                            setSelectedScheduledPeriodKey(group.period.key)
+                          }
+                          className='h-10'
+                        >
+                          {t(getScheduledPeriodLabelKey(group.period))}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  {mode === 'threshold' &&
-                  preset.threshold_amount !== null &&
-                  preset.threshold_amount !== undefined ? (
-                    <div className='text-muted-foreground text-sm'>
-                      {t('Threshold balance')}: {preset.threshold_amount}
+                ) : null}
+                {selectedScheduledGroup ? (
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>
+                      {t('Choose recharge amount')}
                     </div>
-                  ) : null}
-                  {mode === 'scheduled' &&
-                  preset.interval_value !== null &&
-                  preset.interval_value !== undefined ? (
-                    <div className='text-muted-foreground text-sm'>
-                      {t('Charge interval')}: {preset.interval_value}
-                      {preset.interval_unit === 'day' ? t('day') : t('month')}
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      {selectedScheduledGroup.amounts.map((option) => (
+                        <Button
+                          key={`${selectedScheduledGroup.period.key}:${option.amount}`}
+                          type='button'
+                          variant='outline'
+                          disabled={disabled}
+                          onClick={() =>
+                            void handleSelectPreset(option.preset.id)
+                          }
+                          className='h-10'
+                        >
+                          {option.amount}
+                        </Button>
+                      ))}
                     </div>
-                  ) : null}
-                </button>
-              ))}
-            </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {thresholdGroups.length > 0 ? (
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>
+                      {t('Choose recharge amount')}
+                    </div>
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      {thresholdGroups.map((group) => (
+                        <Button
+                          key={group.amount}
+                          type='button'
+                          variant={
+                            selectedThresholdGroup?.amount === group.amount
+                              ? 'default'
+                              : 'outline'
+                          }
+                          disabled={disabled}
+                          onClick={() => void handleThresholdAmountClick(group)}
+                          className='h-10'
+                        >
+                          {group.amount}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {selectedThresholdGroup &&
+                selectedThresholdGroup.thresholds.length > 1 ? (
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>
+                      {t('Choose threshold balance')}
+                    </div>
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      {selectedThresholdGroup.thresholds.map((option) => (
+                        <Button
+                          key={`${selectedThresholdGroup.amount}:${option.thresholdAmount}`}
+                          type='button'
+                          variant='outline'
+                          disabled={disabled}
+                          onClick={() =>
+                            void handleSelectPreset(option.preset.id)
+                          }
+                          className='h-10'
+                        >
+                          {option.thresholdAmount}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
       </CardContent>
