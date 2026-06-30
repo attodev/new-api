@@ -435,6 +435,19 @@ func prepareWalletAutoRechargeCharge(policyId int, now time.Time, maxFails int) 
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
 			return err
 		}
+		pendingChargedTopUp, err := findWalletAutoRechargePendingChargedTopUp(tx, &policy)
+		if err != nil {
+			return err
+		}
+		if pendingChargedTopUp != nil {
+			charge = walletAutoRechargeCharge{
+				policy:       policy,
+				tradeNo:      pendingChargedTopUp.TradeNo,
+				alreadyDone:  true,
+				shouldCharge: true,
+			}
+			return nil
+		}
 		if policy.Status != WalletAutoRechargeStatusActive {
 			return nil
 		}
@@ -481,6 +494,58 @@ func prepareWalletAutoRechargeCharge(policyId int, now time.Time, maxFails int) 
 		return nil
 	})
 	return charge, err
+}
+
+func findWalletAutoRechargePendingChargedTopUp(tx *gorm.DB, policy *WalletAutoRecharge) (*TopUp, error) {
+	if policy.LastTradeNo != "" {
+		topUp, err := findPendingChargedWalletAutoRechargeTopUpByTradeNo(tx, policy.LastTradeNo)
+		if err != nil || topUp != nil {
+			return topUp, err
+		}
+	}
+
+	var rows []TopUp
+	prefix := fmt.Sprintf("wallet_auto_%d_", policy.Id)
+	err := tx.Where(
+		"target_type = ? AND target_id = ? AND payment_provider = ? AND payment_method = ? AND status = ? AND trade_no LIKE ?",
+		policy.TargetType,
+		policy.TargetId,
+		PaymentProviderToss,
+		PaymentMethodToss,
+		common.TopUpStatusPending,
+		prefix+"%",
+	).Order("id desc").Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if isPendingChargedWalletAutoRechargeTopUp(&rows[i]) {
+			return &rows[i], nil
+		}
+	}
+	return nil, nil
+}
+
+func findPendingChargedWalletAutoRechargeTopUpByTradeNo(tx *gorm.DB, tradeNo string) (*TopUp, error) {
+	var topUp TopUp
+	err := tx.Where("trade_no = ?", tradeNo).First(&topUp).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !isPendingChargedWalletAutoRechargeTopUp(&topUp) {
+		return nil, nil
+	}
+	return &topUp, nil
+}
+
+func isPendingChargedWalletAutoRechargeTopUp(topUp *TopUp) bool {
+	return topUp.PaymentProvider == PaymentProviderToss &&
+		topUp.PaymentMethod == PaymentMethodToss &&
+		topUp.Status == common.TopUpStatusPending &&
+		topUp.ProviderOrderId == topUp.TradeNo+":charged"
 }
 
 func ensureWalletAutoRechargePendingTopUp(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, chargeKRW int64, now time.Time) (bool, error) {
@@ -534,9 +599,6 @@ func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", policyId).First(&policy).Error; err != nil {
 			return err
 		}
-		if policy.Status != WalletAutoRechargeStatusActive {
-			return nil
-		}
 
 		var topUp TopUp
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
@@ -546,7 +608,10 @@ func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time
 			return ErrPaymentMethodMismatch
 		}
 		if topUp.Status == common.TopUpStatusSuccess {
-			return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+			if policy.Status == WalletAutoRechargeStatusActive {
+				return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+			}
+			return nil
 		}
 		if topUp.Status != common.TopUpStatusPending {
 			return ErrTopUpStatusInvalid
@@ -564,7 +629,10 @@ func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time
 		if err := CreditTopUpTarget(tx, &topUp, quotaToAdd); err != nil {
 			return err
 		}
-		return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+		if policy.Status == WalletAutoRechargeStatusActive {
+			return updateWalletAutoRechargeSuccess(tx, &policy, tradeNo, now)
+		}
+		return nil
 	})
 }
 
@@ -610,7 +678,7 @@ func markWalletAutoRechargeReconciliationPending(policyId int, tradeNo string, c
 		message = message[:255]
 	}
 	return DB.Model(&WalletAutoRecharge{}).
-		Where("id = ? AND status = ?", policyId, WalletAutoRechargeStatusActive).
+		Where("id = ?", policyId).
 		Updates(map[string]interface{}{
 			"last_trade_no": tradeNo,
 			"last_error":    message,

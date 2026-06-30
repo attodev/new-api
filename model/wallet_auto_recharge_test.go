@@ -311,6 +311,129 @@ func TestProcessWalletAutoRechargeKeepsPendingTopUpWhenPostChargeCreditFails(t *
 	require.Equal(t, int64(1), count)
 }
 
+func TestProcessThresholdWalletAutoRechargeReusesChargedTopUpAfterHourChanges(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	originalUnitPrice := setting.TossUnitPrice
+	setting.TossUnitPrice = 1000
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+	})
+	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", Group: "default", AffCode: "wallet-threshold-reconcile-owner"}).Error)
+	require.NoError(t, DB.Create(&Organization{Id: 504, Name: "threshold-reconcile-org", OwnerUserId: 1, Status: OrganizationStatusEnabled}).Error)
+
+	enc, err := common.EncryptString("billing-key")
+	require.NoError(t, err)
+	require.NoError(t, DB.Create(&UserBillingKey{
+		Id:           34,
+		UserId:       1,
+		CustomerKey:  "customer-34",
+		EncryptedKey: enc,
+		Status:       BillingKeyStatusActive,
+	}).Error)
+
+	now := time.Date(2026, 6, 30, 10, 15, 0, 0, time.UTC)
+	policy := WalletAutoRecharge{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetType:      TopUpTargetTypeOrganization,
+		TargetId:        504,
+		OwnerUserId:     1,
+		BillingKeyId:    34,
+		Amount:          10000,
+		ThresholdAmount: 5000,
+		ThresholdQuota:  walletAutoRechargeQuota(5000),
+		Status:          WalletAutoRechargeStatusActive,
+	}
+	require.NoError(t, DB.Create(&policy).Error)
+
+	calls := 0
+	chargeErr := ProcessWalletAutoRecharge(context.Background(), policy.Id, now, 1, func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		calls++
+		require.NoError(t, DB.Delete(&Organization{}, 504).Error)
+		return true, amount, nil
+	})
+	require.Error(t, chargeErr)
+	require.Equal(t, 1, calls)
+
+	tradeNo := walletAutoRechargeTradeNo(policy, now)
+	var reloaded WalletAutoRecharge
+	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
+	require.Equal(t, tradeNo, reloaded.LastTradeNo)
+	require.Contains(t, reloaded.LastError, "reconciliation")
+
+	var topUp TopUp
+	require.NoError(t, DB.First(&topUp, "trade_no = ?", tradeNo).Error)
+	require.Equal(t, common.TopUpStatusPending, topUp.Status)
+	require.Equal(t, tradeNo+":charged", topUp.ProviderOrderId)
+
+	require.NoError(t, DB.Create(&Organization{Id: 504, Name: "threshold-reconcile-org", OwnerUserId: 1, Status: OrganizationStatusEnabled}).Error)
+	err = ProcessWalletAutoRecharge(context.Background(), policy.Id, now.Add(2*time.Hour), 1, func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		calls++
+		return true, amount, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+
+	require.NoError(t, DB.First(&topUp, "trade_no = ?", tradeNo).Error)
+	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
+	var topUpCount int64
+	require.NoError(t, DB.Model(&TopUp{}).Count(&topUpCount).Error)
+	require.Equal(t, int64(1), topUpCount)
+
+	var org Organization
+	require.NoError(t, DB.First(&org, 504).Error)
+	require.Equal(t, int(10*common.QuotaPerUnit), org.Quota)
+}
+
+func TestCompleteWalletAutoRechargeTopUpCreditsCancelledPolicy(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", Group: "default", AffCode: "wallet-cancelled-reconcile-owner"}).Error)
+
+	now := time.Date(2026, 6, 30, 11, 0, 0, 0, time.UTC)
+	tradeNo := "wallet_auto_cancelled_charged"
+	policy := WalletAutoRecharge{
+		Type:           WalletAutoRechargeTypeScheduled,
+		TargetType:     TopUpTargetTypeUser,
+		TargetId:       1,
+		OwnerUserId:    1,
+		Amount:         10000,
+		IntervalUnit:   WalletAutoRechargeIntervalMonth,
+		IntervalValue:  1,
+		Status:         WalletAutoRechargeStatusCancelled,
+		NextChargeTime: now.Unix(),
+		LastTradeNo:    tradeNo,
+	}
+	require.NoError(t, DB.Create(&policy).Error)
+	require.NoError(t, DB.Create(&TopUp{
+		UserId:          1,
+		TargetType:      TopUpTargetTypeUser,
+		TargetId:        1,
+		Amount:          10000,
+		Money:           10,
+		TradeNo:         tradeNo,
+		ProviderOrderId: tradeNo + ":charged",
+		PaymentMethod:   PaymentMethodToss,
+		PaymentProvider: PaymentProviderToss,
+		CreateTime:      now.Unix(),
+		Status:          common.TopUpStatusPending,
+	}).Error)
+
+	err := completeWalletAutoRechargeTopUp(policy.Id, tradeNo, now)
+	require.NoError(t, err)
+
+	var topUp TopUp
+	require.NoError(t, DB.First(&topUp, "trade_no = ?", tradeNo).Error)
+	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
+
+	var user User
+	require.NoError(t, DB.First(&user, 1).Error)
+	require.Equal(t, int(10*common.QuotaPerUnit), user.Quota)
+
+	var reloaded WalletAutoRecharge
+	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
+	require.Equal(t, WalletAutoRechargeStatusCancelled, reloaded.Status)
+	require.Nil(t, reloaded.ActiveKey)
+}
+
 func TestActivateWalletAutoRechargeFromTossLeavesPolicyActiveWhenImmediateCreditNeedsReconciliation(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 	originalUnitPrice := setting.TossUnitPrice
