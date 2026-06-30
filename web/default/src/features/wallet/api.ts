@@ -43,7 +43,9 @@ import type {
   TossPaymentResponse,
   WalletAutoRechargeRequest,
   WalletAutoRechargeResponse,
+  WalletAutoRechargePreset,
   WalletAutoRechargePresetResponse,
+  WalletAutoRechargePresetRequest,
   WalletAutoRechargeTossResponse,
 } from './types'
 
@@ -306,6 +308,36 @@ export async function getWalletAutoRechargePresets(
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargePresetResponse> {
   const res = await api.get(`${walletAutoRechargeBase(scope)}/presets`)
+  return res.data
+}
+
+export async function listAdminWalletAutoRechargePresets(): Promise<WalletAutoRechargePresetResponse> {
+  const res = await api.get('/api/admin/wallet/auto-recharge/presets')
+  return res.data
+}
+
+export async function createAdminWalletAutoRechargePreset(
+  preset: WalletAutoRechargePresetRequest
+): Promise<ApiResponse<WalletAutoRechargePreset>> {
+  const res = await api.post('/api/admin/wallet/auto-recharge/presets', preset)
+  return res.data
+}
+
+export async function updateAdminWalletAutoRechargePreset(
+  id: number,
+  preset: WalletAutoRechargePresetRequest
+): Promise<ApiResponse<WalletAutoRechargePreset>> {
+  const res = await api.put(
+    `/api/admin/wallet/auto-recharge/presets/${id}`,
+    preset
+  )
+  return res.data
+}
+
+export async function deleteAdminWalletAutoRechargePreset(
+  id: number
+): Promise<ApiResponse> {
+  const res = await api.delete(`/api/admin/wallet/auto-recharge/presets/${id}`)
   return res.data
 }
 

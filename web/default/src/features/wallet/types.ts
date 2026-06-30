@@ -323,6 +323,8 @@ export type WalletAutoRechargeType = 'scheduled' | 'threshold'
 
 export type WalletAutoRechargeTargetScope = 'user' | 'organization' | 'all'
 
+export type WalletAutoRechargeIntervalUnit = 'month' | 'day' | 'custom'
+
 export type WalletAutoRechargeStatus =
   | 'pending'
   | 'active'
@@ -337,7 +339,7 @@ export interface WalletAutoRechargePolicy {
   amount: number
   threshold_amount?: number
   threshold_quota?: number
-  interval_unit?: 'month' | 'day' | 'custom'
+  interval_unit?: WalletAutoRechargeIntervalUnit
   interval_value?: number
   custom_seconds?: number
   charge_immediately?: boolean
@@ -360,11 +362,26 @@ export interface WalletAutoRechargePreset {
   description?: string
   amount: number
   threshold_amount?: number
-  interval_unit?: 'month' | 'day' | 'custom'
+  interval_unit?: WalletAutoRechargeIntervalUnit
   interval_value?: number
   custom_seconds?: number
   charge_immediately?: boolean
   sort_order?: number
+  enabled: boolean
+}
+
+export interface WalletAutoRechargePresetRequest {
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description: string
+  amount: number
+  threshold_amount: number
+  interval_unit: WalletAutoRechargeIntervalUnit
+  interval_value: number
+  custom_seconds: number
+  charge_immediately: boolean
+  sort_order: number
   enabled: boolean
 }
 
