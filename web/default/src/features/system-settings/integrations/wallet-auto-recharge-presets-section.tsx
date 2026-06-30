@@ -80,6 +80,10 @@ import type {
 } from '@/features/wallet/types'
 
 const PRESET_QUERY_KEY = ['admin-wallet-auto-recharge-presets'] as const
+type SummaryTranslator = (
+  key: string,
+  options?: Record<string, unknown>
+) => string
 
 const TYPE_OPTIONS: Array<{ value: WalletAutoRechargeType; label: string }> = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -172,34 +176,74 @@ function toPresetFormState(
 export function normalizePresetForm(
   form: WalletAutoRechargePresetFormState
 ): WalletAutoRechargePresetRequest {
+  const amount = Number(form.amount || 0)
+  const sortOrder = Number(form.sort_order || 0)
+
+  if (form.type === 'scheduled') {
+    const intervalUnit = form.interval_unit
+    const intervalValue = Number(form.interval_value || 0)
+    const customSeconds =
+      intervalUnit === 'custom' ? Number(form.custom_seconds || 0) : 0
+
+    return {
+      type: form.type,
+      target_scope: form.target_scope,
+      name: form.name.trim(),
+      description: form.description.trim(),
+      amount,
+      threshold_amount: 0,
+      interval_unit: intervalUnit,
+      interval_value: intervalValue,
+      custom_seconds: customSeconds,
+      charge_immediately: form.charge_immediately,
+      sort_order: sortOrder,
+      enabled: form.enabled,
+    }
+  }
+
   return {
     type: form.type,
     target_scope: form.target_scope,
     name: form.name.trim(),
     description: form.description.trim(),
-    amount: Number(form.amount || 0),
+    amount,
     threshold_amount: Number(form.threshold_amount || 0),
-    interval_unit: form.interval_unit,
-    interval_value: Number(form.interval_value || 0),
-    custom_seconds: Number(form.custom_seconds || 0),
-    charge_immediately: form.charge_immediately,
-    sort_order: Number(form.sort_order || 0),
+    interval_unit: 'month',
+    interval_value: 1,
+    custom_seconds: 0,
+    charge_immediately: false,
+    sort_order: sortOrder,
     enabled: form.enabled,
   }
 }
 
-function getIntervalSummary(preset: WalletAutoRechargePreset) {
+function getIntervalSummary(
+  preset: WalletAutoRechargePreset,
+  t: SummaryTranslator = (key) => key
+) {
   if (preset.interval_unit === 'custom') {
-    return `${preset.custom_seconds ?? 0}s`
+    return t('{{seconds}}s', { seconds: preset.custom_seconds ?? 0 })
   }
-  return `${preset.interval_value || 1} ${preset.interval_unit || 'month'}`
+  return t('{{value}} {{unit}}', {
+    value: preset.interval_value || 1,
+    unit: preset.interval_unit || 'month',
+  })
 }
 
-export function getPresetSummary(preset: WalletAutoRechargePreset) {
+export function getPresetSummary(
+  preset: WalletAutoRechargePreset,
+  t: SummaryTranslator = (key) => key
+) {
   if (preset.type === 'scheduled') {
-    return `${preset.amount} / ${getIntervalSummary(preset)}`
+    return t('{{amount}} / {{interval}}', {
+      amount: preset.amount,
+      interval: getIntervalSummary(preset, t),
+    })
   }
-  return `Below ${preset.threshold_amount ?? 0} -> ${preset.amount}`
+  return t('Below {{threshold}} -> {{amount}}', {
+    threshold: preset.threshold_amount ?? 0,
+    amount: preset.amount,
+  })
 }
 
 function getTargetScopeLabel(scope: WalletAutoRechargeTargetScope) {
@@ -276,7 +320,7 @@ function PresetTable({
                     </Badge>
                   </TableCell>
                   <TableCell className='text-muted-foreground text-sm'>
-                    {getPresetSummary(preset)}
+                    {getPresetSummary(preset, t)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={preset.enabled ? 'secondary' : 'outline'}>
@@ -793,10 +837,14 @@ export function WalletAutoRechargePresetsSection() {
                 <div className='rounded-lg border p-4'>
                   <div className='text-sm font-medium'>{t('Preview')}</div>
                   <div className='text-muted-foreground mt-2 text-sm'>
-                    {t(getTypeLabel(watchedType))}: {getPresetSummary({
-                      id: editingPreset?.id ?? 0,
-                      ...normalizePresetForm(form.getValues()),
-                    })}
+                    {t(getTypeLabel(watchedType))}:{' '}
+                    {getPresetSummary(
+                      {
+                        id: editingPreset?.id ?? 0,
+                        ...normalizePresetForm(form.getValues()),
+                      },
+                      t
+                    )}
                   </div>
                 </div>
               </div>

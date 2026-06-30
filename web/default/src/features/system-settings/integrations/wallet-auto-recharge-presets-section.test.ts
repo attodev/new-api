@@ -4,6 +4,13 @@ import {
   normalizePresetForm,
 } from './wallet-auto-recharge-presets-section'
 
+const identityT = (key: string, options?: Record<string, unknown>) => {
+  if (!options) return key
+  return key.replace(/\{\{(\w+)\}\}/g, (_, token) =>
+    String(options[token] ?? '')
+  )
+}
+
 describe('wallet auto recharge preset admin helpers', () => {
   test('normalizes scheduled preset form values', () => {
     expect(
@@ -37,6 +44,70 @@ describe('wallet auto recharge preset admin helpers', () => {
     })
   })
 
+  test('normalizes threshold preset by clearing stale scheduled-only values', () => {
+    expect(
+      normalizePresetForm({
+        type: 'threshold',
+        target_scope: 'organization',
+        name: 'Low balance',
+        description: 'uses threshold',
+        amount: '25000',
+        threshold_amount: '7000',
+        interval_unit: 'custom',
+        interval_value: '6',
+        custom_seconds: '900',
+        charge_immediately: true,
+        sort_order: '3',
+        enabled: false,
+      })
+    ).toEqual({
+      type: 'threshold',
+      target_scope: 'organization',
+      name: 'Low balance',
+      description: 'uses threshold',
+      amount: 25000,
+      threshold_amount: 7000,
+      interval_unit: 'month',
+      interval_value: 1,
+      custom_seconds: 0,
+      charge_immediately: false,
+      sort_order: 3,
+      enabled: false,
+    })
+  })
+
+  test('normalizes scheduled preset by clearing stale threshold values after a type switch', () => {
+    expect(
+      normalizePresetForm({
+        type: 'scheduled',
+        target_scope: 'all',
+        name: 'Every day',
+        description: 'switched from threshold',
+        amount: '12000',
+        threshold_amount: '5000',
+        interval_unit: 'day',
+        interval_value: '1',
+        custom_seconds: '300',
+        charge_immediately: true,
+        sort_order: '2',
+        enabled: true,
+      })
+    ).toEqual({
+      type: 'scheduled',
+      target_scope: 'all',
+      name: 'Every day',
+      description: 'switched from threshold',
+      amount: 12000,
+      threshold_amount: 0,
+      interval_unit: 'day',
+      interval_value: 1,
+      custom_seconds: 0,
+      charge_immediately: true,
+      sort_order: 2,
+      enabled: true,
+    })
+  })
+
   test('summarizes threshold preset', () => {
     expect(
       getPresetSummary({
@@ -47,7 +118,23 @@ describe('wallet auto recharge preset admin helpers', () => {
         amount: 20000,
         threshold_amount: 5000,
         enabled: true,
-      })
-    ).toContain('5000')
+      }, identityT)
+    ).toBe('Below 5000 -> 20000')
+  })
+
+  test('summarizes scheduled custom interval with translator', () => {
+    expect(
+      getPresetSummary({
+        id: 2,
+        type: 'scheduled',
+        target_scope: 'all',
+        name: 'Hourly',
+        amount: 15000,
+        interval_unit: 'custom',
+        interval_value: 99,
+        custom_seconds: 3600,
+        enabled: true,
+      }, identityT)
+    ).toBe('15000 / 3600s')
   })
 })
