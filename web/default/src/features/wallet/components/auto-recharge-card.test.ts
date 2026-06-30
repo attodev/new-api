@@ -20,6 +20,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import {
   getAutoRechargeModeTitleKey,
+  getInitialAutoRechargeFormState,
   parseMoneyInput,
 } from './auto-recharge-card'
 
@@ -35,5 +36,29 @@ describe('auto recharge card helpers', () => {
     assert.equal(parseMoneyInput('0'), 0)
     assert.equal(parseMoneyInput(' 0 '), 0)
     assert.equal(parseMoneyInput('12.9'), 12)
+  })
+
+  test('preserves explicit zero values when hydrating an active policy', () => {
+    assert.deepEqual(
+      getInitialAutoRechargeFormState({
+        id: 7,
+        type: 'threshold',
+        target_type: 'user',
+        target_id: 42,
+        status: 'active',
+        amount: 0,
+        threshold_amount: 0,
+        interval_value: 0,
+        interval_unit: 'day',
+        charge_immediately: false,
+      }),
+      {
+        amount: '0',
+        thresholdAmount: '0',
+        intervalUnit: 'day',
+        intervalValue: '0',
+        chargeImmediately: false,
+      }
+    )
   })
 })

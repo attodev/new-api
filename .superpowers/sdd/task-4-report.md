@@ -140,3 +140,61 @@ Task-owned file status:
   - `src/features/wallet/components/auto-recharge-card.test.ts`
 
 Remaining typecheck failures are unrelated pre-existing errors in organizations, system-settings, usage-logs, and `src/i18n/languages.test.ts`.
+
+## Remaining Task 4 Fix
+
+- Replaced the active-policy hydration truthiness checks in `auto-recharge-card.tsx` with a small exported helper that uses explicit nullish checks for `amount`, `threshold_amount`, and `interval_value`, so persisted `0` values hydrate back into the form instead of falling through to empty-string or default fallbacks.
+- Reused that helper inside the component effect so the tested path matches the runtime hydration path exactly.
+- Added a focused regression test proving an active policy with `amount: 0`, `threshold_amount: 0`, and `interval_value: 0` is preserved during hydration.
+
+## Remaining Task 4 Validation
+
+Focused regression test after the fix:
+
+```text
+$ BUN_TMPDIR=/tmp bun test src/features/wallet/components/auto-recharge-card.test.ts
+bun test v1.3.14 (0d9b296a)
+
+src/features/wallet/components/auto-recharge-card.test.ts:
+(pass) auto recharge card helpers > uses English source i18n keys for mode titles [0.24ms]
+(pass) auto recharge card helpers > treats blank money input as invalid while preserving explicit zero [0.08ms]
+(pass) auto recharge card helpers > preserves explicit zero values when hydrating an active policy [0.13ms]
+
+ 3 pass
+ 0 fail
+Ran 3 tests across 1 file. [559.00ms]
+```
+
+Project typecheck re-run:
+
+```text
+$ BUN_TMPDIR=/tmp bun run typecheck
+$ tsc -b
+src/features/organizations/components/organization-dashboard.tsx(720,13): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
+src/features/organizations/components/organization-users-table.tsx(83,3): error TS6133: 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.
+src/features/organizations/components/organization-users-table.tsx(104,7): error TS6133: 'ORGANIZATION_ROLES' is declared but its value is never read.
+src/features/organizations/components/organization-users-table.tsx(862,41): error TS2322: Property 'asChild' does not exist on type 'IntrinsicAttributes & Props<unknown>'.
+src/features/system-settings/billing/index.tsx(27,7): error TS2740: Type '{ ... }' is missing properties from type 'BillingSettings'.
+src/features/system-settings/models/vendor-discount-visual-editor.tsx(344,56): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | number'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): error TS2769: No overload matches this call.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(90,48): error TS2769: No overload matches this call.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(91,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(92,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(93,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(94,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(95,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(96,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/common-logs-filter-bar.tsx(97,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
+src/features/usage-logs/components/task-logs-filter-bar.tsx(82,20): error TS2769: No overload matches this call.
+src/features/usage-logs/components/task-logs-filter-bar.tsx(84,48): error TS2769: No overload matches this call.
+src/features/usage-logs/components/usage-logs-mobile-card.tsx(203,63): error TS2339: Property 'created_at' does not exist on type 'NonNullable<TData>'.
+src/features/usage-logs/components/usage-logs-mobile-card.tsx(204,58): error TS2339: Property 'type' does not exist on type 'NonNullable<TData>'.
+src/features/usage-logs/components/usage-logs-table.tsx(92,5): error TS2322: Type 'UseNavigateResult<string>' is not assignable to type 'NavigateFn'.
+src/features/usage-logs/index.tsx(201,15): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
+src/i18n/languages.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+```
+
+No typecheck errors were reported from:
+
+- `src/features/wallet/components/auto-recharge-card.tsx`
+- `src/features/wallet/components/auto-recharge-card.test.ts`

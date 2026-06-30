@@ -75,6 +75,37 @@ export function parseMoneyInput(value: string) {
   return Number.isFinite(normalized) ? normalized : null
 }
 
+interface AutoRechargeFormState {
+  amount: string
+  thresholdAmount: string
+  intervalUnit: 'month' | 'day'
+  intervalValue: string
+  chargeImmediately: boolean
+}
+
+export function getInitialAutoRechargeFormState(
+  activePolicy?: WalletAutoRechargePolicy
+): AutoRechargeFormState {
+  return {
+    amount:
+      activePolicy?.amount !== null && activePolicy?.amount !== undefined
+        ? String(activePolicy.amount)
+        : '',
+    thresholdAmount:
+      activePolicy?.threshold_amount !== null &&
+      activePolicy?.threshold_amount !== undefined
+        ? String(activePolicy.threshold_amount)
+        : '',
+    intervalUnit: activePolicy?.interval_unit === 'day' ? 'day' : 'month',
+    intervalValue:
+      activePolicy?.interval_value !== null &&
+      activePolicy?.interval_value !== undefined
+        ? String(activePolicy.interval_value)
+        : '1',
+    chargeImmediately: activePolicy?.charge_immediately !== false,
+  }
+}
+
 export function AutoRechargeCard({
   mode,
   policies,
@@ -106,17 +137,12 @@ export function AutoRechargeCard({
   useEffect(() => {
     if (!activePolicy) return
 
-    setAmount(activePolicy.amount ? String(activePolicy.amount) : '')
-    setThresholdAmount(
-      activePolicy.threshold_amount
-        ? String(activePolicy.threshold_amount)
-        : ''
-    )
-    setIntervalUnit(activePolicy.interval_unit === 'day' ? 'day' : 'month')
-    setIntervalValue(
-      activePolicy.interval_value ? String(activePolicy.interval_value) : '1'
-    )
-    setChargeImmediately(activePolicy.charge_immediately !== false)
+    const nextState = getInitialAutoRechargeFormState(activePolicy)
+    setAmount(nextState.amount)
+    setThresholdAmount(nextState.thresholdAmount)
+    setIntervalUnit(nextState.intervalUnit)
+    setIntervalValue(nextState.intervalValue)
+    setChargeImmediately(nextState.chargeImmediately)
   }, [activePolicy])
 
   const disabled = loading || processing || !canManage
