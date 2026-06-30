@@ -224,9 +224,13 @@ function getIntervalSummary(
   if (preset.interval_unit === 'custom') {
     return t('{{seconds}}s', { seconds: preset.custom_seconds ?? 0 })
   }
+
+  const intervalUnitLabel =
+    preset.interval_unit === 'day' ? t('Day(s)') : t('Month(s)')
+
   return t('{{value}} {{unit}}', {
     value: preset.interval_value || 1,
-    unit: preset.interval_unit || 'month',
+    unit: intervalUnitLabel,
   })
 }
 
@@ -402,7 +406,7 @@ export function WalletAutoRechargePresetsSection() {
     mutationFn: createAdminWalletAutoRechargePreset,
     onSuccess: async (response) => {
       if (!isApiSuccess(response)) {
-        throw new Error(response.message || 'Failed to create preset')
+        throw new Error(response.message || t('Failed to create preset'))
       }
       await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
       toast.success(t('Preset created'))
@@ -427,7 +431,7 @@ export function WalletAutoRechargePresetsSection() {
     }) => updateAdminWalletAutoRechargePreset(id, payload),
     onSuccess: async (response) => {
       if (!isApiSuccess(response)) {
-        throw new Error(response.message || 'Failed to update preset')
+        throw new Error(response.message || t('Failed to update preset'))
       }
       await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
       toast.success(t('Preset updated'))
@@ -446,7 +450,7 @@ export function WalletAutoRechargePresetsSection() {
     mutationFn: deleteAdminWalletAutoRechargePreset,
     onSuccess: async (response) => {
       if (!isApiSuccess(response)) {
-        throw new Error(response.message || 'Failed to delete preset')
+        throw new Error(response.message || t('Failed to delete preset'))
       }
       await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
       toast.success(t('Preset deleted'))

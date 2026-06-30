@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "組織の所有者のみが自動支払いを変更できます",
     "Interval value": "間隔値",
     "Minimum recharge amount is {{amount}}.": "最低チャージ金額は {{amount}} です。",
+    "Day(s)": "日",
+    "Month(s)": "か月",
+    "Failed to create preset": "プリセットの作成に失敗しました",
+    "Failed to update preset": "プリセットの更新に失敗しました",
+    "Failed to delete preset": "プリセットの削除に失敗しました",
     "Please enter a valid interval value.": "有効な間隔値を入力してください。",
     "Please enter a valid threshold balance.": "有効な残高しきい値を入力してください。"
   }

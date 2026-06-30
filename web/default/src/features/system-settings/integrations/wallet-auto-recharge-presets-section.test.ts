@@ -137,4 +137,35 @@ describe('wallet auto recharge preset admin helpers', () => {
       }, identityT)
     ).toBe('15000 / 3600s')
   })
+
+  test('translates scheduled interval units before interpolation', () => {
+    const seenKeys: string[] = []
+    const fakeT = (key: string, options?: Record<string, unknown>) => {
+      seenKeys.push(key)
+      if (key === 'Month(s)') return 'meses'
+      if (!options) return key
+      return key.replace(/\{\{(\w+)\}\}/g, (_, token) =>
+        String(options[token] ?? '')
+      )
+    }
+
+    expect(
+      getPresetSummary(
+        {
+          id: 3,
+          type: 'scheduled',
+          target_scope: 'all',
+          name: 'Monthly',
+          amount: 30000,
+          interval_unit: 'month',
+          interval_value: 2,
+          custom_seconds: 0,
+          enabled: true,
+        },
+        fakeT
+      )
+    ).toBe('30000 / 2 meses')
+    expect(seenKeys).toContain('Month(s)')
+    expect(seenKeys).not.toContain('month')
+  })
 })

@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "Chi chu so huu to chuc moi co the thay doi thanh toan tu dong",
     "Interval value": "Gia tri chu ky",
     "Minimum recharge amount is {{amount}}.": "So tien nap toi thieu la {{amount}}.",
+    "Day(s)": "ngay",
+    "Month(s)": "thang",
+    "Failed to create preset": "Khong the tao preset",
+    "Failed to update preset": "Khong the cap nhat preset",
+    "Failed to delete preset": "Khong the xoa preset",
     "Please enter a valid interval value.": "Vui long nhap gia tri chu ky hop le.",
     "Please enter a valid threshold balance.": "Vui long nhap nguong so du hop le."
   }

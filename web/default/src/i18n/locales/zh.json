@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "只有组织所有者才能更改自动付款",
     "Interval value": "周期值",
     "Minimum recharge amount is {{amount}}.": "最低充值金额为 {{amount}}。",
+    "Day(s)": "天",
+    "Month(s)": "个月",
+    "Failed to create preset": "创建预设失败",
+    "Failed to update preset": "更新预设失败",
+    "Failed to delete preset": "删除预设失败",
     "Please enter a valid interval value.": "请输入有效的周期值。",
     "Please enter a valid threshold balance.": "请输入有效的余额阈值。"
   }

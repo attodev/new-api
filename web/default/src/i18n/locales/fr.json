@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "Seul le proprietaire de l'organisation peut modifier les paiements automatiques",
     "Interval value": "Valeur de l'intervalle",
     "Minimum recharge amount is {{amount}}.": "Le montant minimum de recharge est de {{amount}}.",
+    "Day(s)": "jour(s)",
+    "Month(s)": "mois",
+    "Failed to create preset": "Echec de la creation du preset",
+    "Failed to update preset": "Echec de la mise a jour du preset",
+    "Failed to delete preset": "Echec de la suppression du preset",
     "Please enter a valid interval value.": "Veuillez saisir une valeur d'intervalle valide.",
     "Please enter a valid threshold balance.": "Veuillez saisir un seuil de solde valide."
   }

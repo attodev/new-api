@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "Только владелец организации может изменять автоплатежи",
     "Interval value": "Значение интервала",
     "Minimum recharge amount is {{amount}}.": "Минимальная сумма пополнения: {{amount}}.",
+    "Day(s)": "дн.",
+    "Month(s)": "мес.",
+    "Failed to create preset": "Не удалось создать пресет",
+    "Failed to update preset": "Не удалось обновить пресет",
+    "Failed to delete preset": "Не удалось удалить пресет",
     "Please enter a valid interval value.": "Введите корректное значение интервала.",
     "Please enter a valid threshold balance.": "Введите корректный порог баланса."
   }

@@ -4693,6 +4693,11 @@
     "Only the organization owner can change auto payments": "조직 소유자만 자동 결제를 변경할 수 있습니다",
     "Interval value": "주기 값",
     "Minimum recharge amount is {{amount}}.": "최소 충전 금액은 {{amount}}입니다.",
+    "Day(s)": "일",
+    "Month(s)": "개월",
+    "Failed to create preset": "프리셋 생성에 실패했습니다",
+    "Failed to update preset": "프리셋 수정에 실패했습니다",
+    "Failed to delete preset": "프리셋 삭제에 실패했습니다",
     "Please enter a valid interval value.": "유효한 주기 값을 입력하세요.",
     "Please enter a valid threshold balance.": "유효한 기준 잔액을 입력하세요."
   }
