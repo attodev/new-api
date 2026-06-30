@@ -41,6 +41,9 @@ import type {
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
   TossPaymentResponse,
+  WalletAutoRechargeRequest,
+  WalletAutoRechargeResponse,
+  WalletAutoRechargeTossResponse,
 } from './types'
 
 // ============================================================================
@@ -282,5 +285,46 @@ export async function completeOrder(
   request: CompleteOrderRequest
 ): Promise<ApiResponse> {
   const res = await api.post('/api/user/topup/complete', request)
+  return res.data
+}
+
+function walletAutoRechargeBase(scope: 'user' | 'organization') {
+  return scope === 'organization'
+    ? '/api/organization/wallet/auto-recharge'
+    : '/api/user/wallet/auto-recharge'
+}
+
+export async function getWalletAutoRecharge(
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeResponse> {
+  const res = await api.get(walletAutoRechargeBase(scope))
+  return res.data
+}
+
+export async function requestWalletScheduledRecharge(
+  request: WalletAutoRechargeRequest,
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeTossResponse> {
+  const res = await api.post(`${walletAutoRechargeBase(scope)}/scheduled`, request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestWalletThresholdRecharge(
+  request: WalletAutoRechargeRequest,
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeTossResponse> {
+  const res = await api.post(`${walletAutoRechargeBase(scope)}/threshold`, request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function cancelWalletAutoRecharge(
+  id: number,
+  scope: 'user' | 'organization' = 'user'
+): Promise<ApiResponse> {
+  const res = await api.delete(`${walletAutoRechargeBase(scope)}/${id}`)
   return res.data
 }

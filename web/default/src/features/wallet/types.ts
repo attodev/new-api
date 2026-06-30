@@ -318,3 +318,54 @@ export interface BillingHistoryResponse {
 export interface CompleteOrderRequest {
   trade_no: string
 }
+
+export type WalletAutoRechargeType = 'scheduled' | 'threshold'
+
+export type WalletAutoRechargeStatus =
+  | 'pending'
+  | 'active'
+  | 'cancelled'
+  | 'failed'
+
+export interface WalletAutoRechargePolicy {
+  id: number
+  type: WalletAutoRechargeType
+  target_type: 'user' | 'organization'
+  target_id: number
+  amount: number
+  threshold_amount?: number
+  threshold_quota?: number
+  interval_unit?: 'month' | 'day' | 'custom'
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+  next_charge_time?: number
+  last_charge_time?: number
+  cooldown_until?: number
+  daily_charge_count?: number
+  status: WalletAutoRechargeStatus
+  fail_count?: number
+  last_error?: string
+  card_company?: string
+  card_number_masked?: string
+}
+
+export interface WalletAutoRechargeRequest {
+  amount: number
+  threshold_amount?: number
+  interval_unit?: 'month' | 'day' | 'custom'
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+}
+
+export type WalletAutoRechargeResponse =
+  ApiResponse<WalletAutoRechargePolicy[]>
+
+export type WalletAutoRechargeTossResponse = ApiResponse<{
+  client_key: string
+  customer_key: string
+  trade_no: string
+  success_url: string
+  fail_url: string
+}>
