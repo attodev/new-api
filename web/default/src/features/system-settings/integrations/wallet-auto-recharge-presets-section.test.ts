@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
   formatOptionAmountList,
+  getOptionAmountDraftValue,
   getPresetSummary,
   normalizePresetForm,
   parseOptionAmountList,
+  updateOptionAmountDrafts,
 } from './wallet-auto-recharge-presets-section'
 import {
   buildAdminOptionState,
@@ -186,6 +188,15 @@ describe('wallet auto recharge preset admin helpers', () => {
   test('formats option amount lists for editing', () => {
     expect(formatOptionAmountList([30000, 10000, 10000, 5000])).toBe(
       '5000, 10000, 30000'
+    )
+  })
+
+  test('keeps in-progress multi amount input draft instead of reformatting it', () => {
+    const drafts = updateOptionAmountDrafts({}, 'monthly', '1000, ')
+
+    expect(getOptionAmountDraftValue(drafts, 'monthly', [1000])).toBe('1000, ')
+    expect(getOptionAmountDraftValue(drafts, 'weekly', [3000, 1000])).toBe(
+      '1000, 3000'
     )
   })
 

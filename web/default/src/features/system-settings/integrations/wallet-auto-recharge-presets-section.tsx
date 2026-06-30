@@ -220,6 +220,26 @@ export function formatOptionAmountList(values: number[]): string {
     .join(', ')
 }
 
+type OptionAmountDrafts = Record<string, string>
+
+export function updateOptionAmountDrafts(
+  drafts: OptionAmountDrafts,
+  key: string,
+  value: string
+): OptionAmountDrafts {
+  return { ...drafts, [key]: value }
+}
+
+export function getOptionAmountDraftValue(
+  drafts: OptionAmountDrafts,
+  key: string,
+  values: number[]
+): string {
+  return Object.prototype.hasOwnProperty.call(drafts, key)
+    ? drafts[key]
+    : formatOptionAmountList(values)
+}
+
 function makeQuickPeriod(kind: 'daily' | 'weekly' | 'monthly'): ScheduledPeriodOption {
   if (kind === 'daily') {
     return {
@@ -412,6 +432,7 @@ export function WalletAutoRechargePresetsSection() {
   const [optionState, setOptionState] = useState<AdminAutoRechargeOptionState>(
     () => buildAdminOptionState([])
   )
+  const [amountDrafts, setAmountDrafts] = useState<OptionAmountDrafts>({})
 
   const presetQuery = useQuery({
     queryKey: PRESET_QUERY_KEY,
@@ -432,6 +453,7 @@ export function WalletAutoRechargePresetsSection() {
 
   useEffect(() => {
     setOptionState(buildAdminOptionState(presets))
+    setAmountDrafts({})
   }, [presets])
 
   const createMutation = useMutation({
@@ -506,6 +528,9 @@ export function WalletAutoRechargePresetsSection() {
     periodKey: string,
     value: string
   ) => {
+    setAmountDrafts((current) =>
+      updateOptionAmountDrafts(current, `scheduled:${periodKey}`, value)
+    )
     const amounts = parseOptionAmountList(value).filter((item) => item > 0)
     setOptionState((current) => ({
       ...current,
@@ -558,6 +583,7 @@ export function WalletAutoRechargePresetsSection() {
         }
       }
       await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
+      setAmountDrafts({})
       toast.success(t('Options saved'))
     } catch (error) {
       await queryClient.invalidateQueries({ queryKey: PRESET_QUERY_KEY })
@@ -720,7 +746,11 @@ export function WalletAutoRechargePresetsSection() {
                     </div>
                     <div className='grid gap-2 sm:grid-cols-2'>
                       <Input
-                        value={formatOptionAmountList(item.amounts)}
+                        value={getOptionAmountDraftValue(
+                          amountDrafts,
+                          `scheduled:${item.period.key}`,
+                          item.amounts
+                        )}
                         onChange={(event) =>
                           updateScheduledPeriodAmounts(
                             item.period.key,
@@ -798,19 +828,31 @@ export function WalletAutoRechargePresetsSection() {
                     {t('Recharge amounts')}
                   </div>
                   <Input
-                    value={formatOptionAmountList(
+                    value={getOptionAmountDraftValue(
+                      amountDrafts,
+                      'threshold:recharge',
                       optionState.threshold.rechargeAmounts
                     )}
                     onChange={(event) =>
-                      setOptionState((current) => ({
-                        ...current,
-                        threshold: {
-                          ...current.threshold,
-                          rechargeAmounts: parseOptionAmountList(
-                            event.target.value
-                          ).filter((item) => item > 0),
-                        },
-                      }))
+                      {
+                        const value = event.target.value
+                        setAmountDrafts((current) =>
+                          updateOptionAmountDrafts(
+                            current,
+                            'threshold:recharge',
+                            value
+                          )
+                        )
+                        setOptionState((current) => ({
+                          ...current,
+                          threshold: {
+                            ...current.threshold,
+                            rechargeAmounts: parseOptionAmountList(
+                              value
+                            ).filter((item) => item > 0),
+                          },
+                        }))
+                      }
                     }
                     placeholder='10000, 30000, 50000'
                   />
@@ -820,19 +862,29 @@ export function WalletAutoRechargePresetsSection() {
                     {t('Threshold balances')}
                   </div>
                   <Input
-                    value={formatOptionAmountList(
+                    value={getOptionAmountDraftValue(
+                      amountDrafts,
+                      'threshold:balance',
                       optionState.threshold.thresholdAmounts
                     )}
                     onChange={(event) =>
-                      setOptionState((current) => ({
-                        ...current,
-                        threshold: {
-                          ...current.threshold,
-                          thresholdAmounts: parseOptionAmountList(
-                            event.target.value
-                          ),
-                        },
-                      }))
+                      {
+                        const value = event.target.value
+                        setAmountDrafts((current) =>
+                          updateOptionAmountDrafts(
+                            current,
+                            'threshold:balance',
+                            value
+                          )
+                        )
+                        setOptionState((current) => ({
+                          ...current,
+                          threshold: {
+                            ...current.threshold,
+                            thresholdAmounts: parseOptionAmountList(value),
+                          },
+                        }))
+                      }
                     }
                     placeholder='1000, 3000, 5000'
                   />
