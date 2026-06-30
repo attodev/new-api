@@ -177,8 +177,10 @@ export interface TopupInfo {
   waffo_pancake_min_topup?: number
   /** Whether Toss topup is enabled */
   enable_toss_topup?: boolean
-  /** Minimum topup amount for Toss (KRW) */
+  /** Minimum topup amount for Toss in balance units */
   toss_min_topup?: number
+  /** KRW amount charged per USD-equivalent balance unit for Toss */
+  toss_unit_price?: number
   /** Whether Toss billing (recurring subscription) is enabled */
   enable_toss_billing?: boolean
   /** Whether redemption code usage is enabled */

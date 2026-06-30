@@ -63,6 +63,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/toss/confirm", controller.TossConfirm)
 		apiRouter.GET("/toss/fail", controller.TossFail)
 		apiRouter.POST("/toss/webhook", controller.TossWebhook)
+		apiRouter.GET("/subscription/toss/confirm/:trade_no", controller.SubscriptionTossBillingConfirm)
+		apiRouter.GET("/subscription/toss/fail/:trade_no", controller.SubscriptionTossBillingFail)
 		apiRouter.GET("/subscription/toss/confirm", controller.SubscriptionTossBillingConfirm)
 		apiRouter.GET("/subscription/toss/fail", controller.SubscriptionTossBillingFail)
 		// :env separates test vs prod URLs so the operator can register each

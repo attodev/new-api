@@ -2,10 +2,10 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,13 +20,15 @@ import (
 	"github.com/thanhpk/randstr"
 )
 
+const tossBillingChargeTimeout = 70 * time.Second
+
 func init() {
-	model.SetTossBillingCharger(func(ctx context.Context, billingKey, customerKey, orderId, orderName string, amount int64) (bool, int64, error) {
-		res, _, err := chargeTossBilling(ctx, billingKey, customerKey, orderId, orderName, amount)
-		if err != nil {
-			return false, 0, err
-		}
-		return res.Status == "DONE", res.TotalAmount, nil
+	model.SetTossTopUpReconciler(reconcileTossRecordedTopUp)
+	model.SetTossSubscriptionOrderReconciler(reconcileTossPendingSubscriptionOrder)
+	model.SetTossBillingCharger(tossBillingChargeForModel)
+	model.SetTossBillingRevoker(func(ctx context.Context, billingKey, secretKey string) error {
+		_, err := deleteTossBillingKeyWithSecret(ctx, billingKey, secretKey)
+		return err
 	})
 }
 
@@ -34,10 +36,36 @@ func init() {
 type tossBillingIssueResponse struct {
 	BillingKey  string `json:"billingKey"`
 	CustomerKey string `json:"customerKey"`
+	CardCompany string `json:"cardCompany"`
+	CardNumber  string `json:"cardNumber"`
 	Card        struct {
-		Company string `json:"company"`
-		Number  string `json:"number"`
+		Company    string `json:"company"`
+		IssuerCode string `json:"issuerCode"`
+		Number     string `json:"number"`
 	} `json:"card"`
+}
+
+func (r *tossBillingIssueResponse) cardCompanyForStorage() string {
+	if r == nil {
+		return ""
+	}
+	if strings.TrimSpace(r.Card.Company) != "" {
+		return strings.TrimSpace(r.Card.Company)
+	}
+	if strings.TrimSpace(r.CardCompany) != "" {
+		return strings.TrimSpace(r.CardCompany)
+	}
+	return strings.TrimSpace(r.Card.IssuerCode)
+}
+
+func (r *tossBillingIssueResponse) cardNumberForStorage() string {
+	if r == nil {
+		return ""
+	}
+	if strings.TrimSpace(r.Card.Number) != "" {
+		return strings.TrimSpace(r.Card.Number)
+	}
+	return strings.TrimSpace(r.CardNumber)
 }
 
 // tossSubscriptionChargeKRW converts a plan's USD-equivalent price to KRW for Toss.
@@ -46,8 +74,42 @@ func tossSubscriptionChargeKRW(plan *model.SubscriptionPlan) int64 {
 	return model.TossPlanKRW(plan.PriceAmount)
 }
 
+func tossSubscriptionOrderChargeKRW(order *model.SubscriptionOrder, plan *model.SubscriptionPlan) int64 {
+	if order != nil && order.ProviderAmount > 0 {
+		currency := strings.TrimSpace(order.ProviderCurrency)
+		if currency == "" || strings.EqualFold(currency, "KRW") {
+			return order.ProviderAmount
+		}
+		return 0
+	}
+	return tossSubscriptionChargeKRW(plan)
+}
+
+func tossBillingSecretOrActive(secretKey string) string {
+	secretKey = strings.TrimSpace(secretKey)
+	if secretKey == "" {
+		return setting.TossActiveBillingSecretKey()
+	}
+	return secretKey
+}
+
+func subscriptionTossTradeNo(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if tradeNo := strings.TrimSpace(c.Param("trade_no")); tradeNo != "" {
+		return tradeNo
+	}
+	return strings.TrimSpace(c.Query("trade_no"))
+}
+
 // issueTossBillingKey exchanges an authKey for a billing key.
-func issueTossBillingKey(ctx context.Context, authKey, customerKey string) (*tossBillingIssueResponse, int, error) {
+func issueTossBillingKey(ctx context.Context, authKey, customerKey, idempotencyKey string) (*tossBillingIssueResponse, int, error) {
+	return issueTossBillingKeyWithSecret(ctx, authKey, customerKey, idempotencyKey, setting.TossActiveBillingSecretKey())
+}
+
+func issueTossBillingKeyWithSecret(ctx context.Context, authKey, customerKey, idempotencyKey, secretKey string) (*tossBillingIssueResponse, int, error) {
+	secretKey = tossBillingSecretOrActive(secretKey)
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	payload := map[string]interface{}{"authKey": authKey, "customerKey": customerKey}
@@ -55,35 +117,26 @@ func issueTossBillingKey(ctx context.Context, authKey, customerKey string) (*tos
 	if err != nil {
 		return nil, 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tossAPIBase+"/v1/billing/authorizations/issue", strings.NewReader(string(body)))
+	statusCode, rb, err := doTossAPIRequestWithSecret(ctx, http.MethodPost, tossAPIBase+"/v1/billing/authorizations/issue", body, idempotencyKey, secretKey, http.StatusOK)
 	if err != nil {
-		return nil, 0, err
-	}
-	cred := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
-	req.Header.Set("Authorization", "Basic "+cred)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	rb, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("toss billing issue failed: status=%d body=%s", resp.StatusCode, string(rb))
+		return nil, statusCode, fmt.Errorf("toss billing issue failed: %w", err)
 	}
 	var out tossBillingIssueResponse
 	if err := common.Unmarshal(rb, &out); err != nil {
-		return nil, resp.StatusCode, err
+		return nil, statusCode, err
 	}
-	return &out, resp.StatusCode, nil
+	return &out, statusCode, nil
 }
 
 // chargeTossBilling charges a billing key. Reuses tossConfirmResponse (status/totalAmount/orderId/currency).
 func chargeTossBilling(ctx context.Context, billingKey, customerKey, orderId, orderName string, amount int64) (*tossConfirmResponse, int, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	return chargeTossBillingWithSecret(ctx, billingKey, customerKey, setting.TossActiveBillingSecretKey(), orderId, orderName, amount)
+}
+
+func chargeTossBillingWithSecret(ctx context.Context, billingKey, customerKey, secretKey, orderId, orderName string, amount int64) (*tossConfirmResponse, int, error) {
+	secretKey = tossBillingSecretOrActive(secretKey)
+	// Toss documents that card auto-billing approval can take up to 60 seconds.
+	ctx, cancel := context.WithTimeout(ctx, tossBillingChargeTimeout)
 	defer cancel()
 	payload := map[string]interface{}{
 		"customerKey": customerKey,
@@ -95,31 +148,331 @@ func chargeTossBilling(ctx context.Context, billingKey, customerKey, orderId, or
 	if err != nil {
 		return nil, 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tossAPIBase+"/v1/billing/"+billingKey, strings.NewReader(string(body)))
+	statusCode, rb, err := doTossAPIRequestWithSecret(ctx, http.MethodPost, tossAPIBase+"/v1/billing/"+url.PathEscape(billingKey), body, orderId, secretKey, http.StatusOK)
 	if err != nil {
-		return nil, 0, err
-	}
-	cred := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
-	req.Header.Set("Authorization", "Basic "+cred)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", orderId)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	rb, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("toss billing charge failed: status=%d body=%s", resp.StatusCode, string(rb))
+		return nil, statusCode, fmt.Errorf("toss billing charge failed: %w", err)
 	}
 	var out tossConfirmResponse
 	if err := common.Unmarshal(rb, &out); err != nil {
-		return nil, resp.StatusCode, err
+		return nil, statusCode, err
 	}
-	return &out, resp.StatusCode, nil
+	return &out, statusCode, nil
+}
+
+func getTossPaymentByOrderId(ctx context.Context, orderId string) (*tossConfirmResponse, int, error) {
+	return getTossPaymentByOrderIdWithSecret(ctx, orderId, setting.TossActiveBillingSecretKey())
+}
+
+func getTossPaymentByOrderIdWithSecret(ctx context.Context, orderId, secretKey string) (*tossConfirmResponse, int, error) {
+	secretKey = tossBillingSecretOrActive(secretKey)
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	statusCode, body, err := doTossAPIRequestWithSecret(ctx, http.MethodGet, tossAPIBase+"/v1/payments/orders/"+url.PathEscape(orderId), nil, "", secretKey, http.StatusOK)
+	if err != nil {
+		return nil, statusCode, fmt.Errorf("toss get payment by order failed: %w", err)
+	}
+	var result tossConfirmResponse
+	if err := common.Unmarshal(body, &result); err != nil {
+		return nil, statusCode, err
+	}
+	return &result, statusCode, nil
+}
+
+func confirmTossBillingChargeOrLookup(ctx context.Context, billingKey, customerKey, orderId, orderName string, amount int64) (*tossConfirmResponse, error) {
+	return confirmTossBillingChargeOrLookupWithSecret(ctx, billingKey, customerKey, setting.TossActiveBillingSecretKey(), orderId, orderName, amount)
+}
+
+func confirmTossBillingChargeOrLookupWithSecret(ctx context.Context, billingKey, customerKey, secretKey, orderId, orderName string, amount int64) (*tossConfirmResponse, error) {
+	result, statusCode, err := chargeTossBillingWithSecret(ctx, billingKey, customerKey, secretKey, orderId, orderName, amount)
+	if err == nil {
+		return result, nil
+	}
+	auth, lookupStatus, lookupErr := getTossPaymentByOrderIdWithSecret(ctx, orderId, secretKey)
+	if lookupErr == nil && isValidTossBillingCharge(auth, orderId, amount) {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss billing charge response lost but recovered by order lookup order_id=%s", orderId))
+		return auth, nil
+	}
+	if isTossTransientAPIStatus(statusCode) || statusCode == 0 {
+		if lookupErr != nil {
+			return nil, fmt.Errorf("%w: charge status=%d lookup status=%d err=%v", model.ErrTossBillingChargePending, statusCode, lookupStatus, lookupErr)
+		}
+		if auth != nil && auth.OrderId == orderId {
+			switch auth.Status {
+			case "READY", "IN_PROGRESS":
+				return nil, fmt.Errorf("%w: payment status=%s", model.ErrTossBillingChargePending, auth.Status)
+			}
+		}
+		return nil, fmt.Errorf("%w: charge status=%d", model.ErrTossBillingChargePending, statusCode)
+	}
+	if lookupErr != nil {
+		return nil, fmt.Errorf("%w; order lookup failed: %v", err, lookupErr)
+	}
+	return nil, err
+}
+
+func tossBillingChargeForModel(ctx context.Context, billingKey, customerKey, secretKey, orderId, orderName string, amount int64) (*model.TossBillingChargeResult, error) {
+	res, err := confirmTossBillingChargeOrLookupWithSecret(ctx, billingKey, customerKey, secretKey, orderId, orderName, amount)
+	if err != nil {
+		return nil, err
+	}
+	result := &model.TossBillingChargeResult{}
+	if res == nil {
+		return result, nil
+	}
+	result.Done = isValidTossBillingCharge(res, orderId, amount)
+	result.Total = res.TotalAmount
+	result.PaymentKey = res.PaymentKey
+	if payload, err := common.Marshal(res); err == nil {
+		result.ProviderPayload = string(payload)
+	}
+	return result, nil
+}
+
+func deleteTossBillingKey(ctx context.Context, billingKey string) (int, error) {
+	return deleteTossBillingKeyWithSecret(ctx, billingKey, setting.TossActiveBillingSecretKey())
+}
+
+func deleteTossBillingKeyWithSecret(ctx context.Context, billingKey, secretKey string) (int, error) {
+	if billingKey == "" {
+		return 0, nil
+	}
+	secretKey = tossBillingSecretOrActive(secretKey)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	statusCode, _, err := doTossAPIRequestWithSecret(ctx, http.MethodDelete, tossAPIBase+"/v1/billing/"+url.PathEscape(billingKey), nil, "", secretKey, http.StatusOK, http.StatusNotFound)
+	if statusCode == http.StatusNotFound {
+		return statusCode, model.ErrTossBillingKeyAlreadyDeleted
+	}
+	if err != nil {
+		return statusCode, fmt.Errorf("toss billing delete failed: %w", err)
+	}
+	return statusCode, nil
+}
+
+func revokeTossBillingKey(ctx context.Context, billingKey, secretKey string, billingKeyId int, reason string) {
+	if billingKeyId > 0 {
+		if err := model.MarkTossBillingKeyPendingRevocation(nil, billingKeyId); err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss billing key local pending-revoke failed id=%d reason=%s err=%v", billingKeyId, reason, err))
+		}
+	}
+	if _, err := deleteTossBillingKeyWithSecret(ctx, billingKey, secretKey); err != nil && !errors.Is(err, model.ErrTossBillingKeyAlreadyDeleted) {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss billing key remote delete failed reason=%s err=%v", reason, err))
+		return
+	}
+	if billingKeyId > 0 {
+		if err := model.RevokeTossBillingKey(nil, billingKeyId); err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss billing key local revoke failed id=%d reason=%s err=%v", billingKeyId, reason, err))
+		}
+	}
+}
+
+func queueIssuedTossBillingKeyForRevocation(ctx context.Context, userId int, tradeNo, fallbackCustomerKey string, issued *tossBillingIssueResponse, secretKey, reason string) int {
+	if userId <= 0 || issued == nil || strings.TrimSpace(issued.BillingKey) == "" {
+		return 0
+	}
+	customerKey := strings.TrimSpace(issued.CustomerKey)
+	if customerKey == "" {
+		customerKey = strings.TrimSpace(fallbackCustomerKey)
+	}
+	keyId, err := model.StoreTossBillingKeyPendingRevocationWithSecret(
+		userId,
+		customerKey,
+		issued.BillingKey,
+		issued.cardCompanyForStorage(),
+		issued.cardNumberForStorage(),
+		secretKey,
+	)
+	if err != nil {
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: failed to queue issued Toss billing key for revocation trade_no=%s user_id=%d reason=%s customer_key=%s err=%v", tradeNo, userId, reason, customerKey, err))
+		model.RecordLog(userId, model.LogTypeTopup, fmt.Sprintf("Toss billing key cleanup queue failed; manual Toss console check required (trade_no=%s, reason=%s)", tradeNo, reason))
+		return 0
+	}
+	return keyId
+}
+
+func revokeIssuedTossBillingKey(ctx context.Context, userId int, tradeNo, fallbackCustomerKey string, issued *tossBillingIssueResponse, secretKey, reason string) {
+	if issued == nil || strings.TrimSpace(issued.BillingKey) == "" {
+		return
+	}
+	billingKeyId := queueIssuedTossBillingKeyForRevocation(ctx, userId, tradeNo, fallbackCustomerKey, issued, secretKey, reason)
+	revokeTossBillingKey(ctx, issued.BillingKey, secretKey, billingKeyId, reason)
+}
+
+func handleTossBillingActivationFailure(ctx context.Context, userId int, tradeNo, billingKey, secretKey string, billingKeyId int, amount int64, err error) {
+	logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: subscription first charge DONE but activation failed trade_no=%s user=%d amount=%d err=%v", tradeNo, userId, amount, err))
+	model.RecordLog(userId, model.LogTypeTopup, fmt.Sprintf("Toss 구독 첫 결제 승인됨(%d원)이나 구독 활성화 실패 — 수동 정산 필요 (trade_no=%s)", amount, tradeNo))
+	revokeTossBillingKey(ctx, billingKey, secretKey, billingKeyId, "activation_failed")
+}
+
+func isValidTossBillingCharge(result *tossConfirmResponse, orderId string, amount int64) bool {
+	return result != nil &&
+		result.Status == "DONE" &&
+		result.TotalAmount == amount &&
+		result.OrderId == orderId &&
+		strings.ToUpper(result.Currency) == "KRW" &&
+		result.Card != nil
+}
+
+func reconcileTossPendingSubscriptionOrder(ctx context.Context, order model.SubscriptionOrder) (bool, error) {
+	tradeNo := strings.TrimSpace(order.TradeNo)
+	if tradeNo == "" {
+		return true, nil
+	}
+	LockOrder(tradeNo)
+	defer UnlockOrder(tradeNo)
+
+	current := model.GetSubscriptionOrderByTradeNo(tradeNo)
+	if current == nil || current.PaymentProvider != model.PaymentProviderToss {
+		return true, nil
+	}
+	if current.Status == common.TopUpStatusSuccess {
+		return true, nil
+	}
+	if current.Status != common.TopUpStatusPending {
+		return true, nil
+	}
+	if current.BillingKeyId <= 0 {
+		return false, nil
+	}
+	renewalSubId, _, isRenewalOrder := model.ParseTossRenewalTradeNo(tradeNo)
+	invalidRenewalOrder := strings.HasPrefix(tradeNo, model.TossRenewalTradeNoPrefix) && !isRenewalOrder
+
+	var plan *model.SubscriptionPlan
+	var err error
+	if current.ProviderAmount <= 0 {
+		plan, err = model.GetSubscriptionPlanById(current.PlanId)
+		if err != nil {
+			return false, err
+		}
+	}
+	chargeKRW := tossSubscriptionOrderChargeKRW(current, plan)
+	if !model.IsTossCardAmountPayableKRW(chargeKRW) {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending reconcile expiring below-minimum order_id=%s amount=%d", tradeNo, chargeKRW))
+		if isRenewalOrder {
+			return expireTossPendingRenewalOrderForReconcile(renewalSubId, tradeNo)
+		}
+		if invalidRenewalOrder {
+			return expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo)
+		}
+		return expireTossPendingSubscriptionOrderForReconcile(tradeNo)
+	}
+
+	secretKey := tossSecretFromCredential(ctx, current.ProviderCredential, setting.TossActiveBillingSecretKey())
+	auth, statusCode, err := getTossPaymentByOrderIdWithSecret(ctx, tradeNo, secretKey)
+	if err != nil {
+		if statusCode == http.StatusNotFound {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending reconcile found no payment order_id=%s", tradeNo))
+			if isRenewalOrder {
+				return expireTossPendingRenewalOrderForReconcile(renewalSubId, tradeNo)
+			}
+			if invalidRenewalOrder {
+				return expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo)
+			}
+			return expireTossPendingSubscriptionOrderForReconcile(tradeNo)
+		}
+		return false, err
+	}
+	if isValidTossBillingCharge(auth, tradeNo, chargeKRW) {
+		payload, _ := common.Marshal(auth)
+		if isRenewalOrder {
+			if err := model.RenewTossSubscription(renewalSubId, tradeNo, current.Money, chargeKRW, string(payload)); err != nil {
+				if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+					errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+					errors.Is(err, model.ErrPaymentMethodMismatch) {
+					return true, nil
+				}
+				return false, err
+			}
+			logger.LogInfo(ctx, fmt.Sprintf("Toss subscription pending renewal reconciled as DONE order_id=%s sub_id=%d", tradeNo, renewalSubId))
+			return true, nil
+		}
+		if invalidRenewalOrder {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending renewal reconcile has invalid trade_no=%s", tradeNo))
+			return false, nil
+		}
+		if err := model.CompleteTossBillingOrder(tradeNo, current.BillingKeyId, string(payload)); err != nil {
+			if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+				errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+				errors.Is(err, model.ErrPaymentMethodMismatch) {
+				return true, nil
+			}
+			return false, err
+		}
+		logger.LogInfo(ctx, fmt.Sprintf("Toss subscription pending order reconciled as DONE order_id=%s", tradeNo))
+		return true, nil
+	}
+	if auth == nil {
+		return false, nil
+	}
+	if auth.OrderId != "" && auth.OrderId != tradeNo {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending reconcile order mismatch order_id=%s auth_order=%s", tradeNo, auth.OrderId))
+		return false, nil
+	}
+	if isTossTerminalFailStatus(auth.Status) {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending reconcile expiring terminal order_id=%s status=%s", tradeNo, auth.Status))
+		if isRenewalOrder {
+			return expireTossPendingRenewalOrderForReconcile(renewalSubId, tradeNo)
+		}
+		if invalidRenewalOrder {
+			return expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo)
+		}
+		return expireTossPendingSubscriptionOrderForReconcile(tradeNo)
+	}
+	if isTossCancelStatus(auth.Status) {
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: subscription payment %s before activation order_id=%s user_id=%d amount=%d KRW - local subscription NOT activated, manual adjustment needed", auth.Status, tradeNo, current.UserId, auth.TotalAmount))
+		model.RecordTopupLog(current.UserId, fmt.Sprintf("Toss subscription payment %s before activation (amount: %d KRW) - manual subscription/quota reconciliation required", auth.Status, auth.TotalAmount), "toss-pending-cleanup", model.PaymentMethodToss, "toss-subscription-cancel")
+		if isRenewalOrder {
+			return expireTossPendingRenewalOrderForReconcile(renewalSubId, tradeNo)
+		}
+		if invalidRenewalOrder {
+			return expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo)
+		}
+		return expireTossPendingSubscriptionOrderForReconcile(tradeNo)
+	}
+	logger.LogWarn(ctx, fmt.Sprintf("Toss subscription pending reconcile expiring stale non-terminal order_id=%s status=%s", tradeNo, auth.Status))
+	if isRenewalOrder {
+		return expireTossPendingRenewalOrderForReconcile(renewalSubId, tradeNo)
+	}
+	if invalidRenewalOrder {
+		return expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo)
+	}
+	return expireTossPendingSubscriptionOrderForReconcile(tradeNo)
+}
+
+func expireTossPendingRenewalOrderForReconcile(subId int, tradeNo string) (bool, error) {
+	if _, err := model.ExpireTossPendingRenewalOrderAndMarkFailure(subId, tradeNo, 1); err != nil {
+		if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+			errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+			errors.Is(err, model.ErrPaymentMethodMismatch) {
+			return true, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func expireTossPendingSubscriptionOrderOnlyForReconcile(tradeNo string) (bool, error) {
+	if err := model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss); err != nil {
+		if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+			errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+			errors.Is(err, model.ErrPaymentMethodMismatch) {
+			return true, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func expireTossPendingSubscriptionOrderForReconcile(tradeNo string) (bool, error) {
+	if err := model.ExpireTossPendingSubscriptionOrderAndMarkBillingKeyPendingRevocation(tradeNo); err != nil {
+		if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+			errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+			errors.Is(err, model.ErrPaymentMethodMismatch) {
+			return true, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // --- Subscription billing handlers ---
@@ -151,6 +504,11 @@ func SubscriptionRequestTossBilling(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgSubscriptionNotEnabled)
 		return
 	}
+	chargeKRW := tossSubscriptionChargeKRW(plan)
+	if !model.IsTossCardAmountPayableKRW(chargeKRW) {
+		common.ApiErrorI18n(c, i18n.MsgPaymentAmountTooLow)
+		return
+	}
 	if !isValidServerAddress(system_setting.ServerAddress) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
@@ -179,15 +537,24 @@ func SubscriptionRequestTossBilling(c *gin.Context) {
 	}
 	reference := fmt.Sprintf("new-api-toss-sub-%d-%d-%s", userId, time.Now().UnixMilli(), randstr.String(4))
 	tradeNo := "toss_sub_" + common.Sha1([]byte(reference))
+	providerCredential, err := model.EncryptProviderCredential(setting.TossActiveBillingSecretKey())
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss billing encrypt provider credential failed user_id=%d trade_no=%s error=%q", userId, tradeNo, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
+		return
+	}
 	order := &model.SubscriptionOrder{
-		UserId:          userId,
-		PlanId:          plan.Id,
-		Money:           plan.PriceAmount,
-		TradeNo:         tradeNo,
-		PaymentMethod:   model.PaymentMethodToss,
-		PaymentProvider: model.PaymentProviderToss,
-		CreateTime:      time.Now().Unix(),
-		Status:          common.TopUpStatusPending,
+		UserId:             userId,
+		PlanId:             plan.Id,
+		Money:              plan.PriceAmount,
+		TradeNo:            tradeNo,
+		PaymentMethod:      model.PaymentMethodToss,
+		PaymentProvider:    model.PaymentProviderToss,
+		ProviderAmount:     chargeKRW,
+		ProviderCurrency:   "KRW",
+		ProviderCredential: providerCredential,
+		CreateTime:         time.Now().Unix(),
+		Status:             common.TopUpStatusPending,
 	}
 	if err := order.Insert(); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
@@ -197,11 +564,11 @@ func SubscriptionRequestTossBilling(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"client_key":   setting.TossActiveClientKey(),
+			"client_key":   setting.TossActiveBillingClientKey(),
 			"customer_key": customerKey,
 			"trade_no":     tradeNo,
-			"success_url":  base + "/api/subscription/toss/confirm?trade_no=" + tradeNo,
-			"fail_url":     base + "/api/subscription/toss/fail?trade_no=" + tradeNo,
+			"success_url":  base + "/api/subscription/toss/confirm/" + url.PathEscape(tradeNo),
+			"fail_url":     base + "/api/subscription/toss/fail/" + url.PathEscape(tradeNo),
 		},
 	})
 }
@@ -212,7 +579,7 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 	ctx := c.Request.Context()
 	authKey := c.Query("authKey")
 	customerKey := c.Query("customerKey")
-	tradeNo := c.Query("trade_no")
+	tradeNo := subscriptionTossTradeNo(c)
 	if authKey == "" || customerKey == "" || tradeNo == "" {
 		logger.LogWarn(ctx, fmt.Sprintf("Toss billing confirm missing params trade_no=%q", tradeNo))
 		tossRedirect(c, "/console/topup")
@@ -230,8 +597,20 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 		tossRedirect(c, "/console/topup")
 		return
 	}
+	if order.Status != common.TopUpStatusPending {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss billing confirm abnormal status trade_no=%s status=%q", tradeNo, order.Status))
+		tossRedirect(c, "/console/topup")
+		return
+	}
 	plan, err := model.GetSubscriptionPlanById(order.PlanId)
 	if err != nil {
+		tossRedirect(c, "/console/topup")
+		return
+	}
+	chargeKRW := tossSubscriptionOrderChargeKRW(order, plan)
+	if !model.IsTossCardAmountPayableKRW(chargeKRW) {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss billing confirm blocked below minimum trade_no=%s amount=%d", tradeNo, chargeKRW))
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 		tossRedirect(c, "/console/topup")
 		return
 	}
@@ -245,27 +624,53 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 		tossRedirect(c, "/console/topup")
 		return
 	}
+	secretKey := tossSecretFromCredential(ctx, order.ProviderCredential, setting.TossActiveBillingSecretKey())
 
-	issued, _, err := issueTossBillingKey(ctx, authKey, customerKey)
-	if err != nil || issued.BillingKey == "" {
-		logger.LogError(ctx, fmt.Sprintf("Toss billing issue failed trade_no=%s err=%v", tradeNo, err))
+	issued, issueStatus, err := issueTossBillingKeyWithSecret(ctx, authKey, customerKey, tradeNo, secretKey)
+	if err != nil || issued == nil || issued.BillingKey == "" || issued.CustomerKey != customerKey {
+		if err != nil && (issueStatus == 0 || isTossTransientAPIStatus(issueStatus)) && (issued == nil || issued.BillingKey == "") {
+			logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: billing key issue response uncertain trade_no=%s user_id=%d status=%d err=%v; expiring local order and requiring manual Toss console check", tradeNo, order.UserId, issueStatus, err))
+			model.RecordLog(order.UserId, model.LogTypeTopup, fmt.Sprintf("Toss billing key issue uncertain; manual Toss console check required (trade_no=%s, status=%d)", tradeNo, issueStatus))
+			if expireErr := model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss); expireErr != nil {
+				logger.LogError(ctx, fmt.Sprintf("Toss billing issue uncertain local expire failed trade_no=%s err=%v", tradeNo, expireErr))
+			}
+			tossRedirect(c, "/console/topup")
+			return
+		}
+		logger.LogError(ctx, fmt.Sprintf("Toss billing issue failed trade_no=%s status=%d err=%v", tradeNo, issueStatus, err))
+		if issued != nil && issued.BillingKey != "" {
+			revokeIssuedTossBillingKey(ctx, order.UserId, tradeNo, customerKey, issued, secretKey, "issue_validation_failed")
+		}
 		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 		tossRedirect(c, "/console/topup")
 		return
 	}
-	billingKeyId, err := model.StoreTossBillingKey(order.UserId, customerKey, issued.BillingKey, issued.Card.Company, issued.Card.Number)
+	billingKeyId, err := model.StoreTossBillingKeyWithSecret(order.UserId, customerKey, issued.BillingKey, issued.cardCompanyForStorage(), issued.cardNumberForStorage(), secretKey)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss billing store failed trade_no=%s err=%v", tradeNo, err))
+		revokeIssuedTossBillingKey(ctx, order.UserId, tradeNo, customerKey, issued, secretKey, "store_failed")
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
+		tossRedirect(c, "/console/topup")
+		return
+	}
+	if err := model.AttachTossBillingKeyToOrder(tradeNo, billingKeyId); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("Toss billing key attach failed trade_no=%s err=%v", tradeNo, err))
+		revokeTossBillingKey(ctx, issued.BillingKey, secretKey, billingKeyId, "attach_failed")
 		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 		tossRedirect(c, "/console/topup")
 		return
 	}
 
-	chargeKRW := tossSubscriptionChargeKRW(plan)
-	orderName := fmt.Sprintf("%s 구독", plan.Title)
-	result, _, err := chargeTossBilling(ctx, issued.BillingKey, customerKey, tradeNo, orderName, chargeKRW)
-	if err != nil || result.Status != "DONE" || result.TotalAmount != chargeKRW {
+	orderName := model.TossSubscriptionOrderName(plan.Title, false)
+	result, err := confirmTossBillingChargeOrLookupWithSecret(ctx, issued.BillingKey, customerKey, secretKey, tradeNo, orderName, chargeKRW)
+	if err != nil || !isValidTossBillingCharge(result, tradeNo, chargeKRW) {
+		if errors.Is(err, model.ErrTossBillingChargePending) {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss billing first charge still processing trade_no=%s err=%v", tradeNo, err))
+			tossRedirect(c, "/console/topup")
+			return
+		}
 		logger.LogWarn(ctx, fmt.Sprintf("Toss billing first charge not done trade_no=%s err=%v", tradeNo, err))
+		revokeTossBillingKey(ctx, issued.BillingKey, secretKey, billingKeyId, "first_charge_failed")
 		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 		tossRedirect(c, "/console/topup")
 		return
@@ -273,8 +678,7 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 
 	payload, _ := common.Marshal(result)
 	if err := model.CompleteTossBillingOrder(tradeNo, billingKeyId, string(payload)); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: subscription first charge DONE but activation failed trade_no=%s user=%d amount=%d err=%v", tradeNo, order.UserId, chargeKRW, err))
-		model.RecordLog(order.UserId, model.LogTypeTopup, fmt.Sprintf("Toss 구독 첫 결제 승인됨(%d원)이나 구독 활성화 실패 — 수동 정산 필요 (trade_no=%s)", chargeKRW, tradeNo))
+		handleTossBillingActivationFailure(ctx, order.UserId, tradeNo, issued.BillingKey, secretKey, billingKeyId, chargeKRW, err)
 		tossRedirect(c, "/console/topup")
 		return
 	}
@@ -284,19 +688,20 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 
 // SubscriptionTossBillingFail is the billingAuth failUrl.
 func SubscriptionTossBillingFail(c *gin.Context) {
-	tradeNo := c.Query("trade_no")
+	tradeNo := subscriptionTossTradeNo(c)
 	code := c.Query("code")
+	message := c.Query("message")
 	logger.LogWarn(c.Request.Context(), fmt.Sprintf("Toss billing auth failed trade_no=%s code=%s", tradeNo, code))
 	if tradeNo != "" {
 		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 	}
-	tossRedirect(c, "/console/topup")
+	tossRedirect(c, tossFailureRedirectPath(tradeNo, code, message))
 }
 
 // CancelTossAutoRenew disables auto-renew for the user's active Toss subscriptions and revokes the key.
 func CancelTossAutoRenew(c *gin.Context) {
 	userId := c.GetInt("id")
-	if err := model.CancelTossAutoRenewForUser(userId); err != nil {
+	if err := model.CancelTossAutoRenewForUser(c.Request.Context(), userId); err != nil {
 		common.ApiError(c, err)
 		return
 	}

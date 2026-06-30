@@ -16,18 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export {
-  TOSS_CARD_MINIMUM_AMOUNT_KRW,
-  formatDuration,
-  formatResetPeriod,
-  formatTimestamp,
-  formatTossChargeKRW,
-  getTossChargeKRW,
-} from './format'
-export {
-  getPlanFormSchema,
-  PLAN_FORM_DEFAULTS,
-  planToFormValues,
-  formValuesToPlanPayload,
-  type PlanFormValues,
-} from './plan-form'
+import assert from 'node:assert/strict'
+import { describe, test } from 'node:test'
+import { formatTossChargeKRW, getTossChargeKRW } from './format'
+
+describe('formatTossChargeKRW', () => {
+  test('formats subscription USD-equivalent price as KRW charge', () => {
+    assert.equal(formatTossChargeKRW(10, 1300), '₩13,000')
+  })
+
+  test('returns empty string when unit price is not available', () => {
+    assert.equal(formatTossChargeKRW(10, 0), '')
+  })
+
+  test('rounds subscription price to integer KRW charge', () => {
+    assert.equal(getTossChargeKRW(0.075, 1300), 98)
+  })
+})

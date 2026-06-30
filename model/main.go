@@ -254,6 +254,9 @@ func migrateDB() error {
 	if err := migrateTokenModelLimitsToText(); err != nil {
 		return err
 	}
+	if err := migrateUserBillingKeyStatusLength(); err != nil {
+		return err
+	}
 
 	err := DB.AutoMigrate(
 		&Channel{},
@@ -290,6 +293,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := backfillTossBillingKeyHashes(1000); err != nil {
+		return err
+	}
 	if common.UsingSQLite {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -298,6 +304,51 @@ func migrateDB() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// migrateUserBillingKeyStatusLength expands status for pending_revocation.
+// SQLite type affinity makes varchar length irrelevant, so only strict DBs need this.
+func migrateUserBillingKeyStatusLength() error {
+	if common.UsingSQLite {
+		return nil
+	}
+	tableName := "user_billing_keys"
+	columnName := "status"
+	if !DB.Migrator().HasTable(tableName) {
+		return nil
+	}
+	if !DB.Migrator().HasColumn(&UserBillingKey{}, columnName) {
+		return nil
+	}
+
+	if common.UsingPostgreSQL {
+		var maxLength int
+		if err := DB.Raw(`SELECT COALESCE(character_maximum_length, 0)
+			FROM information_schema.columns
+			WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+			tableName, columnName).Scan(&maxLength).Error; err != nil {
+			return fmt.Errorf("failed to query %s.%s length: %w", tableName, columnName, err)
+		}
+		if maxLength >= 32 {
+			return nil
+		}
+		return DB.Exec(`ALTER TABLE "user_billing_keys" ALTER COLUMN "status" TYPE varchar(32)`).Error
+	}
+
+	if common.UsingMySQL {
+		var maxLength int
+		if err := DB.Raw(`SELECT COALESCE(CHARACTER_MAXIMUM_LENGTH, 0)
+			FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+			tableName, columnName).Scan(&maxLength).Error; err != nil {
+			return fmt.Errorf("failed to query %s.%s length: %w", tableName, columnName, err)
+		}
+		if maxLength >= 32 {
+			return nil
+		}
+		return DB.Exec("ALTER TABLE `user_billing_keys` MODIFY COLUMN `status` varchar(32) DEFAULT 'active'").Error
 	}
 	return nil
 }

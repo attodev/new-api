@@ -49,7 +49,13 @@ import {
   paySubscriptionBalance,
 } from '../../api'
 import { useTossBilling } from '../../hooks/use-toss-billing'
-import { formatDuration, formatResetPeriod } from '../../lib'
+import {
+  TOSS_CARD_MINIMUM_AMOUNT_KRW,
+  formatDuration,
+  formatResetPeriod,
+  formatTossChargeKRW,
+  getTossChargeKRW,
+} from '../../lib'
 import type { PlanRecord } from '../../types'
 
 interface PaymentMethod {
@@ -65,6 +71,7 @@ interface Props {
   enableCreem?: boolean
   enableWaffoPancake?: boolean
   enableToss?: boolean
+  tossUnitPrice?: number
   enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
   purchaseLimit?: number
@@ -108,6 +115,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
     t('Select payment method')
   const totalAmount = Number(plan.total_amount || 0)
   const price = Number(plan.price_amount || 0).toFixed(2)
+  const tossChargeKRW = hasToss
+    ? formatTossChargeKRW(
+        Number(plan.price_amount || 0),
+        props.tossUnitPrice || 0
+      )
+    : ''
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
       ? currency.quotaPerUnit
@@ -121,6 +134,11 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const limitReached =
     (props.purchaseLimit || 0) > 0 &&
     (props.purchaseCount || 0) >= (props.purchaseLimit || 0)
+  const tossChargeAmountKRW = hasToss
+    ? getTossChargeKRW(Number(plan.price_amount || 0), props.tossUnitPrice || 0)
+    : 0
+  const tossChargeUnavailable =
+    hasToss && tossChargeAmountKRW < TOSS_CARD_MINIMUM_AMOUNT_KRW
 
   const handlePayStripe = async () => {
     setPaying(true)
@@ -324,6 +342,14 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <span className='text-sm font-medium'>{t('Amount Due')}</span>
               <span className='text-primary text-lg font-bold'>${price}</span>
             </div>
+            {tossChargeKRW && (
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-xs'>
+                  {t('Toss charge')}
+                </span>
+                <span className='text-xs font-medium'>{tossChargeKRW}</span>
+              </div>
+            )}
           </div>
 
           {limitReached && (
@@ -400,7 +426,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
                       variant='outline'
                       className='flex-1'
                       onClick={handlePayToss}
-                      disabled={paying || tossBillingProcessing || limitReached}
+                      disabled={
+                        paying ||
+                        tossBillingProcessing ||
+                        limitReached ||
+                        tossChargeUnavailable
+                      }
                     >
                       {t('Toss Auto Pay')}
                     </Button>

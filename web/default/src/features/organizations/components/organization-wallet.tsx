@@ -17,39 +17,39 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
-import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
+import { SectionPageLayout } from '@/components/layout'
 import { isApiSuccess } from '@/features/wallet/api'
-import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
 import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from '@/features/wallet/components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from '@/features/wallet/components/dialogs/payment-confirm-dialog'
+import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
 import { WalletStatsCard } from '@/features/wallet/components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE } from '@/features/wallet/constants'
 import { useTopupInfo } from '@/features/wallet/hooks'
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
-  isPayPalPayment,
-  isStripePayment,
-  isWaffoPancakePayment,
   submitPaymentForm,
 } from '@/features/wallet/lib'
 import type {
   CreemProduct,
   PaymentMethod,
   PresetAmount,
+  TossPaymentResponse,
   UserWalletData,
 } from '@/features/wallet/types'
 import {
   calculateOrganizationAmount,
   calculateOrganizationPayPalAmount,
   calculateOrganizationStripeAmount,
+  calculateOrganizationTossAmount,
   calculateOrganizationWaffoPancakeAmount,
   getOrganizationBillingHistory,
   getOrganizationWallet,
@@ -57,9 +57,11 @@ import {
   requestOrganizationPayPalPayment,
   requestOrganizationPayment,
   requestOrganizationStripePayment,
+  requestOrganizationTossPayment,
   requestOrganizationWaffoPancakePayment,
   requestOrganizationWaffoPayment,
 } from '../api'
+import { getOrganizationWalletPaymentFlow } from '../lib/organization-wallet-payment'
 import type { Organization } from '../types'
 
 function getPaymentUrl(data: unknown): string | null {
@@ -164,13 +166,17 @@ export function OrganizationWallet() {
       try {
         setCalculating(true)
         const request = { amount }
-        const response = isStripePayment(paymentType)
-          ? await calculateOrganizationStripeAmount(request)
-          : isPayPalPayment(paymentType)
-            ? await calculateOrganizationPayPalAmount(request)
-            : isWaffoPancakePayment(paymentType)
-              ? await calculateOrganizationWaffoPancakeAmount(request)
-              : await calculateOrganizationAmount(request)
+        const flow = getOrganizationWalletPaymentFlow(paymentType)
+        const response =
+          flow === 'stripe'
+            ? await calculateOrganizationStripeAmount(request)
+            : flow === 'paypal'
+              ? await calculateOrganizationPayPalAmount(request)
+              : flow === 'waffo_pancake'
+                ? await calculateOrganizationWaffoPancakeAmount(request)
+                : flow === 'toss'
+                  ? await calculateOrganizationTossAmount(request)
+                  : await calculateOrganizationAmount(request)
 
         if (isApiSuccess(response) && response.data) {
           const value = parseFloat(response.data)
@@ -231,31 +237,58 @@ export function OrganizationWallet() {
     try {
       const amount = Math.floor(topupAmount)
       const paymentType = selectedPaymentMethod.type
-      const response = isStripePayment(paymentType)
-        ? await requestOrganizationStripePayment({
-            amount,
-            payment_method: 'stripe',
-          })
-        : isPayPalPayment(paymentType)
-          ? await requestOrganizationPayPalPayment({
+      const flow = getOrganizationWalletPaymentFlow(paymentType)
+      const response =
+        flow === 'stripe'
+          ? await requestOrganizationStripePayment({
               amount,
-              payment_method: 'paypal',
+              payment_method: 'stripe',
             })
-          : isWaffoPancakePayment(paymentType)
-            ? await requestOrganizationWaffoPancakePayment({ amount })
-            : await requestOrganizationPayment({
+          : flow === 'paypal'
+            ? await requestOrganizationPayPalPayment({
                 amount,
-                payment_method: paymentType,
+                payment_method: 'paypal',
               })
+            : flow === 'waffo_pancake'
+              ? await requestOrganizationWaffoPancakePayment({ amount })
+              : flow === 'toss'
+                ? await requestOrganizationTossPayment({
+                    amount,
+                    payment_method: 'toss',
+                  })
+                : await requestOrganizationPayment({
+                    amount,
+                    payment_method: paymentType,
+                  })
 
       if (!isApiSuccess(response)) {
         toast.error(response.message || i18next.t('Payment request failed'))
         return
       }
 
+      if (flow === 'toss') {
+        const data = (response as TossPaymentResponse).data
+        if (!data) {
+          toast.error(response.message || i18next.t('Payment request failed'))
+          return
+        }
+        const tossPayments = await loadTossPayments(data.client_key)
+        const payment = tossPayments.payment({ customerKey: data.customer_key })
+        await payment.requestPayment({
+          method: 'CARD',
+          amount: { currency: 'KRW', value: data.amount },
+          orderId: data.order_id,
+          orderName: data.order_name,
+          successUrl: data.success_url,
+          failUrl: data.fail_url,
+        })
+        setConfirmDialogOpen(false)
+        return
+      }
+
       const payLink = getPayLink(response.data)
-      if ((isStripePayment(paymentType) || isPayPalPayment(paymentType)) && payLink) {
-        if (isPayPalPayment(paymentType)) {
+      if ((flow === 'stripe' || flow === 'paypal') && payLink) {
+        if (flow === 'paypal') {
           window.location.href = payLink
         } else {
           window.open(payLink, '_blank')
@@ -288,8 +321,11 @@ export function OrganizationWallet() {
         toast.success(t('Redirecting to payment page...'))
         setConfirmDialogOpen(false)
       }
-    } catch {
-      toast.error(t('Payment request failed'))
+    } catch (error) {
+      const e = error as { code?: string }
+      if (e?.code !== 'PAY_PROCESS_CANCELED') {
+        toast.error(t('Payment request failed'))
+      }
     } finally {
       setProcessing(false)
     }
@@ -395,9 +431,7 @@ export function OrganizationWallet() {
                 waffoPayMethods={topupInfo?.waffo_pay_methods}
                 waffoMinTopup={topupInfo?.waffo_min_topup}
                 onWaffoMethodSelect={handleWaffoMethodSelect}
-                enableWaffoPancakeTopup={
-                  topupInfo?.enable_waffo_pancake_topup
-                }
+                enableWaffoPancakeTopup={topupInfo?.enable_waffo_pancake_topup}
                 showRedemption={false}
               />
             </div>

@@ -246,11 +246,16 @@ export type BillingSettings = {
   PayPalUnitPrice: number
   PayPalMinTopUp: number
   TossEnabled: boolean
+  TossBillingEnabled: boolean
   TossTestMode: boolean
   TossClientKey: string
   TossSecretKey: string
   TossTestClientKey: string
   TossTestSecretKey: string
+  TossBillingClientKey: string
+  TossBillingSecretKey: string
+  TossBillingTestClientKey: string
+  TossBillingTestSecretKey: string
   TossUnitPrice: number
   TossMinTopUp: number
   CreemApiKey: string

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -13,19 +14,21 @@ import (
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	TargetType      string  `json:"target_type" gorm:"type:varchar(32);default:'user'"`
-	TargetId        int     `json:"target_id" gorm:"default:0;index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	ProviderOrderId string  `json:"provider_order_id" gorm:"type:varchar(255);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	Id                 int     `json:"id"`
+	UserId             int     `json:"user_id" gorm:"index"`
+	TargetType         string  `json:"target_type" gorm:"type:varchar(32);default:'user'"`
+	TargetId           int     `json:"target_id" gorm:"default:0;index"`
+	Amount             int64   `json:"amount"`
+	Money              float64 `json:"money"`
+	TradeNo            string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	ProviderOrderId    string  `json:"provider_order_id" gorm:"type:varchar(255);index"`
+	ProviderOrderTime  int64   `json:"provider_order_time" gorm:"default:0;index"`
+	ProviderCredential string  `json:"-" gorm:"type:text"`
+	PaymentMethod      string  `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider    string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	CreateTime         int64   `json:"create_time"`
+	CompleteTime       int64   `json:"complete_time"`
+	Status             string  `json:"status"`
 }
 
 const (
@@ -59,6 +62,14 @@ var (
 	ErrTopUpNotFound         = errors.New("topup not found")
 	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
 )
+
+type TossTopUpReconciler func(ctx context.Context, topUp TopUp) (resolved bool, err error)
+
+var tossTopUpReconciler TossTopUpReconciler
+
+func SetTossTopUpReconciler(fn TossTopUpReconciler) {
+	tossTopUpReconciler = fn
+}
 
 func (topUp *TopUp) Insert() error {
 	var err error
@@ -644,14 +655,48 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 // to the orderId (== trade_no); any confirm attempt that reached RecordTossPaymentKey overwrites
 // it with the Toss paymentKey (≠ trade_no). So provider_order_id = trade_no uniquely identifies
 // orders that were never approved at Toss — the only ones safe to expire. Orders that DID record
-// a paymentKey (payment possibly approved; crediting may have died mid-flight or a webhook is
-// still retrying) are left untouched for reconciliation, so a paid order is never wrongly closed.
+// a paymentKey are reconciled separately using provider_order_time, because Toss's 10-minute
+// approval deadline starts when the paymentKey is issued, not when the local order was created.
 func ExpireStaleTossPendingTopUps(cutoffUnix int64) (int64, error) {
 	res := DB.Model(&TopUp{}).
 		Where("payment_provider = ? AND status = ? AND create_time < ? AND provider_order_id = trade_no",
 			PaymentProviderToss, common.TopUpStatusPending, cutoffUnix).
 		Update("status", common.TopUpStatusExpired)
 	return res.RowsAffected, res.Error
+}
+
+func ReconcileStaleTossRecordedTopUps(ctx context.Context, cutoffUnix int64, limit int) (int64, error) {
+	if tossTopUpReconciler == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	var rows []TopUp
+	if err := DB.Where("payment_provider = ? AND status = ? AND provider_order_id <> '' AND provider_order_id <> trade_no AND ((provider_order_time > 0 AND provider_order_time < ?) OR ((provider_order_time = 0 OR provider_order_time IS NULL) AND create_time < ?))",
+		PaymentProviderToss, common.TopUpStatusPending, cutoffUnix, cutoffUnix).
+		Order("create_time asc, id asc").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return 0, err
+	}
+	var resolved int64
+	var lastErr error
+	for i := range rows {
+		ok, err := tossTopUpReconciler(ctx, rows[i])
+		if err != nil {
+			lastErr = err
+			common.SysError(fmt.Sprintf("failed to reconcile stale Toss top-up order %s: %v", rows[i].TradeNo, err))
+			continue
+		}
+		if ok {
+			resolved++
+		}
+	}
+	return resolved, lastErr
 }
 
 // RecordTossPaymentKey persists the Toss paymentKey onto the order's provider_order_id.
@@ -667,19 +712,26 @@ func RecordTossPaymentKey(tradeNo string, paymentKey string) error {
 	if common.UsingPostgreSQL {
 		refCol = `"trade_no"`
 	}
+	now := common.GetTimestamp()
 	if err := DB.Model(&TopUp{}).
 		Where(refCol+" = ? AND payment_provider = ?", tradeNo, PaymentProviderToss).
-		Update("provider_order_id", paymentKey).Error; err != nil {
+		Updates(map[string]interface{}{
+			"provider_order_id":   paymentKey,
+			"provider_order_time": now,
+		}).Error; err != nil {
 		return err
 	}
 	// RowsAffected is unreliable across DBs for unchanged-value updates (MySQL returns 0),
 	// so verify the persisted value directly.
 	var topUp TopUp
-	if err := DB.Select("provider_order_id").Where(refCol+" = ?", tradeNo).First(&topUp).Error; err != nil {
+	if err := DB.Select("provider_order_id", "provider_order_time").Where(refCol+" = ?", tradeNo).First(&topUp).Error; err != nil {
 		return err
 	}
 	if topUp.ProviderOrderId != paymentKey {
 		return errors.New("toss paymentKey persist: value not stored")
+	}
+	if topUp.ProviderOrderTime <= 0 {
+		return errors.New("toss paymentKey persist: timestamp not stored")
 	}
 	return nil
 }

@@ -59,9 +59,13 @@ export function useTossBilling() {
       // requestBillingAuth redirects to successUrl — this line is not reached.
       return true
     } catch (err) {
-      // Toss billing auth cancel code is USER_CANCEL.
+      // Toss billing auth may use PAY_PROCESS_CANCELED; keep USER_CANCEL for SDK-version compatibility.
       const e = err as { code?: string; message?: string }
-      if (e?.code && e.code !== 'USER_CANCEL') {
+      if (
+        e?.code &&
+        e.code !== 'PAY_PROCESS_CANCELED' &&
+        e.code !== 'USER_CANCEL'
+      ) {
         toast.error(i18next.t('Payment request failed'))
       }
       return false

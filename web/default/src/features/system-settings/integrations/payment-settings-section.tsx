@@ -137,12 +137,17 @@ const paymentSchema = z.object({
   PayPalUnitPrice: z.coerce.number().min(0),
   PayPalMinTopUp: z.coerce.number().min(0),
   TossEnabled: z.boolean(),
+  TossBillingEnabled: z.boolean(),
   TossTestMode: z.boolean(),
   TossClientKey: z.string(),
   TossSecretKey: z.string(),
   TossTestClientKey: z.string(),
   TossTestSecretKey: z.string(),
-  TossUnitPrice: z.coerce.number().min(0),
+  TossBillingClientKey: z.string(),
+  TossBillingSecretKey: z.string(),
+  TossBillingTestClientKey: z.string(),
+  TossBillingTestSecretKey: z.string(),
+  TossUnitPrice: z.coerce.number().positive(),
   TossMinTopUp: z.coerce.number().min(0),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
@@ -436,11 +441,16 @@ export function PaymentSettingsSection({
       PayPalUnitPrice: values.PayPalUnitPrice,
       PayPalMinTopUp: values.PayPalMinTopUp,
       TossEnabled: values.TossEnabled,
+      TossBillingEnabled: values.TossBillingEnabled,
       TossTestMode: values.TossTestMode,
       TossClientKey: values.TossClientKey.trim(),
       TossSecretKey: values.TossSecretKey.trim(),
       TossTestClientKey: values.TossTestClientKey.trim(),
       TossTestSecretKey: values.TossTestSecretKey.trim(),
+      TossBillingClientKey: values.TossBillingClientKey.trim(),
+      TossBillingSecretKey: values.TossBillingSecretKey.trim(),
+      TossBillingTestClientKey: values.TossBillingTestClientKey.trim(),
+      TossBillingTestSecretKey: values.TossBillingTestSecretKey.trim(),
       TossUnitPrice: values.TossUnitPrice,
       TossMinTopUp: values.TossMinTopUp,
       CreemApiKey: values.CreemApiKey.trim(),
@@ -495,11 +505,18 @@ export function PaymentSettingsSection({
       PayPalUnitPrice: initialRef.current.PayPalUnitPrice,
       PayPalMinTopUp: initialRef.current.PayPalMinTopUp,
       TossEnabled: initialRef.current.TossEnabled,
+      TossBillingEnabled: initialRef.current.TossBillingEnabled,
       TossTestMode: initialRef.current.TossTestMode,
       TossClientKey: initialRef.current.TossClientKey.trim(),
       TossSecretKey: initialRef.current.TossSecretKey.trim(),
       TossTestClientKey: initialRef.current.TossTestClientKey.trim(),
       TossTestSecretKey: initialRef.current.TossTestSecretKey.trim(),
+      TossBillingClientKey: initialRef.current.TossBillingClientKey.trim(),
+      TossBillingSecretKey: initialRef.current.TossBillingSecretKey.trim(),
+      TossBillingTestClientKey:
+        initialRef.current.TossBillingTestClientKey.trim(),
+      TossBillingTestSecretKey:
+        initialRef.current.TossBillingTestSecretKey.trim(),
       TossUnitPrice: initialRef.current.TossUnitPrice,
       TossMinTopUp: initialRef.current.TossMinTopUp,
       CreemApiKey: initialRef.current.CreemApiKey.trim(),
@@ -662,6 +679,13 @@ export function PaymentSettingsSection({
       updates.push({ key: 'TossEnabled', value: sanitized.TossEnabled })
     }
 
+    if (sanitized.TossBillingEnabled !== initial.TossBillingEnabled) {
+      updates.push({
+        key: 'TossBillingEnabled',
+        value: sanitized.TossBillingEnabled,
+      })
+    }
+
     if (sanitized.TossTestMode !== initial.TossTestMode) {
       updates.push({ key: 'TossTestMode', value: sanitized.TossTestMode })
     }
@@ -697,6 +721,46 @@ export function PaymentSettingsSection({
       updates.push({
         key: 'TossTestSecretKey',
         value: sanitized.TossTestSecretKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingClientKey &&
+      sanitized.TossBillingClientKey !== initial.TossBillingClientKey
+    ) {
+      updates.push({
+        key: 'TossBillingClientKey',
+        value: sanitized.TossBillingClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingSecretKey &&
+      sanitized.TossBillingSecretKey !== initial.TossBillingSecretKey
+    ) {
+      updates.push({
+        key: 'TossBillingSecretKey',
+        value: sanitized.TossBillingSecretKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingTestClientKey &&
+      sanitized.TossBillingTestClientKey !== initial.TossBillingTestClientKey
+    ) {
+      updates.push({
+        key: 'TossBillingTestClientKey',
+        value: sanitized.TossBillingTestClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingTestSecretKey &&
+      sanitized.TossBillingTestSecretKey !== initial.TossBillingTestSecretKey
+    ) {
+      updates.push({
+        key: 'TossBillingTestSecretKey',
+        value: sanitized.TossBillingTestSecretKey,
       })
     }
 
@@ -1524,7 +1588,9 @@ export function PaymentSettingsSection({
                   e.stopPropagation()
                   if (
                     window.confirm(
-                      t('Clear all Stripe credentials and disable Stripe payments?')
+                      t(
+                        'Clear all Stripe credentials and disable Stripe payments?'
+                      )
                     )
                   ) {
                     clearStripeSettings()
@@ -1719,7 +1785,9 @@ export function PaymentSettingsSection({
                   e.stopPropagation()
                   if (
                     window.confirm(
-                      t('Clear all PayPal credentials and disable PayPal payments?')
+                      t(
+                        'Clear all PayPal credentials and disable PayPal payments?'
+                      )
                     )
                   ) {
                     clearPayPalSettings()
@@ -1753,7 +1821,7 @@ export function PaymentSettingsSection({
                 </li>
                 <li>
                   {t(
-                    'In the Toss developer console, register this URL for the PAYMENT_STATUS_CHANGED event (used for recovery crediting, EXPIRED/ABORTED cleanup, and cancel detection)',
+                    'In the Toss developer console, register this URL for PAYMENT_STATUS_CHANGED and BILLING_DELETED events on every Toss MID you use, including the recurring-billing MID when it is separate'
                   )}
                 </li>
               </ul>
@@ -1790,6 +1858,29 @@ export function PaymentSettingsSection({
                       <FormLabel>{t('Test Mode')}</FormLabel>
                       <FormDescription>
                         {t('Use Toss test environment')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Toss Auto Pay')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Enable only when your Toss MID is approved for recurring billing'
+                        )}
                       </FormDescription>
                     </SettingsSwitchContent>
                     <FormControl>
@@ -1866,9 +1957,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t(
-                        'Toss test client key (leave blank unless updating)'
-                      )}
+                      {t('Toss test client key (leave blank unless updating)')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1891,8 +1980,108 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
+                      {t('Toss test secret key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossBillingClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss billing client key')}
+                        autoComplete='off'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
                       {t(
-                        'Toss test secret key (leave blank unless updating)'
+                        'Live client key for a recurring-billing MID (required when Toss Auto Pay is enabled)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss billing secret key')}
+                        autoComplete='new-password'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Live secret key for a recurring-billing MID (required when Toss Auto Pay is enabled)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossBillingTestClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Test Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss billing test client key')}
+                        autoComplete='off'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Test client key for a recurring-billing MID (required when Test Mode and Toss Auto Pay are enabled)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingTestSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Test Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss billing test secret key')}
+                        autoComplete='new-password'
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Test secret key for a recurring-billing MID (required when Test Mode and Toss Auto Pay are enabled)'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -1912,7 +2101,7 @@ export function PaymentSettingsSection({
                       <Input
                         type='number'
                         step='1'
-                        min={0}
+                        min={1}
                         {...safeNumberFieldProps(field)}
                       />
                     </FormControl>
@@ -1929,7 +2118,7 @@ export function PaymentSettingsSection({
                 name='TossMinTopUp'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Min Top-Up (KRW)')}</FormLabel>
+                    <FormLabel>{t('Min Top-Up (units)')}</FormLabel>
                     <FormControl>
                       <Input
                         type='number'
@@ -1939,7 +2128,7 @@ export function PaymentSettingsSection({
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum recharge amount in KRW')}
+                      {t('Minimum recharge amount in balance units')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

@@ -34,14 +34,30 @@ func isTossTopUpEnabled() bool {
 	if !setting.TossEnabled {
 		return false
 	}
+	if setting.TossUnitPrice <= 0 {
+		return false
+	}
 	return strings.TrimSpace(setting.TossActiveClientKey()) != "" &&
 		strings.TrimSpace(setting.TossActiveSecretKey()) != "" &&
 		isValidServerAddress(system_setting.ServerAddress)
 }
 
 func isTossBillingEnabled() bool {
-	// Same prerequisites as Toss top-up (compliance + enabled + active keys + valid ServerAddress).
-	return isTossTopUpEnabled()
+	// Toss recurring billing requires a separate Toss contract/MID capability; keep it
+	// opt-in even when normal Toss top-up is enabled.
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	if !setting.TossBillingEnabled {
+		return false
+	}
+	if setting.TossUnitPrice <= 0 {
+		return false
+	}
+	clientKey, secretKey := setting.TossExplicitActiveBillingKeyPair()
+	return strings.TrimSpace(clientKey) != "" &&
+		strings.TrimSpace(secretKey) != "" &&
+		isValidServerAddress(system_setting.ServerAddress)
 }
 
 func isStripeWebhookConfigured() bool {

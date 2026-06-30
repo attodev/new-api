@@ -119,6 +119,7 @@ export function SubscriptionPlansCard({
   const enableCreem = !!topupInfo?.enable_creem_topup
   const enableWaffoPancake = !!topupInfo?.enable_waffo_pancake_topup
   const enableToss = !!topupInfo?.enable_toss_billing
+  const tossUnitPrice = Number(topupInfo?.toss_unit_price || 0)
   const enableOnlineTopUp = !!topupInfo?.enable_online_topup
   const epayMethods = useMemo(
     () => getEpayMethods(topupInfo?.pay_methods),
@@ -672,6 +673,7 @@ export function SubscriptionPlansCard({
         enableCreem={enableCreem}
         enableWaffoPancake={enableWaffoPancake}
         enableToss={enableToss}
+        tossUnitPrice={tossUnitPrice}
         enableOnlineTopUp={enableOnlineTopUp}
         epayMethods={epayMethods}
         userQuota={userQuota}

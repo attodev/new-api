@@ -145,6 +145,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_toss_topup":                isTossTopUpEnabled(),
 		"enable_toss_billing":              isTossBillingEnabled(),
 		"toss_min_topup":                   setting.TossMinTopUp,
+		"toss_unit_price":                  setting.TossUnitPrice,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,

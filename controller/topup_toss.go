@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,37 +25,165 @@ import (
 	"github.com/thanhpk/randstr"
 )
 
-const tossAPIBase = "https://api.tosspayments.com"
+var tossAPIBase = "https://api.tosspayments.com"
+
+const tossAPIMaxAttempts = 3
+
+func isTossTransientAPIStatus(status int) bool {
+	return status == http.StatusRequestTimeout ||
+		status == http.StatusConflict ||
+		status == http.StatusTooManyRequests ||
+		status >= http.StatusInternalServerError
+}
+
+func tossRetryDelay(attempt int) time.Duration {
+	if attempt < 0 {
+		return 0
+	}
+	return time.Duration(100*(attempt+1)) * time.Millisecond
+}
+
+func waitTossRetry(ctx context.Context, attempt int) error {
+	delay := tossRetryDelay(attempt)
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func doTossAPIRequest(ctx context.Context, method, endpoint string, body []byte, idempotencyKey string, acceptedStatuses ...int) (int, []byte, error) {
+	return doTossAPIRequestWithSecret(ctx, method, endpoint, body, idempotencyKey, setting.TossActiveSecretKey(), acceptedStatuses...)
+}
+
+func doTossAPIRequestWithSecret(ctx context.Context, method, endpoint string, body []byte, idempotencyKey string, secretKey string, acceptedStatuses ...int) (int, []byte, error) {
+	accepted := make(map[int]struct{}, len(acceptedStatuses))
+	for _, status := range acceptedStatuses {
+		accepted[status] = struct{}{}
+	}
+	var lastStatus int
+	var lastBody []byte
+	var lastErr error
+	for attempt := 0; attempt < tossAPIMaxAttempts; attempt++ {
+		var reader io.Reader
+		if body != nil {
+			reader = strings.NewReader(string(body))
+		}
+		req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
+		if err != nil {
+			return 0, nil, err
+		}
+		credentials := base64.StdEncoding.EncodeToString([]byte(secretKey + ":"))
+		req.Header.Set("Authorization", "Basic "+credentials)
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if strings.TrimSpace(idempotencyKey) != "" {
+			req.Header.Set("Idempotency-Key", idempotencyKey)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			lastStatus = 0
+			lastBody = nil
+			lastErr = err
+		} else {
+			respBody, readErr := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			lastStatus = resp.StatusCode
+			lastBody = respBody
+			if readErr != nil {
+				return lastStatus, lastBody, readErr
+			}
+			if _, ok := accepted[resp.StatusCode]; ok {
+				return lastStatus, lastBody, nil
+			}
+			lastErr = fmt.Errorf("toss api failed: method=%s status=%d body=%s", method, resp.StatusCode, string(respBody))
+			if !isTossTransientAPIStatus(resp.StatusCode) {
+				return lastStatus, lastBody, lastErr
+			}
+		}
+
+		if attempt == tossAPIMaxAttempts-1 {
+			break
+		}
+		if err := waitTossRetry(ctx, attempt); err != nil {
+			return lastStatus, lastBody, err
+		}
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("toss api failed: method=%s status=%d body=%s", method, lastStatus, string(lastBody))
+	}
+	return lastStatus, lastBody, lastErr
+}
 
 type TossPayRequest struct {
 	Amount        int64  `json:"amount"`
 	PaymentMethod string `json:"payment_method"`
 }
 
+type tossPaymentCard struct {
+	Company string `json:"company"`
+	Number  string `json:"number"`
+}
+
 // tossConfirmResponse is the subset of the Toss Payment object we rely on.
 type tossConfirmResponse struct {
-	PaymentKey  string `json:"paymentKey"`
-	OrderId     string `json:"orderId"`
-	Status      string `json:"status"`
-	TotalAmount int64  `json:"totalAmount"`
-	Currency    string `json:"currency"`
-	Method      string `json:"method"`
-	ApprovedAt  string `json:"approvedAt"`
+	PaymentKey  string           `json:"paymentKey"`
+	OrderId     string           `json:"orderId"`
+	Status      string           `json:"status"`
+	TotalAmount int64            `json:"totalAmount"`
+	Currency    string           `json:"currency"`
+	Method      string           `json:"method"`
+	ApprovedAt  string           `json:"approvedAt"`
+	Card        *tossPaymentCard `json:"card"`
+}
+
+func tossSecretFromCredential(ctx context.Context, encrypted, fallback string) string {
+	secret, err := model.DecryptProviderCredential(encrypted)
+	if err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss provider credential decrypt failed, falling back to active key: %v", err))
+		return fallback
+	}
+	if strings.TrimSpace(secret) == "" {
+		return fallback
+	}
+	return secret
 }
 
 // getTossPayMoney returns the KRW amount to charge for the given entered amount.
 // It applies both the group top-up ratio and the amount-based discount (keyed on
 // the entered amount), mirroring getPayPalPayMoney for provider parity.
-func getTossPayMoney(amountKRW int64, group string) int64 {
+// getTossPayMoney converts an entered amount (in display units, same model as PayPal/$)
+// to the KRW to charge: chargedKRW = units × TossUnitPrice × groupRatio × discount.
+// This keeps Toss internally identical to the USD/unit model (Money = chargedKRW/TossUnitPrice
+// = units, quota = Money × QuotaPerUnit) while charging in KRW.
+func getTossPayMoney(amountUnits int64, group string) int64 {
+	amt := decimal.NewFromInt(amountUnits)
+	// When the platform displays quota as raw tokens, the entered amount is tokens; convert to units.
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		amt = amt.Div(decimal.NewFromFloat(common.QuotaPerUnit))
+	}
 	ratio := common.GetTopupGroupRatio(group)
 	if ratio == 0 {
 		ratio = 1
 	}
 	discount := 1.0
-	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountKRW)]; ok && ds > 0 {
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountUnits)]; ok && ds > 0 {
 		discount = ds
 	}
-	return decimal.NewFromInt(amountKRW).
+	unit := setting.TossUnitPrice
+	if unit <= 0 {
+		return 0
+	}
+	return amt.
+		Mul(decimal.NewFromFloat(unit)).
 		Mul(decimal.NewFromFloat(ratio)).
 		Mul(decimal.NewFromFloat(discount)).
 		Round(0).
@@ -65,7 +194,7 @@ func getTossPayMoney(amountKRW int64, group string) int64 {
 func tossUSDEquivalent(chargedKRW int64) float64 {
 	unit := setting.TossUnitPrice
 	if unit <= 0 {
-		unit = 1
+		return 0
 	}
 	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
 }
@@ -87,17 +216,29 @@ func RequestTossAmount(c *gin.Context) {
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 	charged := getTossPayMoney(req.Amount, user.Group)
+	if !model.IsTossCardAmountPayableKRW(charged) {
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatInt(charged, 10)})
 }
 
-// isValidServerAddress reports whether addr is an absolute http(s) URL with a host.
+// isValidServerAddress reports whether addr can be used as a Toss callback base.
+// Public callback URLs must be HTTPS; HTTP is allowed only for local development.
 func isValidServerAddress(addr string) bool {
 	addr = strings.TrimSpace(addr)
 	u, err := url.Parse(addr)
 	if err != nil || u.Host == "" {
 		return false
 	}
-	return u.Scheme == "http" || u.Scheme == "https"
+	if u.Scheme == "https" {
+		return true
+	}
+	if u.Scheme != "http" {
+		return false
+	}
+	host := strings.Trim(strings.ToLower(u.Hostname()), "[]")
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 func RequestTossPay(c *gin.Context) {
@@ -128,7 +269,7 @@ func RequestTossPay(c *gin.Context) {
 	user, _ := model.GetUserById(id, false)
 
 	chargedKRW := getTossPayMoney(req.Amount, user.Group)
-	if chargedKRW <= 0 {
+	if !model.IsTossCardAmountPayableKRW(chargedKRW) {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
@@ -144,19 +285,26 @@ func RequestTossPay(c *gin.Context) {
 
 	reference := fmt.Sprintf("new-api-toss-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	orderId := "toss_" + common.Sha1([]byte(reference))
+	providerCredential, err := model.EncryptProviderCredential(setting.TossActiveSecretKey())
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss encrypt provider credential failed user_id=%d order_id=%s error=%q", id, orderId, err.Error()))
+		common.ApiErrorI18n(c, i18n.MsgPaymentCreateFailed)
+		return
+	}
 
 	topUp := &model.TopUp{
-		UserId:          id,
-		TargetType:      getTopUpTargetType(c),
-		TargetId:        getTopUpTargetId(c),
-		Amount:          chargedKRW,
-		Money:           tossUSDEquivalent(chargedKRW),
-		TradeNo:         orderId,
-		ProviderOrderId: orderId,
-		PaymentMethod:   model.PaymentMethodToss,
-		PaymentProvider: model.PaymentProviderToss,
-		CreateTime:      time.Now().Unix(),
-		Status:          common.TopUpStatusPending,
+		UserId:             id,
+		TargetType:         getTopUpTargetType(c),
+		TargetId:           getTopUpTargetId(c),
+		Amount:             chargedKRW,
+		Money:              tossUSDEquivalent(chargedKRW),
+		TradeNo:            orderId,
+		ProviderOrderId:    orderId,
+		ProviderCredential: providerCredential,
+		PaymentMethod:      model.PaymentMethodToss,
+		PaymentProvider:    model.PaymentProviderToss,
+		CreateTime:         time.Now().Unix(),
+		Status:             common.TopUpStatusPending,
 	}
 	if err := topUp.Insert(); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Toss create topup order failed user_id=%d order_id=%s error=%q", id, orderId, err.Error()))
@@ -171,10 +319,10 @@ func RequestTossPay(c *gin.Context) {
 			"client_key":   setting.TossActiveClientKey(),
 			"customer_key": customerKey,
 			"order_id":     orderId,
-			"order_name": fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
-			"amount":     chargedKRW,
-			"success_url": serverBase + "/api/toss/confirm",
-			"fail_url":    serverBase + "/api/toss/fail",
+			"order_name":   fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
+			"amount":       chargedKRW,
+			"success_url":  serverBase + "/api/toss/confirm",
+			"fail_url":     serverBase + "/api/toss/fail",
 		},
 	})
 }
@@ -183,6 +331,10 @@ func RequestTossPay(c *gin.Context) {
 // It returns the HTTP status code so callers can distinguish terminal (4xx)
 // rejections from transient (5xx/network) failures.
 func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount int64) (*tossConfirmResponse, int, error) {
+	return confirmTossPaymentWithSecret(ctx, paymentKey, orderId, amount, setting.TossActiveSecretKey())
+}
+
+func confirmTossPaymentWithSecret(ctx context.Context, paymentKey, orderId string, amount int64, secretKey string) (*tossConfirmResponse, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	payload := map[string]interface{}{
@@ -195,71 +347,72 @@ func confirmTossPayment(ctx context.Context, paymentKey, orderId string, amount 
 		return nil, 0, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tossAPIBase+"/v1/payments/confirm", strings.NewReader(string(bodyBytes)))
+	statusCode, respBody, err := doTossAPIRequestWithSecret(ctx, http.MethodPost, tossAPIBase+"/v1/payments/confirm", bodyBytes, orderId, secretKey, http.StatusOK)
 	if err != nil {
-		return nil, 0, err
-	}
-	credentials := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
-	req.Header.Set("Authorization", "Basic "+credentials)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Idempotency-Key", orderId)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("toss confirm failed: status=%d body=%s", resp.StatusCode, string(respBody))
+		return nil, statusCode, fmt.Errorf("toss confirm failed: %w", err)
 	}
 
 	var result tossConfirmResponse
 	if err := common.Unmarshal(respBody, &result); err != nil {
-		return nil, resp.StatusCode, err
+		return nil, statusCode, err
 	}
-	return &result, resp.StatusCode, nil
+	return &result, statusCode, nil
 }
 
-// getTossPayment fetches the authoritative payment object from Toss.
+// getTossPaymentWithSecret fetches the authoritative payment object from Toss.
 // It returns the HTTP status code so callers can distinguish a definitive
 // 404 (no such payment) from transient (network/5xx) failures.
-func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, int, error) {
+func getTossPaymentWithSecret(ctx context.Context, paymentKey, secretKey string) (*tossConfirmResponse, int, error) {
 	// Webhook-only path: stay under Toss's ~10s webhook response window.
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+paymentKey, nil)
+	statusCode, body, err := doTossAPIRequestWithSecret(ctx, http.MethodGet, tossAPIBase+"/v1/payments/"+url.PathEscape(paymentKey), nil, "", secretKey, http.StatusOK)
 	if err != nil {
-		return nil, 0, err
-	}
-	credentials := base64.StdEncoding.EncodeToString([]byte(setting.TossActiveSecretKey() + ":"))
-	req.Header.Set("Authorization", "Basic "+credentials)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("toss get payment failed: status=%d body=%s", resp.StatusCode, string(body))
+		return nil, statusCode, fmt.Errorf("toss get payment failed: %w", err)
 	}
 	var result tossConfirmResponse
 	if err := common.Unmarshal(body, &result); err != nil {
-		return nil, resp.StatusCode, err
+		return nil, statusCode, err
 	}
-	return &result, resp.StatusCode, nil
+	return &result, statusCode, nil
+}
+
+func getTossPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, int, error) {
+	return getTossPaymentWithSecret(ctx, paymentKey, setting.TossActiveSecretKey())
+}
+
+func getTossBillingPayment(ctx context.Context, paymentKey string) (*tossConfirmResponse, int, error) {
+	return getTossPaymentWithSecret(ctx, paymentKey, setting.TossActiveBillingSecretKey())
 }
 
 func tossRedirect(c *gin.Context, path string) {
 	c.Redirect(http.StatusFound, path)
+}
+
+func tossFailureRedirectPath(orderId, code, message string) string {
+	values := url.Values{}
+	if orderId = strings.TrimSpace(orderId); orderId != "" {
+		values.Set("toss_order_id", trimTossFailureValue(orderId))
+	}
+	if code = strings.TrimSpace(code); code != "" {
+		values.Set("toss_error_code", trimTossFailureValue(code))
+	}
+	if message = strings.TrimSpace(message); message != "" {
+		values.Set("toss_error_message", trimTossFailureValue(message))
+	}
+	if len(values) == 0 {
+		return "/console/topup"
+	}
+	return "/console/topup?" + values.Encode()
+}
+
+func trimTossFailureValue(value string) string {
+	const maxRunes = 300
+	runes := []rune(value)
+	if len(runes) <= maxRunes {
+		return value
+	}
+	return string(runes[:maxRunes])
 }
 
 func validateTossConfirm(topUp *model.TopUp, orderId string, amount int64) error {
@@ -273,6 +426,88 @@ func validateTossConfirm(topUp *model.TopUp, orderId string, amount int64) error
 		return fmt.Errorf("toss amount mismatch order_id=%s expected=%d actual=%d", orderId, topUp.Amount, amount)
 	}
 	return nil
+}
+
+func isValidTossTopUpCardPayment(result *tossConfirmResponse, orderId string, amount int64) bool {
+	return result != nil &&
+		result.Status == "DONE" &&
+		result.TotalAmount == amount &&
+		result.OrderId == orderId &&
+		strings.ToUpper(result.Currency) == "KRW" &&
+		result.Card != nil
+}
+
+func closeStaleTossPendingTopUp(ctx context.Context, orderId, targetStatus, reason string) (bool, error) {
+	if err := model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, targetStatus); err != nil {
+		if errors.Is(err, model.ErrTopUpStatusInvalid) || errors.Is(err, model.ErrTopUpNotFound) {
+			return true, nil
+		}
+		return false, err
+	}
+	logger.LogWarn(ctx, fmt.Sprintf("Toss stale pending top-up closed order_id=%s status=%s reason=%s", orderId, targetStatus, reason))
+	return true, nil
+}
+
+func reconcileTossRecordedTopUp(ctx context.Context, topUp model.TopUp) (bool, error) {
+	orderId := strings.TrimSpace(topUp.TradeNo)
+	paymentKey := strings.TrimSpace(topUp.ProviderOrderId)
+	if orderId == "" || paymentKey == "" || paymentKey == orderId {
+		return false, nil
+	}
+
+	LockOrder(orderId)
+	defer UnlockOrder(orderId)
+
+	current := model.GetTopUpByTradeNo(orderId)
+	if current == nil {
+		return true, nil
+	}
+	if current.Status != common.TopUpStatusPending {
+		return true, nil
+	}
+	paymentKey = strings.TrimSpace(current.ProviderOrderId)
+	if paymentKey == "" || paymentKey == current.TradeNo {
+		return false, nil
+	}
+
+	secretKey := tossSecretFromCredential(ctx, current.ProviderCredential, setting.TossActiveSecretKey())
+	auth, statusCode, err := getTossPaymentWithSecret(ctx, paymentKey, secretKey)
+	if err != nil {
+		if statusCode == http.StatusNotFound {
+			return closeStaleTossPendingTopUp(ctx, orderId, common.TopUpStatusFailed, "payment_not_found")
+		}
+		return false, err
+	}
+	if auth.OrderId != orderId {
+		return closeStaleTossPendingTopUp(ctx, orderId, common.TopUpStatusFailed, "order_mismatch")
+	}
+	if auth.Status == "DONE" {
+		if isValidTossTopUpCardPayment(auth, orderId, current.Amount) {
+			if err := model.RechargeToss(orderId, auth.PaymentKey, "toss-pending-cleanup"); err != nil {
+				return false, err
+			}
+			logger.LogInfo(ctx, fmt.Sprintf("Toss stale pending top-up credited order_id=%s", orderId))
+			return true, nil
+		}
+		logger.LogWarn(ctx, fmt.Sprintf("Toss stale pending top-up DONE rejected order_id=%s total=%d currency=%s card_present=%t", orderId, auth.TotalAmount, auth.Currency, auth.Card != nil))
+		return closeStaleTossPendingTopUp(ctx, orderId, common.TopUpStatusFailed, "done_payload_mismatch")
+	}
+	if isTossTerminalFailStatus(auth.Status) || isTossCancelStatus(auth.Status) {
+		target := common.TopUpStatusFailed
+		if auth.Status == "EXPIRED" {
+			target = common.TopUpStatusExpired
+		}
+		if isTossCancelStatus(auth.Status) {
+			paymentMethod := strings.TrimSpace(current.PaymentMethod)
+			if paymentMethod == "" {
+				paymentMethod = model.PaymentMethodToss
+			}
+			logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: %s on uncredited stale pending order order_id=%s user_id=%d amount=%d KRW — verify Toss balance and adjust manually", auth.Status, orderId, current.UserId, current.Amount))
+			model.RecordTopupLog(current.UserId, fmt.Sprintf("Toss payment %s before local credit (amount: %d KRW) — manual quota reconciliation required", auth.Status, current.Amount), "toss-pending-cleanup", paymentMethod, "toss-cancel")
+		}
+		return closeStaleTossPendingTopUp(ctx, orderId, target, strings.ToLower(auth.Status))
+	}
+	return closeStaleTossPendingTopUp(ctx, orderId, common.TopUpStatusExpired, "approval_window_elapsed_"+strings.ToLower(auth.Status))
 }
 
 // TossConfirm handles the successUrl redirect: ?paymentKey&orderId&amount.
@@ -312,6 +547,7 @@ func TossConfirm(c *gin.Context) {
 		tossRedirect(c, "/console/topup")
 		return
 	}
+	secretKey := tossSecretFromCredential(ctx, topUp.ProviderCredential, setting.TossActiveSecretKey())
 
 	// Persist the paymentKey BEFORE approving the payment. This MUST succeed: the stale-pending
 	// sweep treats provider_order_id == trade_no as "never approved" and expires such orders, so
@@ -323,12 +559,12 @@ func TossConfirm(c *gin.Context) {
 		return
 	}
 
-	result, statusCode, err := confirmTossPayment(ctx, paymentKey, orderId, amount)
+	result, statusCode, err := confirmTossPaymentWithSecret(ctx, paymentKey, orderId, amount, secretKey)
 	if err != nil {
 		// Don't infer terminal-vs-transient from the HTTP status (e.g. 409 IDEMPOTENT_REQUEST_PROCESSING
 		// is transient, not a rejection). Ask Toss authoritatively what actually happened.
 		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm API failed order_id=%s status=%d error=%q — re-verifying", orderId, statusCode, err.Error()))
-		auth, verifyStatus, gerr := getTossPayment(ctx, paymentKey)
+		auth, verifyStatus, gerr := getTossPaymentWithSecret(ctx, paymentKey, secretKey)
 		if gerr != nil {
 			if verifyStatus == http.StatusNotFound {
 				// Toss has no payment for this paymentKey (forged/invalid key, or no payment ever made)
@@ -350,7 +586,7 @@ func TossConfirm(c *gin.Context) {
 			logger.LogWarn(ctx, fmt.Sprintf("Toss confirm verify: order mismatch order_id=%s auth_order=%s — closed as failed", orderId, auth.OrderId))
 			tossRedirect(c, "/console/topup")
 			return
-		case auth.Status == "DONE" && auth.TotalAmount == amount && strings.ToUpper(auth.Currency) == "KRW":
+		case isValidTossTopUpCardPayment(auth, orderId, amount):
 			// Actually approved (confirm response lost / concurrent idempotent confirm). Credit it.
 			if rerr := model.RechargeToss(orderId, auth.PaymentKey, c.ClientIP()); rerr != nil {
 				logger.LogError(ctx, fmt.Sprintf("Toss confirm-verify recharge failed order_id=%s error=%q", orderId, rerr.Error()))
@@ -378,10 +614,8 @@ func TossConfirm(c *gin.Context) {
 			return
 		}
 	}
-	if result.Status != "DONE" || result.TotalAmount != amount ||
-		result.OrderId != orderId || result.PaymentKey != paymentKey ||
-		strings.ToUpper(result.Currency) != "KRW" {
-		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm validation failed order_id=%s status=%s total=%d resp_order=%s currency=%s", orderId, result.Status, result.TotalAmount, result.OrderId, result.Currency))
+	if !isValidTossTopUpCardPayment(result, orderId, amount) || result.PaymentKey != paymentKey {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss confirm validation failed order_id=%s status=%s total=%d resp_order=%s currency=%s card_present=%t", orderId, result.Status, result.TotalAmount, result.OrderId, result.Currency, result.Card != nil))
 		tossRedirect(c, "/console/topup")
 		return
 	}
@@ -410,7 +644,7 @@ func TossFail(c *gin.Context) {
 		// credits only orders that are still in pending status.
 		_ = model.UpdatePendingTopUpStatus(orderId, model.PaymentProviderToss, common.TopUpStatusFailed)
 	}
-	tossRedirect(c, "/console/topup")
+	tossRedirect(c, tossFailureRedirectPath(orderId, code, message))
 }
 
 // isTossTerminalFailStatus reports whether a Toss status means the payment never completed.
@@ -433,7 +667,113 @@ func isTossCancelStatus(status string) bool {
 	}
 }
 
-// TossWebhook handles Toss PAYMENT_STATUS_CHANGED events for card payments.
+func isTossPaymentWebhookEventType(eventType string) bool {
+	switch eventType {
+	case "PAYMENT_STATUS_CHANGED":
+		return true
+	default:
+		return false
+	}
+}
+
+func handleTossSubscriptionPaymentWebhook(c *gin.Context, orderId, paymentKey, status string, isCancel bool) bool {
+	ctx := c.Request.Context()
+	order := model.GetSubscriptionOrderByTradeNo(orderId)
+	if order == nil || order.PaymentProvider != model.PaymentProviderToss {
+		return false
+	}
+	if !isCancel {
+		if status != "DONE" {
+			c.Status(http.StatusOK)
+			return true
+		}
+		if order.Status == common.TopUpStatusSuccess {
+			c.Status(http.StatusOK)
+			return true
+		}
+		if order.Status != common.TopUpStatusPending {
+			c.Status(http.StatusOK)
+			return true
+		}
+		if paymentKey == "" {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss subscription DONE webhook missing paymentKey order_id=%s status=%s", orderId, status))
+			c.Status(http.StatusOK)
+			return true
+		}
+		if order.BillingKeyId <= 0 {
+			logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION: subscription DONE webhook has no billing key order_id=%s user_id=%d", orderId, order.UserId))
+			c.Status(http.StatusOK)
+			return true
+		}
+		plan, err := model.GetSubscriptionPlanById(order.PlanId)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Toss subscription DONE webhook load plan failed order_id=%s plan_id=%d error=%q", orderId, order.PlanId, err.Error()))
+			c.Status(http.StatusServiceUnavailable)
+			return true
+		}
+		chargeKRW := tossSubscriptionOrderChargeKRW(order, plan)
+		if !model.IsTossCardAmountPayableKRW(chargeKRW) {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss subscription DONE webhook blocked below minimum order_id=%s amount=%d", orderId, chargeKRW))
+			c.Status(http.StatusOK)
+			return true
+		}
+		secretKey := tossSecretFromCredential(ctx, order.ProviderCredential, setting.TossActiveBillingSecretKey())
+		auth, _, err := getTossPaymentWithSecret(ctx, paymentKey, secretKey)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Toss subscription DONE webhook get payment failed order_id=%s error=%q", orderId, err.Error()))
+			c.Status(http.StatusServiceUnavailable)
+			return true
+		}
+		if !isValidTossBillingCharge(auth, orderId, chargeKRW) {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss subscription DONE webhook verification failed order_id=%s auth_order=%s status=%s amount=%d", orderId, auth.OrderId, auth.Status, auth.TotalAmount))
+			c.Status(http.StatusOK)
+			return true
+		}
+		payload, _ := common.Marshal(auth)
+		if err := model.CompleteTossBillingOrder(orderId, order.BillingKeyId, string(payload)); err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Toss subscription DONE webhook complete failed order_id=%s error=%q", orderId, err.Error()))
+			if errors.Is(err, model.ErrSubscriptionOrderNotFound) ||
+				errors.Is(err, model.ErrSubscriptionOrderStatusInvalid) ||
+				errors.Is(err, model.ErrPaymentMethodMismatch) {
+				c.Status(http.StatusOK)
+			} else {
+				c.Status(http.StatusServiceUnavailable)
+			}
+			return true
+		}
+		c.Status(http.StatusOK)
+		return true
+	}
+	if paymentKey == "" {
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION: subscription cancel webhook missing paymentKey order_id=%s status=%s", orderId, status))
+		c.Status(http.StatusOK)
+		return true
+	}
+	secretKey := tossSecretFromCredential(ctx, order.ProviderCredential, setting.TossActiveBillingSecretKey())
+	auth, _, err := getTossPaymentWithSecret(ctx, paymentKey, secretKey)
+	if err != nil {
+		logger.LogError(ctx, fmt.Sprintf("Toss subscription webhook get payment failed (cancel) order_id=%s error=%q", orderId, err.Error()))
+		c.Status(http.StatusServiceUnavailable)
+		return true
+	}
+	if auth.OrderId != orderId {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss subscription webhook order mismatch order_id=%s auth_order=%s", orderId, auth.OrderId))
+		c.Status(http.StatusOK)
+		return true
+	}
+	if isTossCancelStatus(auth.Status) {
+		paymentMethod := strings.TrimSpace(order.PaymentMethod)
+		if paymentMethod == "" {
+			paymentMethod = "toss"
+		}
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: subscription payment %s after activation order_id=%s user_id=%d amount=%d KRW - local subscription/quota NOT reverted, manual adjustment needed", auth.Status, orderId, order.UserId, auth.TotalAmount))
+		model.RecordTopupLog(order.UserId, fmt.Sprintf("Toss subscription payment %s after activation (amount: %d KRW) - manual subscription/quota reconciliation required", auth.Status, auth.TotalAmount), c.ClientIP(), paymentMethod, "toss-subscription-cancel")
+	}
+	c.Status(http.StatusOK)
+	return true
+}
+
+// TossWebhook handles Toss payment/billing events for card payments.
 //
 //   - DONE → credit the order (re-verified against the authoritative payment, idempotent).
 //   - EXPIRED / ABORTED → close the lingering pending order (re-verified).
@@ -446,8 +786,10 @@ func isTossCancelStatus(status string) bool {
 // lapsed (Toss emits EXPIRED for card payments when the 30-min/10-min windows lapse),
 // and post-credit refund detection.
 //
-// Every action is re-verified by re-fetching the authoritative payment from Toss, so
-// nothing is ever decided from the unauthenticated webhook payload alone.
+// Payment actions are re-verified by re-fetching the authoritative payment from Toss, so
+// payment credit/cancel decisions are never made from the unauthenticated webhook payload alone.
+// Subscription payment cancel events are also re-verified and logged for manual reconciliation.
+// BILLING_DELETED is matched against the encrypted local billing key before local revocation.
 //
 // This endpoint does NOT implement Toss's virtual-account DEPOSIT_CALLBACK shape
 // (top-level "secret"/"status"/"orderId") nor store the deposit secret; that is
@@ -461,10 +803,14 @@ func TossWebhook(c *gin.Context) {
 	}
 
 	var event struct {
-		EventType string `json:"eventType"`
-		Data      struct {
+		EventType  string `json:"eventType"`
+		BillingKey string `json:"billingKey"`
+		Reason     string `json:"reason"`
+		Data       struct {
 			OrderId     string `json:"orderId"`
 			PaymentKey  string `json:"paymentKey"`
+			BillingKey  string `json:"billingKey"`
+			CustomerKey string `json:"customerKey"`
 			Status      string `json:"status"`
 			TotalAmount int64  `json:"totalAmount"`
 		} `json:"data"`
@@ -472,6 +818,33 @@ func TossWebhook(c *gin.Context) {
 	if err := common.Unmarshal(body, &event); err != nil {
 		logger.LogError(ctx, "Toss webhook parse failed: "+err.Error())
 		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	if event.EventType == "BILLING_DELETED" {
+		billingKey := strings.TrimSpace(event.BillingKey)
+		if billingKey == "" {
+			billingKey = strings.TrimSpace(event.Data.BillingKey)
+		}
+		if billingKey == "" {
+			logger.LogWarn(ctx, "Toss billing deleted webhook missing billingKey")
+			c.Status(http.StatusOK)
+			return
+		}
+		revoked, err := model.RevokeTossBillingKeyByPlain(event.Data.CustomerKey, billingKey)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("Toss billing deleted webhook revoke failed customer_key=%s error=%q", event.Data.CustomerKey, err.Error()))
+			c.Status(http.StatusServiceUnavailable)
+			return
+		}
+		if revoked {
+			logger.LogInfo(ctx, fmt.Sprintf("Toss billing key revoked from BILLING_DELETED webhook customer_key=%s", event.Data.CustomerKey))
+		}
+		c.Status(http.StatusOK)
+		return
+	}
+	if !isTossPaymentWebhookEventType(event.EventType) {
+		c.Status(http.StatusOK)
 		return
 	}
 
@@ -496,6 +869,9 @@ func TossWebhook(c *gin.Context) {
 
 	topUp := model.GetTopUpByTradeNo(orderId)
 	if topUp == nil || topUp.PaymentProvider != model.PaymentProviderToss {
+		if handleTossSubscriptionPaymentWebhook(c, orderId, event.Data.PaymentKey, status, isCancel) {
+			return
+		}
 		c.Status(http.StatusOK)
 		return
 	}
@@ -508,7 +884,8 @@ func TossWebhook(c *gin.Context) {
 				c.Status(http.StatusOK)
 				return
 			}
-			auth, _, err := getTossPayment(ctx, event.Data.PaymentKey)
+			secretKey := tossSecretFromCredential(ctx, topUp.ProviderCredential, setting.TossActiveSecretKey())
+			auth, _, err := getTossPaymentWithSecret(ctx, event.Data.PaymentKey, secretKey)
 			if err != nil {
 				logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed (cancel) order_id=%s error=%q", orderId, err.Error()))
 				c.Status(http.StatusServiceUnavailable) // retry so a real refund isn't missed
@@ -533,7 +910,8 @@ func TossWebhook(c *gin.Context) {
 		c.Status(http.StatusOK)
 		return
 	}
-	auth, _, err := getTossPayment(ctx, event.Data.PaymentKey)
+	secretKey := tossSecretFromCredential(ctx, topUp.ProviderCredential, setting.TossActiveSecretKey())
+	auth, _, err := getTossPaymentWithSecret(ctx, event.Data.PaymentKey, secretKey)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss webhook get payment failed order_id=%s error=%q", orderId, err.Error()))
 		c.Status(http.StatusServiceUnavailable) // Toss 재시도 유도
@@ -546,8 +924,8 @@ func TossWebhook(c *gin.Context) {
 	}
 
 	if auth.Status == "DONE" {
-		if auth.TotalAmount != topUp.Amount || strings.ToUpper(auth.Currency) != "KRW" {
-			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook DONE authoritative mismatch order_id=%s total=%d currency=%s", orderId, auth.TotalAmount, auth.Currency))
+		if !isValidTossTopUpCardPayment(auth, orderId, topUp.Amount) {
+			logger.LogWarn(ctx, fmt.Sprintf("Toss webhook DONE authoritative mismatch order_id=%s total=%d currency=%s card_present=%t", orderId, auth.TotalAmount, auth.Currency, auth.Card != nil))
 			c.Status(http.StatusOK)
 			return
 		}
