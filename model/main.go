@@ -279,6 +279,7 @@ func migrateDB() error {
 		&SubscriptionOrder{},
 		&UserSubscription{},
 		&UserBillingKey{},
+		&WalletAutoRecharge{},
 		&SubscriptionPreConsumeRecord{},
 		&OrganizationSubscriptionPlan{},
 		&OrganizationUserSubscription{},
