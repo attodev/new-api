@@ -39,6 +39,25 @@ func TossPlanKRW(priceAmount float64) int64 {
 	return decimal.NewFromFloat(priceAmount).Mul(decimal.NewFromFloat(unit)).Round(0).IntPart()
 }
 
+// tossNextBillingTime returns when to charge the next period: a lead BEFORE endUnix so the
+// renewal cron extends the subscription before ExpireDueSubscriptions can expire it.
+// lead = min(1h, period/4), clamped to stay within [startUnix, endUnix].
+func tossNextBillingTime(startUnix, endUnix int64) int64 {
+	period := endUnix - startUnix
+	if period <= 0 {
+		return endUnix
+	}
+	lead := period / 4
+	if lead > 3600 {
+		lead = 3600
+	}
+	next := endUnix - lead
+	if next < startUnix {
+		next = startUnix
+	}
+	return next
+}
+
 // TossBillingCharger performs a Toss billing charge. Injected by the controller package
 // at init to avoid a model→controller import cycle.
 // Returns (statusDONE, totalAmount, error).

@@ -1338,10 +1338,11 @@ func CompleteTossBillingOrder(tradeNo string, billingKeyId int, providerPayload 
 		if err != nil {
 			return err
 		}
-		// Mark for auto-renew: charge again when the current period ends.
+		// Mark for auto-renew: charge a lead time before the current period ends so the
+		// renewal cron extends EndTime before ExpireDueSubscriptions can expire it.
 		sub.AutoRenew = true
 		sub.BillingKeyId = billingKeyId
-		sub.NextBillingTime = sub.EndTime
+		sub.NextBillingTime = tossNextBillingTime(sub.StartTime, sub.EndTime)
 		sub.BillingFailCount = 0
 		sub.UpdatedAt = common.GetTimestamp()
 		if err := tx.Save(sub).Error; err != nil {
@@ -1386,13 +1387,14 @@ func RenewTossSubscription(subId int, tradeNo string, money float64) error {
 		if err != nil {
 			return err
 		}
-		base := time.Unix(sub.EndTime, 0)
+		oldEnd := sub.EndTime
+		base := time.Unix(oldEnd, 0)
 		newEnd, err := calcPlanEndTime(base, plan)
 		if err != nil {
 			return err
 		}
 		sub.EndTime = newEnd
-		sub.NextBillingTime = newEnd
+		sub.NextBillingTime = tossNextBillingTime(oldEnd, newEnd)
 		sub.AmountUsed = 0
 		sub.LastResetTime = common.GetTimestamp()
 		sub.NextResetTime = calcNextResetTime(time.Unix(common.GetTimestamp(), 0), plan, newEnd)

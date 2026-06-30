@@ -236,6 +236,16 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 		return
 	}
 
+	// Bind the callback customerKey to the order user's canonical key so a billing key
+	// can't be associated under a mismatched/forged customerKey.
+	canonical, err := model.GetOrCreateTossCustomerKey(order.UserId)
+	if err != nil || canonical != customerKey {
+		logger.LogWarn(ctx, fmt.Sprintf("Toss billing customerKey mismatch trade_no=%s", tradeNo))
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
+		tossRedirect(c, "/console/topup")
+		return
+	}
+
 	issued, _, err := issueTossBillingKey(ctx, authKey, customerKey)
 	if err != nil || issued.BillingKey == "" {
 		logger.LogError(ctx, fmt.Sprintf("Toss billing issue failed trade_no=%s err=%v", tradeNo, err))
