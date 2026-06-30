@@ -1,56 +1,56 @@
-# Wallet Auto Recharge Design
+# 지갑 자동충전 설계
 
-## Purpose
+## 목적
 
-Add two wallet-based automatic payment policies that are separate from the existing subscription system:
+기존 구독 시스템과 분리된 지갑 기반 자동 결제 정책 두 가지를 추가한다.
 
-- **정기결제**: charge a user-selected amount on a fixed interval, usually monthly, and add it to the normal wallet balance.
-- **자동결제**: when wallet balance falls below a user-selected threshold, charge a predefined amount and add it to the normal wallet balance.
+- **정기결제**: 사용자가 지정한 금액을 정해진 주기마다 결제하고, 일반 지갑 잔액에 충전한다. 기본 사용 사례는 월 1회 충전이다.
+- **자동결제**: 지갑 잔액이 사용자가 지정한 기준 이하로 내려가면, 미리 지정한 금액을 결제하고 일반 지갑 잔액에 충전한다.
 
-Both policies use Toss billing only. They must not create or modify subscription quota buckets. Successful charges behave like normal wallet top-ups: create a `TopUp` success record and increase the target wallet quota.
+두 정책은 Toss 빌링만 지원한다. 이 기능은 기존 구독 quota bucket을 생성하거나 수정하지 않는다. 결제가 성공하면 일반 지갑 충전과 동일하게 `TopUp` 성공 기록을 만들고 대상 지갑 quota를 증가시킨다.
 
-## Scope
+## 범위
 
-This feature supports:
+이번 기능에서 지원하는 것:
 
-- Personal wallets.
-- Organization wallets.
-- One active scheduled policy and one active threshold policy per target.
-- Organization policy management by organization owner only.
-- Toss billing-key based charges.
-- UI inside the existing wallet pages as tabs: `충전`, `정기결제`, `자동결제`.
+- 개인 지갑.
+- 조직 지갑.
+- 대상별 활성 정기결제 1개와 활성 자동결제 1개.
+- 조직 정책은 조직 소유자만 관리 가능.
+- Toss 빌링키 기반 결제.
+- 기존 지갑 화면 내부 탭 구성: `충전`, `정기결제`, `자동결제`.
 
-This feature does not support:
+이번 기능에서 지원하지 않는 것:
 
-- Other payment providers.
-- Multiple active policies of the same type for one target.
-- Changing existing subscription billing semantics.
-- Admin-managed plan catalogs.
+- Toss 외 결제 수단.
+- 같은 대상에 같은 유형의 활성 정책 여러 개.
+- 기존 구독 과금 의미 변경.
+- 관리자용 구독 플랜 카탈로그와의 연동.
 
-## Decisions
+## 결정 사항
 
-- Scheduled recharge can optionally charge immediately during setup.
-- Threshold recharge uses user-facing money amounts in the UI, but the server stores and compares an internal quota threshold.
-- Threshold recharge has both a cooldown and a daily count limit.
-- Organization wallets charge the organization owner's Toss billing key.
-- Existing subscription tables and APIs remain separate.
+- 정기결제는 설정 시 즉시 첫 충전을 할지 사용자가 선택할 수 있다.
+- 자동결제 기준은 UI에서 금액처럼 입력받지만, 서버는 내부 quota로 환산한 값을 저장하고 비교한다.
+- 자동결제에는 충전 후 대기시간과 일일 충전 횟수 제한을 모두 둔다.
+- 조직 지갑은 조직 소유자의 Toss 빌링키로 결제한다.
+- 기존 구독 테이블과 API는 분리된 상태로 유지한다.
 
-## Data Model
+## 데이터 모델
 
-Create a new GORM model and table: `wallet_auto_recharges`.
+새 GORM 모델과 테이블 `wallet_auto_recharges`를 추가한다.
 
-Core fields:
+핵심 필드:
 
 - `id`
-- `type`: `scheduled` or `threshold`
-- `target_type`: `user` or `organization`
-- `target_id`: user id for personal wallet, organization id for organization wallet
-- `owner_user_id`: user who owns the Toss billing key
-- `billing_key_id`: references existing `user_billing_keys`
-- `amount`: amount to charge, in the same user-facing unit used by normal wallet top-up
-- `threshold_amount`: user-facing threshold amount for threshold policies
-- `threshold_quota`: server-side quota value used for balance comparison
-- `interval_unit`: `month`, `day`, or `custom`
+- `type`: `scheduled` 또는 `threshold`
+- `target_type`: `user` 또는 `organization`
+- `target_id`: 개인 지갑이면 user id, 조직 지갑이면 organization id
+- `owner_user_id`: Toss 빌링키를 소유한 사용자 id
+- `billing_key_id`: 기존 `user_billing_keys` 참조
+- `amount`: 자동으로 결제할 금액. 일반 지갑 충전에서 사용자가 입력하는 금액 단위와 동일하게 취급한다.
+- `threshold_amount`: 자동결제 기준 금액. 사용자에게 표시되는 금액 단위다.
+- `threshold_quota`: 잔액 비교에 사용하는 서버 내부 quota 값
+- `interval_unit`: `month`, `day`, 또는 `custom`
 - `interval_value`
 - `custom_seconds`
 - `charge_immediately`
@@ -59,7 +59,7 @@ Core fields:
 - `cooldown_until`
 - `daily_charge_count`
 - `daily_charge_date`
-- `status`: `pending`, `active`, `cancelled`, or `failed`
+- `status`: `pending`, `active`, `cancelled`, 또는 `failed`
 - `fail_count`
 - `last_error`
 - `card_company`
@@ -68,217 +68,217 @@ Core fields:
 - `created_at`
 - `updated_at`
 
-The model is migrated through GORM AutoMigrate and must avoid raw SQL. The active-one-policy rule is enforced in application transactions rather than partial unique indexes so SQLite, MySQL, and PostgreSQL all work consistently.
+테이블 생성은 GORM AutoMigrate를 사용한다. raw SQL은 사용하지 않는다. 활성 정책 1개 제한은 DB별 부분 인덱스 차이를 피하기 위해 애플리케이션 트랜잭션에서 보장한다. 이 방식은 SQLite, MySQL, PostgreSQL에서 동일하게 동작한다.
 
-## Wallet Targeting
+## 지갑 대상
 
-Personal wallet:
+개인 지갑:
 
 - `target_type = user`
 - `target_id = current user id`
 - `owner_user_id = current user id`
 
-Organization wallet:
+조직 지갑:
 
 - `target_type = organization`
 - `target_id = organization id`
 - `owner_user_id = organization.owner_user_id`
-- Only the organization owner can create, update, or cancel policies.
-- Successful charges create a `TopUp` with `target_type = organization` and `target_id = organization id`.
+- 조직 소유자만 정책을 생성, 수정, 해지할 수 있다.
+- 성공한 충전은 `target_type = organization`, `target_id = organization id`인 `TopUp` 기록을 만든다.
 
-## Toss Billing Flow
+## Toss 빌링 흐름
 
-Policy setup uses the same Toss billing authorization pattern as existing Toss subscription billing:
+정책 설정은 기존 Toss 구독 자동결제와 같은 Toss billing authorization 패턴을 재사용한다.
 
-1. User submits scheduled or threshold policy settings.
-2. Backend validates Toss billing availability, target access, amount limits, and active-policy uniqueness.
-3. Backend creates a `wallet_auto_recharges` row in `pending` status.
-4. Backend returns Toss billing auth data: `client_key`, `customer_key`, `trade_no`, `success_url`, `fail_url`.
-5. Frontend opens Toss billing auth.
-6. Toss redirects to success callback with `authKey` and `customerKey`.
-7. Backend verifies the pending policy and customer key.
-8. Backend exchanges `authKey` for `billingKey`.
-9. Backend stores the billing key in `user_billing_keys`.
-10. Backend activates the policy and stores masked card metadata.
-11. For scheduled policies with `charge_immediately = true`, backend immediately attempts the first wallet top-up.
+1. 사용자가 정기결제 또는 자동결제 설정값을 제출한다.
+2. 백엔드는 Toss 빌링 사용 가능 여부, 대상 접근 권한, 금액 제한, 활성 정책 중복 여부를 검증한다.
+3. 백엔드는 `wallet_auto_recharges`에 `pending` 상태 정책을 생성한다.
+4. 백엔드는 Toss 빌링 인증에 필요한 `client_key`, `customer_key`, `trade_no`, `success_url`, `fail_url`을 반환한다.
+5. 프론트엔드는 Toss billing auth 창을 연다.
+6. Toss는 성공 콜백으로 `authKey`와 `customerKey`를 전달한다.
+7. 백엔드는 pending 정책과 customer key를 검증한다.
+8. 백엔드는 `authKey`를 `billingKey`로 교환한다.
+9. 백엔드는 빌링키를 `user_billing_keys`에 저장한다.
+10. 백엔드는 정책을 `active`로 전환하고 마스킹된 카드 정보를 저장한다.
+11. 정기결제 정책이고 `charge_immediately = true`이면 백엔드는 즉시 첫 지갑 충전을 시도한다.
 
-The confirm/fail callbacks are separate from existing subscription callbacks and live under wallet auto-recharge routes.
+confirm/fail 콜백은 기존 구독 콜백과 별도로 둔다. 콜백 경로는 지갑 자동충전 전용 라우트에 둔다.
 
-## Charging Flow
+## 결제 실행 흐름
 
-Add a service task that runs on the master node every minute.
+master node에서 1분마다 실행되는 service task를 추가한다.
 
-Scheduled policy:
+정기결제 정책:
 
-1. Query active scheduled policies with `next_charge_time <= now`.
-2. Lock one policy row before charging.
-3. Charge Toss with a deterministic trade number and idempotency key.
-4. On success, create a successful `TopUp` row and increase target quota.
-5. Advance `next_charge_time` from the intended schedule, not from arbitrary job delay.
-6. Reset `fail_count`.
-7. On failure, increment `fail_count`; after the max failure count, mark policy `failed`.
+1. `next_charge_time <= now`인 활성 scheduled 정책을 조회한다.
+2. 결제 전에 정책 row를 lock한다.
+3. deterministic trade number와 Toss idempotency key로 Toss billing charge를 수행한다.
+4. 성공하면 `TopUp` 성공 row를 생성하고 대상 quota를 증가시킨다.
+5. 임의의 job 지연 시간이 아니라 의도된 스케줄 기준으로 `next_charge_time`을 다음 주기로 이동한다.
+6. `fail_count`를 초기화한다.
+7. 실패하면 `fail_count`를 증가시키고, 최대 실패 횟수 이상이면 정책을 `failed`로 전환한다.
 
-Threshold policy:
+자동결제 정책:
 
-1. Query active threshold policies.
-2. Skip if `cooldown_until > now`.
-3. Skip if daily limit is reached.
-4. Read target wallet quota.
-5. Charge only when `quota <= threshold_quota`.
-6. On success, create a successful `TopUp` row and increase target quota.
-7. Set `cooldown_until = now + 1 hour`.
-8. Increment the daily charge count for the current date.
-9. On failure, increment `fail_count`; after the max failure count, mark policy `failed`.
+1. 활성 threshold 정책을 조회한다.
+2. `cooldown_until > now`이면 건너뛴다.
+3. 일일 제한 횟수에 도달했으면 건너뛴다.
+4. 대상 지갑 quota를 읽는다.
+5. `quota <= threshold_quota`일 때만 결제한다.
+6. 성공하면 `TopUp` 성공 row를 생성하고 대상 quota를 증가시킨다.
+7. `cooldown_until = now + 1 hour`로 설정한다.
+8. 현재 날짜의 일일 충전 횟수를 증가시킨다.
+9. 실패하면 `fail_count`를 증가시키고, 최대 실패 횟수 이상이면 정책을 `failed`로 전환한다.
 
-Default safety values:
+기본 안전장치 값:
 
-- Threshold cooldown: 1 hour.
-- Threshold daily charge limit: 3 successful automatic charges per policy.
-- Max failure count: 3.
+- 자동결제 cooldown: 1시간.
+- 자동결제 일일 충전 제한: 정책당 성공한 자동충전 3회.
+- 최대 실패 횟수: 3회.
 
-## TopUp Integration
+## TopUp 연동
 
-Successful automatic charges use the existing wallet crediting path:
+성공한 자동 결제는 기존 지갑 충전 경로를 사용한다.
 
-- Personal: increase `users.quota`.
-- Organization: increase `organizations.quota`.
-- Create `TopUp` with:
+- 개인 지갑: `users.quota` 증가.
+- 조직 지갑: `organizations.quota` 증가.
+- 생성되는 `TopUp` 값:
   - `payment_method = toss`
   - `payment_provider = toss`
   - `status = success`
   - `money = amount`
   - `amount = charged KRW`
-  - `target_type` and `target_id` for organization targets
-  - `provider_order_id` or provider payload containing Toss charge metadata
+  - 조직 대상이면 `target_type`, `target_id` 설정
+  - `provider_order_id` 또는 provider payload에 Toss charge 메타데이터 저장
 
-This makes automatic recharge visible in existing wallet top-up history.
+이렇게 하면 자동충전도 기존 지갑 충전 내역에서 자연스럽게 보인다.
 
-## API Design
+## API 설계
 
-Personal wallet:
+개인 지갑:
 
 - `GET /api/wallet/auto-recharge`
 - `POST /api/wallet/auto-recharge/scheduled`
 - `POST /api/wallet/auto-recharge/threshold`
 - `DELETE /api/wallet/auto-recharge/:id`
 
-Organization wallet:
+조직 지갑:
 
 - `GET /api/organization/wallet/auto-recharge`
 - `POST /api/organization/wallet/auto-recharge/scheduled`
 - `POST /api/organization/wallet/auto-recharge/threshold`
 - `DELETE /api/organization/wallet/auto-recharge/:id`
 
-Callbacks:
+콜백:
 
 - `GET /api/wallet/auto-recharge/toss/confirm`
 - `GET /api/wallet/auto-recharge/toss/fail`
 
-The callback resolves the pending policy by trade number and applies the policy target recorded in the database. Personal and organization setup flows use the same callback endpoints; organization routing is derived from `target_type = organization` and `target_id`.
+콜백은 trade number로 pending 정책을 찾고, DB에 기록된 정책 대상을 적용한다. 개인 지갑과 조직 지갑 설정 흐름은 같은 callback endpoint를 사용한다. 조직 처리는 `target_type = organization`과 `target_id`에서 판단한다.
 
-## Frontend Design
+## 프론트엔드 설계
 
-Personal wallet page:
+개인 지갑 화면:
 
-- Add tabs inside the existing wallet page:
+- 기존 지갑 페이지 내부에 탭을 추가한다.
   - `충전`
   - `정기결제`
   - `자동결제`
-- Keep the existing top-up UI in `충전`.
-- `정기결제` shows amount, interval, immediate-charge toggle, card/status, next charge time, and cancel action.
-- `자동결제` shows threshold amount, recharge amount, cooldown/daily-limit explanation, card/status, last charge time, and cancel action.
+- 기존 일반 충전 UI는 `충전` 탭에 유지한다.
+- `정기결제` 탭에는 금액, 주기, 즉시 충전 토글, 카드/상태, 다음 결제 예정일, 해지 액션을 보여준다.
+- `자동결제` 탭에는 기준 잔액, 충전 금액, cooldown/일일 제한 안내, 카드/상태, 최근 충전일, 해지 액션을 보여준다.
 
-Organization wallet page:
+조직 지갑 화면:
 
-- Add the same tabs.
-- Non-owner organization users can view policy status but cannot create or cancel policies.
-- Organization owner sees setup and cancel actions.
+- 같은 탭 구성을 추가한다.
+- 조직 소유자가 아닌 사용자는 정책 상태를 볼 수 있지만 생성/해지할 수 없다.
+- 조직 소유자는 설정과 해지 액션을 사용할 수 있다.
 
-Copy must avoid the word "구독" for this feature. Use wallet language:
+이 기능에서는 "구독"이라는 단어를 피한다. 다음 지갑 중심 표현을 사용한다.
 
 - 정기결제: "정해진 주기마다 지갑에 자동 충전"
 - 자동결제: "잔액이 기준 이하일 때 지갑에 자동 충전"
 
-## Validation
+## 검증 규칙
 
-Common validation:
+공통 검증:
 
-- Toss billing must be enabled.
-- Payment compliance must be confirmed.
-- Amount must be at least `TossMinTopUp`.
-- Active policy of the same type must not already exist for the same target.
-- Pending stale policies can be expired or overwritten by a new setup attempt.
+- Toss 빌링이 활성화되어 있어야 한다.
+- 결제 컴플라이언스가 확인되어 있어야 한다.
+- 금액은 `TossMinTopUp` 이상이어야 한다.
+- 같은 대상에 같은 유형의 활성 정책이 이미 있으면 안 된다.
+- 오래된 pending 정책은 만료하거나 새 설정 시 덮어쓸 수 있다.
 
-Scheduled validation:
+정기결제 검증:
 
-- Interval unit must be supported.
-- Interval value must be positive unless custom seconds is used.
-- Custom seconds must be positive.
+- 지원하는 interval unit만 허용한다.
+- custom seconds를 쓰지 않는 경우 interval value는 양수여야 한다.
+- custom seconds는 양수여야 한다.
 
-Threshold validation:
+자동결제 검증:
 
-- Threshold amount must be non-negative.
-- Threshold quota is calculated server-side using current quota conversion rules.
-- Recharge amount must be positive and at least `TossMinTopUp`.
+- 기준 금액은 음수일 수 없다.
+- `threshold_quota`는 서버에서 현재 quota 환산 규칙으로 계산한다.
+- 충전 금액은 양수이고 `TossMinTopUp` 이상이어야 한다.
 
-Organization validation:
+조직 검증:
 
-- Current user must be the organization owner.
-- Owner's Toss customer key is used for billing authorization.
+- 현재 사용자가 조직 소유자여야 한다.
+- 빌링 인증에는 조직 소유자의 Toss customer key를 사용한다.
 
-## Error Handling
+## 오류 처리
 
-Toss billing authorization failure:
+Toss 빌링 인증 실패:
 
-- Pending policy is marked `cancelled` or `failed`.
-- User is redirected back to the wallet page.
+- pending 정책을 `cancelled` 또는 `failed`로 표시한다.
+- 사용자를 지갑 페이지로 되돌린다.
 
-Toss charge failure:
+Toss charge 실패:
 
-- `fail_count` increments.
-- `last_error` stores a short error message.
-- Policy is marked `failed` after the max failure count.
+- `fail_count`를 증가시킨다.
+- `last_error`에 짧은 오류 메시지를 저장한다.
+- 최대 실패 횟수 이후 정책을 `failed`로 표시한다.
 
-Charge succeeded but local credit failed:
+결제는 성공했지만 로컬 충전 반영에 실패한 경우:
 
-- Log an explicit reconciliation-required error with trade number, user/organization, amount, and policy id.
-- Do not silently retry with a new trade number.
+- trade number, 사용자/조직, 금액, 정책 id를 포함한 수동 정산 필요 로그를 명확히 남긴다.
+- 새 trade number로 조용히 재시도하지 않는다.
 
-Duplicate job execution:
+중복 job 실행:
 
-- Policy rows are locked in transactions.
-- Toss idempotency key is based on the policy id and scheduled/trigger cycle.
-- TopUp trade numbers are unique.
+- 정책 row를 transaction 안에서 lock한다.
+- Toss idempotency key는 정책 id와 scheduled/trigger cycle을 기반으로 만든다.
+- TopUp trade number는 unique해야 한다.
 
-## Tests
+## 테스트
 
-Backend tests:
+백엔드 테스트:
 
-- Personal scheduled policy with immediate charge creates successful `TopUp` and increases `users.quota`.
-- Personal scheduled policy without immediate charge activates without increasing quota.
-- Scheduled job charges due policies and advances `next_charge_time`.
-- Threshold job skips when balance is above threshold.
-- Threshold job charges when balance is at or below threshold.
-- Threshold cooldown prevents repeated charge.
-- Threshold daily limit prevents additional same-day charge.
-- Organization owner can create organization wallet policies.
-- Non-owner cannot create or cancel organization wallet policies.
-- Organization charge increases `organizations.quota` and creates `TopUp target_type=organization`.
-- Toss failure increments `fail_count` and eventually marks policy failed.
-- Existing subscription purchase and Toss subscription renewal tests continue to pass.
+- 개인 정기결제 정책에서 즉시 충전을 선택하면 `TopUp` 성공 기록이 생성되고 `users.quota`가 증가한다.
+- 개인 정기결제 정책에서 즉시 충전을 선택하지 않으면 quota 증가 없이 정책만 active가 된다.
+- 정기결제 job은 due 정책을 결제하고 `next_charge_time`을 다음 주기로 이동한다.
+- 자동결제 job은 잔액이 기준보다 높으면 충전하지 않는다.
+- 자동결제 job은 잔액이 기준 이하이면 충전한다.
+- 자동결제 cooldown 중에는 반복 충전하지 않는다.
+- 자동결제 일일 제한을 넘으면 추가 충전하지 않는다.
+- 조직 소유자는 조직 지갑 정책을 생성할 수 있다.
+- 조직 소유자가 아닌 사용자는 조직 지갑 정책을 생성하거나 해지할 수 없다.
+- 조직 충전은 `organizations.quota`를 증가시키고 `TopUp target_type=organization` 기록을 생성한다.
+- Toss 실패는 `fail_count`를 증가시키고, 반복 실패 시 정책을 failed로 만든다.
+- 기존 구독 구매와 Toss 구독 자동갱신 테스트는 계속 통과해야 한다.
 
-Frontend tests:
+프론트엔드 테스트:
 
-- Wallet page renders `충전`, `정기결제`, and `자동결제` tabs.
-- Scheduled form validates amount and interval.
-- Threshold form validates threshold and amount.
-- Organization non-owner cannot submit setup/cancel actions.
-- Existing wallet recharge flow remains reachable from the `충전` tab.
+- 지갑 페이지가 `충전`, `정기결제`, `자동결제` 탭을 렌더링한다.
+- 정기결제 폼은 금액과 주기를 검증한다.
+- 자동결제 폼은 기준 금액과 충전 금액을 검증한다.
+- 조직 소유자가 아닌 사용자는 설정/해지 액션을 제출할 수 없다.
+- 기존 지갑 충전 흐름은 `충전` 탭에서 계속 접근 가능하다.
 
-## Rollout Notes
+## 배포 메모
 
-- Existing users and subscription data require no migration.
-- New table is additive.
-- Existing Toss billing settings are reused.
-- Existing subscription Toss auto-renew remains untouched.
-- The feature can be deployed disabled implicitly when Toss billing is not configured.
+- 기존 사용자와 구독 데이터에는 별도 마이그레이션이 필요 없다.
+- 새 테이블은 additive 변경이다.
+- 기존 Toss 빌링 설정을 재사용한다.
+- 기존 Toss 구독 자동갱신은 건드리지 않는다.
+- Toss 빌링이 설정되지 않은 환경에서는 이 기능이 자연스럽게 비활성화된다.
