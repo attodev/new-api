@@ -246,6 +246,7 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 	billingKeyId, err := model.StoreTossBillingKey(order.UserId, customerKey, issued.BillingKey, issued.Card.Company, issued.Card.Number)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("Toss billing store failed trade_no=%s err=%v", tradeNo, err))
+		_ = model.ExpireSubscriptionOrder(tradeNo, model.PaymentProviderToss)
 		tossRedirect(c, "/console/topup")
 		return
 	}
@@ -262,7 +263,8 @@ func SubscriptionTossBillingConfirm(c *gin.Context) {
 
 	payload, _ := common.Marshal(result)
 	if err := model.CompleteTossBillingOrder(tradeNo, billingKeyId, string(payload)); err != nil {
-		logger.LogError(ctx, fmt.Sprintf("Toss billing complete order failed trade_no=%s err=%v", tradeNo, err))
+		logger.LogError(ctx, fmt.Sprintf("TOSS RECONCILIATION REQUIRED: subscription first charge DONE but activation failed trade_no=%s user=%d amount=%d err=%v", tradeNo, order.UserId, chargeKRW, err))
+		model.RecordLog(order.UserId, model.LogTypeTopup, fmt.Sprintf("Toss 구독 첫 결제 승인됨(%d원)이나 구독 활성화 실패 — 수동 정산 필요 (trade_no=%s)", chargeKRW, tradeNo))
 		tossRedirect(c, "/console/topup")
 		return
 	}

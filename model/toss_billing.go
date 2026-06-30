@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
@@ -59,6 +58,11 @@ func ProcessTossRenewal(ctx context.Context, subId int, maxFails int) error {
 	if err := DB.Where("id = ?", subId).First(&sub).Error; err != nil {
 		return err
 	}
+	// Re-check right before charging: a cancel that landed after GetDueTossRenewals
+	// must not get charged.
+	if !sub.AutoRenew || sub.Status != "active" {
+		return nil
+	}
 	plan, err := GetSubscriptionPlanById(sub.PlanId)
 	if err != nil {
 		return err
@@ -70,7 +74,12 @@ func ProcessTossRenewal(ctx context.Context, subId int, maxFails int) error {
 		return err
 	}
 	chargeKRW := TossPlanKRW(plan.PriceAmount)
-	tradeNo := fmt.Sprintf("toss_sub_renew_%d_%d", subId, time.Now().Unix())
+	// Deterministic tradeNo per billing cycle: if the charge succeeds but
+	// RenewTossSubscription fails (NextBillingTime not advanced), the next cron tick
+	// retries with the SAME tradeNo → Toss Idempotency-Key dedups the charge and the
+	// audit-order insert (unique trade_no) only commits once. On successful renew,
+	// NextBillingTime advances so the next cycle gets a fresh tradeNo.
+	tradeNo := fmt.Sprintf("toss_sub_renew_%d_%d", subId, sub.NextBillingTime)
 	orderName := fmt.Sprintf("%s 구독 갱신", plan.Title)
 	done, total, err := tossBillingCharger(ctx, billingKey, customerKey, tradeNo, orderName, chargeKRW)
 	if err != nil || !done || total != chargeKRW {

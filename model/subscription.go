@@ -1377,11 +1377,6 @@ func CompleteTossBillingOrder(tradeNo string, billingKeyId int, providerPayload 
 // recurring billing charge. Extends EndTime from the current EndTime (no drift), resets
 // quota usage, advances NextBillingTime, records an audit order, and clears fail count.
 func RenewTossSubscription(subId int, tradeNo string, money float64) error {
-	refCol := "`trade_no`"
-	if common.UsingPostgreSQL {
-		refCol = `"trade_no"`
-	}
-	_ = refCol // used implicitly by GORM unique constraint on trade_no
 	return DB.Transaction(func(tx *gorm.DB) error {
 		var sub UserSubscription
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", subId).First(&sub).Error; err != nil {
