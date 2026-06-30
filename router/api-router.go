@@ -149,10 +149,6 @@ func SetApiRouter(router *gin.Engine) {
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
-				adminRoute.GET("/wallet/auto-recharge/presets", controller.ListWalletAutoRechargePresets)
-				adminRoute.POST("/wallet/auto-recharge/presets", controller.CreateWalletAutoRechargePreset)
-				adminRoute.PUT("/wallet/auto-recharge/presets/:id", controller.UpdateWalletAutoRechargePreset)
-				adminRoute.DELETE("/wallet/auto-recharge/presets/:id", controller.DeleteWalletAutoRechargePreset)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.GET("/search", controller.SearchUsers)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
@@ -173,6 +169,15 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/export", controller.ExportUsers)
 				adminRoute.POST("/import", controller.ImportUsers)
 			}
+		}
+
+		adminRoute := apiRouter.Group("/admin")
+		adminRoute.Use(middleware.AdminAuth())
+		{
+			adminRoute.GET("/wallet/auto-recharge/presets", controller.ListWalletAutoRechargePresets)
+			adminRoute.POST("/wallet/auto-recharge/presets", controller.CreateWalletAutoRechargePreset)
+			adminRoute.PUT("/wallet/auto-recharge/presets/:id", controller.UpdateWalletAutoRechargePreset)
+			adminRoute.DELETE("/wallet/auto-recharge/presets/:id", controller.DeleteWalletAutoRechargePreset)
 		}
 
 		organizationsRoute := apiRouter.Group("/organizations")
