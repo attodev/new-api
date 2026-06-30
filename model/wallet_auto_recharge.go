@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -40,6 +41,7 @@ type WalletAutoRecharge struct {
 	Type              string  `json:"type" gorm:"type:varchar(32);index"`
 	TargetType        string  `json:"target_type" gorm:"type:varchar(32);index"`
 	TargetId          int     `json:"target_id" gorm:"index"`
+	ActiveKey         *string `json:"-" gorm:"type:varchar(128);uniqueIndex"`
 	OwnerUserId       int     `json:"owner_user_id" gorm:"index"`
 	BillingKeyId      int     `json:"billing_key_id" gorm:"index"`
 	Amount            float64 `json:"amount"`
@@ -81,57 +83,60 @@ type CreateWalletAutoRechargeRequest struct {
 	ChargeImmediately bool
 }
 
-func (req CreateWalletAutoRechargeRequest) validate() error {
+func (req CreateWalletAutoRechargeRequest) normalizeAndValidate() (CreateWalletAutoRechargeRequest, error) {
 	if req.Type != WalletAutoRechargeTypeScheduled && req.Type != WalletAutoRechargeTypeThreshold {
-		return errors.New("invalid wallet auto recharge type")
+		return req, errors.New("invalid wallet auto recharge type")
 	}
 	if req.TargetType != TopUpTargetTypeUser && req.TargetType != TopUpTargetTypeOrganization {
-		return errors.New("invalid wallet auto recharge target")
+		return req, errors.New("invalid wallet auto recharge target")
 	}
 	if req.TargetId <= 0 || req.OwnerUserId <= 0 {
-		return errors.New("invalid wallet auto recharge owner or target")
+		return req, errors.New("invalid wallet auto recharge owner or target")
 	}
 	if req.Amount <= 0 {
-		return errors.New("wallet auto recharge amount must be positive")
+		return req, errors.New("wallet auto recharge amount must be positive")
 	}
 	if walletAutoRechargeKRW(req.Amount) < int64(setting.TossMinTopUp) {
-		return errors.New("wallet auto recharge amount is below Toss minimum")
+		return req, errors.New("wallet auto recharge amount is below Toss minimum")
 	}
 	switch req.Type {
 	case WalletAutoRechargeTypeScheduled:
 		switch req.IntervalUnit {
 		case WalletAutoRechargeIntervalMonth, WalletAutoRechargeIntervalDay:
 			if req.IntervalValue <= 0 {
-				return errors.New("wallet auto recharge interval value is invalid")
+				return req, errors.New("wallet auto recharge interval value is invalid")
 			}
 		case WalletAutoRechargeIntervalCustom:
 			if req.CustomSeconds <= 0 {
-				return errors.New("wallet auto recharge custom seconds is invalid")
+				return req, errors.New("wallet auto recharge custom seconds is invalid")
 			}
 			if req.IntervalValue <= 0 {
 				req.IntervalValue = 1
 			}
 		default:
-			return errors.New("wallet auto recharge interval is required")
+			return req, errors.New("wallet auto recharge interval is required")
 		}
 	case WalletAutoRechargeTypeThreshold:
 		if req.ThresholdAmount < 0 {
-			return errors.New("wallet auto recharge threshold cannot be negative")
+			return req, errors.New("wallet auto recharge threshold cannot be negative")
 		}
 	}
-	return nil
+	return req, nil
 }
 
 func CreatePendingWalletAutoRecharge(req CreateWalletAutoRechargeRequest) (*WalletAutoRecharge, error) {
-	if err := req.validate(); err != nil {
+	req, err := req.normalizeAndValidate()
+	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
+	activeKey := walletAutoRechargeActiveKey(req.TargetType, req.TargetId, req.Type)
 	policy := &WalletAutoRecharge{
 		Type:              req.Type,
 		TargetType:        req.TargetType,
 		TargetId:          req.TargetId,
+		ActiveKey:         &activeKey,
 		OwnerUserId:       req.OwnerUserId,
 		Amount:            req.Amount,
 		ThresholdAmount:   req.ThresholdAmount,
@@ -150,17 +155,14 @@ func CreatePendingWalletAutoRecharge(req CreateWalletAutoRechargeRequest) (*Wall
 		policy.NextChargeTime = nextWalletChargeTime(now, req.IntervalUnit, req.IntervalValue, req.CustomSeconds).Unix()
 	}
 
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&WalletAutoRecharge{}).
-			Where("target_type = ? AND target_id = ? AND type = ? AND status IN ?", req.TargetType, req.TargetId, req.Type, []string{WalletAutoRechargeStatusPending, WalletAutoRechargeStatusActive}).
-			Count(&count).Error; err != nil {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(policy).Error; err != nil {
+			if isWalletAutoRechargeActiveKeyConflict(err) {
+				return errors.New("active wallet auto recharge already exists")
+			}
 			return err
 		}
-		if count > 0 {
-			return errors.New("active wallet auto recharge already exists")
-		}
-		return tx.Create(policy).Error
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -191,6 +193,7 @@ func ActivateWalletAutoRechargeFromToss(tradeNo string, billingKeyId int, cardCo
 			"card_company":       cardCompany,
 			"card_number_masked": cardMasked,
 			"status":             WalletAutoRechargeStatusActive,
+			"active_key":         walletAutoRechargeActiveKey(policy.TargetType, policy.TargetId, policy.Type),
 			"last_error":         "",
 			"fail_count":         0,
 			"update_time":        now.Unix(),
@@ -200,12 +203,17 @@ func ActivateWalletAutoRechargeFromToss(tradeNo string, billingKeyId int, cardCo
 			policy.NextChargeTime = now.Unix()
 		}
 		if err := tx.Model(&policy).Updates(updates).Error; err != nil {
+			if isWalletAutoRechargeActiveKeyConflict(err) {
+				return errors.New("active wallet auto recharge already exists")
+			}
 			return err
 		}
 		policy.BillingKeyId = billingKeyId
 		policy.CardCompany = cardCompany
 		policy.CardNumberMasked = cardMasked
 		policy.Status = WalletAutoRechargeStatusActive
+		activeKey := walletAutoRechargeActiveKey(policy.TargetType, policy.TargetId, policy.Type)
+		policy.ActiveKey = &activeKey
 		policy.FailCount = 0
 		policy.LastError = ""
 		return nil
@@ -251,12 +259,8 @@ func CancelWalletAutoRecharge(id int, targetType string, targetId int) error {
 		if policy.Status == WalletAutoRechargeStatusCancelled {
 			return nil
 		}
-		if policy.BillingKeyId > 0 {
-			if err := RevokeTossBillingKey(tx, policy.BillingKeyId); err != nil {
-				return err
-			}
-		}
 		return tx.Model(&policy).Updates(map[string]interface{}{
+			"active_key":  nil,
 			"status":      WalletAutoRechargeStatusCancelled,
 			"update_time": time.Now().Unix(),
 		}).Error
@@ -355,6 +359,24 @@ func walletAutoRechargeTradeNo(policy WalletAutoRecharge, now time.Time) string 
 	return fmt.Sprintf("wallet_auto_%d_%d", policy.Id, policy.NextChargeTime)
 }
 
+func walletAutoRechargeActiveKey(targetType string, targetId int, rechargeType string) string {
+	return fmt.Sprintf("%s:%d:%s", targetType, targetId, rechargeType)
+}
+
+func isWalletAutoRechargeActiveKeyConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "wallet_auto_recharges.active_key") ||
+		strings.Contains(message, "wallet_auto_recharge.active_key") ||
+		strings.Contains(message, "active_key") && strings.Contains(message, "duplicate") ||
+		strings.Contains(message, "active_key") && strings.Contains(message, "unique")
+}
+
 func walletThresholdShouldCharge(tx *gorm.DB, policy *WalletAutoRecharge, now time.Time) (bool, error) {
 	if policy.CooldownUntil > now.Unix() {
 		return false, nil
@@ -440,12 +462,16 @@ func markWalletAutoRechargeFailure(tx *gorm.DB, policy *WalletAutoRecharge, maxF
 	if len(message) > 255 {
 		message = message[:255]
 	}
-	return tx.Model(policy).Updates(map[string]interface{}{
+	updates := map[string]interface{}{
 		"fail_count":  failCount,
 		"status":      status,
 		"last_error":  message,
 		"update_time": time.Now().Unix(),
-	}).Error
+	}
+	if status == WalletAutoRechargeStatusFailed {
+		updates["active_key"] = nil
+	}
+	return tx.Model(policy).Updates(updates).Error
 }
 
 func getTossBillingKeyPlainTx(tx *gorm.DB, id int) (string, string, error) {

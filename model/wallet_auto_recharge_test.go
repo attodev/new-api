@@ -39,6 +39,7 @@ func stubWalletCharger(done bool, total int64, err error) TossBillingCharger {
 func TestCreatePendingWalletAutoRechargeRejectsDuplicateActiveType(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 	now := time.Now().Unix()
+	activeKey := walletAutoRechargeActiveKey(TopUpTargetTypeUser, 1, WalletAutoRechargeTypeScheduled)
 	require.NoError(t, DB.Create(&WalletAutoRecharge{
 		Type:           WalletAutoRechargeTypeScheduled,
 		TargetType:     TopUpTargetTypeUser,
@@ -49,6 +50,8 @@ func TestCreatePendingWalletAutoRechargeRejectsDuplicateActiveType(t *testing.T)
 		IntervalValue:  1,
 		Status:         WalletAutoRechargeStatusActive,
 		NextChargeTime: now + 3600,
+		ActiveKey:      &activeKey,
+		AuthTradeNo:    "existing-trade-no",
 	}).Error)
 
 	_, err := CreatePendingWalletAutoRecharge(CreateWalletAutoRechargeRequest{
@@ -57,12 +60,72 @@ func TestCreatePendingWalletAutoRechargeRejectsDuplicateActiveType(t *testing.T)
 		TargetId:      1,
 		OwnerUserId:   1,
 		Amount:        20,
+		AuthTradeNo:   "new-trade-no",
 		IntervalUnit:  WalletAutoRechargeIntervalMonth,
 		IntervalValue: 1,
 	})
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "active wallet auto recharge already exists")
+}
+
+func TestCreatePendingWalletAutoRechargeNormalizesCustomIntervalValue(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+
+	policy, err := CreatePendingWalletAutoRecharge(CreateWalletAutoRechargeRequest{
+		Type:          WalletAutoRechargeTypeScheduled,
+		TargetType:    TopUpTargetTypeUser,
+		TargetId:      1,
+		OwnerUserId:   1,
+		Amount:        20,
+		IntervalUnit:  WalletAutoRechargeIntervalCustom,
+		CustomSeconds: 3600,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, policy.IntervalValue)
+
+	var stored WalletAutoRecharge
+	require.NoError(t, DB.First(&stored, policy.Id).Error)
+	require.Equal(t, 1, stored.IntervalValue)
+}
+
+func TestCancelWalletAutoRechargeKeepsBillingKeyActive(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	enc, err := common.EncryptString("billing-key")
+	require.NoError(t, err)
+	require.NoError(t, DB.Create(&UserBillingKey{
+		Id:           21,
+		UserId:       1,
+		CustomerKey:  "customer-21",
+		EncryptedKey: enc,
+		Status:       BillingKeyStatusActive,
+	}).Error)
+	activeKey := walletAutoRechargeActiveKey(TopUpTargetTypeUser, 1, WalletAutoRechargeTypeScheduled)
+	require.NoError(t, DB.Create(&WalletAutoRecharge{
+		Type:           WalletAutoRechargeTypeScheduled,
+		TargetType:     TopUpTargetTypeUser,
+		TargetId:       1,
+		OwnerUserId:    1,
+		BillingKeyId:   21,
+		Amount:         10,
+		IntervalUnit:   WalletAutoRechargeIntervalMonth,
+		IntervalValue:  1,
+		Status:         WalletAutoRechargeStatusActive,
+		NextChargeTime: time.Now().Add(time.Hour).Unix(),
+		ActiveKey:      &activeKey,
+	}).Error)
+
+	require.NoError(t, CancelWalletAutoRecharge(1, TopUpTargetTypeUser, 1))
+
+	var billingKey UserBillingKey
+	require.NoError(t, DB.First(&billingKey, 21).Error)
+	require.Equal(t, BillingKeyStatusActive, billingKey.Status)
+
+	var policy WalletAutoRecharge
+	require.NoError(t, DB.First(&policy, 1).Error)
+	require.Equal(t, WalletAutoRechargeStatusCancelled, policy.Status)
+	require.Nil(t, policy.ActiveKey)
 }
 
 func TestProcessWalletAutoRechargeCreditsUserWallet(t *testing.T) {
