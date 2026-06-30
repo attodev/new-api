@@ -136,6 +136,26 @@ export async function paySubscriptionBalance(
   return res.data
 }
 
+export async function paySubscriptionToss(data: {
+  plan_id: number
+}): Promise<SubscriptionPayResponse & {
+  data?: {
+    client_key?: string
+    customer_key?: string
+    trade_no?: string
+    success_url?: string
+    fail_url?: string
+  }
+}> {
+  const res = await api.post('/api/subscription/toss/pay', data)
+  return res.data
+}
+
+export async function cancelTossAutoRenew(): Promise<SubscriptionPayResponse> {
+  const res = await api.post('/api/subscription/toss/cancel', {})
+  return res.data
+}
+
 // Mints a Pancake OnetimeProduct (see controller for the OnetimeProduct vs
 // SubscriptionProduct rationale) using persisted creds + StoreID.
 export async function createWaffoPancakeSubscriptionProduct(data: {
