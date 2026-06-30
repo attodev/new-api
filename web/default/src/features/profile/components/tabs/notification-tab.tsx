@@ -24,7 +24,6 @@ import { ROLE } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 import { PasswordInput } from '@/components/password-input'
 import { updateUserSettings } from '../../api'
@@ -124,39 +123,33 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
       {/* Notification Type */}
       <div className='space-y-2.5'>
         <Label>{t('Notification Method')}</Label>
-        <RadioGroup
-          value={settings.notify_type}
-          onValueChange={(value) =>
-            updateField('notify_type', value as NotifyType)
-          }
-          className='grid grid-cols-4 gap-1.5 sm:gap-3'
-        >
+        <div role='radiogroup' className='grid grid-cols-4 gap-1.5 sm:gap-3'>
           {NOTIFICATION_METHODS.map((method) => {
             const Icon = NOTIFICATION_ICONS[method.value]
             const isSelected = settings.notify_type === method.value
             return (
-              <Label
+              <button
                 key={method.value}
-                htmlFor={method.value}
+                type='button'
+                role='radio'
+                aria-checked={isSelected}
+                onClick={() =>
+                  updateField('notify_type', method.value as NotifyType)
+                }
                 className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-colors sm:min-h-20 sm:gap-2 sm:border-2 sm:p-3 ${
                   isSelected
                     ? 'border-primary bg-primary/5 text-primary'
                     : 'border-muted hover:border-muted-foreground/25 hover:bg-muted/50'
                 }`}
               >
-                <RadioGroupItem
-                  value={method.value}
-                  id={method.value}
-                  className='sr-only'
-                />
                 <Icon className='h-4 w-4 sm:h-5 sm:w-5' />
                 <span className='max-w-full truncate text-xs font-medium sm:text-sm'>
                   {t(method.label)}
                 </span>
-              </Label>
+              </button>
             )
           })}
-        </RadioGroup>
+        </div>
       </div>
 
       {/* Warning Threshold */}
