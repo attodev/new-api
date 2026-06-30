@@ -20,18 +20,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth-store'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
-import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SectionPageLayout } from '@/components/layout'
 import { isApiSuccess } from '@/features/wallet/api'
-import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
+import { AutoRechargeCard } from '@/features/wallet/components/auto-recharge-card'
 import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from '@/features/wallet/components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from '@/features/wallet/components/dialogs/payment-confirm-dialog'
+import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
 import { WalletStatsCard } from '@/features/wallet/components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE } from '@/features/wallet/constants'
-import { useTopupInfo } from '@/features/wallet/hooks'
+import { useTopupInfo, useWalletAutoRecharge } from '@/features/wallet/hooks'
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
@@ -94,6 +97,17 @@ function isSafeHttpUrl(value: string): boolean {
   }
 }
 
+export function canManageOrganizationAutoRecharge(
+  ownerUserId: number | null | undefined,
+  currentUserId: number | null | undefined
+) {
+  return (
+    ownerUserId !== null &&
+    ownerUserId !== undefined &&
+    ownerUserId === currentUserId
+  )
+}
+
 export function OrganizationWallet() {
   const { t } = useTranslation()
   const [organization, setOrganization] = useState<Organization | null>(null)
@@ -112,9 +126,18 @@ export function OrganizationWallet() {
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
 
+  const currentUser = useAuthStore((state) => state.auth.user)
   const { status } = useStatus()
   const { currency } = useSystemConfig()
   const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
+  const canManageAutoRecharge = canManageOrganizationAutoRecharge(
+    organization?.owner_user_id,
+    currentUser?.id
+  )
+  const walletAutoRecharge = useWalletAutoRecharge(
+    'organization',
+    canManageAutoRecharge
+  )
 
   const effectiveUsdExchangeRate = useMemo(() => {
     return currency?.quotaDisplayType === 'USD'
@@ -254,7 +277,10 @@ export function OrganizationWallet() {
       }
 
       const payLink = getPayLink(response.data)
-      if ((isStripePayment(paymentType) || isPayPalPayment(paymentType)) && payLink) {
+      if (
+        (isStripePayment(paymentType) || isPayPalPayment(paymentType)) &&
+        payLink
+      ) {
         if (isPayPalPayment(paymentType)) {
           window.location.href = payLink
         } else {
@@ -368,39 +394,85 @@ export function OrganizationWallet() {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={walletUser} loading={organizationLoading} />
 
-            <div id='organization-wallet-add-funds' className='scroll-mt-4'>
-              <RechargeFormCard
-                topupInfo={topupInfo}
-                presetAmounts={presetAmounts}
-                selectedPreset={selectedPreset}
-                onSelectPreset={handleSelectPreset}
-                topupAmount={topupAmount}
-                onTopupAmountChange={handleTopupAmountChange}
-                paymentAmount={paymentAmount}
-                calculating={calculating}
-                onPaymentMethodSelect={handlePaymentMethodSelect}
-                paymentLoading={paymentLoading}
-                redemptionCode=''
-                onRedemptionCodeChange={() => undefined}
-                onRedeem={() => undefined}
-                redeeming={false}
-                loading={topupLoading}
-                priceRatio={(status?.price as number) || 1}
-                usdExchangeRate={effectiveUsdExchangeRate}
-                onOpenBilling={() => setBillingDialogOpen(true)}
-                creemProducts={topupInfo?.creem_products}
-                enableCreemTopup={topupInfo?.enable_creem_topup}
-                onCreemProductSelect={handleCreemProductSelect}
-                enableWaffoTopup={topupInfo?.enable_waffo_topup}
-                waffoPayMethods={topupInfo?.waffo_pay_methods}
-                waffoMinTopup={topupInfo?.waffo_min_topup}
-                onWaffoMethodSelect={handleWaffoMethodSelect}
-                enableWaffoPancakeTopup={
-                  topupInfo?.enable_waffo_pancake_topup
-                }
-                showRedemption={false}
-              />
-            </div>
+            <Tabs defaultValue='topup' className='w-full gap-4'>
+              <TabsList className='grid w-full grid-cols-3 sm:w-fit'>
+                <TabsTrigger value='topup'>{t('Top up')}</TabsTrigger>
+                <TabsTrigger value='scheduled'>
+                  {t('Scheduled recharge')}
+                </TabsTrigger>
+                <TabsTrigger value='threshold'>
+                  {t('Auto recharge')}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value='topup'>
+                <div id='organization-wallet-add-funds' className='scroll-mt-4'>
+                  <RechargeFormCard
+                    topupInfo={topupInfo}
+                    presetAmounts={presetAmounts}
+                    selectedPreset={selectedPreset}
+                    onSelectPreset={handleSelectPreset}
+                    topupAmount={topupAmount}
+                    onTopupAmountChange={handleTopupAmountChange}
+                    paymentAmount={paymentAmount}
+                    calculating={calculating}
+                    onPaymentMethodSelect={handlePaymentMethodSelect}
+                    paymentLoading={paymentLoading}
+                    redemptionCode=''
+                    onRedemptionCodeChange={() => undefined}
+                    onRedeem={() => undefined}
+                    redeeming={false}
+                    loading={topupLoading}
+                    priceRatio={(status?.price as number) || 1}
+                    usdExchangeRate={effectiveUsdExchangeRate}
+                    onOpenBilling={() => setBillingDialogOpen(true)}
+                    creemProducts={topupInfo?.creem_products}
+                    enableCreemTopup={topupInfo?.enable_creem_topup}
+                    onCreemProductSelect={handleCreemProductSelect}
+                    enableWaffoTopup={topupInfo?.enable_waffo_topup}
+                    waffoPayMethods={topupInfo?.waffo_pay_methods}
+                    waffoMinTopup={topupInfo?.waffo_min_topup}
+                    onWaffoMethodSelect={handleWaffoMethodSelect}
+                    enableWaffoPancakeTopup={
+                      topupInfo?.enable_waffo_pancake_topup
+                    }
+                    showRedemption={false}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value='scheduled'>
+                <AutoRechargeCard
+                  mode='scheduled'
+                  policies={walletAutoRecharge.policies}
+                  loading={walletAutoRecharge.loading}
+                  processing={walletAutoRecharge.processing}
+                  canManage={canManageAutoRecharge}
+                  minTopup={
+                    topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
+                  }
+                  onCreateScheduled={walletAutoRecharge.createScheduled}
+                  onCreateThreshold={walletAutoRecharge.createThreshold}
+                  onCancel={walletAutoRecharge.cancel}
+                />
+              </TabsContent>
+
+              <TabsContent value='threshold'>
+                <AutoRechargeCard
+                  mode='threshold'
+                  policies={walletAutoRecharge.policies}
+                  loading={walletAutoRecharge.loading}
+                  processing={walletAutoRecharge.processing}
+                  canManage={canManageAutoRecharge}
+                  minTopup={
+                    topupInfo?.toss_min_topup || getMinTopupAmount(topupInfo)
+                  }
+                  onCreateScheduled={walletAutoRecharge.createScheduled}
+                  onCreateThreshold={walletAutoRecharge.createThreshold}
+                  onCancel={walletAutoRecharge.cancel}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>

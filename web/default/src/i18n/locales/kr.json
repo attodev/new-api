@@ -2447,7 +2447,7 @@
     "Monitor balance, usage, and request volume": "잔액, 사용량, 요청 수 모니터링",
     "Monitored relay requests": "모니터링된 릴레이 요청",
     "Monitoring & Alerts": "모니터링 및 알림",
-    "month": "월",
+    "month": "개월",
     "Month": "월",
     "Month number": "월 번호",
     "monthly": "매월",
@@ -4677,6 +4677,22 @@
     "Toss Auto Pay": "Toss 자동결제",
     "Auto-renew active": "자동결제 활성",
     "Cancel Auto-renew": "자동결제 해지",
-    "Auto-renew cancelled": "자동결제가 해지되었습니다"
+    "Auto-renew cancelled": "자동결제가 해지되었습니다",
+    "Top up": "충전",
+    "Scheduled recharge": "정기 충전",
+    "Auto recharge": "자동 충전",
+    "Recharge amount": "충전 금액",
+    "Threshold balance": "기준 잔액",
+    "Charge immediately": "즉시 첫 충전",
+    "Current policy": "현재 정책",
+    "Charge interval": "충전 주기",
+    "Next charge": "다음 결제",
+    "Card": "카드",
+    "No policy configured": "설정된 정책 없음",
+    "You do not have permission to manage this.": "관리 권한이 없습니다.",
+    "Interval value": "주기 값",
+    "Minimum recharge amount is {{amount}}.": "최소 충전 금액은 {{amount}}입니다.",
+    "Please enter a valid interval value.": "유효한 주기 값을 입력하세요.",
+    "Please enter a valid threshold balance.": "유효한 기준 잔액을 입력하세요."
   }
 }
