@@ -126,6 +126,9 @@ func main() {
 	// Toss auto-renew recurring billing (charges due subscriptions every minute)
 	service.StartTossBillingTask()
 
+	// Wallet auto-recharge background billing (scheduled + threshold policies)
+	service.StartWalletAutoRechargeTask()
+
 	// Wire task polling adaptor factory (breaks service -> relay import cycle)
 	service.GetTaskAdaptorFunc = func(platform constant.TaskPlatform) service.TaskPollingAdaptor {
 		a := relay.GetTaskAdaptor(platform)
