@@ -4673,6 +4673,10 @@
     "Toss live client key (leave blank unless updating)": "Toss 실제 Client Key (변경 시에만 입력)",
     "Toss live secret key (leave blank unless updating)": "Toss 실제 Secret Key (변경 시에만 입력)",
     "KRW amount charged per unit of balance": "잔액 1 unit당 청구되는 금액(원)",
-    "Minimum recharge amount in KRW": "최소 충전 금액(원)"
+    "Minimum recharge amount in KRW": "최소 충전 금액(원)",
+    "Toss Auto Pay": "Toss 자동결제",
+    "Auto-renew active": "자동결제 활성",
+    "Cancel Auto-renew": "자동결제 해지",
+    "Auto-renew cancelled": "자동결제가 해지되었습니다"
   }
 }

@@ -179,6 +179,8 @@ export interface TopupInfo {
   enable_toss_topup?: boolean
   /** Minimum topup amount for Toss (KRW) */
   toss_min_topup?: number
+  /** Whether Toss billing (recurring subscription) is enabled */
+  enable_toss_billing?: boolean
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */

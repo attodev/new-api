@@ -143,6 +143,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
 		"enable_toss_topup":                isTossTopUpEnabled(),
+		"enable_toss_billing":              isTossBillingEnabled(),
 		"toss_min_topup":                   setting.TossMinTopUp,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
