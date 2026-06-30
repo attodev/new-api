@@ -247,6 +247,12 @@ type UserSubscription struct {
 
 	Source string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin
 
+	// Toss 자동결제(빌링) 연동 필드
+	AutoRenew        bool  `json:"auto_renew" gorm:"default:false"`
+	NextBillingTime  int64 `json:"next_billing_time" gorm:"default:0;index"`
+	BillingKeyId     int   `json:"billing_key_id" gorm:"default:0;index"`
+	BillingFailCount int   `json:"billing_fail_count" gorm:"default:0"`
+
 	LastResetTime int64 `json:"last_reset_time" gorm:"type:bigint;default:0"`
 	NextResetTime int64 `json:"next_reset_time" gorm:"type:bigint;default:0;index"`
 
