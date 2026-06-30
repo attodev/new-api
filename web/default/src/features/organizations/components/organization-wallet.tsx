@@ -387,9 +387,14 @@ export function OrganizationWallet() {
     () =>
       getVisibleAutoRechargeModes(
         walletAutoRecharge.presets.filter((preset) => preset.enabled),
-        walletAutoRecharge.policies
+        walletAutoRecharge.policies,
+        walletAutoRecharge.presetsLoaded
       ),
-    [walletAutoRecharge.policies, walletAutoRecharge.presets]
+    [
+      walletAutoRecharge.policies,
+      walletAutoRecharge.presets,
+      walletAutoRecharge.presetsLoaded,
+    ]
   )
 
   useEffect(() => {

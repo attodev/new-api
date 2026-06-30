@@ -44,6 +44,8 @@ export function useWalletAutoRecharge(
   const [presets, setPresets] = useState<WalletAutoRechargePreset[]>([])
   const [loading, setLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [presetsLoading, setPresetsLoading] = useState(false)
+  const [presetsLoaded, setPresetsLoaded] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -58,9 +60,15 @@ export function useWalletAutoRecharge(
   }, [scope])
 
   const refreshPresets = useCallback(async () => {
-    const response = await getWalletAutoRechargePresets(scope)
-    if (isApiSuccess(response) && Array.isArray(response.data)) {
-      setPresets(response.data)
+    setPresetsLoading(true)
+    try {
+      const response = await getWalletAutoRechargePresets(scope)
+      if (isApiSuccess(response) && Array.isArray(response.data)) {
+        setPresets(response.data)
+        setPresetsLoaded(true)
+      }
+    } finally {
+      setPresetsLoading(false)
     }
   }, [scope])
 
@@ -163,6 +171,8 @@ export function useWalletAutoRecharge(
   return {
     policies,
     presets,
+    presetsLoading,
+    presetsLoaded,
     loading,
     processing,
     refresh,

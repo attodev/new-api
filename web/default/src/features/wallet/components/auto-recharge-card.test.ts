@@ -133,8 +133,15 @@ describe('auto recharge card helpers', () => {
 })
 
 describe('auto recharge preset UI helpers', () => {
+  test('keeps both modes visible until preset fetch resolves', () => {
+    assert.deepEqual(getVisibleAutoRechargeModes([], [], false), [
+      'scheduled',
+      'threshold',
+    ])
+  })
+
   test('hides mode without preset and without existing policy', () => {
-    assert.deepEqual(getVisibleAutoRechargeModes([], []), [])
+    assert.deepEqual(getVisibleAutoRechargeModes([], [], true), [])
   })
 
   test('shows mode when preset exists', () => {
@@ -150,7 +157,8 @@ describe('auto recharge preset UI helpers', () => {
             enabled: true,
           },
         ],
-        []
+        [],
+        true
       ),
       ['scheduled']
     )
@@ -160,7 +168,8 @@ describe('auto recharge preset UI helpers', () => {
     assert.deepEqual(
       getVisibleAutoRechargeModes(
         [],
-        [{ id: 7, type: 'threshold', status: 'active', amount: 10000 } as never]
+        [{ id: 7, type: 'threshold', status: 'active', amount: 10000 } as never],
+        true
       ),
       ['threshold']
     )

@@ -108,8 +108,13 @@ export function buildPresetCreatePayload(
 
 export function getVisibleAutoRechargeModes(
   presets: Array<Pick<WalletAutoRechargePreset, 'type'>>,
-  policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>
+  policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>,
+  presetsLoaded = true
 ): WalletAutoRechargeType[] {
+  if (!presetsLoaded) {
+    return ['scheduled', 'threshold']
+  }
+
   return (['scheduled', 'threshold'] as WalletAutoRechargeType[]).filter(
     (mode) =>
       presets.some((preset) => preset.type === mode) ||
