@@ -4699,6 +4699,19 @@
     "Failed to update preset": "프리셋 수정에 실패했습니다",
     "Failed to delete preset": "프리셋 삭제에 실패했습니다",
     "Please enter a valid interval value.": "유효한 주기 값을 입력하세요.",
-    "Please enter a valid threshold balance.": "유효한 기준 잔액을 입력하세요."
+    "Please enter a valid threshold balance.": "유효한 기준 잔액을 입력하세요.",
+    "Auto Recharge Presets": "자동충전 프리셋",
+    "Scheduled recharge presets": "정기결제 프리셋",
+    "Auto recharge presets": "자동결제 프리셋",
+    "Preset name": "프리셋 이름",
+    "Preset description": "프리셋 설명",
+    "Target scope": "적용 대상",
+    "Applies to personal wallets": "개인 지갑에 적용",
+    "Applies to organization wallets": "조직 지갑에 적용",
+    "Applies to all wallets": "모든 지갑에 적용",
+    "No auto recharge presets are available.": "사용 가능한 자동충전 프리셋이 없습니다.",
+    "This preset is no longer available. Existing policy values are preserved.": "이 프리셋은 더 이상 사용할 수 없습니다. 기존 정책 값은 유지됩니다.",
+    "Select this preset": "이 프리셋 선택",
+    "Disable preset": "프리셋 비활성화"
   }
 }

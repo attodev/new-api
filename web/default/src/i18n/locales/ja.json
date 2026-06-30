@@ -4699,6 +4699,19 @@
     "Failed to update preset": "プリセットの更新に失敗しました",
     "Failed to delete preset": "プリセットの削除に失敗しました",
     "Please enter a valid interval value.": "有効な間隔値を入力してください。",
-    "Please enter a valid threshold balance.": "有効な残高しきい値を入力してください。"
+    "Please enter a valid threshold balance.": "有効な残高しきい値を入力してください。",
+    "Auto Recharge Presets": "自動チャージプリセット",
+    "Scheduled recharge presets": "定期チャージプリセット",
+    "Auto recharge presets": "自動チャージプリセット",
+    "Preset name": "プリセット名",
+    "Preset description": "プリセット説明",
+    "Target scope": "適用対象",
+    "Applies to personal wallets": "個人ウォレットに適用",
+    "Applies to organization wallets": "組織ウォレットに適用",
+    "Applies to all wallets": "すべてのウォレットに適用",
+    "No auto recharge presets are available.": "利用可能な自動チャージプリセットはありません。",
+    "This preset is no longer available. Existing policy values are preserved.": "このプリセットは利用できなくなりました。既存のポリシー値は保持されます。",
+    "Select this preset": "このプリセットを選択",
+    "Disable preset": "プリセットを無効化"
   }
 }

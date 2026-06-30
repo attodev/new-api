@@ -4699,6 +4699,19 @@
     "Failed to update preset": "更新预设失败",
     "Failed to delete preset": "删除预设失败",
     "Please enter a valid interval value.": "请输入有效的周期值。",
-    "Please enter a valid threshold balance.": "请输入有效的余额阈值。"
+    "Please enter a valid threshold balance.": "请输入有效的余额阈值。",
+    "Auto Recharge Presets": "Auto Recharge Presets",
+    "Scheduled recharge presets": "Scheduled recharge presets",
+    "Auto recharge presets": "Auto recharge presets",
+    "Preset name": "Preset name",
+    "Preset description": "Preset description",
+    "Target scope": "Target scope",
+    "Applies to personal wallets": "Applies to personal wallets",
+    "Applies to organization wallets": "Applies to organization wallets",
+    "Applies to all wallets": "Applies to all wallets",
+    "No auto recharge presets are available.": "No auto recharge presets are available.",
+    "This preset is no longer available. Existing policy values are preserved.": "This preset is no longer available. Existing policy values are preserved.",
+    "Select this preset": "Select this preset",
+    "Disable preset": "Disable preset"
   }
 }
