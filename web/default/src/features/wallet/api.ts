@@ -305,9 +305,13 @@ export async function requestWalletScheduledRecharge(
   request: WalletAutoRechargeRequest,
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargeTossResponse> {
-  const res = await api.post(`${walletAutoRechargeBase(scope)}/scheduled`, request, {
-    skipBusinessError: true,
-  } as Record<string, unknown>)
+  const res = await api.post(
+    `${walletAutoRechargeBase(scope)}/scheduled`,
+    request,
+    {
+      skipBusinessError: true,
+    } as Record<string, unknown>
+  )
   return res.data
 }
 
@@ -315,9 +319,13 @@ export async function requestWalletThresholdRecharge(
   request: WalletAutoRechargeRequest,
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargeTossResponse> {
-  const res = await api.post(`${walletAutoRechargeBase(scope)}/threshold`, request, {
-    skipBusinessError: true,
-  } as Record<string, unknown>)
+  const res = await api.post(
+    `${walletAutoRechargeBase(scope)}/threshold`,
+    request,
+    {
+      skipBusinessError: true,
+    } as Record<string, unknown>
+  )
   return res.data
 }
 
@@ -326,5 +334,15 @@ export async function cancelWalletAutoRecharge(
   scope: 'user' | 'organization' = 'user'
 ): Promise<ApiResponse> {
   const res = await api.delete(`${walletAutoRechargeBase(scope)}/${id}`)
+  return res.data
+}
+
+export async function cancelPendingWalletAutoRecharge(
+  tradeNo: string,
+  scope: 'user' | 'organization' = 'user'
+): Promise<ApiResponse> {
+  const res = await api.delete(
+    `${walletAutoRechargeBase(scope)}/pending/${encodeURIComponent(tradeNo)}`
+  )
   return res.data
 }

@@ -267,6 +267,23 @@ func CancelWalletAutoRecharge(id int, targetType string, targetId int) error {
 	})
 }
 
+func CancelPendingWalletAutoRechargeByTradeNo(tradeNo string, targetType string, targetId int) error {
+	if strings.TrimSpace(tradeNo) == "" {
+		return errors.New("wallet auto recharge tradeNo is required")
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var policy WalletAutoRecharge
+		if err := tx.Where("auth_trade_no = ? AND target_type = ? AND target_id = ? AND status = ?", tradeNo, targetType, targetId, WalletAutoRechargeStatusPending).First(&policy).Error; err != nil {
+			return err
+		}
+		return tx.Model(&policy).Updates(map[string]interface{}{
+			"active_key":  nil,
+			"status":      WalletAutoRechargeStatusCancelled,
+			"update_time": time.Now().Unix(),
+		}).Error
+	})
+}
+
 func ListWalletAutoRecharges(targetType string, targetId int) ([]WalletAutoRecharge, error) {
 	var rows []WalletAutoRecharge
 	err := DB.Where("target_type = ? AND target_id = ?", targetType, targetId).Order("id desc").Find(&rows).Error
@@ -338,18 +355,23 @@ func ProcessWalletAutoRechargeWithConfiguredCharger(ctx context.Context, policyI
 }
 
 func walletAutoRechargeKRW(amount float64) int64 {
+	return decimal.NewFromFloat(amount).Round(0).IntPart()
+}
+
+func walletAutoRechargeMoney(amountKRW float64) float64 {
 	unit := setting.TossUnitPrice
 	if unit <= 0 {
 		unit = 1
 	}
-	return decimal.NewFromFloat(amount).Mul(decimal.NewFromFloat(unit)).Round(0).IntPart()
+	return decimal.NewFromFloat(amountKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
 }
 
 func walletAutoRechargeQuota(amount float64) int {
 	if amount <= 0 {
 		return 0
 	}
-	return int(decimal.NewFromFloat(amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	money := walletAutoRechargeMoney(float64(walletAutoRechargeKRW(amount)))
+	return int(decimal.NewFromFloat(money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
 }
 
 func walletAutoRechargeTradeNo(policy WalletAutoRecharge, now time.Time) string {
@@ -408,17 +430,18 @@ func walletThresholdShouldCharge(tx *gorm.DB, policy *WalletAutoRecharge, now ti
 }
 
 func creditWalletAutoRecharge(tx *gorm.DB, policy *WalletAutoRecharge, tradeNo string, chargeKRW int64, now time.Time) error {
-	quotaToAdd := walletAutoRechargeQuota(policy.Amount)
+	quotaToAdd := walletAutoRechargeQuota(float64(chargeKRW))
 	if quotaToAdd <= 0 {
 		return errors.New("invalid wallet auto recharge quota")
 	}
+	money := walletAutoRechargeMoney(float64(chargeKRW))
 
 	topUp := &TopUp{
 		UserId:          policy.OwnerUserId,
 		TargetType:      policy.TargetType,
 		TargetId:        policy.TargetId,
 		Amount:          chargeKRW,
-		Money:           policy.Amount,
+		Money:           money,
 		TradeNo:         tradeNo,
 		ProviderOrderId: tradeNo,
 		PaymentMethod:   PaymentMethodToss,

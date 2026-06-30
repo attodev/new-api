@@ -101,6 +101,11 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
+	if !isValidServerAddress(system_setting.ServerAddress) {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("wallet auto recharge blocked: invalid ServerAddress=%q", system_setting.ServerAddress))
+		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
+		return
+	}
 
 	var req walletAutoRechargeRequest
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
@@ -218,6 +223,23 @@ func CancelWalletAutoRecharge(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
+func CancelPendingWalletAutoRecharge(c *gin.Context) {
+	target, ok := resolveUserWalletTarget(c)
+	if !ok {
+		return
+	}
+	tradeNo := strings.TrimSpace(c.Param("trade_no"))
+	if tradeNo == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.CancelPendingWalletAutoRechargeByTradeNo(tradeNo, target.TargetType, target.TargetId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
 func GetOrganizationWalletAutoRecharge(c *gin.Context) {
 	target, ok := resolveOrganizationWalletTarget(c)
 	if !ok {
@@ -258,6 +280,23 @@ func CancelOrganizationWalletAutoRecharge(c *gin.Context) {
 		return
 	}
 	if err := model.CancelWalletAutoRecharge(id, target.TargetType, target.TargetId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+func CancelPendingOrganizationWalletAutoRecharge(c *gin.Context) {
+	target, ok := resolveOrganizationWalletTarget(c)
+	if !ok {
+		return
+	}
+	tradeNo := strings.TrimSpace(c.Param("trade_no"))
+	if tradeNo == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.CancelPendingWalletAutoRechargeByTradeNo(tradeNo, target.TargetType, target.TargetId); err != nil {
 		common.ApiError(c, err)
 		return
 	}

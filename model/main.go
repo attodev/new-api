@@ -333,6 +333,8 @@ func migrateDBFast() error {
 		{&Checkin{}, "Checkin"},
 		{&SubscriptionOrder{}, "SubscriptionOrder"},
 		{&UserSubscription{}, "UserSubscription"},
+		{&UserBillingKey{}, "UserBillingKey"},
+		{&WalletAutoRecharge{}, "WalletAutoRecharge"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
 		{&OrganizationSubscriptionPlan{}, "OrganizationSubscriptionPlan"},
 		{&OrganizationUserSubscription{}, "OrganizationUserSubscription"},

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -45,7 +46,7 @@ func TestCreatePendingWalletAutoRechargeRejectsDuplicateActiveType(t *testing.T)
 		TargetType:     TopUpTargetTypeUser,
 		TargetId:       1,
 		OwnerUserId:    1,
-		Amount:         10,
+		Amount:         10000,
 		IntervalUnit:   WalletAutoRechargeIntervalMonth,
 		IntervalValue:  1,
 		Status:         WalletAutoRechargeStatusActive,
@@ -59,7 +60,7 @@ func TestCreatePendingWalletAutoRechargeRejectsDuplicateActiveType(t *testing.T)
 		TargetType:    TopUpTargetTypeUser,
 		TargetId:      1,
 		OwnerUserId:   1,
-		Amount:        20,
+		Amount:        20000,
 		AuthTradeNo:   "new-trade-no",
 		IntervalUnit:  WalletAutoRechargeIntervalMonth,
 		IntervalValue: 1,
@@ -77,7 +78,7 @@ func TestCreatePendingWalletAutoRechargeNormalizesCustomIntervalValue(t *testing
 		TargetType:    TopUpTargetTypeUser,
 		TargetId:      1,
 		OwnerUserId:   1,
-		Amount:        20,
+		Amount:        20000,
 		IntervalUnit:  WalletAutoRechargeIntervalCustom,
 		CustomSeconds: 3600,
 	})
@@ -108,7 +109,7 @@ func TestCancelWalletAutoRechargeKeepsBillingKeyActive(t *testing.T) {
 		TargetId:       1,
 		OwnerUserId:    1,
 		BillingKeyId:   21,
-		Amount:         10,
+		Amount:         10000,
 		IntervalUnit:   WalletAutoRechargeIntervalMonth,
 		IntervalValue:  1,
 		Status:         WalletAutoRechargeStatusActive,
@@ -130,6 +131,11 @@ func TestCancelWalletAutoRechargeKeepsBillingKeyActive(t *testing.T) {
 
 func TestProcessWalletAutoRechargeCreditsUserWallet(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
+	originalUnitPrice := setting.TossUnitPrice
+	setting.TossUnitPrice = 1300
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+	})
 	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", AffCode: "wallet-auto-owner"}).Error)
 
 	enc, err := common.EncryptString("billing-key")
@@ -148,7 +154,7 @@ func TestProcessWalletAutoRechargeCreditsUserWallet(t *testing.T) {
 		TargetId:       1,
 		OwnerUserId:    1,
 		BillingKeyId:   11,
-		Amount:         10,
+		Amount:         13000,
 		IntervalUnit:   WalletAutoRechargeIntervalMonth,
 		IntervalValue:  1,
 		Status:         WalletAutoRechargeStatusActive,
@@ -168,6 +174,8 @@ func TestProcessWalletAutoRechargeCreditsUserWallet(t *testing.T) {
 	require.NoError(t, DB.First(&topUp, "target_type = ? AND target_id = ?", TopUpTargetTypeUser, 1).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
 	require.Equal(t, PaymentProviderToss, topUp.PaymentProvider)
+	require.Equal(t, int64(13000), topUp.Amount)
+	require.Equal(t, float64(10), topUp.Money)
 }
 
 func TestProcessThresholdWalletAutoRechargeRespectsCooldownAndDailyLimit(t *testing.T) {
@@ -191,9 +199,9 @@ func TestProcessThresholdWalletAutoRechargeRespectsCooldownAndDailyLimit(t *test
 		TargetId:         1,
 		OwnerUserId:      1,
 		BillingKeyId:     12,
-		Amount:           10,
-		ThresholdAmount:  5,
-		ThresholdQuota:   int(5 * common.QuotaPerUnit),
+		Amount:           10000,
+		ThresholdAmount:  5000,
+		ThresholdQuota:   walletAutoRechargeQuota(5000),
 		Status:           WalletAutoRechargeStatusActive,
 		CooldownUntil:    now.Add(time.Hour).Unix(),
 		DailyChargeCount: 3,

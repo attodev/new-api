@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { toast } from 'sonner'
-import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import {
+  cancelPendingWalletAutoRecharge,
   cancelWalletAutoRecharge,
   getWalletAutoRecharge,
   isApiSuccess,
@@ -64,7 +65,8 @@ export function useWalletAutoRecharge(
         return false
       }
 
-      const { client_key, customer_key, success_url, fail_url } = response.data
+      const { client_key, customer_key, success_url, fail_url, trade_no } =
+        response.data
       if (!client_key || !customer_key || !success_url || !fail_url) {
         toast.error(i18next.t('Payment request failed'))
         return false
@@ -84,10 +86,14 @@ export function useWalletAutoRecharge(
         if (error.code && error.code !== 'USER_CANCEL') {
           toast.error(i18next.t('Payment request failed'))
         }
+        if (trade_no) {
+          await cancelPendingWalletAutoRecharge(trade_no, scope).catch(() => {})
+          await refresh()
+        }
         return false
       }
     },
-    []
+    [refresh, scope]
   )
 
   const createScheduled = useCallback(
