@@ -740,7 +740,7 @@ func RechargeToss(tradeNo string, paymentKey string, callerIp string) (err error
 	}
 
 	if quotaToAdd > 0 {
-		RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss top-up successful — quota: %v, payment amount: %d KRW", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentProviderToss)
+		RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss 충전 성공 — 적립: %v, 결제 금액: %d원", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentProviderToss)
 	}
 
 	return nil
