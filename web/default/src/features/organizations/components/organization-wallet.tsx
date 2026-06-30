@@ -388,11 +388,13 @@ export function OrganizationWallet() {
       getVisibleAutoRechargeModes(
         walletAutoRecharge.presets.filter((preset) => preset.enabled),
         walletAutoRecharge.policies,
-        walletAutoRecharge.presetsLoaded
+        walletAutoRecharge.presetsLoaded,
+        walletAutoRecharge.policiesLoaded
       ),
     [
       walletAutoRecharge.policies,
       walletAutoRecharge.presets,
+      walletAutoRecharge.policiesLoaded,
       walletAutoRecharge.presetsLoaded,
     ]
   )

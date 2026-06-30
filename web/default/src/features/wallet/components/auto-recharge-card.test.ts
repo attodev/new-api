@@ -140,8 +140,15 @@ describe('auto recharge preset UI helpers', () => {
     ])
   })
 
+  test('keeps both modes visible when presets resolve empty before policies resolve', () => {
+    assert.deepEqual(getVisibleAutoRechargeModes([], [], true, false), [
+      'scheduled',
+      'threshold',
+    ])
+  })
+
   test('hides mode without preset and without existing policy', () => {
-    assert.deepEqual(getVisibleAutoRechargeModes([], [], true), [])
+    assert.deepEqual(getVisibleAutoRechargeModes([], [], true, true), [])
   })
 
   test('shows mode when preset exists', () => {
@@ -158,6 +165,7 @@ describe('auto recharge preset UI helpers', () => {
           },
         ],
         [],
+        true,
         true
       ),
       ['scheduled']
@@ -169,6 +177,7 @@ describe('auto recharge preset UI helpers', () => {
       getVisibleAutoRechargeModes(
         [],
         [{ id: 7, type: 'threshold', status: 'active', amount: 10000 } as never],
+        true,
         true
       ),
       ['threshold']
