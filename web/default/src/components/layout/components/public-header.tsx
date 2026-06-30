@@ -196,28 +196,54 @@ export function PublicHeader(props: PublicHeaderProps) {
             )}
           >
             {/* Logo */}
-            <a
-              href={homeUrl}
-              className='group flex shrink-0 items-center gap-2.5'
-            >
-              <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
-                {loading ? (
-                  <Skeleton className='size-full rounded-lg' />
-                ) : customLogo ? (
-                  customLogo
-                ) : (
-                  <HeaderLogo
-                    src={systemLogo}
-                    loading={loading}
-                    logoLoaded={logoLoaded}
-                    className='size-full rounded-lg object-contain'
-                  />
-                )}
-              </div>
-              <span className='text-sm font-semibold tracking-tight'>
-                {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
-              </span>
-            </a>
+            {isAuthenticated ? (
+              <Link
+                to='/dashboard/$section'
+                params={{ section: 'overview' }}
+                className='group flex shrink-0 items-center gap-2.5'
+              >
+                <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
+                  {loading ? (
+                    <Skeleton className='size-full rounded-lg' />
+                  ) : customLogo ? (
+                    customLogo
+                  ) : (
+                    <HeaderLogo
+                      src={systemLogo}
+                      loading={loading}
+                      logoLoaded={logoLoaded}
+                      className='size-full rounded-lg object-contain'
+                    />
+                  )}
+                </div>
+                <span className='text-sm font-semibold tracking-tight'>
+                  {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
+                </span>
+              </Link>
+            ) : (
+              <a
+                href={homeUrl}
+                className='group flex shrink-0 items-center gap-2.5'
+              >
+                <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
+                  {loading ? (
+                    <Skeleton className='size-full rounded-lg' />
+                  ) : customLogo ? (
+                    customLogo
+                  ) : (
+                    <HeaderLogo
+                      src={systemLogo}
+                      loading={loading}
+                      logoLoaded={logoLoaded}
+                      className='size-full rounded-lg object-contain'
+                    />
+                  )}
+                </div>
+                <span className='text-sm font-semibold tracking-tight'>
+                  {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
+                </span>
+              </a>
+            )}
 
             {/* Desktop nav */}
             <div className='hidden items-center gap-0.5 sm:flex'>
