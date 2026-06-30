@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"testing"
@@ -64,6 +66,40 @@ func TestOrganizationMemberCannotCreateWalletAutoRecharge(t *testing.T) {
 		Id:          1,
 		Name:        "Acme",
 		OwnerUserId: 2,
+		Quota:       1000,
+		Status:      model.OrganizationStatusEnabled,
+	}
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		RequestOrganizationWalletScheduledRecharge,
+		member,
+		http.MethodPost,
+		"/api/organization/wallet/auto-recharge/scheduled",
+		`{"amount":10,"interval_unit":"month","interval_value":1,"charge_immediately":false}`,
+	)
+
+	requireOrganizationApiError(t, res, "organization owner permission required")
+}
+
+func TestOrganizationUserWithoutOwnerRoleCannotCreateWalletAutoRechargeEvenIfOrgOwnerMatches(t *testing.T) {
+	setupWalletAutoRechargeControllerTestDB(t)
+	enableTossBillingForTest(t)
+
+	member := model.User{
+		Id:               8,
+		Username:         "member-owner-mismatch",
+		Password:         "x",
+		Role:             common.RoleCommonUser,
+		OrganizationId:   12,
+		OrganizationRole: model.OrganizationRoleMember,
+		AffCode:          "member-owner-mismatch-wallet-auto",
+	}
+	org := model.Organization{
+		Id:          12,
+		Name:        "Acme",
+		OwnerUserId: member.Id,
 		Quota:       1000,
 		Status:      model.OrganizationStatusEnabled,
 	}
@@ -188,6 +224,85 @@ func TestCancelOrganizationWalletAutoRechargeRejectsNonOwner(t *testing.T) {
 	)
 
 	requireOrganizationApiError(t, res, "organization owner permission required")
+}
+
+func TestWalletAutoRechargeTossConfirmIssueFailureReleasesPendingPolicy(t *testing.T) {
+	setupWalletAutoRechargeControllerTestDB(t)
+
+	originalIssuer := walletAutoRechargeBillingKeyIssuer
+	walletAutoRechargeBillingKeyIssuer = func(ctx context.Context, authKey, customerKey string) (*tossBillingIssueResponse, int, error) {
+		return nil, 0, errors.New("issue failed")
+	}
+	t.Cleanup(func() {
+		walletAutoRechargeBillingKeyIssuer = originalIssuer
+	})
+
+	user := model.User{
+		Id:       6,
+		Username: "issue-failure-owner",
+		Password: "x",
+		Role:     common.RoleCommonUser,
+		AffCode:  "wallet-auto-issue-failure",
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+
+	policy, err := model.CreatePendingWalletAutoRecharge(model.CreateWalletAutoRechargeRequest{
+		Type:          model.WalletAutoRechargeTypeScheduled,
+		TargetType:    model.TopUpTargetTypeUser,
+		TargetId:      user.Id,
+		OwnerUserId:   user.Id,
+		CustomerKey:   "customer-6",
+		AuthTradeNo:   "wallet-auto-issue-failure-trade",
+		Amount:        10,
+		IntervalUnit:  model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+	})
+	require.NoError(t, err)
+
+	_, err = model.CreatePendingWalletAutoRecharge(model.CreateWalletAutoRechargeRequest{
+		Type:          model.WalletAutoRechargeTypeScheduled,
+		TargetType:    model.TopUpTargetTypeUser,
+		TargetId:      user.Id,
+		OwnerUserId:   user.Id,
+		CustomerKey:   "customer-6",
+		AuthTradeNo:   "wallet-auto-issue-failure-duplicate-before-release",
+		Amount:        10,
+		IntervalUnit:  model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+	})
+	require.ErrorContains(t, err, "active wallet auto recharge already exists")
+
+	res := performOrganizationRequest(
+		WalletAutoRechargeTossConfirm,
+		user,
+		http.MethodGet,
+		"/api/wallet/auto-recharge/toss/confirm?trade_no=wallet-auto-issue-failure-trade&authKey=fake-auth&customerKey=customer-6",
+		"",
+	)
+
+	require.Equal(t, http.StatusFound, res.Code)
+	location, err := url.QueryUnescape(res.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "/wallet?wallet_auto_recharge=failed", location)
+
+	var reloaded model.WalletAutoRecharge
+	require.NoError(t, model.DB.First(&reloaded, policy.Id).Error)
+	require.NotEqual(t, model.WalletAutoRechargeStatusPending, reloaded.Status)
+	require.Nil(t, reloaded.ActiveKey)
+
+	retryPolicy, err := model.CreatePendingWalletAutoRecharge(model.CreateWalletAutoRechargeRequest{
+		Type:          model.WalletAutoRechargeTypeScheduled,
+		TargetType:    model.TopUpTargetTypeUser,
+		TargetId:      user.Id,
+		OwnerUserId:   user.Id,
+		CustomerKey:   "customer-6",
+		AuthTradeNo:   "wallet-auto-issue-failure-after-release",
+		Amount:        10,
+		IntervalUnit:  model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+	})
+	require.NoError(t, err)
+	require.NotZero(t, retryPolicy.Id)
 }
 
 func TestWalletAutoRechargeTossFailCancelsPendingPolicy(t *testing.T) {

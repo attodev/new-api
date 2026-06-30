@@ -42,6 +42,8 @@ type walletRechargeTarget struct {
 	OwnerUserId int
 }
 
+var walletAutoRechargeBillingKeyIssuer = issueTossBillingKey
+
 func walletAutoRechargeTossCharger(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
 	res, _, err := chargeTossBilling(ctx, billingKey, customerKey, orderID, orderName, amount)
 	if err != nil {
@@ -79,7 +81,7 @@ func resolveOrganizationWalletTarget(c *gin.Context) (walletRechargeTarget, bool
 		common.ApiError(c, err)
 		return walletRechargeTarget{}, false
 	}
-	if actor.OrganizationRole != model.OrganizationRoleOwner && org.OwnerUserId != actor.Id {
+	if actor.OrganizationRole != model.OrganizationRoleOwner || org.OwnerUserId != actor.Id {
 		common.ApiErrorMsg(c, organizationOwnerPermissionRequired)
 		return walletRechargeTarget{}, false
 	}
@@ -272,6 +274,8 @@ func WalletAutoRechargeTossConfirm(c *gin.Context) {
 		redirectWalletAutoRechargeResult(c, nil, "failed")
 		return
 	}
+	LockOrder(tradeNo)
+	defer UnlockOrder(tradeNo)
 
 	policy, err := loadWalletAutoRechargeByTradeNo(tradeNo)
 	if err != nil {
@@ -294,9 +298,10 @@ func WalletAutoRechargeTossConfirm(c *gin.Context) {
 		return
 	}
 
-	issued, _, err := issueTossBillingKey(ctx, authKey, customerKey)
+	issued, _, err := walletAutoRechargeBillingKeyIssuer(ctx, authKey, customerKey)
 	if err != nil || issued == nil || issued.BillingKey == "" {
 		logger.LogError(ctx, fmt.Sprintf("wallet auto recharge billing key issue failed trade_no=%s err=%v", tradeNo, err))
+		cancelPendingWalletAutoRecharge(policy)
 		redirectWalletAutoRechargeResult(c, policy, "failed")
 		return
 	}
@@ -304,12 +309,14 @@ func WalletAutoRechargeTossConfirm(c *gin.Context) {
 	billingKeyID, err := model.StoreTossBillingKey(policy.OwnerUserId, customerKey, issued.BillingKey, issued.Card.Company, issued.Card.Number)
 	if err != nil {
 		logger.LogError(ctx, fmt.Sprintf("wallet auto recharge store billing key failed trade_no=%s err=%v", tradeNo, err))
+		cancelPendingWalletAutoRecharge(policy)
 		redirectWalletAutoRechargeResult(c, policy, "failed")
 		return
 	}
 
 	if _, err := model.ActivateWalletAutoRechargeFromToss(tradeNo, billingKeyID, issued.Card.Company, issued.Card.Number, false, walletAutoRechargeTossCharger); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("wallet auto recharge activation failed trade_no=%s err=%v", tradeNo, err))
+		cancelPendingWalletAutoRecharge(policy)
 		redirectWalletAutoRechargeResult(c, policy, "failed")
 		return
 	}
@@ -325,6 +332,8 @@ func WalletAutoRechargeTossFail(c *gin.Context) {
 		redirectWalletAutoRechargeResult(c, nil, "failed")
 		return
 	}
+	LockOrder(tradeNo)
+	defer UnlockOrder(tradeNo)
 
 	policy, err := loadWalletAutoRechargeByTradeNo(tradeNo)
 	if err != nil {
