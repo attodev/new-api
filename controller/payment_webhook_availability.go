@@ -39,6 +39,11 @@ func isTossTopUpEnabled() bool {
 		isValidServerAddress(system_setting.ServerAddress)
 }
 
+func isTossBillingEnabled() bool {
+	// Same prerequisites as Toss top-up (compliance + enabled + active keys + valid ServerAddress).
+	return isTossTopUpEnabled()
+}
+
 func isStripeWebhookConfigured() bool {
 	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
 }
