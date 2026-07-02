@@ -46,6 +46,7 @@ import {
   isStripePayment,
   isTossPayment,
   isWaffoPancakePayment,
+  shouldOpenPaymentConfirmDialog,
   submitPaymentForm,
 } from '@/features/wallet/lib'
 import {
@@ -308,8 +309,13 @@ export function OrganizationWallet() {
         topupAmountMode
       )
       if (amountForMinimum < getMinTopupAmount(topupInfo)) return
-      await calculatePaymentAmount(topupAmount, method.type)
-      setConfirmDialogOpen(true)
+      const paymentAmount = await calculatePaymentAmount(
+        topupAmount,
+        method.type
+      )
+      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }

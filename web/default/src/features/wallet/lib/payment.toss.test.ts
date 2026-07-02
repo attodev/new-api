@@ -22,6 +22,7 @@ import {
   isTossPayment,
   getDefaultPaymentType,
   getMinTopupAmount,
+  shouldOpenPaymentConfirmDialog,
 } from './payment'
 import { PAYMENT_TYPES, DEFAULT_MIN_TOPUP } from '../constants'
 import type { TopupInfo } from '../types'
@@ -56,5 +57,21 @@ describe('getMinTopupAmount (toss)', () => {
       toss_min_topup: 0,
     } as unknown as TopupInfo
     assert.equal(getMinTopupAmount(info), DEFAULT_MIN_TOPUP)
+  })
+})
+
+describe('shouldOpenPaymentConfirmDialog', () => {
+  test('blocks Toss confirmation when quote calculation returns no payable amount', () => {
+    assert.equal(
+      shouldOpenPaymentConfirmDialog(PAYMENT_TYPES.TOSS, 0),
+      false
+    )
+  })
+
+  test('keeps non-Toss confirmation behavior unchanged for zero amounts', () => {
+    assert.equal(
+      shouldOpenPaymentConfirmDialog(PAYMENT_TYPES.STRIPE, 0),
+      true
+    )
   })
 })

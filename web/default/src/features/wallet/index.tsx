@@ -61,6 +61,7 @@ import {
   getMinTopupAmount,
   isWaffoPancakePayment,
   isTossPayment,
+  shouldOpenPaymentConfirmDialog,
 } from './lib'
 import {
   buildWalletPaymentSettingTabs,
@@ -295,12 +296,14 @@ export function Wallet(props: WalletProps) {
       }
 
       // Calculate payment amount and show confirmation dialog
-      await calculatePaymentAmount(
+      const paymentAmount = await calculatePaymentAmount(
         topupAmount,
         method.type,
         getAmountModeForPaymentType(method.type)
       )
-      setConfirmDialogOpen(true)
+      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }

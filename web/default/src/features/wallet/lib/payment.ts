@@ -104,6 +104,17 @@ export function isTossPayment(paymentType: string): boolean {
   return paymentType === PAYMENT_TYPES.TOSS
 }
 
+export function shouldOpenPaymentConfirmDialog(
+  paymentType: string,
+  paymentAmount: number
+): boolean {
+  if (isTossPayment(paymentType)) {
+    return paymentAmount > 0
+  }
+
+  return true
+}
+
 /**
  * Get default payment type from topup info
  */
