@@ -52,6 +52,27 @@ func TestQuoteTossTopUpInvalidModeDefaultsToKRWMode(t *testing.T) {
 	require.Equal(t, 5000000, quote.CreditQuota)
 }
 
+func TestQuoteTossTopUpKRWModeFloorsQuotaUsingDecimal(t *testing.T) {
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 3
+	common.QuotaPerUnit = 3
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	defer func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	}()
+
+	quote := QuoteTossTopUp(1, TossTopUpAmountModeKRW, "default")
+
+	require.Equal(t, TossTopUpAmountModeKRW, quote.AmountMode)
+	require.Equal(t, int64(1), quote.ChargeKRW)
+	require.InDelta(t, 1.0/3.0, quote.CreditAmount, 1e-12)
+	require.Equal(t, 1, quote.CreditQuota)
+}
+
 func TestQuoteTossTopUpQuotaModeChargesUnitPriceTimesQuota(t *testing.T) {
 	originalUnitPrice := setting.TossUnitPrice
 	originalQuotaPerUnit := common.QuotaPerUnit

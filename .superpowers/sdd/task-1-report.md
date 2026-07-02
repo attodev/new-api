@@ -82,3 +82,23 @@ ok  	github.com/QuantumNous/new-api/model	0.098s
 - `NormalizeTossTopUpAmountMode` behavior remains the same for explicit/implicit modes.
 - Existing `TossTopUpChargedKRW` and `TossUSDEquivalent` were preserved as requested.
 - The non-positive unit-price guard keeps quote generation safe for invalid operator configuration without affecting legacy charge paths.
+
+## Re-review Fix (Task 1 Addendum)
+
+### What test I added
+- Added `TestQuoteTossTopUpKRWModeFloorsQuotaUsingDecimal` in `model/toss_billing_test.go`.
+- Test uses KRW mode with `amount=1`, `TossUnitPrice=3`, `common.QuotaPerUnit=3` to create a non-terminating credit value `1/3`.
+- It asserts `CreditQuota == 1` to lock in exact floored quota behavior that a float-based round-trip could undercount (historically to `0`).
+
+### Tests run and output
+- `go test ./model -run 'TestQuoteTossTopUp|TestToss' -count=1`
+  - output: `ok  	github.com/QuantumNous/new-api/model	0.091s`
+
+### Files changed
+- `model/toss_billing_test.go`
+- `model/toss_billing.go` (KRW-mode `CreditQuota` calculation now computes quota via `amount * quota / unit / factor` path to avoid precision-loss flooring)
+- `.superpowers/sdd/task-1-report.md`
+
+### Self-review
+- The newly added KRW test specifically guards a previous float-based precision regression while remaining deterministic and fast.
+- `QuoteTossTopUp` remains behavior-compatible for KRW/ quota modes and discount/group factor handling, but now preserves a full quota unit for repeating-decimal credits.

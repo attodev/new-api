@@ -141,13 +141,17 @@ func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuot
 			IntPart())
 	default:
 		charge := decimal.NewFromInt(amount)
+		unitDec := decimal.NewFromFloat(unit)
+		factorDec := decimal.NewFromFloat(factor)
 		credit := charge.
-			Div(decimal.NewFromFloat(unit)).
-			Div(decimal.NewFromFloat(factor))
+			Div(unitDec).
+			Div(factorDec)
 		quote.ChargeKRW = amount
 		quote.CreditAmount = credit.InexactFloat64()
-		quote.CreditQuota = int(credit.
+		quote.CreditQuota = int(decimal.NewFromInt(amount).
 			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+			Div(unitDec).
+			Div(factorDec).
 			IntPart())
 	}
 
