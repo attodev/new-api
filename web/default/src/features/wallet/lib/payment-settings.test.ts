@@ -4,6 +4,7 @@ import {
   buildWalletPaymentSettingTabs,
   getConfiguredAutoRechargeTypes,
   getInitialWalletPaymentSetting,
+  getWalletPaymentSettingTabsGridClass,
 } from './payment-settings'
 
 describe('wallet payment setting helpers', () => {
@@ -53,6 +54,24 @@ describe('wallet payment setting helpers', () => {
     assert.equal(getInitialWalletPaymentSetting(tabs), 'threshold')
   })
 
+  test('locks unconfigured auto recharge while subscription status is unknown', () => {
+    const tabs = buildWalletPaymentSettingTabs({
+      hasActiveSubscription: false,
+      subscriptionStatusKnown: false,
+      visibleAutoRechargeModes: ['threshold', 'scheduled'],
+      policies: [],
+    })
+
+    assert.deepEqual(
+      tabs.map((tab) => [tab.kind, tab.disabled]),
+      [
+        ['threshold', true],
+        ['scheduled', true],
+      ]
+    )
+    assert.equal(getInitialWalletPaymentSetting(tabs), 'threshold')
+  })
+
   test('keeps every already configured exception tab enabled so users can cancel', () => {
     const tabs = buildWalletPaymentSettingTabs({
       hasActiveSubscription: true,
@@ -80,6 +99,21 @@ describe('wallet payment setting helpers', () => {
         { id: 2, type: 'scheduled', status: 'failed' },
       ] as never),
       []
+    )
+  })
+
+  test('derives tab grid class from the visible tab count', () => {
+    assert.equal(
+      getWalletPaymentSettingTabsGridClass(1),
+      'grid w-full grid-cols-1'
+    )
+    assert.equal(
+      getWalletPaymentSettingTabsGridClass(2),
+      'grid w-full grid-cols-2'
+    )
+    assert.equal(
+      getWalletPaymentSettingTabsGridClass(3),
+      'grid w-full grid-cols-3'
     )
   })
 })

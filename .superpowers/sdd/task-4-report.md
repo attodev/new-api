@@ -88,3 +88,37 @@ I fixed the only `build:check` error that was inside the focused Task 4 test fil
 - `bun run build:check` is still red because of pre-existing/unrelated TypeScript issues listed above.
 - Manual browser inspection was not performed; verification was limited to static review and automated tests/build command output.
 - `bun run i18n:sync` generated untracked untranslated report files under `web/default/src/i18n/locales/_reports/`; they were not staged.
+
+## Review Fix: Subscription-Unknown Lock and Dynamic Tabs
+
+### Fix Details
+
+- Preserved last-known subscription state in `web/default/src/features/wallet/index.tsx` when subscription fetch/refresh fails instead of clearing active/all subscription arrays.
+- Added explicit `subscriptionStatusKnown` tracking and pass it into `buildWalletPaymentSettingTabs`; before the first successful subscription load, unconfigured auto-recharge tabs are visible only in a disabled/locked state.
+- Kept configured auto-recharge tabs enabled while subscription status is unknown so users can still cancel an existing policy.
+- Replaced the hard-coded `grid-cols-3` payment-setting tab layout with `getWalletPaymentSettingTabsGridClass(paymentSettingTabs.length)`.
+- Added focused helper coverage for the subscription-unknown lock and tab grid class behavior.
+
+### Verification
+
+```text
+$ cd web/default && bun test src/features/wallet/lib/payment-settings.test.ts src/features/wallet/components/auto-recharge-card.test.ts src/features/wallet/components/wallet-subscription-status-card.test.ts
+25 pass
+0 fail
+Ran 25 tests across 3 files.
+```
+
+```text
+$ cd web/default && bun run build:check
+$ tsc -b && rsbuild build
+```
+
+`build:check` still fails during TypeScript checking with unrelated pre-existing errors outside the modified wallet files. Current evidence includes:
+
+- `src/features/organizations/components/organization-dashboard.tsx(720,13): Type '(organizationId: string) => void' is not assignable to type '(value: string | null, ...) => void'.`
+- `src/features/organizations/components/organization-users-table.tsx(83,3): 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.`
+- `src/features/system-settings/billing/index.tsx(27,7): ... missing properties from type 'BillingSettings': PayPalClientId, PayPalClientSecret, PayPalWebhookID, PayPalSandbox, and 2 more.`
+- `src/features/system-settings/integrations/wallet-auto-recharge-presets-section.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+- `src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): No overload matches this call.`
+- `src/features/wallet/lib/auto-recharge-options.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+- `src/i18n/languages.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`

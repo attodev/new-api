@@ -16,6 +16,7 @@ export interface WalletPaymentSettingTab {
 
 export interface WalletPaymentSettingInput {
   hasActiveSubscription: boolean
+  subscriptionStatusKnown?: boolean
   visibleAutoRechargeModes: WalletAutoRechargeType[]
   policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>
 }
@@ -57,12 +58,16 @@ export function buildWalletPaymentSettingTabs(
   )
   if (input.hasActiveSubscription) configured.add('subscription')
 
+  const subscriptionStatusKnown = input.subscriptionStatusKnown ?? true
   const hasConfigured = configured.size > 0
 
   return PAYMENT_SETTING_ORDER.filter((kind) => visible.has(kind)).map(
     (kind) => {
       const isConfigured = configured.has(kind)
-      const disabled = hasConfigured && !isConfigured
+      const waitsForSubscriptionStatus =
+        !subscriptionStatusKnown && kind !== 'subscription' && !isConfigured
+      const disabled =
+        (hasConfigured && !isConfigured) || waitsForSubscriptionStatus
       return {
         kind,
         configured: isConfigured,
@@ -73,6 +78,17 @@ export function buildWalletPaymentSettingTabs(
       }
     }
   )
+}
+
+export function getWalletPaymentSettingTabsGridClass(count: number) {
+  switch (count) {
+    case 1:
+      return 'grid w-full grid-cols-1'
+    case 2:
+      return 'grid w-full grid-cols-2'
+    default:
+      return 'grid w-full grid-cols-3'
+  }
 }
 
 export function getInitialWalletPaymentSetting(

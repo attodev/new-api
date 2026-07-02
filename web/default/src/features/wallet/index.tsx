@@ -65,6 +65,7 @@ import {
 import {
   buildWalletPaymentSettingTabs,
   getInitialWalletPaymentSetting,
+  getWalletPaymentSettingTabsGridClass,
   WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
   type WalletPaymentSettingKind,
 } from './lib/payment-settings'
@@ -106,7 +107,7 @@ export function Wallet(props: WalletProps) {
   >([])
   const [billingPreference, setBillingPreference] =
     useState('subscription_first')
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
+  const [subscriptionStatusKnown, setSubscriptionStatusKnown] = useState(false)
   const [subscriptionRefreshing, setSubscriptionRefreshing] = useState(false)
   const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
@@ -172,21 +173,17 @@ export function Wallet(props: WalletProps) {
         )
         setActiveSubscriptions(res.data.subscriptions || [])
         setAllSubscriptions(res.data.all_subscriptions || [])
-      } else {
-        setActiveSubscriptions([])
-        setAllSubscriptions([])
+        setSubscriptionStatusKnown(true)
       }
-    } catch {
-      setActiveSubscriptions([])
-      setAllSubscriptions([])
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch subscription data:', error)
     }
   }, [])
 
   useEffect(() => {
     const init = async () => {
-      setSubscriptionLoading(true)
       await fetchSelfSubscription()
-      setSubscriptionLoading(false)
     }
     void init()
   }, [fetchSelfSubscription])
@@ -370,9 +367,7 @@ export function Wallet(props: WalletProps) {
     }
   }, [fetchSelfSubscription, t])
 
-  const activePaymentSubscriptions = subscriptionLoading
-    ? []
-    : activeSubscriptions
+  const activePaymentSubscriptions = activeSubscriptions
 
   const visibleAutoRechargeModes = useMemo(
     () =>
@@ -394,11 +389,13 @@ export function Wallet(props: WalletProps) {
     () =>
       buildWalletPaymentSettingTabs({
         hasActiveSubscription: activePaymentSubscriptions.length > 0,
+        subscriptionStatusKnown,
         visibleAutoRechargeModes,
         policies: walletAutoRecharge.policies,
       }),
     [
       activePaymentSubscriptions.length,
+      subscriptionStatusKnown,
       visibleAutoRechargeModes,
       walletAutoRecharge.policies,
     ]
@@ -475,7 +472,11 @@ export function Wallet(props: WalletProps) {
                       setPaymentSettingTab(value as WalletPaymentSettingKind)
                     }
                   >
-                    <TabsList className='grid w-full grid-cols-3'>
+                    <TabsList
+                      className={getWalletPaymentSettingTabsGridClass(
+                        paymentSettingTabs.length
+                      )}
+                    >
                       {paymentSettingTabs.map((tab) => (
                         <TabsTrigger
                           key={tab.kind}
