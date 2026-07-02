@@ -31,8 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  groupMonthlyScheduledPresetOptions,
   groupThresholdPresetOptions,
+  groupUserScheduledPresetOptions,
 } from '../lib/auto-recharge-options'
 import type {
   WalletAutoRechargePolicy,
@@ -124,7 +124,9 @@ export function buildPresetCreatePayload(
 export function getVisibleAutoRechargeModes(
   presets: Array<
     Pick<WalletAutoRechargePreset, 'type'> &
-      Partial<Pick<WalletAutoRechargePreset, 'interval_unit' | 'interval_value'>>
+      Partial<
+        Pick<WalletAutoRechargePreset, 'interval_unit' | 'interval_value'>
+      >
   >,
   policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>,
   presetsLoaded = true,
@@ -139,6 +141,7 @@ export function getVisibleAutoRechargeModes(
       presets.some((preset) => {
         if (preset.type !== mode) return false
         if (mode !== 'scheduled') return true
+        if (preset.interval_unit === 'custom') return true
         return (
           preset.interval_unit === 'month' && (preset.interval_value ?? 1) === 1
         )
@@ -197,7 +200,7 @@ export function AutoRechargeCard({
   const creationLocked = creationDisabled && !activePolicy
   const creationButtonDisabled = disabled || creationLocked
   const scheduledGroups = useMemo(
-    () => groupMonthlyScheduledPresetOptions(availablePresets),
+    () => groupUserScheduledPresetOptions(availablePresets),
     [availablePresets]
   )
   const thresholdGroups = useMemo(
@@ -249,7 +252,8 @@ export function AutoRechargeCard({
                     {t('Recharge amount')}: {activePolicy.amount}
                   </div>
                   {mode === 'scheduled' ? (
-                    activePolicy.interval_unit === 'month' ? (
+                    activePolicy.interval_unit === 'month' ||
+                    activePolicy.interval_unit === 'custom' ? (
                       <div className='text-muted-foreground text-sm'>
                         {t('Charges on the 1st of every month')}
                       </div>
@@ -367,7 +371,9 @@ export function AutoRechargeCard({
                         <SelectTrigger className='w-full sm:w-44'>
                           <SelectValue placeholder={t('Threshold quota')}>
                             {selectedThresholdGroup
-                              ? formatQuota(selectedThresholdGroup.thresholdQuota)
+                              ? formatQuota(
+                                  selectedThresholdGroup.thresholdQuota
+                                )
                               : null}
                           </SelectValue>
                         </SelectTrigger>

@@ -1,8 +1,14 @@
 import { describe, expect, test } from 'bun:test'
+import { formatQuota } from '@/lib/format'
+import {
+  buildAdminBalanceOptionState,
+  buildAdminOptionState,
+  buildPresetSavePlan,
+} from '@/features/wallet/lib/auto-recharge-options'
 import {
   formatOptionBalanceList,
   formatOptionAmountList,
-  canAddTestScheduledPeriod,
+  canAddScheduledPeriod,
   getOptionAmountDraftValue,
   getOptionBalanceDraftValue,
   getPresetSummary,
@@ -12,12 +18,6 @@ import {
   toPresetFormState,
   updateOptionAmountDrafts,
 } from './wallet-auto-recharge-presets-section'
-import {
-  buildAdminBalanceOptionState,
-  buildAdminOptionState,
-  buildPresetSavePlan,
-} from '@/features/wallet/lib/auto-recharge-options'
-import { formatQuota } from '@/lib/format'
 
 const identityT = (key: string, options?: Record<string, unknown>) => {
   if (!options) return key
@@ -131,16 +131,19 @@ describe('wallet auto recharge preset admin helpers', () => {
 
   test('summarizes threshold preset', () => {
     expect(
-      getPresetSummary({
-        id: 1,
-        type: 'threshold',
-        target_scope: 'user',
-        name: '자동',
-        amount: 20000,
-        threshold_amount: 5000,
-        threshold_quota: 500000,
-        enabled: true,
-      }, identityT)
+      getPresetSummary(
+        {
+          id: 1,
+          type: 'threshold',
+          target_scope: 'user',
+          name: '자동',
+          amount: 20000,
+          threshold_amount: 5000,
+          threshold_quota: 500000,
+          enabled: true,
+        },
+        identityT
+      )
     ).toBe(`Below ${formatQuota(500000)} -> 20000`)
   })
 
@@ -160,17 +163,20 @@ describe('wallet auto recharge preset admin helpers', () => {
 
   test('summarizes scheduled custom interval with translator', () => {
     expect(
-      getPresetSummary({
-        id: 2,
-        type: 'scheduled',
-        target_scope: 'all',
-        name: 'Hourly',
-        amount: 15000,
-        interval_unit: 'custom',
-        interval_value: 99,
-        custom_seconds: 3600,
-        enabled: true,
-      }, identityT)
+      getPresetSummary(
+        {
+          id: 2,
+          type: 'scheduled',
+          target_scope: 'all',
+          name: 'Hourly',
+          amount: 15000,
+          interval_unit: 'custom',
+          interval_value: 99,
+          custom_seconds: 3600,
+          enabled: true,
+        },
+        identityT
+      )
     ).toBe('15000 / 3600s')
   })
 
@@ -207,9 +213,7 @@ describe('wallet auto recharge preset admin helpers', () => {
 
   test('parses option amount lists into sorted unique numbers', () => {
     expect(parseOptionAmountList('30000, 10000 10000\n5000')).toEqual([
-      5000,
-      10000,
-      30000,
+      5000, 10000, 30000,
     ])
   })
 
@@ -220,11 +224,7 @@ describe('wallet auto recharge preset admin helpers', () => {
   })
 
   test('parses wallet balance lists without flooring decimals', () => {
-    expect(parseOptionBalanceList('1, 0.5 2.25\n0.5')).toEqual([
-      0.5,
-      1,
-      2.25,
-    ])
+    expect(parseOptionBalanceList('1, 0.5 2.25\n0.5')).toEqual([0.5, 1, 2.25])
   })
 
   test('formats wallet balance lists for editing', () => {
@@ -297,10 +297,10 @@ describe('wallet auto recharge preset admin helpers', () => {
     expect(plan.disable.map((preset) => preset.id)).toEqual([1])
   })
 
-  test('allows adding only one test scheduled period', () => {
-    expect(canAddTestScheduledPeriod([])).toBe(true)
+  test('allows adding only one scheduled period option', () => {
+    expect(canAddScheduledPeriod([])).toBe(true)
     expect(
-      canAddTestScheduledPeriod([
+      canAddScheduledPeriod([
         {
           period: {
             key: 'monthly',
@@ -312,9 +312,9 @@ describe('wallet auto recharge preset admin helpers', () => {
           amounts: [10000],
         },
       ])
-    ).toBe(true)
+    ).toBe(false)
     expect(
-      canAddTestScheduledPeriod([
+      canAddScheduledPeriod([
         {
           period: {
             key: 'custom:1:60',

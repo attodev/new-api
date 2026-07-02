@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
+import type { WalletAutoRechargePreset } from '../types'
 import {
   buildAdminOptionState,
   buildPresetSavePlan,
   buildPresetSavePlanFromBalanceThresholds,
-  groupMonthlyScheduledPresetOptions,
   groupScheduledPresetOptions,
   groupThresholdPresetOptions,
+  groupUserScheduledPresetOptions,
 } from './auto-recharge-options'
-import type { WalletAutoRechargePreset } from '../types'
 
 const preset = (
   patch: Partial<WalletAutoRechargePreset>
@@ -73,8 +73,8 @@ describe('auto recharge option helpers', () => {
     ])
   })
 
-  test('groups user scheduled presets as monthly options only', () => {
-    const groups = groupMonthlyScheduledPresetOptions([
+  test('groups user scheduled presets as monthly or test-period options only', () => {
+    const groups = groupUserScheduledPresetOptions([
       preset({
         id: 1,
         amount: 10000,
@@ -96,8 +96,13 @@ describe('auto recharge option helpers', () => {
       }),
     ])
 
-    expect(groups.map((group) => group.period.kind)).toEqual(['monthly'])
-    expect(groups[0].amounts.map((item) => item.amount)).toEqual([30000])
+    expect(groups.map((group) => group.period.kind)).toEqual([
+      'monthly',
+      'custom',
+    ])
+    expect(
+      groups.map((group) => group.amounts.map((item) => item.amount))
+    ).toEqual([[30000], [5000]])
   })
 
   test('groups threshold presets by quota before recharge amount', () => {
@@ -123,8 +128,7 @@ describe('auto recharge option helpers', () => {
     ])
 
     expect(groups.map((group) => group.thresholdQuota)).toEqual([
-      500000,
-      1000000,
+      500000, 1000000,
     ])
     expect(
       groups[0].amounts.map((item) => [item.amount, item.preset.id])
@@ -300,8 +304,7 @@ describe('auto recharge option helpers', () => {
     })
 
     expect(plan.create.map((item) => item.threshold_quota)).toEqual([
-      500000,
-      2500000,
+      500000, 2500000,
     ])
   })
 })

@@ -3,6 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,7 +40,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { SettingsSection } from '../components/settings-section'
 import {
   createAdminWalletAutoRechargePreset,
   deleteAdminWalletAutoRechargePreset,
@@ -59,11 +63,7 @@ import type {
   WalletAutoRechargeTargetScope,
   WalletAutoRechargeType,
 } from '@/features/wallet/types'
-import {
-  formatQuota,
-  parseQuotaFromDollars,
-  quotaUnitsToDollars,
-} from '@/lib/format'
+import { SettingsSection } from '../components/settings-section'
 
 const PRESET_QUERY_KEY = ['admin-wallet-auto-recharge-presets'] as const
 type SummaryTranslator = (
@@ -293,7 +293,9 @@ export function getOptionBalanceDraftValue(
     : formatOptionBalanceList(values)
 }
 
-function makeQuickPeriod(kind: 'daily' | 'weekly' | 'monthly'): ScheduledPeriodOption {
+function makeQuickPeriod(
+  kind: 'daily' | 'weekly' | 'monthly'
+): ScheduledPeriodOption {
   if (kind === 'daily') {
     return {
       key: 'daily',
@@ -332,10 +334,8 @@ function makeCustomPeriod(customSeconds: number): ScheduledPeriodOption {
   }
 }
 
-export function canAddTestScheduledPeriod(
-  periods: AdminScheduledPeriodOption[]
-) {
-  return !periods.some((item) => item.period.kind === 'custom')
+export function canAddScheduledPeriod(periods: AdminScheduledPeriodOption[]) {
+  return periods.length === 0
 }
 
 function getIntervalSummary(
@@ -373,7 +373,8 @@ export function getPresetSummary(
 
 function getTargetScopeLabel(scope: WalletAutoRechargeTargetScope) {
   return (
-    TARGET_SCOPE_OPTIONS.find((option) => option.value === scope)?.label ?? scope
+    TARGET_SCOPE_OPTIONS.find((option) => option.value === scope)?.label ??
+    scope
   )
 }
 
@@ -499,14 +500,15 @@ export function WalletAutoRechargePresetsSection() {
   })
 
   const presets = useMemo(
-    () => [...(presetQuery.data?.data ?? [])].sort((left, right) => {
-      if (left.type !== right.type) {
-        return left.type.localeCompare(right.type)
-      }
-      const sortOrder = (left.sort_order ?? 0) - (right.sort_order ?? 0)
-      if (sortOrder !== 0) return sortOrder
-      return left.id - right.id
-    }),
+    () =>
+      [...(presetQuery.data?.data ?? [])].sort((left, right) => {
+        if (left.type !== right.type) {
+          return left.type.localeCompare(right.type)
+        }
+        const sortOrder = (left.sort_order ?? 0) - (right.sort_order ?? 0)
+        if (sortOrder !== 0) return sortOrder
+        return left.id - right.id
+      }),
     [presetQuery.data?.data]
   )
 
@@ -555,9 +557,7 @@ export function WalletAutoRechargePresetsSection() {
   const addScheduledPeriod = (period: ScheduledPeriodOption) => {
     setOptionState((current) => {
       if (
-        current.scheduled.periods.some(
-          (item) => item.period.key === period.key
-        )
+        current.scheduled.periods.some((item) => item.period.key === period.key)
       ) {
         return current
       }
@@ -583,10 +583,7 @@ export function WalletAutoRechargePresetsSection() {
     }))
   }
 
-  const updateScheduledPeriodAmounts = (
-    periodKey: string,
-    value: string
-  ) => {
+  const updateScheduledPeriodAmounts = (periodKey: string, value: string) => {
     setAmountDrafts((current) =>
       updateOptionAmountDrafts(current, `scheduled:${periodKey}`, value)
     )
@@ -652,9 +649,7 @@ export function WalletAutoRechargePresetsSection() {
     }
   }
 
-  const canAddTestPeriod = canAddTestScheduledPeriod(
-    optionState.scheduled.periods
-  )
+  const canAddPeriod = canAddScheduledPeriod(optionState.scheduled.periods)
 
   return (
     <SettingsSection title={t('Auto Recharge Presets')}>
@@ -746,6 +741,7 @@ export function WalletAutoRechargePresetsSection() {
                   type='button'
                   variant='outline'
                   size='sm'
+                  disabled={!canAddPeriod}
                   onClick={() => addScheduledPeriod(makeQuickPeriod('monthly'))}
                 >
                   <Plus data-icon='inline-start' />
@@ -755,7 +751,7 @@ export function WalletAutoRechargePresetsSection() {
                   type='button'
                   variant='outline'
                   size='sm'
-                  disabled={!canAddTestPeriod}
+                  disabled={!canAddPeriod}
                   onClick={() => addScheduledPeriod(makeCustomPeriod(86400))}
                 >
                   <Plus data-icon='inline-start' />
@@ -879,27 +875,25 @@ export function WalletAutoRechargePresetsSection() {
                       'threshold:recharge',
                       optionState.threshold.rechargeAmounts
                     )}
-                    onChange={(event) =>
-                      {
-                        const value = event.target.value
-                        setAmountDrafts((current) =>
-                          updateOptionAmountDrafts(
-                            current,
-                            'threshold:recharge',
-                            value
-                          )
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setAmountDrafts((current) =>
+                        updateOptionAmountDrafts(
+                          current,
+                          'threshold:recharge',
+                          value
                         )
-                        setOptionState((current) => ({
-                          ...current,
-                          threshold: {
-                            ...current.threshold,
-                            rechargeAmounts: parseOptionAmountList(
-                              value
-                            ).filter((item) => item > 0),
-                          },
-                        }))
-                      }
-                    }
+                      )
+                      setOptionState((current) => ({
+                        ...current,
+                        threshold: {
+                          ...current.threshold,
+                          rechargeAmounts: parseOptionAmountList(value).filter(
+                            (item) => item > 0
+                          ),
+                        },
+                      }))
+                    }}
                     placeholder='10000, 30000, 50000'
                   />
                 </div>
@@ -913,25 +907,23 @@ export function WalletAutoRechargePresetsSection() {
                       'threshold:quota',
                       optionState.threshold.thresholdQuotas
                     )}
-                    onChange={(event) =>
-                      {
-                        const value = event.target.value
-                        setAmountDrafts((current) =>
-                          updateOptionAmountDrafts(
-                            current,
-                            'threshold:quota',
-                            value
-                          )
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setAmountDrafts((current) =>
+                        updateOptionAmountDrafts(
+                          current,
+                          'threshold:quota',
+                          value
                         )
-                        setOptionState((current) => ({
-                          ...current,
-                          threshold: {
-                            ...current.threshold,
-                            thresholdQuotas: parseOptionBalanceList(value),
-                          },
-                        }))
-                      }
-                    }
+                      )
+                      setOptionState((current) => ({
+                        ...current,
+                        threshold: {
+                          ...current.threshold,
+                          thresholdQuotas: parseOptionBalanceList(value),
+                        },
+                      }))
+                    }}
                     placeholder='1, 5, 10'
                   />
                 </div>

@@ -1,10 +1,10 @@
+import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 import type {
   WalletAutoRechargeIntervalUnit,
   WalletAutoRechargePreset,
   WalletAutoRechargePresetRequest,
   WalletAutoRechargeTargetScope,
 } from '../types'
-import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 
 export type ScheduledPeriodKind = 'daily' | 'weekly' | 'monthly' | 'custom'
 
@@ -166,6 +166,14 @@ export function groupMonthlyScheduledPresetOptions(
 
 function isManagedScheduledPeriod(period: ScheduledPeriodOption) {
   return period.kind === 'monthly' || period.kind === 'custom'
+}
+
+export function groupUserScheduledPresetOptions(
+  presets: WalletAutoRechargePreset[]
+): ScheduledPresetGroup[] {
+  return groupScheduledPresetOptions(presets).filter((group) =>
+    isManagedScheduledPeriod(group.period)
+  )
 }
 
 export function groupThresholdPresetOptions(
@@ -342,8 +350,10 @@ export function buildPresetSavePlan(
   desired: AdminAutoRechargeOptionState
 ): PresetSavePlan {
   const create: WalletAutoRechargePresetRequest[] = []
-  const update: Array<{ id: number; request: WalletAutoRechargePresetRequest }> =
-    []
+  const update: Array<{
+    id: number
+    request: WalletAutoRechargePresetRequest
+  }> = []
   const disable: WalletAutoRechargePreset[] = []
   const desiredByKey = new Map<string, WalletAutoRechargePresetRequest>()
   let sortOrder = 0
@@ -395,7 +405,9 @@ export function buildPresetSavePlan(
     }
   }
 
-  for (const preset of current.filter((item) => item.enabled).sort(byPresetOrder)) {
+  for (const preset of current
+    .filter((item) => item.enabled)
+    .sort(byPresetOrder)) {
     if (!desiredByKey.has(presetComboKey(preset))) {
       disable.push(preset)
     }

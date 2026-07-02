@@ -162,6 +162,38 @@ describe('auto recharge card helpers', () => {
     assert.ok(html.includes(formatQuota(500000)))
     assert.doesNotMatch(html, /Threshold balance/)
   })
+
+  test('renders active scheduled test-period policy with monthly copy', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'scheduled',
+        policies: [
+          {
+            id: 8,
+            type: 'scheduled',
+            target_type: 'user',
+            target_id: 42,
+            status: 'active',
+            amount: 5000,
+            interval_unit: 'custom',
+            interval_value: 1,
+            custom_seconds: 60,
+          },
+        ],
+        presets: [],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Charges on the 1st of every month/)
+    assert.doesNotMatch(html, /Charge interval/)
+    assert.doesNotMatch(html, /custom/)
+  })
 })
 
 describe('auto recharge preset UI helpers', () => {
@@ -190,6 +222,24 @@ describe('auto recharge preset UI helpers', () => {
           {
             type: 'scheduled',
             interval_unit: 'month',
+            interval_value: 1,
+          },
+        ],
+        [],
+        true,
+        true
+      ),
+      ['scheduled']
+    )
+  })
+
+  test('shows scheduled mode when test-period preset exists', () => {
+    assert.deepEqual(
+      getVisibleAutoRechargeModes(
+        [
+          {
+            type: 'scheduled',
+            interval_unit: 'custom',
             interval_value: 1,
           },
         ],
@@ -288,6 +338,43 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /30000/)
   })
 
+  test('renders scheduled test-period presets with monthly copy', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'scheduled',
+        policies: [],
+        presets: [
+          {
+            id: 3,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Test 5000',
+            amount: 5000,
+            interval_unit: 'custom',
+            interval_value: 1,
+            custom_seconds: 60,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.doesNotMatch(html, /Choose recharge period/)
+    assert.doesNotMatch(html, /Test period/)
+    assert.match(
+      html,
+      /Monthly recharge charges the selected amount on the 1st of every month\./
+    )
+    assert.match(html, /5000/)
+    assert.match(html, /Register card and set auto recharge/)
+  })
+
   test('hides scheduled period selector when only one period exists', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
@@ -370,10 +457,7 @@ describe('auto recharge preset UI helpers', () => {
       })
     )
 
-    assert.equal(
-      html.match(/When remaining quota is below/g)?.length ?? 0,
-      1
-    )
+    assert.equal(html.match(/When remaining quota is below/g)?.length ?? 0, 1)
     assert.match(html, /charge the following amount/)
     assert.ok(html.includes(formatQuota(500000)))
     assert.match(html, /Choose recharge amount/)
