@@ -214,7 +214,7 @@ func ActivateWalletAutoRechargeFromToss(tradeNo string, billingKeyId int, cardCo
 			"fail_count":         0,
 			"update_time":        now.Unix(),
 		}
-		if policy.Type == WalletAutoRechargeTypeScheduled && (chargeNow || policy.ChargeImmediately) {
+		if walletScheduledShouldChargeImmediately(policy, chargeNow) {
 			updates["next_charge_time"] = now.Unix()
 			policy.NextChargeTime = now.Unix()
 		}
@@ -238,7 +238,7 @@ func ActivateWalletAutoRechargeFromToss(tradeNo string, billingKeyId int, cardCo
 		return nil, err
 	}
 
-	if chargeNow || policy.ChargeImmediately {
+	if walletScheduledShouldChargeImmediately(policy, chargeNow) {
 		if err := ProcessWalletAutoRecharge(context.Background(), policy.Id, now, WalletAutoRechargeDailyLimit, charger); err != nil {
 			return nil, err
 		}
@@ -262,8 +262,32 @@ func nextWalletChargeTime(base time.Time, unit string, value int, customSeconds 
 		}
 		return base.Add(time.Duration(customSeconds) * time.Second)
 	default:
-		return base.AddDate(0, value, 0)
+		return nextMonthlyWalletChargeTime(base, value)
 	}
+}
+
+func nextMonthlyWalletChargeTime(base time.Time, value int) time.Time {
+	if value <= 0 {
+		value = 1
+	}
+	next := time.Date(base.Year(), base.Month(), 1, 0, 0, 0, 0, base.Location())
+	if !next.After(base) {
+		next = next.AddDate(0, 1, 0)
+	}
+	if value > 1 {
+		next = next.AddDate(0, value-1, 0)
+	}
+	return next
+}
+
+func walletScheduledShouldChargeImmediately(policy WalletAutoRecharge, chargeNow bool) bool {
+	if policy.Type != WalletAutoRechargeTypeScheduled {
+		return false
+	}
+	if policy.IntervalUnit == WalletAutoRechargeIntervalMonth {
+		return false
+	}
+	return chargeNow || policy.ChargeImmediately
 }
 
 func CancelWalletAutoRecharge(id int, targetType string, targetId int) error {

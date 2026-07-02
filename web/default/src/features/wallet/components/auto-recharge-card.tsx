@@ -31,8 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  getScheduledPeriodLabelKey,
-  groupScheduledPresetOptions,
+  groupMonthlyScheduledPresetOptions,
   groupThresholdPresetOptions,
 } from '../lib/auto-recharge-options'
 import type {
@@ -123,7 +122,10 @@ export function buildPresetCreatePayload(
 }
 
 export function getVisibleAutoRechargeModes(
-  presets: Array<Pick<WalletAutoRechargePreset, 'type'>>,
+  presets: Array<
+    Pick<WalletAutoRechargePreset, 'type'> &
+      Partial<Pick<WalletAutoRechargePreset, 'interval_unit' | 'interval_value'>>
+  >,
   policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>,
   presetsLoaded = true,
   policiesLoaded = true
@@ -134,7 +136,13 @@ export function getVisibleAutoRechargeModes(
 
   return (['scheduled', 'threshold'] as WalletAutoRechargeType[]).filter(
     (mode) =>
-      presets.some((preset) => preset.type === mode) ||
+      presets.some((preset) => {
+        if (preset.type !== mode) return false
+        if (mode !== 'scheduled') return true
+        return (
+          preset.interval_unit === 'month' && (preset.interval_value ?? 1) === 1
+        )
+      }) ||
       policies.some(
         (policy) =>
           policy.type === mode &&
@@ -158,9 +166,6 @@ export function AutoRechargeCard({
   onCancel,
 }: AutoRechargeCardProps) {
   const { t } = useTranslation()
-  const [selectedScheduledPeriodKey, setSelectedScheduledPeriodKey] = useState<
-    string | null
-  >(null)
   const [selectedThresholdQuota, setSelectedThresholdQuota] = useState<
     number | null
   >(null)
@@ -192,21 +197,22 @@ export function AutoRechargeCard({
   const creationLocked = creationDisabled && !activePolicy
   const creationButtonDisabled = disabled || creationLocked
   const scheduledGroups = useMemo(
-    () => groupScheduledPresetOptions(availablePresets),
+    () => groupMonthlyScheduledPresetOptions(availablePresets),
     [availablePresets]
   )
   const thresholdGroups = useMemo(
     () => groupThresholdPresetOptions(availablePresets),
     [availablePresets]
   )
-  const selectedScheduledGroup =
-    scheduledGroups.find(
-      (group) => group.period.key === selectedScheduledPeriodKey
-    ) ?? scheduledGroups[0]
+  const selectedScheduledGroup = scheduledGroups[0]
   const selectedThresholdGroup =
     thresholdGroups.find(
       (group) => group.thresholdQuota === selectedThresholdQuota
     ) ?? thresholdGroups[0]
+  const hasSelectablePresets =
+    mode === 'scheduled'
+      ? scheduledGroups.length > 0
+      : thresholdGroups.length > 0
 
   const handleSelectPreset = async (presetId: number) => {
     const payload = buildPresetCreatePayload(presetId)
@@ -243,12 +249,19 @@ export function AutoRechargeCard({
                     {t('Recharge amount')}: {activePolicy.amount}
                   </div>
                   {mode === 'scheduled' ? (
-                    <div className='text-muted-foreground text-sm'>
-                      {t('Charge interval')}: {activePolicy.interval_value || 1}
-                      {activePolicy.interval_unit === 'day'
-                        ? t('day')
-                        : t('month')}
-                    </div>
+                    activePolicy.interval_unit === 'month' ? (
+                      <div className='text-muted-foreground text-sm'>
+                        {t('Charges on the 1st of every month')}
+                      </div>
+                    ) : (
+                      <div className='text-muted-foreground text-sm'>
+                        {t('Charge interval')}:{' '}
+                        {activePolicy.interval_value || 1}
+                        {activePolicy.interval_unit === 'day'
+                          ? t('day')
+                          : t('month')}
+                      </div>
+                    )
                   ) : (
                     <div className='text-muted-foreground text-sm'>
                       {t('Threshold quota')}:{' '}
@@ -301,43 +314,16 @@ export function AutoRechargeCard({
           </div>
         ) : null}
 
-        {!activePolicy && availablePresets.length > 0 ? (
+        {!activePolicy && hasSelectablePresets ? (
           <div className={cn('space-y-3', !canManage && 'opacity-60')}>
             {mode === 'scheduled' ? (
               <>
-                {scheduledGroups.length > 1 ? (
-                  <div className='space-y-2'>
-                    <div className='text-sm font-medium'>
-                      {t('Choose recharge period')}
-                    </div>
-                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
-                      {scheduledGroups.map((group) => (
-                        <Button
-                          key={group.period.key}
-                          type='button'
-                          variant={
-                            selectedScheduledGroup?.period.key ===
-                            group.period.key
-                              ? 'default'
-                              : 'outline'
-                          }
-                          disabled={creationButtonDisabled}
-                          onClick={() => {
-                            setSelectedScheduledPeriodKey(group.period.key)
-                            setSelectedPresetId(null)
-                          }}
-                          className='h-10'
-                        >
-                          {t(getScheduledPeriodLabelKey(group.period))}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
                 {selectedScheduledGroup ? (
                   <div className='space-y-2'>
                     <div className='text-sm font-medium'>
-                      {t('Choose recharge amount')}
+                      {t(
+                        'Monthly recharge charges the selected amount on the 1st of every month.'
+                      )}
                     </div>
                     <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
                       {selectedScheduledGroup.amounts.map((option) => (

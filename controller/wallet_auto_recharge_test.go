@@ -488,8 +488,9 @@ func TestWalletAutoRechargeTossConfirmDoesNotCancelWhenImmediateChargeNeedsRecon
 		CustomerKey:       "customer-7",
 		AuthTradeNo:       "wallet-auto-controller-reconcile",
 		Amount:            10000,
-		IntervalUnit:      model.WalletAutoRechargeIntervalMonth,
+		IntervalUnit:      model.WalletAutoRechargeIntervalCustom,
 		IntervalValue:     1,
+		CustomSeconds:     60,
 		ChargeImmediately: true,
 	})
 	require.NoError(t, err)

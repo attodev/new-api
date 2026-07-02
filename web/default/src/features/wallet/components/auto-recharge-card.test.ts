@@ -183,12 +183,14 @@ describe('auto recharge preset UI helpers', () => {
     assert.deepEqual(getVisibleAutoRechargeModes([], [], true, true), [])
   })
 
-  test('shows mode when preset exists', () => {
+  test('shows scheduled mode when monthly preset exists', () => {
     assert.deepEqual(
       getVisibleAutoRechargeModes(
         [
           {
             type: 'scheduled',
+            interval_unit: 'month',
+            interval_value: 1,
           },
         ],
         [],
@@ -196,6 +198,24 @@ describe('auto recharge preset UI helpers', () => {
         true
       ),
       ['scheduled']
+    )
+  })
+
+  test('hides scheduled mode when only legacy non-monthly preset exists', () => {
+    assert.deepEqual(
+      getVisibleAutoRechargeModes(
+        [
+          {
+            type: 'scheduled',
+            interval_unit: 'day',
+            interval_value: 1,
+          },
+        ],
+        [],
+        true,
+        true
+      ),
+      []
     )
   })
 
@@ -222,7 +242,7 @@ describe('auto recharge preset UI helpers', () => {
     assert.deepEqual(buildPresetCreatePayload(12), { preset_id: 12 })
   })
 
-  test('renders scheduled presets as period then amount buttons', () => {
+  test('renders scheduled presets as monthly amount choices only', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
         mode: 'scheduled',
@@ -258,9 +278,14 @@ describe('auto recharge preset UI helpers', () => {
       })
     )
 
-    assert.match(html, /Choose recharge period/)
-    assert.match(html, /Daily/)
-    assert.match(html, /Monthly/)
+    assert.doesNotMatch(html, /Choose recharge period/)
+    assert.doesNotMatch(html, /Daily/)
+    assert.match(
+      html,
+      /Monthly recharge charges the selected amount on the 1st of every month\./
+    )
+    assert.doesNotMatch(html, /10000/)
+    assert.match(html, /30000/)
   })
 
   test('hides scheduled period selector when only one period exists', () => {
@@ -300,7 +325,10 @@ describe('auto recharge preset UI helpers', () => {
     )
 
     assert.doesNotMatch(html, /Choose recharge period/)
-    assert.match(html, /Choose recharge amount/)
+    assert.match(
+      html,
+      /Monthly recharge charges the selected amount on the 1st of every month\./
+    )
     assert.match(html, /10000/)
     assert.match(html, /30000/)
     assert.match(html, /Register card and set auto recharge/)
@@ -365,7 +393,8 @@ describe('auto recharge preset UI helpers', () => {
             target_scope: 'all',
             name: 'Auto 10000',
             amount: 10000,
-            threshold_amount: 1000,
+            threshold_amount: 0,
+            threshold_quota: 500000,
             enabled: true,
           },
         ],

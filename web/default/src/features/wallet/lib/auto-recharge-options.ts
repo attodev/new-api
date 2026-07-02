@@ -115,7 +115,7 @@ export function getScheduledPeriodLabelKey(period: ScheduledPeriodOption) {
   if (period.kind === 'daily') return 'Daily'
   if (period.kind === 'weekly') return 'Weekly'
   if (period.kind === 'monthly') return 'Monthly'
-  return 'Custom period'
+  return 'Test period'
 }
 
 export function formatScheduledPeriodSummary(
@@ -154,6 +154,18 @@ export function groupScheduledPresetOptions(
     ...group,
     amounts: group.amounts.sort((left, right) => left.amount - right.amount),
   }))
+}
+
+export function groupMonthlyScheduledPresetOptions(
+  presets: WalletAutoRechargePreset[]
+): ScheduledPresetGroup[] {
+  return groupScheduledPresetOptions(presets).filter(
+    (group) => group.period.kind === 'monthly'
+  )
+}
+
+function isManagedScheduledPeriod(period: ScheduledPeriodOption) {
+  return period.kind === 'monthly' || period.kind === 'custom'
 }
 
 export function groupThresholdPresetOptions(
@@ -217,6 +229,7 @@ export function buildAdminOptionState(
       chargeImmediately:
         scheduledPresets.sort(byPresetOrder)[0]?.charge_immediately !== false,
       periods: scheduledGroups
+        .filter((group) => isManagedScheduledPeriod(group.period))
         .map((group) => ({
           period: group.period,
           amounts: uniqueNumbers(group.amounts.map((item) => item.amount)),

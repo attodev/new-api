@@ -3,6 +3,7 @@ import {
   buildAdminOptionState,
   buildPresetSavePlan,
   buildPresetSavePlanFromBalanceThresholds,
+  groupMonthlyScheduledPresetOptions,
   groupScheduledPresetOptions,
   groupThresholdPresetOptions,
 } from './auto-recharge-options'
@@ -72,6 +73,33 @@ describe('auto recharge option helpers', () => {
     ])
   })
 
+  test('groups user scheduled presets as monthly options only', () => {
+    const groups = groupMonthlyScheduledPresetOptions([
+      preset({
+        id: 1,
+        amount: 10000,
+        interval_unit: 'day',
+        interval_value: 1,
+      }),
+      preset({
+        id: 2,
+        amount: 30000,
+        interval_unit: 'month',
+        interval_value: 1,
+      }),
+      preset({
+        id: 3,
+        amount: 5000,
+        interval_unit: 'custom',
+        interval_value: 1,
+        custom_seconds: 60,
+      }),
+    ])
+
+    expect(groups.map((group) => group.period.kind)).toEqual(['monthly'])
+    expect(groups[0].amounts.map((item) => item.amount)).toEqual([30000])
+  })
+
   test('groups threshold presets by quota before recharge amount', () => {
     const groups = groupThresholdPresetOptions([
       preset({
@@ -138,14 +166,35 @@ describe('auto recharge option helpers', () => {
       }),
       preset({
         id: 2,
+        type: 'scheduled',
+        amount: 20000,
+        interval_unit: 'month',
+        interval_value: 1,
+      }),
+      preset({
+        id: 3,
+        type: 'scheduled',
+        amount: 5000,
+        interval_unit: 'custom',
+        interval_value: 1,
+        custom_seconds: 60,
+      }),
+      preset({
+        id: 4,
         type: 'threshold',
         amount: 30000,
         threshold_quota: 500000,
       }),
     ])
 
-    expect(state.scheduled.periods[0].period.kind).toBe('daily')
-    expect(state.scheduled.periods[0].amounts).toEqual([10000])
+    expect(state.scheduled.periods.map((item) => item.period.kind)).toEqual([
+      'monthly',
+      'custom',
+    ])
+    expect(state.scheduled.periods.map((item) => item.amounts)).toEqual([
+      [20000],
+      [5000],
+    ])
     expect(state.threshold.rechargeAmounts).toEqual([30000])
     expect(state.threshold.thresholdQuotas).toEqual([500000])
   })

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   formatOptionBalanceList,
   formatOptionAmountList,
+  canAddTestScheduledPeriod,
   getOptionAmountDraftValue,
   getOptionBalanceDraftValue,
   getPresetSummary,
@@ -294,5 +295,37 @@ describe('wallet auto recharge preset admin helpers', () => {
     const plan = buildPresetSavePlan(current, desired)
 
     expect(plan.disable.map((preset) => preset.id)).toEqual([1])
+  })
+
+  test('allows adding only one test scheduled period', () => {
+    expect(canAddTestScheduledPeriod([])).toBe(true)
+    expect(
+      canAddTestScheduledPeriod([
+        {
+          period: {
+            key: 'monthly',
+            kind: 'monthly',
+            interval_unit: 'month',
+            interval_value: 1,
+            custom_seconds: 0,
+          },
+          amounts: [10000],
+        },
+      ])
+    ).toBe(true)
+    expect(
+      canAddTestScheduledPeriod([
+        {
+          period: {
+            key: 'custom:1:60',
+            kind: 'custom',
+            interval_unit: 'custom',
+            interval_value: 1,
+            custom_seconds: 60,
+          },
+          amounts: [1000],
+        },
+      ])
+    ).toBe(false)
   })
 })

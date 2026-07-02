@@ -93,6 +93,85 @@ func TestCreatePendingWalletAutoRechargeNormalizesCustomIntervalValue(t *testing
 	require.Equal(t, 1, stored.IntervalValue)
 }
 
+func TestNextWalletChargeTimeMonthlyUsesNextFirstDayAnchor(t *testing.T) {
+	loc := time.FixedZone("KST", 9*60*60)
+
+	tests := []struct {
+		name string
+		base time.Time
+		want time.Time
+	}{
+		{
+			name: "end of month schedules next month first day",
+			base: time.Date(2026, 6, 30, 13, 45, 0, 0, loc),
+			want: time.Date(2026, 7, 1, 0, 0, 0, 0, loc),
+		},
+		{
+			name: "first day anchor advances to following month",
+			base: time.Date(2026, 7, 1, 0, 0, 0, 0, loc),
+			want: time.Date(2026, 8, 1, 0, 0, 0, 0, loc),
+		},
+		{
+			name: "after first day schedules following month first day",
+			base: time.Date(2026, 7, 2, 10, 30, 0, 0, loc),
+			want: time.Date(2026, 8, 1, 0, 0, 0, 0, loc),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := nextWalletChargeTime(tc.base, WalletAutoRechargeIntervalMonth, 1, 0)
+
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestActivateMonthlyWalletAutoRechargeIgnoresImmediateCharge(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	require.NoError(t, DB.Create(&User{Id: 1, Username: "owner", AffCode: "monthly-owner"}).Error)
+	enc, err := common.EncryptString("billing-key")
+	require.NoError(t, err)
+	require.NoError(t, DB.Create(&UserBillingKey{
+		Id:           1,
+		UserId:       1,
+		CustomerKey:  "customer-monthly",
+		EncryptedKey: enc,
+		Status:       BillingKeyStatusActive,
+	}).Error)
+
+	policy, err := CreatePendingWalletAutoRecharge(CreateWalletAutoRechargeRequest{
+		Type:              WalletAutoRechargeTypeScheduled,
+		TargetType:        TopUpTargetTypeUser,
+		TargetId:          1,
+		OwnerUserId:       1,
+		CustomerKey:       "customer-monthly",
+		AuthTradeNo:       "monthly-immediate-auth",
+		Amount:            20000,
+		IntervalUnit:      WalletAutoRechargeIntervalMonth,
+		IntervalValue:     1,
+		ChargeImmediately: true,
+	})
+	require.NoError(t, err)
+	originalNextChargeTime := policy.NextChargeTime
+
+	called := false
+	activated, err := ActivateWalletAutoRechargeFromToss("monthly-immediate-auth", 1, "card", "****1234", false, func(ctx context.Context, billingKey, customerKey, orderID, orderName string, amount int64) (bool, int64, error) {
+		called = true
+		return true, amount, nil
+	})
+
+	require.NoError(t, err)
+	require.False(t, called)
+	require.Equal(t, WalletAutoRechargeStatusActive, activated.Status)
+	require.Equal(t, originalNextChargeTime, activated.NextChargeTime)
+
+	var reloaded WalletAutoRecharge
+	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
+	require.Equal(t, originalNextChargeTime, reloaded.NextChargeTime)
+	require.Zero(t, reloaded.LastChargeTime)
+}
+
 func TestCreatePendingThresholdWalletAutoRechargeStoresThresholdQuotaDirectly(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 
@@ -527,7 +606,7 @@ func TestCompleteWalletAutoRechargeTopUpCreditsCancelledPolicy(t *testing.T) {
 	require.Nil(t, reloaded.ActiveKey)
 }
 
-func TestActivateWalletAutoRechargeFromTossLeavesPolicyActiveWhenImmediateCreditNeedsReconciliation(t *testing.T) {
+func TestActivateCustomWalletAutoRechargeFromTossLeavesPolicyActiveWhenImmediateCreditNeedsReconciliation(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 	originalUnitPrice := setting.TossUnitPrice
 	setting.TossUnitPrice = 1000
@@ -554,8 +633,9 @@ func TestActivateWalletAutoRechargeFromTossLeavesPolicyActiveWhenImmediateCredit
 		CustomerKey:       "customer-33",
 		AuthTradeNo:       "wallet-auto-activation-reconcile",
 		Amount:            10000,
-		IntervalUnit:      WalletAutoRechargeIntervalMonth,
+		IntervalUnit:      WalletAutoRechargeIntervalCustom,
 		IntervalValue:     1,
+		CustomSeconds:     60,
 		ChargeImmediately: true,
 	})
 	require.NoError(t, err)

@@ -49,6 +49,7 @@ import {
   formatScheduledPeriodSummary,
   getScheduledPeriodLabelKey,
   type AdminAutoRechargeOptionState,
+  type AdminScheduledPeriodOption,
   type ScheduledPeriodOption,
 } from '@/features/wallet/lib/auto-recharge-options'
 import type {
@@ -329,6 +330,12 @@ function makeCustomPeriod(customSeconds: number): ScheduledPeriodOption {
     interval_value: 1,
     custom_seconds: seconds,
   }
+}
+
+export function canAddTestScheduledPeriod(
+  periods: AdminScheduledPeriodOption[]
+) {
+  return !periods.some((item) => item.period.kind === 'custom')
 }
 
 function getIntervalSummary(
@@ -645,6 +652,10 @@ export function WalletAutoRechargePresetsSection() {
     }
   }
 
+  const canAddTestPeriod = canAddTestScheduledPeriod(
+    optionState.scheduled.periods
+  )
+
   return (
     <SettingsSection title={t('Auto Recharge Presets')}>
       <div className='flex items-center justify-between gap-3'>
@@ -735,24 +746,6 @@ export function WalletAutoRechargePresetsSection() {
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => addScheduledPeriod(makeQuickPeriod('daily'))}
-                >
-                  <Plus data-icon='inline-start' />
-                  {t('Add daily')}
-                </Button>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
-                  onClick={() => addScheduledPeriod(makeQuickPeriod('weekly'))}
-                >
-                  <Plus data-icon='inline-start' />
-                  {t('Add weekly')}
-                </Button>
-                <Button
-                  type='button'
-                  variant='outline'
-                  size='sm'
                   onClick={() => addScheduledPeriod(makeQuickPeriod('monthly'))}
                 >
                   <Plus data-icon='inline-start' />
@@ -762,10 +755,11 @@ export function WalletAutoRechargePresetsSection() {
                   type='button'
                   variant='outline'
                   size='sm'
+                  disabled={!canAddTestPeriod}
                   onClick={() => addScheduledPeriod(makeCustomPeriod(86400))}
                 >
                   <Plus data-icon='inline-start' />
-                  {t('Add custom period')}
+                  {t('Add test period')}
                 </Button>
               </div>
 
