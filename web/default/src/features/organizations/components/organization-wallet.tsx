@@ -57,6 +57,7 @@ import type {
   PaymentMethod,
   PresetAmount,
   TopupAmountMode,
+  TossTopupQuote,
   UserWalletData,
 } from '@/features/wallet/types'
 import {
@@ -141,6 +142,9 @@ export function OrganizationWallet() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
   const [paymentAmount, setPaymentAmount] = useState(0)
+  const [tossQuote, setTossQuote] = useState<Partial<TossTopupQuote> | null>(
+    null
+  )
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null)
@@ -244,14 +248,17 @@ export function OrganizationWallet() {
           const quote = isTossPayment(paymentType)
             ? parseTossQuoteData(response.data)
             : null
+          setTossQuote(isTossPayment(paymentType) ? quote : null)
           const value =
             quote?.charge_amount ?? parseFloat(String(response.data))
           setPaymentAmount(value)
           return value
         }
+        setTossQuote(null)
         setPaymentAmount(0)
         return 0
       } catch {
+        setTossQuote(null)
         setPaymentAmount(0)
         return 0
       } finally {
@@ -645,6 +652,7 @@ export function OrganizationWallet() {
         paymentMethod={selectedPaymentMethod}
         amountMode={topupAmountMode}
         tossUnitPrice={topupInfo?.toss_unit_price}
+        tossQuote={tossQuote}
         calculating={calculating}
         processing={processing}
         discountRate={getDiscountRate()}

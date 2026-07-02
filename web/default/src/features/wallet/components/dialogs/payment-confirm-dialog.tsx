@@ -36,7 +36,48 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { DEFAULT_DISCOUNT_RATE } from '../../constants'
 import { formatCurrency, getPaymentIcon, isTossPayment } from '../../lib'
 import { formatWonAmount, getTossPreview } from '../../lib/topup-amount-mode'
-import type { PaymentMethod, TopupAmountMode } from '../../types'
+import type {
+  PaymentMethod,
+  TopupAmountMode,
+  TossTopupQuote,
+} from '../../types'
+
+interface TossConfirmAmountsInput {
+  topupAmount: number
+  paymentAmount: number
+  amountMode?: TopupAmountMode
+  tossUnitPrice?: number
+  tossQuote?: Partial<TossTopupQuote> | null
+}
+
+export function getTossConfirmAmounts({
+  topupAmount,
+  paymentAmount,
+  amountMode,
+  tossUnitPrice,
+  tossQuote,
+}: TossConfirmAmountsInput) {
+  const preview = getTossPreview(
+    topupAmount,
+    amountMode ?? 'krw',
+    tossUnitPrice
+  )
+  const quoteChargeAmount =
+    typeof tossQuote?.charge_amount === 'number' &&
+    Number.isFinite(tossQuote.charge_amount)
+      ? tossQuote.charge_amount
+      : null
+  const quoteCreditAmount =
+    typeof tossQuote?.credit_amount === 'number' &&
+    Number.isFinite(tossQuote.credit_amount)
+      ? tossQuote.credit_amount
+      : null
+
+  return {
+    chargeAmount: quoteChargeAmount ?? (paymentAmount || preview.chargeAmount),
+    creditAmount: quoteCreditAmount ?? preview.creditAmount,
+  }
+}
 
 interface PaymentConfirmDialogProps {
   open: boolean
@@ -47,6 +88,7 @@ interface PaymentConfirmDialogProps {
   paymentMethod: PaymentMethod | undefined
   amountMode?: TopupAmountMode
   tossUnitPrice?: number
+  tossQuote?: Partial<TossTopupQuote> | null
   calculating: boolean
   processing: boolean
   discountRate?: number
@@ -62,6 +104,7 @@ export function PaymentConfirmDialog({
   paymentMethod,
   amountMode,
   tossUnitPrice,
+  tossQuote,
   calculating,
   processing,
   discountRate = DEFAULT_DISCOUNT_RATE,
@@ -69,10 +112,15 @@ export function PaymentConfirmDialog({
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
   const isToss = paymentMethod ? isTossPayment(paymentMethod.type) : false
-  const tossPreview = isToss
-    ? getTossPreview(topupAmount, amountMode ?? 'krw', tossUnitPrice)
+  const tossAmounts = isToss
+    ? getTossConfirmAmounts({
+        topupAmount,
+        paymentAmount,
+        amountMode,
+        tossUnitPrice,
+        tossQuote,
+      })
     : null
-  const tossChargeAmount = paymentAmount || tossPreview?.chargeAmount || 0
   const hasDiscount =
     !isToss && discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
@@ -91,7 +139,7 @@ export function PaymentConfirmDialog({
         </AlertDialogHeader>
 
         <div className='space-y-3 py-3 sm:space-y-4 sm:py-4'>
-          {isToss && tossPreview ? (
+          {isToss && tossAmounts ? (
             <>
               <div className='flex items-center justify-between'>
                 <span className='text-muted-foreground text-sm'>
@@ -101,7 +149,7 @@ export function PaymentConfirmDialog({
                   <Skeleton className='h-6 w-24' />
                 ) : (
                   <span className='text-lg font-semibold'>
-                    {formatWonAmount(tossChargeAmount)}
+                    {formatWonAmount(tossAmounts.chargeAmount)}
                   </span>
                 )}
               </div>
@@ -111,7 +159,7 @@ export function PaymentConfirmDialog({
                   {t('Credit amount')}
                 </span>
                 <span className='text-lg font-semibold'>
-                  {formatCurrencyFromUSD(tossPreview.creditAmount)}
+                  {formatCurrencyFromUSD(tossAmounts.creditAmount)}
                 </span>
               </div>
             </>

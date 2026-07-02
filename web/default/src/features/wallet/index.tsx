@@ -90,8 +90,7 @@ export function Wallet(props: WalletProps) {
   const [userLoading, setUserLoading] = useState(true)
   const setAuthUser = useAuthStore((state) => state.auth.setUser)
   const [topupAmount, setTopupAmount] = useState(0)
-  const [topupAmountMode, setTopupAmountMode] =
-    useState<TopupAmountMode>('krw')
+  const [topupAmountMode, setTopupAmountMode] = useState<TopupAmountMode>('krw')
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
@@ -132,6 +131,7 @@ export function Wallet(props: WalletProps) {
     processing,
     calculatePaymentAmount,
     processPayment,
+    tossQuote,
   } = usePayment()
   const {
     affiliateLink,
@@ -155,11 +155,8 @@ export function Wallet(props: WalletProps) {
   const getAmountForMinimumCheck = useCallback(
     (amount: number, paymentType: string, amountMode: TopupAmountMode) => {
       if (isTossPayment(paymentType) && amountMode === 'quota') {
-        return getTossPreview(
-          amount,
-          amountMode,
-          topupInfo?.toss_unit_price
-        ).chargeAmount
+        return getTossPreview(amount, amountMode, topupInfo?.toss_unit_price)
+          .chargeAmount
       }
       return amount
     },
@@ -652,6 +649,7 @@ export function Wallet(props: WalletProps) {
         paymentMethod={selectedPaymentMethod}
         amountMode={topupAmountMode}
         tossUnitPrice={topupInfo?.toss_unit_price}
+        tossQuote={tossQuote}
         calculating={calculating}
         processing={processing || pancakeProcessing || tossProcessing}
         discountRate={getDiscountRate()}
