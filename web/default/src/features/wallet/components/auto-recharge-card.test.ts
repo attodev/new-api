@@ -306,7 +306,7 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /Register card and set auto recharge/)
   })
 
-  test('renders threshold quota sentence before recharge amount choices', () => {
+  test('renders threshold quota heading once before recharge amount choices', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
         mode: 'threshold',
@@ -342,7 +342,10 @@ describe('auto recharge preset UI helpers', () => {
       })
     )
 
-    assert.match(html, /When remaining quota is below/)
+    assert.equal(
+      html.match(/When remaining quota is below/g)?.length ?? 0,
+      1
+    )
     assert.match(html, /charge the following amount/)
     assert.ok(html.includes(formatQuota(500000)))
     assert.match(html, /Choose recharge amount/)

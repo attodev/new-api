@@ -368,9 +368,6 @@ export function AutoRechargeCard({
                       {t('When remaining quota is below')}
                     </div>
                     <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-                      <span className='text-muted-foreground text-sm'>
-                        {t('When remaining quota is below')}
-                      </span>
                       <Select
                         value={String(
                           selectedThresholdGroup?.thresholdQuota ?? ''
