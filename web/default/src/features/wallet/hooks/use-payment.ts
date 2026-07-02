@@ -37,6 +37,8 @@ import {
   isTossPayment,
   submitPaymentForm,
 } from '../lib'
+import { parseTossQuoteData } from '../lib/topup-amount-mode'
+import type { TopupAmountMode } from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -49,7 +51,11 @@ export function usePayment() {
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
-    async (topupAmount: number, paymentType: string) => {
+    async (
+      topupAmount: number,
+      paymentType: string,
+      amountMode?: TopupAmountMode
+    ) => {
       try {
         setCalculating(true)
 
@@ -65,13 +71,18 @@ export function usePayment() {
         } else if (isPancake) {
           response = await calculateWaffoPancakeAmount({ amount: topupAmount })
         } else if (isToss) {
-          response = await calculateTossAmount({ amount: topupAmount })
+          response = await calculateTossAmount({
+            amount: topupAmount,
+            amount_mode: amountMode,
+          })
         } else {
           response = await calculateAmount({ amount: topupAmount })
         }
 
         if (isApiSuccess(response) && response.data) {
-          const calculatedAmount = parseFloat(response.data)
+          const quote = isToss ? parseTossQuoteData(response.data) : null
+          const calculatedAmount =
+            quote?.charge_amount ?? parseFloat(String(response.data))
           setAmount(calculatedAmount)
           return calculatedAmount
         }

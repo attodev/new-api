@@ -69,11 +69,13 @@ import {
   WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
   type WalletPaymentSettingKind,
 } from './lib/payment-settings'
+import { getTossPreview } from './lib/topup-amount-mode'
 import type {
   UserWalletData,
   PaymentMethod,
   PresetAmount,
   CreemProduct,
+  TopupAmountMode,
 } from './types'
 
 interface WalletProps {
@@ -88,6 +90,8 @@ export function Wallet(props: WalletProps) {
   const [userLoading, setUserLoading] = useState(true)
   const setAuthUser = useAuthStore((state) => state.auth.setUser)
   const [topupAmount, setTopupAmount] = useState(0)
+  const [topupAmountMode, setTopupAmountMode] =
+    useState<TopupAmountMode>('krw')
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
@@ -141,6 +145,26 @@ export function Wallet(props: WalletProps) {
   const { processing: pancakeProcessing, processWaffoPancakePayment } =
     useWaffoPancakePayment()
   const { processing: tossProcessing, processTossPayment } = useTossPayment()
+
+  const getAmountModeForPaymentType = useCallback(
+    (paymentType: string) =>
+      isTossPayment(paymentType) ? topupAmountMode : undefined,
+    [topupAmountMode]
+  )
+
+  const getAmountForMinimumCheck = useCallback(
+    (amount: number, paymentType: string, amountMode: TopupAmountMode) => {
+      if (isTossPayment(paymentType) && amountMode === 'quota') {
+        return getTossPreview(
+          amount,
+          amountMode,
+          topupInfo?.toss_unit_price
+        ).chargeAmount
+      }
+      return amount
+    },
+    [topupInfo?.toss_unit_price]
+  )
 
   // Fetch and refresh user data
   const fetchUser = useCallback(async () => {
@@ -203,27 +227,57 @@ export function Wallet(props: WalletProps) {
 
       // Calculate initial payment amount with default payment type
       const defaultPaymentType = getDefaultPaymentType(topupInfo)
-      calculatePaymentAmount(minTopup, defaultPaymentType)
+      calculatePaymentAmount(
+        minTopup,
+        defaultPaymentType,
+        getAmountModeForPaymentType(defaultPaymentType)
+      )
     }
-  }, [topupInfo, topupAmount, calculatePaymentAmount])
+  }, [
+    topupInfo,
+    topupAmount,
+    calculatePaymentAmount,
+    getAmountModeForPaymentType,
+  ])
 
   // Get current payment type (selected or default)
   const getCurrentPaymentType = useCallback(() => {
     return selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
   }, [selectedPaymentMethod, topupInfo])
 
+  const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTopupAmountMode(mode)
+    setSelectedPreset(null)
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      topupAmount,
+      paymentType,
+      isTossPayment(paymentType) ? mode : undefined
+    )
+  }
+
   // Handle preset selection
   const handleSelectPreset = (preset: PresetAmount) => {
     setTopupAmount(preset.value)
     setSelectedPreset(preset.value)
-    calculatePaymentAmount(preset.value, getCurrentPaymentType())
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      preset.value,
+      paymentType,
+      getAmountModeForPaymentType(paymentType)
+    )
   }
 
   // Handle topup amount change
   const handleTopupAmountChange = (amount: number) => {
     setTopupAmount(amount)
     setSelectedPreset(null)
-    calculatePaymentAmount(amount, getCurrentPaymentType())
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      amount,
+      paymentType,
+      getAmountModeForPaymentType(paymentType)
+    )
   }
 
   // Handle payment method selection
@@ -233,13 +287,22 @@ export function Wallet(props: WalletProps) {
 
     try {
       // Validate minimum topup
-      const minTopup = getMinTopupAmount(topupInfo)
-      if (topupAmount < minTopup) {
+      const minTopup = method.min_topup || getMinTopupAmount(topupInfo)
+      const amountForMinimum = getAmountForMinimumCheck(
+        topupAmount,
+        method.type,
+        topupAmountMode
+      )
+      if (amountForMinimum < minTopup) {
         return
       }
 
       // Calculate payment amount and show confirmation dialog
-      await calculatePaymentAmount(topupAmount, method.type)
+      await calculatePaymentAmount(
+        topupAmount,
+        method.type,
+        getAmountModeForPaymentType(method.type)
+      )
       setConfirmDialogOpen(true)
     } finally {
       setPaymentLoading(null)
@@ -255,7 +318,7 @@ export function Wallet(props: WalletProps) {
     if (isWaffoPancakePayment(type)) {
       success = await processWaffoPancakePayment(topupAmount)
     } else if (isTossPayment(type)) {
-      success = await processTossPayment(topupAmount)
+      success = await processTossPayment(topupAmount, topupAmountMode)
     } else {
       success = await processPayment(topupAmount, type)
     }
@@ -438,6 +501,9 @@ export function Wallet(props: WalletProps) {
                   onSelectPreset={handleSelectPreset}
                   topupAmount={topupAmount}
                   onTopupAmountChange={handleTopupAmountChange}
+                  amountMode={topupAmountMode}
+                  onAmountModeChange={handleTopupAmountModeChange}
+                  tossUnitPrice={topupInfo?.toss_unit_price}
                   paymentAmount={paymentAmount}
                   calculating={calculating}
                   onPaymentMethodSelect={handlePaymentMethodSelect}
@@ -584,6 +650,8 @@ export function Wallet(props: WalletProps) {
         topupAmount={topupAmount}
         paymentAmount={paymentAmount}
         paymentMethod={selectedPaymentMethod}
+        amountMode={topupAmountMode}
+        tossUnitPrice={topupInfo?.toss_unit_price}
         calculating={calculating}
         processing={processing || pancakeProcessing || tossProcessing}
         discountRate={getDiscountRate()}

@@ -1,4 +1,4 @@
-# Task 4 Report: Wallet Page Integration and Verification
+# Task 4 Report: User Wallet Toss Amount Mode Flow
 
 ## Status
 
@@ -6,63 +6,61 @@ DONE_WITH_CONCERNS
 
 ## Summary
 
-- Integrated the personal wallet page with the wallet payment-setting helpers.
-- Kept ordinary top-up on the left and moved subscription/auto-recharge/scheduled recharge controls into a right-side `Payment settings` card when at least one setting tab is visible.
-- Removed wallet-page subscription purchase plans; wallet now only shows active subscription status in this area.
-- Loaded self subscription state and wired refresh, billing preference update, and Toss auto-renew cancellation handlers.
-- Enforced frontend mutual exclusion by disabling unconfigured payment setting tabs and passing the lock message to auto-recharge creation controls.
-- Added an i18n-backed accessible label to the subscription refresh icon button.
-- Added translations for new wallet strings in `en`, `zh`, `fr`, `ja`, `kr`, `ru`, and `vi`.
-- Cleaned up a focused wallet test fixture so TypeScript uses the helper's narrow input contract.
+- Added user-wallet Toss amount mode state with `krw` as the default.
+- Passed `amount_mode` to Toss amount calculation and Toss payment session creation.
+- Parsed structured Toss quote responses so payment amount uses `charge_amount` while legacy string responses still work.
+- Added a Toss mode selector to the recharge card with English i18n source keys: `KRW based`, `Quota based`, `Credit`, `Pay`, `Payment amount`, and `Credit amount`.
+- Rendered KRW presets as won payment amounts with wallet credit preview.
+- Rendered quota presets as wallet quota amounts with KRW payment preview.
+- Updated custom amount preview to mirror the active Toss mode.
+- Updated the payment confirmation dialog to show Toss KRW payment amount and wallet credit amount clearly.
+- Preserved non-Toss preset, custom amount, payment amount, and confirmation behavior.
 
-## Files Changed
+## TDD Evidence
 
-- `web/default/src/features/wallet/index.tsx`
-- `web/default/src/features/wallet/components/auto-recharge-card.test.ts`
-- `web/default/src/features/wallet/components/wallet-subscription-status-card.tsx`
-- `web/default/src/features/wallet/components/wallet-subscription-status-card.test.ts`
-- `web/default/src/i18n/locales/en.json`
-- `web/default/src/i18n/locales/fr.json`
-- `web/default/src/i18n/locales/ja.json`
-- `web/default/src/i18n/locales/kr.json`
-- `web/default/src/i18n/locales/ru.json`
-- `web/default/src/i18n/locales/vi.json`
-- `web/default/src/i18n/locales/zh.json`
+### RED
+
+```text
+$ cd web/default && bun test src/features/wallet/components/recharge-form-card.test.tsx
+AssertionError: The input did not match the regular expression /KRW based/.
+AssertionError: The input did not match the regular expression /Quota based/.
+0 pass
+2 fail
+```
+
+This was the expected failure because `RechargeFormCard` did not yet render the Toss amount mode selector or Toss mode-specific preset previews.
+
+### GREEN
+
+```text
+$ cd web/default && bun test src/features/wallet/components/recharge-form-card.test.tsx
+2 pass
+0 fail
+Ran 2 tests across 1 file.
+```
+
+```text
+$ cd web/default && bun test src/features/wallet/lib/topup-amount-mode.test.ts src/features/wallet/components/recharge-form-card.test.tsx
+7 pass
+0 fail
+Ran 7 tests across 2 files.
+```
 
 ## Verification
 
 ```text
-$ cd web/default && bun run i18n:sync
-i18n sync done. Report: /tmp/new-api-wallet-auto-recharge/web/default/src/i18n/locales/_reports/_sync-report.json
-```
-
-Sync report showed `missingCount: 0` and `extrasCount: 0` for every locale.
-
-```text
-$ cd web/default && bun test src/features/wallet/lib/payment-settings.test.ts src/features/wallet/components/auto-recharge-card.test.ts src/features/wallet/components/wallet-subscription-status-card.test.ts
-23 pass
+$ cd web/default && bun test src/features/wallet/lib/topup-amount-mode.test.ts src/features/wallet/components/recharge-form-card.test.tsx
+7 pass
 0 fail
-Ran 23 tests across 3 files.
+Ran 7 tests across 2 files.
 ```
 
 ```text
-$ cd web/default && bun test src/features/wallet
-33 pass
-0 fail
-Ran 33 tests across 6 files.
+$ cd web/default && bun run typecheck
+$ tsc -b
 ```
 
-```text
-$ cd web/default && ./node_modules/.bin/prettier --check ...
-All matched files use Prettier code style!
-```
-
-```text
-$ cd web/default && bun run build:check
-$ tsc -b && rsbuild build
-```
-
-`build:check` failed during TypeScript checking before Rsbuild ran. The remaining errors are outside the Task 4 wallet integration surface, except an existing `bun:test` type-resolution issue in another wallet test file. Examples from the final run:
+`bun run typecheck` fails from pre-existing unrelated TypeScript errors outside the Task 4 edited files. Representative errors from the final run:
 
 - `src/features/organizations/components/organization-dashboard.tsx(720,13): Type '(organizationId: string) => void' is not assignable to type '(value: string | null, ...) => void'.`
 - `src/features/organizations/components/organization-users-table.tsx(83,3): 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.`
@@ -72,53 +70,39 @@ $ tsc -b && rsbuild build
 - `src/features/wallet/lib/auto-recharge-options.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
 - `src/i18n/languages.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
 
-I fixed the only `build:check` error that was inside the focused Task 4 test files (`auto-recharge-card.test.ts` excess properties for `getVisibleAutoRechargeModes`). No errors from `web/default/src/features/wallet/index.tsx`, `wallet-subscription-status-card.tsx`, or `auto-recharge-card.test.ts` remained in the final `build:check` output.
+No errors from these edited files remained in the final typecheck output:
+
+- `web/default/src/features/wallet/hooks/use-payment.ts`
+- `web/default/src/features/wallet/hooks/use-toss-payment.ts`
+- `web/default/src/features/wallet/index.tsx`
+- `web/default/src/features/wallet/components/recharge-form-card.tsx`
+- `web/default/src/features/wallet/components/recharge-form-card.test.tsx`
+- `web/default/src/features/wallet/components/dialogs/payment-confirm-dialog.tsx`
+
+```text
+$ git diff --check
+```
+
+No whitespace errors.
+
+## Files Changed
+
+- `web/default/src/features/wallet/hooks/use-payment.ts`
+- `web/default/src/features/wallet/hooks/use-toss-payment.ts`
+- `web/default/src/features/wallet/index.tsx`
+- `web/default/src/features/wallet/components/recharge-form-card.tsx`
+- `web/default/src/features/wallet/components/recharge-form-card.test.tsx`
+- `web/default/src/features/wallet/components/dialogs/payment-confirm-dialog.tsx`
+- `.superpowers/sdd/task-4-report.md`
 
 ## Self-Review
 
-- Confirmed `SubscriptionPlansCard`, `showSubscriptionPanel`, `handleSubscriptionAvailabilityChange`, and top-level wallet payment tabs were removed from `wallet/index.tsx`.
-- Confirmed wallet subscription UI is hidden while initial subscription state is loading or when there are no active subscriptions.
-- Confirmed subscription, threshold auto recharge, and scheduled recharge tabs are built through `buildWalletPaymentSettingTabs`.
-- Confirmed disabled auto-recharge modes receive `creationDisabled` and `WALLET_PAYMENT_SETTING_LOCK_MESSAGE`.
-- Confirmed ordinary top-up remains the left-side primary wallet action and `AffiliateRewardsCard` remains below the grid.
-- Confirmed new user-facing strings use `t('English source key')` and have locale entries.
+- Confirmed new visible UI text uses English source keys and locale JSON files were not edited.
+- Confirmed organization wallet files and backend files were not edited.
+- Confirmed non-Toss amount requests do not receive `amount_mode`.
+- Confirmed Toss quota-mode minimum checks compare the estimated KRW charge rather than the quota input value.
+- Confirmed missing `amountMode` defaults to `krw` to preserve backward-compatible Toss semantics.
 
 ## Concerns
 
-- `bun run build:check` is still red because of pre-existing/unrelated TypeScript issues listed above.
-- Manual browser inspection was not performed; verification was limited to static review and automated tests/build command output.
-- `bun run i18n:sync` generated untracked untranslated report files under `web/default/src/i18n/locales/_reports/`; they were not staged.
-
-## Review Fix: Subscription-Unknown Lock and Dynamic Tabs
-
-### Fix Details
-
-- Preserved last-known subscription state in `web/default/src/features/wallet/index.tsx` when subscription fetch/refresh fails instead of clearing active/all subscription arrays.
-- Added explicit `subscriptionStatusKnown` tracking and pass it into `buildWalletPaymentSettingTabs`; before the first successful subscription load, unconfigured auto-recharge tabs are visible only in a disabled/locked state.
-- Kept configured auto-recharge tabs enabled while subscription status is unknown so users can still cancel an existing policy.
-- Replaced the hard-coded `grid-cols-3` payment-setting tab layout with `getWalletPaymentSettingTabsGridClass(paymentSettingTabs.length)`.
-- Added focused helper coverage for the subscription-unknown lock and tab grid class behavior.
-
-### Verification
-
-```text
-$ cd web/default && bun test src/features/wallet/lib/payment-settings.test.ts src/features/wallet/components/auto-recharge-card.test.ts src/features/wallet/components/wallet-subscription-status-card.test.ts
-25 pass
-0 fail
-Ran 25 tests across 3 files.
-```
-
-```text
-$ cd web/default && bun run build:check
-$ tsc -b && rsbuild build
-```
-
-`build:check` still fails during TypeScript checking with unrelated pre-existing errors outside the modified wallet files. Current evidence includes:
-
-- `src/features/organizations/components/organization-dashboard.tsx(720,13): Type '(organizationId: string) => void' is not assignable to type '(value: string | null, ...) => void'.`
-- `src/features/organizations/components/organization-users-table.tsx(83,3): 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.`
-- `src/features/system-settings/billing/index.tsx(27,7): ... missing properties from type 'BillingSettings': PayPalClientId, PayPalClientSecret, PayPalWebhookID, PayPalSandbox, and 2 more.`
-- `src/features/system-settings/integrations/wallet-auto-recharge-presets-section.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
-- `src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): No overload matches this call.`
-- `src/features/wallet/lib/auto-recharge-options.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
-- `src/i18n/languages.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+- `bun run typecheck` remains red due to unrelated pre-existing TypeScript errors listed above.
