@@ -610,6 +610,11 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const details = props.log.content ?? ''
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
+  // Prefer the precise, gateway-entry-to-last-byte e2e_ms measurement over
+  // the legacy whole-second use_time, which can be off by up to 1s due to
+  // Unix()-second truncation. Fall back for older logs predating this metric.
+  const effectiveUseTime =
+    other?.e2e_ms != null ? other.e2e_ms / 1000 : props.log.use_time
 
   const isViolation = isViolationFeeLog(other)
   const isRefund = props.log.type === 6
@@ -789,7 +794,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 />
               )}
 
-              {showTiming && props.log.use_time > 0 && (
+              {showTiming && effectiveUseTime > 0 && (
                 <DetailRow
                   label={t('Response Time')}
                   value={
@@ -798,13 +803,13 @@ export function DetailsDialog(props: DetailsDialogProps) {
                         'font-medium',
                         timingTextColorClass(
                           getResponseTimeColor(
-                            props.log.use_time,
+                            effectiveUseTime,
                             props.log.completion_tokens
                           )
                         )
                       )}
                     >
-                      {formatUseTime(props.log.use_time)}
+                      {formatUseTime(effectiveUseTime)}
                       {props.log.is_stream &&
                         other?.frt != null &&
                         other.frt > 0 && (
@@ -831,11 +836,6 @@ export function DetailsDialog(props: DetailsDialogProps) {
               other?.llm_ms != null &&
               other?.gateway_ms != null && (
                 <DetailSection label={t('Timing Breakdown')}>
-                  <DetailRow
-                    label={t('Total (End-to-End)')}
-                    value={formatUseTime(other.e2e_ms / 1000)}
-                    mono
-                  />
                   <DetailRow
                     label={t('Model Provider')}
                     value={formatUseTime(other.llm_ms / 1000)}
