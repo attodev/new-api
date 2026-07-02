@@ -271,6 +271,7 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /Choose recharge amount/)
     assert.match(html, /10000/)
     assert.match(html, /30000/)
+    assert.match(html, /Register card and set auto recharge/)
   })
 
   test('renders threshold presets as recharge amount choices', () => {
@@ -310,6 +311,36 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /Choose recharge amount/)
     assert.match(html, /10000/)
     assert.match(html, /30000/)
+    assert.match(html, /Register card and set auto recharge/)
+  })
+
+  test('requires confirming the selected preset before creating auto recharge', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'threshold',
+        policies: [],
+        presets: [
+          {
+            id: 3,
+            type: 'threshold',
+            target_scope: 'all',
+            name: 'Auto 10000',
+            amount: 10000,
+            threshold_amount: 1000,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Register card and set auto recharge/)
+    assert.match(html, /disabled/)
   })
 
   test('disables scheduled preset creation when another payment setting is active', () => {

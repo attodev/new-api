@@ -149,11 +149,13 @@ export function AutoRechargeCard({
   onCancel,
 }: AutoRechargeCardProps) {
   const { t } = useTranslation()
-  const [selectedScheduledPeriodKey, setSelectedScheduledPeriodKey] =
-    useState<string | null>(null)
+  const [selectedScheduledPeriodKey, setSelectedScheduledPeriodKey] = useState<
+    string | null
+  >(null)
   const [selectedThresholdAmount, setSelectedThresholdAmount] = useState<
     number | null
   >(null)
+  const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null)
 
   const activePolicy = useMemo(
     () =>
@@ -189,8 +191,9 @@ export function AutoRechargeCard({
     [availablePresets]
   )
   const selectedScheduledGroup =
-    scheduledGroups.find((group) => group.period.key === selectedScheduledPeriodKey) ??
-    scheduledGroups[0]
+    scheduledGroups.find(
+      (group) => group.period.key === selectedScheduledPeriodKey
+    ) ?? scheduledGroups[0]
   const selectedThresholdGroup =
     thresholdGroups.find((group) => group.amount === selectedThresholdAmount) ??
     null
@@ -209,14 +212,20 @@ export function AutoRechargeCard({
     await onCancel(activePolicy.id)
   }
 
-  const handleThresholdAmountClick = async (
+  const handleThresholdAmountClick = (
     group: (typeof thresholdGroups)[number]
   ) => {
+    setSelectedThresholdAmount(group.amount)
     if (group.thresholds.length === 1) {
-      await handleSelectPreset(group.thresholds[0].preset.id)
+      setSelectedPresetId(group.thresholds[0].preset.id)
       return
     }
-    setSelectedThresholdAmount(group.amount)
+    setSelectedPresetId(null)
+  }
+
+  const handleSubmitSelectedPreset = async () => {
+    if (selectedPresetId === null) return
+    await handleSelectPreset(selectedPresetId)
   }
 
   return (
@@ -314,9 +323,10 @@ export function AutoRechargeCard({
                               : 'outline'
                           }
                           disabled={creationButtonDisabled}
-                          onClick={() =>
+                          onClick={() => {
                             setSelectedScheduledPeriodKey(group.period.key)
-                          }
+                            setSelectedPresetId(null)
+                          }}
                           className='h-10'
                         >
                           {t(getScheduledPeriodLabelKey(group.period))}
@@ -335,11 +345,13 @@ export function AutoRechargeCard({
                         <Button
                           key={`${selectedScheduledGroup.period.key}:${option.amount}`}
                           type='button'
-                          variant='outline'
-                          disabled={creationButtonDisabled}
-                          onClick={() =>
-                            void handleSelectPreset(option.preset.id)
+                          variant={
+                            selectedPresetId === option.preset.id
+                              ? 'default'
+                              : 'outline'
                           }
+                          disabled={creationButtonDisabled}
+                          onClick={() => setSelectedPresetId(option.preset.id)}
                           className='h-10'
                         >
                           {option.amount}
@@ -367,7 +379,7 @@ export function AutoRechargeCard({
                               : 'outline'
                           }
                           disabled={creationButtonDisabled}
-                          onClick={() => void handleThresholdAmountClick(group)}
+                          onClick={() => handleThresholdAmountClick(group)}
                           className='h-10'
                         >
                           {group.amount}
@@ -387,11 +399,13 @@ export function AutoRechargeCard({
                         <Button
                           key={`${selectedThresholdGroup.amount}:${option.thresholdAmount}`}
                           type='button'
-                          variant='outline'
-                          disabled={creationButtonDisabled}
-                          onClick={() =>
-                            void handleSelectPreset(option.preset.id)
+                          variant={
+                            selectedPresetId === option.preset.id
+                              ? 'default'
+                              : 'outline'
                           }
+                          disabled={creationButtonDisabled}
+                          onClick={() => setSelectedPresetId(option.preset.id)}
                           className='h-10'
                         >
                           {option.thresholdAmount}
@@ -402,6 +416,14 @@ export function AutoRechargeCard({
                 ) : null}
               </>
             )}
+            <Button
+              type='button'
+              className='w-full'
+              disabled={creationButtonDisabled || selectedPresetId === null}
+              onClick={() => void handleSubmitSelectedPreset()}
+            >
+              {t('Register card and set auto recharge')}
+            </Button>
           </div>
         ) : null}
       </CardContent>
