@@ -140,6 +140,13 @@ export interface LogOtherData {
   audio_ratio?: number
   audio_completion_ratio?: number
   frt?: number
+  // Timing breakdown (ms). e2e_ms spans gateway entry to the last byte
+  // written to the client; llm_ms is the upstream provider call only;
+  // gateway_ms = e2e_ms - llm_ms is new-api's own overhead. Omitted when
+  // the request never reached an upstream provider.
+  e2e_ms?: number
+  llm_ms?: number
+  gateway_ms?: number
   // Tiered (expression-based) billing fields, set by backend when
   // billing_mode === 'tiered_expr'. expr_b64 is the base64-encoded billing
   // expression and matched_tier is the label of the tier that fired.
