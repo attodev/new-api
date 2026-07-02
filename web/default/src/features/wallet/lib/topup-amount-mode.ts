@@ -34,7 +34,7 @@ export function getTossPreview(
 }
 
 export function formatWonAmount(amount: number): string {
-  return `${new Intl.NumberFormat(undefined, {
+  return `${new Intl.NumberFormat('ko-KR', {
     maximumFractionDigits: 0,
   }).format(amount)}원`
 }
