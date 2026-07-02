@@ -1,108 +1,69 @@
-# Task 3 Report: API와 Toss Billing Auth 콜백
+# Task 3 Report: Subscription Status-Only Card
+
+## Status
+
+DONE_WITH_CONCERNS
 
 ## Summary
 
-Implemented wallet auto recharge controller APIs and Toss billing auth callbacks for user and organization wallet targets, plus router wiring for the new endpoints.
+- Added `WalletSubscriptionStatusCard` in `web/default/src/features/wallet/components/wallet-subscription-status-card.tsx`.
+- Added render tests in `web/default/src/features/wallet/components/wallet-subscription-status-card.test.ts`.
+- The component returns `null` with no active subscriptions.
+- The component renders active subscription status only: header, billing preference select, refresh button, quota usage, remaining days, and Toss auto-renew status/cancel control.
+- The component does not import `getPublicPlans`, does not render purchase plan cards, and does not render `SubscriptionPurchaseDialog`.
 
 ## TDD Evidence
 
-### RED
-
-Command:
+RED:
 
 ```bash
-env GOCACHE=/tmp/go-build-cache go test ./controller -run WalletAutoRecharge -count=1
+cd web/default
+bun test src/features/wallet/components/wallet-subscription-status-card.test.ts
 ```
 
-Result:
+Result: failed because `./wallet-subscription-status-card` did not exist.
 
-```text
-# github.com/QuantumNous/new-api/controller [github.com/QuantumNous/new-api/controller.test]
-controller/wallet_auto_recharge_test.go:74:3: undefined: RequestOrganizationWalletScheduledRecharge
-controller/wallet_auto_recharge_test.go:108:3: undefined: RequestOrganizationWalletScheduledRecharge
-controller/wallet_auto_recharge_test.go:182:3: undefined: CancelOrganizationWalletAutoRecharge
-controller/wallet_auto_recharge_test.go:218:3: undefined: WalletAutoRechargeTossFail
-FAIL	github.com/QuantumNous/new-api/controller [build failed]
-FAIL
-```
-
-### GREEN
-
-Commands:
+GREEN:
 
 ```bash
-gofmt -w controller/wallet_auto_recharge.go controller/wallet_auto_recharge_test.go router/api-router.go
-env GOCACHE=/tmp/go-build-cache go test ./controller -run WalletAutoRecharge -count=1
-env GOCACHE=/tmp/go-build-cache go test ./router -count=1
+cd web/default
+bun test src/features/wallet/components/wallet-subscription-status-card.test.ts
 ```
 
-Results:
+Result: 2 pass, 0 fail.
 
-```text
-ok  	github.com/QuantumNous/new-api/controller	0.194s
-?   	github.com/QuantumNous/new-api/router	[no test files]
+## Additional Verification
+
+```bash
+cd web/default
+./node_modules/.bin/prettier --write src/features/wallet/components/wallet-subscription-status-card.tsx src/features/wallet/components/wallet-subscription-status-card.test.ts
 ```
 
-## Files Changed
+Result: completed successfully.
 
-- `controller/wallet_auto_recharge.go`
-- `controller/wallet_auto_recharge_test.go`
-- `router/api-router.go`
+```bash
+cd web/default
+bun run typecheck
+```
+
+Result: failed on existing unrelated branch errors outside the new status-card files, including organization, system settings, usage logs, and existing test type errors. No reported error referenced `wallet-subscription-status-card.tsx` or `wallet-subscription-status-card.test.ts`.
+
+```bash
+cd web/default
+bun run lint src/features/wallet/components/wallet-subscription-status-card.tsx src/features/wallet/components/wallet-subscription-status-card.test.ts
+```
+
+Result: failed before linting due to the ESLint toolchain error `TypeError: (0 , brace_expansion_1.expand) is not a function`.
 
 ## Self-Review
 
-- Added shared request handling for scheduled and threshold wallet auto recharge creation.
-- Enforced organization owner-only create/cancel behavior with the required `"organization owner permission required"` error.
-- Bound Toss callback `customerKey` to the stored pending policy before billing key persistence.
-- Used `model.StoreTossBillingKey` followed by `model.ActivateWalletAutoRechargeFromToss` in confirm flow as requested.
-- Kept subscription behavior untouched and did not edit frontend/service/docs.
-- Avoided model changes; controller performs the pending-policy lookup directly.
+- Scope stayed limited to the two requested component/test files.
+- Reused existing wallet subscription display behavior and existing i18n keys.
+- Did not change backend APIs, database models, wallet page routing, or existing subscription purchase UI.
+- Verified the new component has no purchase API/dialog imports and no `Subscribe Now` or `No plans available` rendering.
+- Left pre-existing untracked `new-api-bin` untouched.
 
 ## Concerns
 
-- None.
-
-## Review Fix Follow-Up
-
-### Fix Details
-
-- Tightened organization wallet ownership checks to require both `actor.OrganizationRole == model.OrganizationRoleOwner` and `org.OwnerUserId == actor.Id`.
-- Added `LockOrder(tradeNo)` / `UnlockOrder(tradeNo)` around wallet auto-recharge Toss confirm handling, and mirrored the same serialization on the fail callback for the same trade number.
-- Stopped duplicate confirm processing from re-running activation by returning success immediately when the loaded policy is already active under the order lock.
-- Released pending policies on every confirm-path failure after load (`customerKey` mismatch, billing-key issue failure, billing-key store failure, activation failure) so the pending row no longer holds the unique `active_key`.
-- Added focused controller regressions for strict org-owner role enforcement and confirm failure release behavior, including proof that a new pending policy can be created after the failed confirm path.
-
-### Review TDD RED
-
-Command:
-
-```bash
-env GOCACHE=/tmp/go-build-cache go test ./controller -run WalletAutoRecharge -count=1
-```
-
-Result:
-
-```text
-# github.com/QuantumNous/new-api/controller [github.com/QuantumNous/new-api/controller.test]
-controller/wallet_auto_recharge_test.go:231:20: undefined: walletAutoRechargeBillingKeyIssuer
-controller/wallet_auto_recharge_test.go:232:2: undefined: walletAutoRechargeBillingKeyIssuer
-controller/wallet_auto_recharge_test.go:236:24: undefined: time
-controller/wallet_auto_recharge_test.go:241:3: undefined: walletAutoRechargeBillingKeyIssuer
-FAIL	github.com/QuantumNous/new-api/controller [build failed]
-FAIL
-```
-
-### Review GREEN
-
-Commands:
-
-```bash
-gofmt -w controller/wallet_auto_recharge.go controller/wallet_auto_recharge_test.go
-env GOCACHE=/tmp/go-build-cache go test ./controller -run WalletAutoRecharge -count=1
-```
-
-Results:
-
-```text
-ok  	github.com/QuantumNous/new-api/controller	0.233s
-```
+- Full frontend typecheck is currently blocked by unrelated branch errors.
+- Targeted lint is currently blocked by an ESLint dependency/runtime crash in this worktree.
