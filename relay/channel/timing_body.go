@@ -30,10 +30,14 @@ func (t *timingReadCloser) Read(p []byte) (int, error) {
 }
 
 func (t *timingReadCloser) Close() error {
+	err := t.ReadCloser.Close()
 	t.markDone()
-	return t.ReadCloser.Close()
+	return err
 }
 
 func (t *timingReadCloser) markDone() {
+	if t.onDone == nil {
+		return
+	}
 	t.once.Do(t.onDone)
 }
