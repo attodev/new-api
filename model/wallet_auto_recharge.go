@@ -401,8 +401,7 @@ func walletAutoRechargeQuota(amount float64) int {
 	if amount <= 0 {
 		return 0
 	}
-	money := walletAutoRechargeMoney(float64(walletAutoRechargeKRW(amount)))
-	return int(decimal.NewFromFloat(money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+	return TossCreditQuotaFromKRW(walletAutoRechargeKRW(amount))
 }
 
 func walletAutoRechargeTradeNo(policy WalletAutoRecharge, now time.Time) string {
@@ -620,6 +619,7 @@ func ensureWalletAutoRechargePendingTopUp(tx *gorm.DB, policy *WalletAutoRecharg
 		TargetId:        policy.TargetId,
 		Amount:          chargeKRW,
 		Money:           TossUSDEquivalent(chargeKRW),
+		Quota:           TossCreditQuotaFromKRW(chargeKRW),
 		TradeNo:         tradeNo,
 		ProviderOrderId: tradeNo,
 		PaymentMethod:   PaymentMethodToss,
@@ -664,7 +664,7 @@ func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time
 			return ErrTopUpStatusInvalid
 		}
 
-		quotaToAdd := int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		quotaToAdd := CreditedQuotaForTossTopUp(&topUp)
 		if quotaToAdd <= 0 {
 			return errors.New("invalid wallet auto recharge quota")
 		}

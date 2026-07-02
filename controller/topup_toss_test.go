@@ -280,6 +280,7 @@ func TestRequestTossPayQuotaModeReturnsStructuredFieldsAndPersistsCreditAmount(t
 	require.NoError(t, model.DB.Where("trade_no = ?", payload.Data.OrderID).First(&topUp).Error)
 	require.Equal(t, int64(1300), topUp.Amount)
 	require.Equal(t, 1.0, topUp.Money)
+	require.Equal(t, 500000, topUp.Quota)
 }
 
 func TestOrganizationTossAmountQuotaModeUsesChargeForMinValidation(t *testing.T) {

@@ -71,6 +71,17 @@ func TossUSDEquivalent(chargedKRW int64) float64 {
 	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
 }
 
+func TossCreditQuotaFromKRW(chargedKRW int64) int {
+	unit := setting.TossUnitPrice
+	if unit <= 0 || chargedKRW <= 0 {
+		return 0
+	}
+	return int(decimal.NewFromInt(chargedKRW).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+		Div(decimal.NewFromFloat(unit)).
+		IntPart())
+}
+
 type TossTopUpQuote struct {
 	AmountMode   string  `json:"amount_mode"`
 	InputAmount  int64   `json:"input_amount"`

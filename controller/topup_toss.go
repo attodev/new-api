@@ -135,6 +135,7 @@ func RequestTossPay(c *gin.Context) {
 		TargetId:        getTopUpTargetId(c),
 		Amount:          chargedKRW,
 		Money:           quote.CreditAmount,
+		Quota:           quote.CreditQuota,
 		TradeNo:         orderId,
 		ProviderOrderId: orderId,
 		PaymentMethod:   model.PaymentMethodToss,
