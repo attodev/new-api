@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   buildAdminOptionState,
   buildPresetSavePlan,
+  buildPresetSavePlanFromBalanceThresholds,
   groupScheduledPresetOptions,
   groupThresholdPresetOptions,
 } from './auto-recharge-options'
@@ -237,5 +238,21 @@ describe('auto recharge option helpers', () => {
       threshold_amount: 0,
       threshold_quota: 500000,
     })
+  })
+
+  test('save plan converts wallet balance thresholds into raw quota', () => {
+    const plan = buildPresetSavePlanFromBalanceThresholds([], {
+      scheduled: { targetScope: 'all', chargeImmediately: true, periods: [] },
+      threshold: {
+        targetScope: 'all',
+        rechargeAmounts: [10000],
+        thresholdQuotas: [1, 5],
+      },
+    })
+
+    expect(plan.create.map((item) => item.threshold_quota)).toEqual([
+      500000,
+      2500000,
+    ])
   })
 })

@@ -44,8 +44,8 @@ import {
   updateAdminWalletAutoRechargePreset,
 } from '@/features/wallet/api'
 import {
-  buildAdminOptionState,
-  buildPresetSavePlan,
+  buildAdminBalanceOptionState,
+  buildPresetSavePlanFromBalanceThresholds,
   formatScheduledPeriodSummary,
   getScheduledPeriodLabelKey,
   type AdminAutoRechargeOptionState,
@@ -58,6 +58,11 @@ import type {
   WalletAutoRechargeTargetScope,
   WalletAutoRechargeType,
 } from '@/features/wallet/types'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToDollars,
+} from '@/lib/format'
 
 const PRESET_QUERY_KEY = ['admin-wallet-auto-recharge-presets'] as const
 type SummaryTranslator = (
@@ -122,7 +127,12 @@ function createEmptyPresetFormState(): WalletAutoRechargePresetFormState {
   }
 }
 
-function toPresetFormState(
+function formatBalanceInput(value: number): string {
+  if (!Number.isFinite(value)) return ''
+  return String(Number(value.toFixed(4)))
+}
+
+export function toPresetFormState(
   preset?: WalletAutoRechargePreset | null
 ): WalletAutoRechargePresetFormState {
   if (!preset) return createEmptyPresetFormState()
@@ -139,7 +149,7 @@ function toPresetFormState(
         : '',
     threshold_quota:
       preset.threshold_quota !== null && preset.threshold_quota !== undefined
-        ? String(preset.threshold_quota)
+        ? formatBalanceInput(quotaUnitsToDollars(preset.threshold_quota))
         : '',
     interval_unit: preset.interval_unit ?? 'month',
     interval_value:
@@ -195,7 +205,7 @@ export function normalizePresetForm(
     description: form.description.trim(),
     amount,
     threshold_amount: 0,
-    threshold_quota: Number(form.threshold_quota || 0),
+    threshold_quota: parseQuotaFromDollars(Number(form.threshold_quota || 0)),
     interval_unit: 'month',
     interval_value: 1,
     custom_seconds: 0,
@@ -216,6 +226,17 @@ export function parseOptionAmountList(value: string): number[] {
   ].sort((left, right) => left - right)
 }
 
+export function parseOptionBalanceList(value: string): number[] {
+  return [
+    ...new Set(
+      value
+        .split(/[\s,]+/)
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isFinite(item) && item >= 0)
+    ),
+  ].sort((left, right) => left - right)
+}
+
 export function formatOptionAmountList(values: number[]): string {
   return [
     ...new Set(
@@ -225,6 +246,19 @@ export function formatOptionAmountList(values: number[]): string {
     ),
   ]
     .sort((left, right) => left - right)
+    .join(', ')
+}
+
+export function formatOptionBalanceList(values: number[]): string {
+  return [
+    ...new Set(
+      values
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item) && item >= 0)
+    ),
+  ]
+    .sort((left, right) => left - right)
+    .map(formatBalanceInput)
     .join(', ')
 }
 
@@ -246,6 +280,16 @@ export function getOptionAmountDraftValue(
   return Object.prototype.hasOwnProperty.call(drafts, key)
     ? drafts[key]
     : formatOptionAmountList(values)
+}
+
+export function getOptionBalanceDraftValue(
+  drafts: OptionAmountDrafts,
+  key: string,
+  values: number[]
+): string {
+  return Object.prototype.hasOwnProperty.call(drafts, key)
+    ? drafts[key]
+    : formatOptionBalanceList(values)
 }
 
 function makeQuickPeriod(kind: 'daily' | 'weekly' | 'monthly'): ScheduledPeriodOption {
@@ -315,7 +359,7 @@ export function getPresetSummary(
     })
   }
   return t('Below {{threshold}} -> {{amount}}', {
-    threshold: preset.threshold_quota ?? 0,
+    threshold: formatQuota(preset.threshold_quota ?? 0),
     amount: preset.amount,
   })
 }
@@ -438,7 +482,7 @@ export function WalletAutoRechargePresetsSection() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [optionState, setOptionState] = useState<AdminAutoRechargeOptionState>(
-    () => buildAdminOptionState([])
+    () => buildAdminBalanceOptionState([])
   )
   const [amountDrafts, setAmountDrafts] = useState<OptionAmountDrafts>({})
 
@@ -460,7 +504,7 @@ export function WalletAutoRechargePresetsSection() {
   )
 
   useEffect(() => {
-    setOptionState(buildAdminOptionState(presets))
+    setOptionState(buildAdminBalanceOptionState(presets))
     setAmountDrafts({})
   }, [presets])
 
@@ -567,7 +611,7 @@ export function WalletAutoRechargePresetsSection() {
   }
 
   const handleSaveOptions = async () => {
-    const plan = buildPresetSavePlan(presets, optionState)
+    const plan = buildPresetSavePlanFromBalanceThresholds(presets, optionState)
     try {
       for (const payload of plan.create) {
         const response = await createMutation.mutateAsync(payload)
@@ -867,10 +911,10 @@ export function WalletAutoRechargePresetsSection() {
                 </div>
                 <div className='space-y-2'>
                   <div className='text-sm font-medium'>
-                    {t('Threshold quotas')}
+                    {t('Threshold balances')}
                   </div>
                   <Input
-                    value={getOptionAmountDraftValue(
+                    value={getOptionBalanceDraftValue(
                       amountDrafts,
                       'threshold:quota',
                       optionState.threshold.thresholdQuotas
@@ -889,12 +933,12 @@ export function WalletAutoRechargePresetsSection() {
                           ...current,
                           threshold: {
                             ...current.threshold,
-                            thresholdQuotas: parseOptionAmountList(value),
+                            thresholdQuotas: parseOptionBalanceList(value),
                           },
                         }))
                       }
                     }
-                    placeholder='500000, 2500000, 5000000'
+                    placeholder='1, 5, 10'
                   />
                 </div>
               </div>

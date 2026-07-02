@@ -4,6 +4,7 @@ import type {
   WalletAutoRechargePresetRequest,
   WalletAutoRechargeTargetScope,
 } from '../types'
+import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 
 export type ScheduledPeriodKind = 'daily' | 'weekly' | 'monthly' | 'custom'
 
@@ -241,6 +242,23 @@ export function buildAdminOptionState(
   }
 }
 
+export function buildAdminBalanceOptionState(
+  presets: WalletAutoRechargePreset[]
+): AdminAutoRechargeOptionState {
+  const state = buildAdminOptionState(presets)
+  return {
+    ...state,
+    threshold: {
+      ...state.threshold,
+      thresholdQuotas: uniqueNumbers(
+        state.threshold.thresholdQuotas.map((quota) =>
+          quotaUnitsToDollars(quota)
+        )
+      ),
+    },
+  }
+}
+
 function presetComboKey(
   preset: Pick<
     WalletAutoRechargePreset,
@@ -371,4 +389,21 @@ export function buildPresetSavePlan(
   }
 
   return { create, update, disable }
+}
+
+export function buildPresetSavePlanFromBalanceThresholds(
+  current: WalletAutoRechargePreset[],
+  desired: AdminAutoRechargeOptionState
+): PresetSavePlan {
+  return buildPresetSavePlan(current, {
+    ...desired,
+    threshold: {
+      ...desired.threshold,
+      thresholdQuotas: uniqueNumbers(
+        desired.threshold.thresholdQuotas.map((balance) =>
+          parseQuotaFromDollars(balance)
+        )
+      ),
+    },
+  })
 }

@@ -1,16 +1,22 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  formatOptionBalanceList,
   formatOptionAmountList,
   getOptionAmountDraftValue,
+  getOptionBalanceDraftValue,
   getPresetSummary,
   normalizePresetForm,
+  parseOptionBalanceList,
   parseOptionAmountList,
+  toPresetFormState,
   updateOptionAmountDrafts,
 } from './wallet-auto-recharge-presets-section'
 import {
+  buildAdminBalanceOptionState,
   buildAdminOptionState,
   buildPresetSavePlan,
 } from '@/features/wallet/lib/auto-recharge-options'
+import { formatQuota } from '@/lib/format'
 
 const identityT = (key: string, options?: Record<string, unknown>) => {
   if (!options) return key
@@ -54,16 +60,16 @@ describe('wallet auto recharge preset admin helpers', () => {
     })
   })
 
-  test('normalizes threshold preset with threshold quota', () => {
+  test('normalizes threshold preset from wallet balance threshold', () => {
     expect(
       normalizePresetForm({
         type: 'threshold',
         target_scope: 'organization',
-        name: 'Low quota',
-        description: 'uses quota threshold',
+        name: 'Low balance',
+        description: 'uses wallet balance threshold',
         amount: '25000',
         threshold_amount: '7000',
-        threshold_quota: '500000',
+        threshold_quota: '1',
         interval_unit: 'custom',
         interval_value: '6',
         custom_seconds: '900',
@@ -74,8 +80,8 @@ describe('wallet auto recharge preset admin helpers', () => {
     ).toEqual({
       type: 'threshold',
       target_scope: 'organization',
-      name: 'Low quota',
-      description: 'uses quota threshold',
+      name: 'Low balance',
+      description: 'uses wallet balance threshold',
       amount: 25000,
       threshold_amount: 0,
       threshold_quota: 500000,
@@ -134,7 +140,21 @@ describe('wallet auto recharge preset admin helpers', () => {
         threshold_quota: 500000,
         enabled: true,
       }, identityT)
-    ).toBe('Below 500000 -> 20000')
+    ).toBe(`Below ${formatQuota(500000)} -> 20000`)
+  })
+
+  test('hydrates threshold preset form with wallet balance threshold', () => {
+    expect(
+      toPresetFormState({
+        id: 4,
+        type: 'threshold',
+        target_scope: 'user',
+        name: 'Auto',
+        amount: 20000,
+        threshold_quota: 500000,
+        enabled: true,
+      }).threshold_quota
+    ).toBe('1')
   })
 
   test('summarizes scheduled custom interval with translator', () => {
@@ -198,6 +218,18 @@ describe('wallet auto recharge preset admin helpers', () => {
     )
   })
 
+  test('parses wallet balance lists without flooring decimals', () => {
+    expect(parseOptionBalanceList('1, 0.5 2.25\n0.5')).toEqual([
+      0.5,
+      1,
+      2.25,
+    ])
+  })
+
+  test('formats wallet balance lists for editing', () => {
+    expect(formatOptionBalanceList([1, 0.5, 1])).toBe('0.5, 1')
+  })
+
   test('keeps in-progress multi amount input draft instead of reformatting it', () => {
     const drafts = updateOptionAmountDrafts({}, 'monthly', '1000, ')
 
@@ -205,10 +237,13 @@ describe('wallet auto recharge preset admin helpers', () => {
     expect(getOptionAmountDraftValue(drafts, 'weekly', [3000, 1000])).toBe(
       '1000, 3000'
     )
+    expect(getOptionBalanceDraftValue(drafts, 'threshold', [0.5, 1])).toBe(
+      '0.5, 1'
+    )
   })
 
-  test('converts preset rows into admin option state', () => {
-    const state = buildAdminOptionState([
+  test('converts preset rows into admin balance option state', () => {
+    const state = buildAdminBalanceOptionState([
       {
         id: 1,
         type: 'scheduled',
@@ -234,7 +269,7 @@ describe('wallet auto recharge preset admin helpers', () => {
 
     expect(state.scheduled.periods[0].amounts).toEqual([10000])
     expect(state.threshold.rechargeAmounts).toEqual([30000])
-    expect(state.threshold.thresholdQuotas).toEqual([500000])
+    expect(state.threshold.thresholdQuotas).toEqual([1])
   })
 
   test('builds save plan that disables removed admin combinations', () => {
