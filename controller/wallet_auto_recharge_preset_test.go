@@ -64,6 +64,39 @@ func TestAdminCanCreateListAndDisableWalletAutoRechargePreset(t *testing.T) {
 	require.False(t, stored.Enabled)
 }
 
+func TestCreateWalletAutoRechargePresetAcceptsThresholdQuota(t *testing.T) {
+	setupWalletAutoRechargePresetControllerTestDB(t)
+	admin := model.User{Id: 1, Username: "admin", Role: common.RoleAdminUser}
+
+	body := `{
+		"type":"threshold",
+		"target_scope":"all",
+		"name":"Quota threshold",
+		"description":"",
+		"amount":10000,
+		"threshold_amount":0,
+		"threshold_quota":250000,
+		"interval_unit":"month",
+		"interval_value":1,
+		"custom_seconds":0,
+		"charge_immediately":false,
+		"sort_order":1,
+		"enabled":true
+	}`
+	res := performOrganizationRequest(
+		CreateWalletAutoRechargePreset,
+		admin,
+		http.MethodPost,
+		"/api/admin/wallet/auto-recharge/presets",
+		body,
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	var preset model.WalletAutoRechargePreset
+	require.NoError(t, model.DB.Where("name = ?", "Quota threshold").First(&preset).Error)
+	require.Equal(t, 250000, preset.ThresholdQuota)
+}
+
 func TestUserPresetListFiltersByWalletTarget(t *testing.T) {
 	setupWalletAutoRechargePresetControllerTestDB(t)
 	user := model.User{Id: 2, Username: "user", Role: common.RoleCommonUser, AffCode: "preset-user"}

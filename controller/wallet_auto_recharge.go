@@ -134,6 +134,7 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 		AuthTradeNo:       reference,
 		Amount:            preset.Amount,
 		ThresholdAmount:   preset.ThresholdAmount,
+		ThresholdQuota:    preset.ThresholdQuota,
 		IntervalUnit:      preset.IntervalUnit,
 		IntervalValue:     preset.IntervalValue,
 		CustomSeconds:     preset.CustomSeconds,

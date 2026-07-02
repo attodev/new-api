@@ -93,6 +93,26 @@ func TestCreatePendingWalletAutoRechargeNormalizesCustomIntervalValue(t *testing
 	require.Equal(t, 1, stored.IntervalValue)
 }
 
+func TestCreatePendingThresholdWalletAutoRechargeStoresThresholdQuotaDirectly(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+
+	policy, err := CreatePendingWalletAutoRecharge(CreateWalletAutoRechargeRequest{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetType:      TopUpTargetTypeUser,
+		TargetId:        1,
+		OwnerUserId:     1,
+		CustomerKey:     "customer-quota-threshold",
+		AuthTradeNo:     "quota-threshold-auth",
+		Amount:          10000,
+		ThresholdAmount: 999999,
+		ThresholdQuota:  250000,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 250000, policy.ThresholdQuota)
+	require.Equal(t, 999999.0, policy.ThresholdAmount)
+}
+
 func TestCancelWalletAutoRechargeKeepsBillingKeyActive(t *testing.T) {
 	setupWalletAutoRechargeTestDB(t)
 	enc, err := common.EncryptString("billing-key")
@@ -626,4 +646,28 @@ func TestProcessWalletAutoRechargeMarksFailureWhenChargerFailsBeforeDone(t *test
 	var reloaded WalletAutoRecharge
 	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusFailed, reloaded.Status)
+}
+
+func TestWalletThresholdShouldChargeComparesStoredThresholdQuota(t *testing.T) {
+	setupWalletAutoRechargeTestDB(t)
+	require.NoError(t, DB.Create(&User{
+		Id:       1,
+		Username: "quota-threshold-user",
+		Quota:    249999,
+		AffCode:  "quota-threshold-user",
+	}).Error)
+
+	policy := &WalletAutoRecharge{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetType:      TopUpTargetTypeUser,
+		TargetId:        1,
+		ThresholdAmount: 1,
+		ThresholdQuota:  250000,
+		Status:          WalletAutoRechargeStatusActive,
+	}
+
+	ok, err := walletThresholdShouldCharge(DB, policy, time.Now())
+
+	require.NoError(t, err)
+	require.True(t, ok)
 }

@@ -22,6 +22,7 @@ type WalletAutoRechargePreset struct {
 	Description       string  `json:"description" gorm:"type:varchar(255)"`
 	Amount            float64 `json:"amount"`
 	ThresholdAmount   float64 `json:"threshold_amount"`
+	ThresholdQuota    int     `json:"threshold_quota"`
 	IntervalUnit      string  `json:"interval_unit" gorm:"type:varchar(16)"`
 	IntervalValue     int     `json:"interval_value"`
 	CustomSeconds     int64   `json:"custom_seconds"`
@@ -39,6 +40,7 @@ type WalletAutoRechargePresetRequest struct {
 	Description       string  `json:"description"`
 	Amount            float64 `json:"amount"`
 	ThresholdAmount   float64 `json:"threshold_amount"`
+	ThresholdQuota    int     `json:"threshold_quota"`
 	IntervalUnit      string  `json:"interval_unit"`
 	IntervalValue     int     `json:"interval_value"`
 	CustomSeconds     int64   `json:"custom_seconds"`
@@ -88,8 +90,8 @@ func (req WalletAutoRechargePresetRequest) normalizeAndValidate() (WalletAutoRec
 			return req, errors.New("wallet auto recharge preset interval is required")
 		}
 	case WalletAutoRechargeTypeThreshold:
-		if req.ThresholdAmount < 0 {
-			return req, errors.New("wallet auto recharge preset threshold cannot be negative")
+		if req.ThresholdQuota < 0 {
+			return req, errors.New("wallet auto recharge preset threshold quota cannot be negative")
 		}
 	}
 
@@ -110,6 +112,7 @@ func CreateWalletAutoRechargePreset(req WalletAutoRechargePresetRequest) (*Walle
 		Description:       req.Description,
 		Amount:            req.Amount,
 		ThresholdAmount:   req.ThresholdAmount,
+		ThresholdQuota:    req.ThresholdQuota,
 		IntervalUnit:      req.IntervalUnit,
 		IntervalValue:     req.IntervalValue,
 		CustomSeconds:     req.CustomSeconds,
@@ -143,6 +146,7 @@ func UpdateWalletAutoRechargePreset(id int, req WalletAutoRechargePresetRequest)
 		"description":        req.Description,
 		"amount":             req.Amount,
 		"threshold_amount":   req.ThresholdAmount,
+		"threshold_quota":    req.ThresholdQuota,
 		"interval_unit":      req.IntervalUnit,
 		"interval_value":     req.IntervalValue,
 		"custom_seconds":     req.CustomSeconds,

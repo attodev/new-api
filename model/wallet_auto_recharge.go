@@ -81,6 +81,7 @@ type CreateWalletAutoRechargeRequest struct {
 	AuthTradeNo       string
 	Amount            float64
 	ThresholdAmount   float64
+	ThresholdQuota    int
 	IntervalUnit      string
 	IntervalValue     int
 	CustomSeconds     int64
@@ -131,8 +132,8 @@ func (req CreateWalletAutoRechargeRequest) normalizeAndValidate() (CreateWalletA
 			return req, errors.New("wallet auto recharge interval is required")
 		}
 	case WalletAutoRechargeTypeThreshold:
-		if req.ThresholdAmount < 0 {
-			return req, errors.New("wallet auto recharge threshold cannot be negative")
+		if req.ThresholdQuota < 0 {
+			return req, errors.New("wallet auto recharge threshold quota cannot be negative")
 		}
 	}
 	return req, nil
@@ -155,7 +156,7 @@ func CreatePendingWalletAutoRecharge(req CreateWalletAutoRechargeRequest) (*Wall
 		OwnerUserId:       req.OwnerUserId,
 		Amount:            req.Amount,
 		ThresholdAmount:   req.ThresholdAmount,
-		ThresholdQuota:    walletAutoRechargeQuota(req.ThresholdAmount),
+		ThresholdQuota:    req.ThresholdQuota,
 		IntervalUnit:      req.IntervalUnit,
 		IntervalValue:     req.IntervalValue,
 		CustomSeconds:     req.CustomSeconds,
