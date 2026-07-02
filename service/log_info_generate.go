@@ -33,6 +33,47 @@ func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other
 	}
 }
 
+// appendTimingBreakdown splits total request latency into the portion spent
+// waiting on the model provider (llm_ms) vs. everything new-api itself adds
+// (gateway_ms = e2e_ms - llm_ms). e2e_ms spans from the earliest gateway
+// middleware to the last byte written to the client, so it captures auth,
+// rate-limiting, channel selection, and response transformation/transport —
+// not just the distributor-onward window that UseTime measures.
+//
+// llm_ms/gateway_ms/pre_llm_ms/post_llm_ms are omitted when no upstream call
+// was made (e.g. the request was rejected before reaching a channel), so
+// "blocked before reaching a provider" stays distinguishable from "provider
+// was slow" in the stored data.
+func appendTimingBreakdown(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
+	if ctx == nil || relayInfo == nil || other == nil {
+		return
+	}
+	gatewayEntryTime := common.GetContextKeyTime(ctx, constant.ContextKeyGatewayEntryTime)
+	if gatewayEntryTime.IsZero() {
+		return
+	}
+	gatewayExitTime := common.GetLastWriteTime(ctx)
+
+	e2eMs := gatewayExitTime.Sub(gatewayEntryTime).Milliseconds()
+	if e2eMs < 0 {
+		e2eMs = 0
+	}
+	other["e2e_ms"] = e2eMs
+
+	if relayInfo.UpstreamRequestStartTime.IsZero() || relayInfo.UpstreamResponseEndTime.IsZero() {
+		return
+	}
+
+	llmMs := relayInfo.UpstreamResponseEndTime.Sub(relayInfo.UpstreamRequestStartTime).Milliseconds()
+	if llmMs < 0 {
+		llmMs = 0
+	}
+	other["llm_ms"] = llmMs
+	other["gateway_ms"] = e2eMs - llmMs
+	other["pre_llm_ms"] = relayInfo.UpstreamRequestStartTime.Sub(gatewayEntryTime).Milliseconds()
+	other["post_llm_ms"] = gatewayExitTime.Sub(relayInfo.UpstreamResponseEndTime).Milliseconds()
+}
+
 func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelRatio, groupRatio, completionRatio float64,
 	cacheTokens int, cacheRatio float64, modelPrice float64, userGroupRatio float64) map[string]interface{} {
 	other := make(map[string]interface{})
@@ -44,6 +85,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	other["model_price"] = modelPrice
 	other["user_group_ratio"] = userGroupRatio
 	other["frt"] = float64(relayInfo.FirstResponseTime.UnixMilli() - relayInfo.StartTime.UnixMilli())
+	appendTimingBreakdown(ctx, relayInfo, other)
 	if relayInfo.ReasoningEffort != "" {
 		other["reasoning_effort"] = relayInfo.ReasoningEffort
 	}
