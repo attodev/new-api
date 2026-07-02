@@ -27,6 +27,9 @@ type UserBillingKey struct {
 const (
 	BillingKeyStatusActive  = "active"
 	BillingKeyStatusRevoked = "revoked"
+
+	TossTopUpAmountModeKRW   = "krw"
+	TossTopUpAmountModeQuota = "quota"
 )
 
 // TossPlanKRW converts a plan's USD-equivalent price to KRW integer for Toss billing.
@@ -66,6 +69,83 @@ func TossUSDEquivalent(chargedKRW int64) float64 {
 		unit = 1
 	}
 	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
+}
+
+type TossTopUpQuote struct {
+	AmountMode   string  `json:"amount_mode"`
+	InputAmount  int64   `json:"input_amount"`
+	ChargeKRW    int64   `json:"charge_amount"`
+	CreditAmount float64 `json:"credit_amount"`
+	CreditQuota  int     `json:"credit_quota"`
+	UnitPrice    float64 `json:"unit_price"`
+}
+
+func NormalizeTossTopUpAmountMode(amountMode string) string {
+	switch amountMode {
+	case TossTopUpAmountModeQuota:
+		return TossTopUpAmountModeQuota
+	default:
+		return TossTopUpAmountModeKRW
+	}
+}
+
+func tossTopUpUnitPrice() float64 {
+	unit := setting.TossUnitPrice
+	if unit <= 0 {
+		unit = 1
+	}
+	return unit
+}
+
+func tossTopUpPriceFactor(amount int64, group string) float64 {
+	ratio := common.GetTopupGroupRatio(group)
+	if ratio == 0 {
+		ratio = 1
+	}
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amount)]; ok && ds > 0 {
+		discount = ds
+	}
+	return ratio * discount
+}
+
+func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuote {
+	mode := NormalizeTossTopUpAmountMode(amountMode)
+	unit := tossTopUpUnitPrice()
+	factor := tossTopUpPriceFactor(amount, group)
+
+	quote := TossTopUpQuote{
+		AmountMode:  mode,
+		InputAmount: amount,
+		UnitPrice:   unit,
+	}
+	if amount <= 0 {
+		return quote
+	}
+
+	switch mode {
+	case TossTopUpAmountModeQuota:
+		credit := decimal.NewFromInt(amount)
+		charge := credit.
+			Mul(decimal.NewFromFloat(unit)).
+			Mul(decimal.NewFromFloat(factor)).
+			Round(0).
+			IntPart()
+		quote.ChargeKRW = charge
+		quote.CreditAmount = credit.InexactFloat64()
+	default:
+		charge := decimal.NewFromInt(amount)
+		credit := charge.
+			Div(decimal.NewFromFloat(unit)).
+			Div(decimal.NewFromFloat(factor))
+		quote.ChargeKRW = amount
+		quote.CreditAmount = credit.InexactFloat64()
+	}
+
+	quote.CreditQuota = int(decimal.NewFromFloat(quote.CreditAmount).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+		IntPart())
+	return quote
 }
 
 // tossNextBillingTime returns when to charge the next period: a lead BEFORE endUnix so the
