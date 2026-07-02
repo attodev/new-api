@@ -362,6 +362,7 @@ export interface WalletAutoRechargePreset {
   description?: string
   amount: number
   threshold_amount?: number
+  threshold_quota?: number
   interval_unit?: WalletAutoRechargeIntervalUnit
   interval_value?: number
   custom_seconds?: number
@@ -377,6 +378,7 @@ export interface WalletAutoRechargePresetRequest {
   description: string
   amount: number
   threshold_amount: number
+  threshold_quota: number
   interval_unit: WalletAutoRechargeIntervalUnit
   interval_value: number
   custom_seconds: number

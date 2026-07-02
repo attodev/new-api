@@ -17,6 +17,7 @@ const preset = (
   description: patch.description ?? '',
   amount: patch.amount ?? 10000,
   threshold_amount: patch.threshold_amount ?? 0,
+  threshold_quota: patch.threshold_quota ?? 0,
   interval_unit: patch.interval_unit ?? 'month',
   interval_value: patch.interval_value ?? 1,
   custom_seconds: patch.custom_seconds ?? 0,
@@ -70,40 +71,37 @@ describe('auto recharge option helpers', () => {
     ])
   })
 
-  test('groups threshold presets by recharge amount then threshold amount', () => {
+  test('groups threshold presets by quota before recharge amount', () => {
     const groups = groupThresholdPresetOptions([
       preset({
-        id: 7,
+        id: 1,
         type: 'threshold',
         amount: 10000,
-        threshold_amount: 5000,
-        sort_order: 2,
+        threshold_quota: 500000,
       }),
       preset({
-        id: 6,
-        type: 'threshold',
-        amount: 10000,
-        threshold_amount: 1000,
-        sort_order: 1,
-      }),
-      preset({
-        id: 8,
+        id: 2,
         type: 'threshold',
         amount: 30000,
-        threshold_amount: 5000,
-        sort_order: 3,
+        threshold_quota: 500000,
+      }),
+      preset({
+        id: 3,
+        type: 'threshold',
+        amount: 10000,
+        threshold_quota: 1000000,
       }),
     ])
 
-    expect(groups.map((group) => group.amount)).toEqual([10000, 30000])
+    expect(groups.map((group) => group.thresholdQuota)).toEqual([
+      500000,
+      1000000,
+    ])
     expect(
-      groups[0].thresholds.map((threshold) => [
-        threshold.thresholdAmount,
-        threshold.preset.id,
-      ])
+      groups[0].amounts.map((item) => [item.amount, item.preset.id])
     ).toEqual([
-      [1000, 6],
-      [5000, 7],
+      [10000, 1],
+      [30000, 2],
     ])
   })
 
@@ -120,14 +118,28 @@ describe('auto recharge option helpers', () => {
         id: 2,
         type: 'threshold',
         amount: 30000,
-        threshold_amount: 5000,
+        threshold_quota: 500000,
       }),
     ])
 
     expect(state.scheduled.periods[0].period.kind).toBe('daily')
     expect(state.scheduled.periods[0].amounts).toEqual([10000])
     expect(state.threshold.rechargeAmounts).toEqual([30000])
-    expect(state.threshold.thresholdAmounts).toEqual([5000])
+    expect(state.threshold.thresholdQuotas).toEqual([500000])
+  })
+
+  test('builds admin option state with threshold quota values', () => {
+    const state = buildAdminOptionState([
+      preset({
+        id: 1,
+        type: 'threshold',
+        amount: 30000,
+        threshold_quota: 500000,
+      }),
+    ])
+
+    expect(state.threshold.rechargeAmounts).toEqual([30000])
+    expect(state.threshold.thresholdQuotas).toEqual([500000])
   })
 
   test('plans create, update, and disable operations for option save', () => {
@@ -144,23 +156,46 @@ describe('auto recharge option helpers', () => {
         id: 2,
         type: 'threshold',
         amount: 30000,
-        threshold_amount: 5000,
+        threshold_quota: 500000,
         enabled: true,
       }),
     ]
     const desired = buildAdminOptionState(current)
     desired.scheduled.periods[0].amounts = [10000, 50000]
-    desired.threshold.thresholdAmounts = [1000]
+    desired.threshold.thresholdQuotas = [1000000]
 
     const plan = buildPresetSavePlan(current, desired)
 
     expect(
-      plan.create.map((item) => [item.type, item.amount, item.threshold_amount])
+      plan.create.map((item) => [
+        item.type,
+        item.amount,
+        item.threshold_amount,
+        item.threshold_quota,
+      ])
     ).toEqual([
-      ['scheduled', 50000, 0],
-      ['threshold', 30000, 1000],
+      ['scheduled', 50000, 0, 0],
+      ['threshold', 30000, 0, 1000000],
     ])
     expect(plan.update.map((item) => item.id)).toEqual([1])
     expect(plan.disable.map((item) => item.id)).toEqual([2])
+  })
+
+  test('save plan writes threshold_quota and clears threshold_amount', () => {
+    const plan = buildPresetSavePlan([], {
+      scheduled: { targetScope: 'all', chargeImmediately: true, periods: [] },
+      threshold: {
+        targetScope: 'all',
+        rechargeAmounts: [10000],
+        thresholdQuotas: [500000],
+      },
+    })
+
+    expect(plan.create[0]).toMatchObject({
+      type: 'threshold',
+      amount: 10000,
+      threshold_amount: 0,
+      threshold_quota: 500000,
+    })
   })
 })

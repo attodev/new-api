@@ -25,14 +25,14 @@ export interface ScheduledPresetGroup {
   amounts: ScheduledAmountOption[]
 }
 
-export interface ThresholdOption {
-  thresholdAmount: number
+export interface ThresholdRechargeAmountOption {
+  amount: number
   preset: WalletAutoRechargePreset
 }
 
-export interface ThresholdAmountGroup {
-  amount: number
-  thresholds: ThresholdOption[]
+export interface ThresholdQuotaGroup {
+  thresholdQuota: number
+  amounts: ThresholdRechargeAmountOption[]
 }
 
 export interface AdminScheduledPeriodOption {
@@ -49,7 +49,7 @@ export interface AdminScheduledOptionState {
 export interface AdminThresholdOptionState {
   targetScope: WalletAutoRechargeTargetScope
   rechargeAmounts: number[]
-  thresholdAmounts: number[]
+  thresholdQuotas: number[]
 }
 
 export interface AdminAutoRechargeOptionState {
@@ -157,31 +157,25 @@ export function groupScheduledPresetOptions(
 
 export function groupThresholdPresetOptions(
   presets: WalletAutoRechargePreset[]
-): ThresholdAmountGroup[] {
-  const map = new Map<number, ThresholdAmountGroup>()
+): ThresholdQuotaGroup[] {
+  const map = new Map<number, ThresholdQuotaGroup>()
 
   for (const preset of [...presets]
     .filter((item) => item.enabled && item.type === 'threshold')
     .sort(byPresetOrder)) {
-    const thresholdAmount = preset.threshold_amount ?? 0
-    const group = map.get(preset.amount) ?? { amount: preset.amount, thresholds: [] }
-    if (
-      !group.thresholds.some(
-        (item) => item.thresholdAmount === thresholdAmount
-      )
-    ) {
-      group.thresholds.push({ thresholdAmount, preset })
+    const thresholdQuota = preset.threshold_quota ?? 0
+    const group = map.get(thresholdQuota) ?? { thresholdQuota, amounts: [] }
+    if (!group.amounts.some((item) => item.amount === preset.amount)) {
+      group.amounts.push({ amount: preset.amount, preset })
     }
-    map.set(preset.amount, group)
+    map.set(thresholdQuota, group)
   }
 
   return [...map.values()]
-    .sort((left, right) => left.amount - right.amount)
+    .sort((left, right) => left.thresholdQuota - right.thresholdQuota)
     .map((group) => ({
       ...group,
-      thresholds: group.thresholds.sort(
-        (left, right) => left.thresholdAmount - right.thresholdAmount
-      ),
+      amounts: group.amounts.sort((left, right) => left.amount - right.amount),
     }))
 }
 
@@ -231,12 +225,12 @@ export function buildAdminOptionState(
     threshold: {
       targetScope: firstScope(thresholdPresets),
       rechargeAmounts: uniqueNumbers(
-        thresholdGroups.map((group) => group.amount)
-      ),
-      thresholdAmounts: uniqueNumbers(
         thresholdGroups.flatMap((group) =>
-          group.thresholds.map((item) => item.thresholdAmount)
+          group.amounts.map((item) => item.amount)
         )
+      ),
+      thresholdQuotas: uniqueNumbers(
+        thresholdGroups.map((group) => group.thresholdQuota)
       ),
     },
   }
@@ -248,13 +242,14 @@ function presetComboKey(
     | 'type'
     | 'amount'
     | 'threshold_amount'
+    | 'threshold_quota'
     | 'interval_unit'
     | 'interval_value'
     | 'custom_seconds'
   >
 ) {
   if (preset.type === 'threshold') {
-    return `threshold:${preset.amount}:${preset.threshold_amount ?? 0}`
+    return `threshold:${preset.amount}:${preset.threshold_quota ?? 0}`
   }
   const period = getScheduledPeriodOption(preset)
   return `scheduled:${period.key}:${preset.amount}`
@@ -273,6 +268,7 @@ function scheduledRequest(
     description: '',
     amount,
     threshold_amount: 0,
+    threshold_quota: 0,
     interval_unit: period.interval_unit,
     interval_value: period.interval_value,
     custom_seconds: period.custom_seconds,
@@ -284,17 +280,18 @@ function scheduledRequest(
 
 function thresholdRequest(
   amount: number,
-  thresholdAmount: number,
+  thresholdQuota: number,
   state: AdminThresholdOptionState,
   sortOrder: number
 ): WalletAutoRechargePresetRequest {
   return {
     type: 'threshold',
     target_scope: state.targetScope,
-    name: `Auto ${amount} below ${thresholdAmount}`,
+    name: `Auto ${amount} below quota ${thresholdQuota}`,
     description: '',
     amount,
-    threshold_amount: thresholdAmount,
+    threshold_amount: 0,
+    threshold_quota: thresholdQuota,
     interval_unit: 'month',
     interval_value: 1,
     custom_seconds: 0,
@@ -332,12 +329,12 @@ export function buildPresetSavePlan(
   for (const amount of uniqueNumbers(desired.threshold.rechargeAmounts).filter(
     (value) => value > 0
   )) {
-    for (const thresholdAmount of uniqueNumbers(
-      desired.threshold.thresholdAmounts
+    for (const thresholdQuota of uniqueNumbers(
+      desired.threshold.thresholdQuotas
     )) {
       const request = thresholdRequest(
         amount,
-        thresholdAmount,
+        thresholdQuota,
         desired.threshold,
         sortOrder++
       )
