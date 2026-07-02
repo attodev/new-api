@@ -95,6 +95,7 @@ export interface WalletAutoRechargePresetFormState {
   description: string
   amount: string
   threshold_amount: string
+  threshold_quota: string
   interval_unit: WalletAutoRechargeIntervalUnit
   interval_value: string
   custom_seconds: string
@@ -111,6 +112,7 @@ function createEmptyPresetFormState(): WalletAutoRechargePresetFormState {
     description: '',
     amount: '',
     threshold_amount: '',
+    threshold_quota: '',
     interval_unit: 'month',
     interval_value: '1',
     custom_seconds: '',
@@ -134,6 +136,10 @@ function toPresetFormState(
     threshold_amount:
       preset.threshold_amount !== null && preset.threshold_amount !== undefined
         ? String(preset.threshold_amount)
+        : '',
+    threshold_quota:
+      preset.threshold_quota !== null && preset.threshold_quota !== undefined
+        ? String(preset.threshold_quota)
         : '',
     interval_unit: preset.interval_unit ?? 'month',
     interval_value:
@@ -172,6 +178,7 @@ export function normalizePresetForm(
       description: form.description.trim(),
       amount,
       threshold_amount: 0,
+      threshold_quota: 0,
       interval_unit: intervalUnit,
       interval_value: intervalValue,
       custom_seconds: customSeconds,
@@ -187,7 +194,8 @@ export function normalizePresetForm(
     name: form.name.trim(),
     description: form.description.trim(),
     amount,
-    threshold_amount: Number(form.threshold_amount || 0),
+    threshold_amount: 0,
+    threshold_quota: Number(form.threshold_quota || 0),
     interval_unit: 'month',
     interval_value: 1,
     custom_seconds: 0,
@@ -307,7 +315,7 @@ export function getPresetSummary(
     })
   }
   return t('Below {{threshold}} -> {{amount}}', {
-    threshold: preset.threshold_amount ?? 0,
+    threshold: preset.threshold_quota ?? 0,
     amount: preset.amount,
   })
 }
@@ -859,13 +867,13 @@ export function WalletAutoRechargePresetsSection() {
                 </div>
                 <div className='space-y-2'>
                   <div className='text-sm font-medium'>
-                    {t('Threshold balances')}
+                    {t('Threshold quotas')}
                   </div>
                   <Input
                     value={getOptionAmountDraftValue(
                       amountDrafts,
-                      'threshold:balance',
-                      optionState.threshold.thresholdAmounts
+                      'threshold:quota',
+                      optionState.threshold.thresholdQuotas
                     )}
                     onChange={(event) =>
                       {
@@ -873,7 +881,7 @@ export function WalletAutoRechargePresetsSection() {
                         setAmountDrafts((current) =>
                           updateOptionAmountDrafts(
                             current,
-                            'threshold:balance',
+                            'threshold:quota',
                             value
                           )
                         )
@@ -881,12 +889,12 @@ export function WalletAutoRechargePresetsSection() {
                           ...current,
                           threshold: {
                             ...current.threshold,
-                            thresholdAmounts: parseOptionAmountList(value),
+                            thresholdQuotas: parseOptionAmountList(value),
                           },
                         }))
                       }
                     }
-                    placeholder='1000, 3000, 5000'
+                    placeholder='500000, 2500000, 5000000'
                   />
                 </div>
               </div>

@@ -29,6 +29,7 @@ describe('wallet auto recharge preset admin helpers', () => {
         description: '',
         amount: '10000',
         threshold_amount: '',
+        threshold_quota: '',
         interval_unit: 'month',
         interval_value: '1',
         custom_seconds: '',
@@ -43,6 +44,7 @@ describe('wallet auto recharge preset admin helpers', () => {
       description: '',
       amount: 10000,
       threshold_amount: 0,
+      threshold_quota: 0,
       interval_unit: 'month',
       interval_value: 1,
       custom_seconds: 0,
@@ -52,15 +54,16 @@ describe('wallet auto recharge preset admin helpers', () => {
     })
   })
 
-  test('normalizes threshold preset by clearing stale scheduled-only values', () => {
+  test('normalizes threshold preset with threshold quota', () => {
     expect(
       normalizePresetForm({
         type: 'threshold',
         target_scope: 'organization',
-        name: 'Low balance',
-        description: 'uses threshold',
+        name: 'Low quota',
+        description: 'uses quota threshold',
         amount: '25000',
         threshold_amount: '7000',
+        threshold_quota: '500000',
         interval_unit: 'custom',
         interval_value: '6',
         custom_seconds: '900',
@@ -71,10 +74,11 @@ describe('wallet auto recharge preset admin helpers', () => {
     ).toEqual({
       type: 'threshold',
       target_scope: 'organization',
-      name: 'Low balance',
-      description: 'uses threshold',
+      name: 'Low quota',
+      description: 'uses quota threshold',
       amount: 25000,
-      threshold_amount: 7000,
+      threshold_amount: 0,
+      threshold_quota: 500000,
       interval_unit: 'month',
       interval_value: 1,
       custom_seconds: 0,
@@ -93,6 +97,7 @@ describe('wallet auto recharge preset admin helpers', () => {
         description: 'switched from threshold',
         amount: '12000',
         threshold_amount: '5000',
+        threshold_quota: '500000',
         interval_unit: 'day',
         interval_value: '1',
         custom_seconds: '300',
@@ -107,6 +112,7 @@ describe('wallet auto recharge preset admin helpers', () => {
       description: 'switched from threshold',
       amount: 12000,
       threshold_amount: 0,
+      threshold_quota: 0,
       interval_unit: 'day',
       interval_value: 1,
       custom_seconds: 0,
@@ -125,9 +131,10 @@ describe('wallet auto recharge preset admin helpers', () => {
         name: '자동',
         amount: 20000,
         threshold_amount: 5000,
+        threshold_quota: 500000,
         enabled: true,
       }, identityT)
-    ).toBe('Below 5000 -> 20000')
+    ).toBe('Below 500000 -> 20000')
   })
 
   test('summarizes scheduled custom interval with translator', () => {
@@ -220,13 +227,14 @@ describe('wallet auto recharge preset admin helpers', () => {
         name: 'Auto',
         amount: 30000,
         threshold_amount: 5000,
+        threshold_quota: 500000,
         enabled: true,
       },
     ])
 
     expect(state.scheduled.periods[0].amounts).toEqual([10000])
     expect(state.threshold.rechargeAmounts).toEqual([30000])
-    expect(state.threshold.thresholdAmounts).toEqual([5000])
+    expect(state.threshold.thresholdQuotas).toEqual([500000])
   })
 
   test('builds save plan that disables removed admin combinations', () => {
