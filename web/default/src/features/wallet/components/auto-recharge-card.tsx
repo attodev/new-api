@@ -343,7 +343,7 @@ export function AutoRechargeCard({
                           onClick={() => setSelectedPresetId(option.preset.id)}
                           className='h-10'
                         >
-                          {option.amount}
+                          {option.amount}원
                         </Button>
                       ))}
                     </div>

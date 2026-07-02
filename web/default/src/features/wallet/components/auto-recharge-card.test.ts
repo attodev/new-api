@@ -334,8 +334,8 @@ describe('auto recharge preset UI helpers', () => {
       html,
       /Monthly recharge charges the selected amount on the 1st of every month\./
     )
-    assert.doesNotMatch(html, /10000/)
-    assert.match(html, /30000/)
+    assert.doesNotMatch(html, /10000원/)
+    assert.match(html, /30000원/)
   })
 
   test('renders scheduled test-period presets with monthly copy', () => {
@@ -371,7 +371,7 @@ describe('auto recharge preset UI helpers', () => {
       html,
       /Monthly recharge charges the selected amount on the 1st of every month\./
     )
-    assert.match(html, /5000/)
+    assert.match(html, /5000원/)
     assert.match(html, /Register card and set auto recharge/)
   })
 
