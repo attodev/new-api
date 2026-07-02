@@ -401,6 +401,10 @@ export function Wallet(props: WalletProps) {
     ]
   )
 
+  const paymentSettingLockMessageKey = paymentSettingTabs.find(
+    (tab) => tab.disabled && tab.disabledMessageKey
+  )?.disabledMessageKey
+
   useEffect(() => {
     const currentTab = paymentSettingTabs.find(
       (tab) => tab.kind === paymentSettingTab
@@ -491,6 +495,11 @@ export function Wallet(props: WalletProps) {
                         </TabsTrigger>
                       ))}
                     </TabsList>
+                    {paymentSettingLockMessageKey ? (
+                      <p className='text-muted-foreground text-sm'>
+                        {t(paymentSettingLockMessageKey)}
+                      </p>
+                    ) : null}
 
                     <TabsContent value='subscription'>
                       <WalletSubscriptionStatusCard
