@@ -44,6 +44,15 @@ func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other
 // was made (e.g. the request was rejected before reaching a channel), so
 // "blocked before reaching a provider" stays distinguishable from "provider
 // was slow" in the stored data.
+//
+// Known limitation: on a retried request, RelayInfo's upstream timestamps
+// (see relay/common/relay_info.go) only reflect the final attempt, while
+// e2e_ms spans the whole request including earlier failed attempts on other
+// channels. gateway_ms therefore absorbs that failed-attempt time as if it
+// were new-api's own overhead, even though it was really time spent waiting
+// on (other) upstream providers. This is acceptable for the common case
+// (first-attempt success) but means gateway_ms can overstate new-api's
+// overhead on requests that needed a retry.
 func appendTimingBreakdown(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
 	if ctx == nil || relayInfo == nil || other == nil {
 		return
@@ -69,7 +78,11 @@ func appendTimingBreakdown(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, o
 		llmMs = 0
 	}
 	other["llm_ms"] = llmMs
-	other["gateway_ms"] = e2eMs - llmMs
+	gatewayMs := e2eMs - llmMs
+	if gatewayMs < 0 {
+		gatewayMs = 0
+	}
+	other["gateway_ms"] = gatewayMs
 	other["pre_llm_ms"] = relayInfo.UpstreamRequestStartTime.Sub(gatewayEntryTime).Milliseconds()
 	other["post_llm_ms"] = gatewayExitTime.Sub(relayInfo.UpstreamResponseEndTime).Milliseconds()
 }
