@@ -90,11 +90,7 @@ func NormalizeTossTopUpAmountMode(amountMode string) string {
 }
 
 func tossTopUpUnitPrice() float64 {
-	unit := setting.TossUnitPrice
-	if unit <= 0 {
-		unit = 1
-	}
-	return unit
+	return setting.TossUnitPrice
 }
 
 func tossTopUpPriceFactor(amount int64, group string) float64 {
@@ -112,6 +108,13 @@ func tossTopUpPriceFactor(amount int64, group string) float64 {
 func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuote {
 	mode := NormalizeTossTopUpAmountMode(amountMode)
 	unit := tossTopUpUnitPrice()
+	if unit <= 0 {
+		return TossTopUpQuote{
+			AmountMode:  mode,
+			InputAmount: amount,
+			UnitPrice:   0,
+		}
+	}
 	factor := tossTopUpPriceFactor(amount, group)
 
 	quote := TossTopUpQuote{
@@ -133,6 +136,9 @@ func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuot
 			IntPart()
 		quote.ChargeKRW = charge
 		quote.CreditAmount = credit.InexactFloat64()
+		quote.CreditQuota = int(credit.
+			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+			IntPart())
 	default:
 		charge := decimal.NewFromInt(amount)
 		credit := charge.
@@ -140,11 +146,11 @@ func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuot
 			Div(decimal.NewFromFloat(factor))
 		quote.ChargeKRW = amount
 		quote.CreditAmount = credit.InexactFloat64()
+		quote.CreditQuota = int(credit.
+			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+			IntPart())
 	}
 
-	quote.CreditQuota = int(decimal.NewFromFloat(quote.CreditAmount).
-		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
-		IntPart())
 	return quote
 }
 

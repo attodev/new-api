@@ -31,6 +31,27 @@ func TestQuoteTossTopUpDefaultsToKRWMode(t *testing.T) {
 	require.Equal(t, 1300.0, quote.UnitPrice)
 }
 
+func TestQuoteTossTopUpInvalidModeDefaultsToKRWMode(t *testing.T) {
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 1300
+	common.QuotaPerUnit = 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	defer func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	}()
+
+	quote := QuoteTossTopUp(13000, "invalid", "default")
+
+	require.Equal(t, TossTopUpAmountModeKRW, quote.AmountMode)
+	require.Equal(t, int64(13000), quote.ChargeKRW)
+	require.InDelta(t, 10.0, quote.CreditAmount, 0.000001)
+	require.Equal(t, 5000000, quote.CreditQuota)
+}
+
 func TestQuoteTossTopUpQuotaModeChargesUnitPriceTimesQuota(t *testing.T) {
 	originalUnitPrice := setting.TossUnitPrice
 	originalQuotaPerUnit := common.QuotaPerUnit
@@ -50,6 +71,28 @@ func TestQuoteTossTopUpQuotaModeChargesUnitPriceTimesQuota(t *testing.T) {
 	require.Equal(t, int64(13000), quote.ChargeKRW)
 	require.InDelta(t, 10.0, quote.CreditAmount, 0.000001)
 	require.Equal(t, 5000000, quote.CreditQuota)
+}
+
+func TestQuoteTossTopUpNonPositiveUnitPriceReturnsZeroQuote(t *testing.T) {
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 0
+	common.QuotaPerUnit = 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	defer func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	}()
+
+	quote := QuoteTossTopUp(13000, TossTopUpAmountModeKRW, "default")
+
+	require.Equal(t, TossTopUpAmountModeKRW, quote.AmountMode)
+	require.Equal(t, int64(0), quote.ChargeKRW)
+	require.InDelta(t, 0.0, quote.CreditAmount, 0.000001)
+	require.Equal(t, 0, quote.CreditQuota)
+	require.Equal(t, 0.0, quote.UnitPrice)
 }
 
 func TestQuoteTossTopUpKRWModeKeepsChargeFixedWhenDiscountApplies(t *testing.T) {
