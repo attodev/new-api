@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -43,19 +44,26 @@ import {
   getMinTopupAmount,
   isPayPalPayment,
   isStripePayment,
+  isTossPayment,
   isWaffoPancakePayment,
   submitPaymentForm,
 } from '@/features/wallet/lib'
+import {
+  getTossPreview,
+  parseTossQuoteData,
+} from '@/features/wallet/lib/topup-amount-mode'
 import type {
   CreemProduct,
   PaymentMethod,
   PresetAmount,
+  TopupAmountMode,
   UserWalletData,
 } from '@/features/wallet/types'
 import {
   calculateOrganizationAmount,
   calculateOrganizationPayPalAmount,
   calculateOrganizationStripeAmount,
+  calculateOrganizationTossAmount,
   calculateOrganizationWaffoPancakeAmount,
   getOrganizationBillingHistory,
   getOrganizationWallet,
@@ -63,6 +71,7 @@ import {
   requestOrganizationPayPalPayment,
   requestOrganizationPayment,
   requestOrganizationStripePayment,
+  requestOrganizationTossPayment,
   requestOrganizationWaffoPancakePayment,
   requestOrganizationWaffoPayment,
 } from '../api'
@@ -111,12 +120,23 @@ export function canManageOrganizationAutoRecharge(
   )
 }
 
+export function getOrganizationAmountModeRequest(
+  amount: number,
+  paymentType: string,
+  amountMode: TopupAmountMode
+) {
+  return isTossPayment(paymentType)
+    ? { amount, amount_mode: amountMode }
+    : { amount }
+}
+
 export function OrganizationWallet() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState('topup')
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizationLoading, setOrganizationLoading] = useState(true)
   const [topupAmount, setTopupAmount] = useState(0)
+  const [topupAmountMode, setTopupAmountMode] = useState<TopupAmountMode>('krw')
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
@@ -186,21 +206,46 @@ export function OrganizationWallet() {
     void fetchOrganization()
   }, [fetchOrganization])
 
+  const getAmountForMinimumCheck = useCallback(
+    (amount: number, paymentType: string, amountMode: TopupAmountMode) => {
+      if (isTossPayment(paymentType) && amountMode === 'quota') {
+        return getTossPreview(amount, amountMode, topupInfo?.toss_unit_price)
+          .chargeAmount
+      }
+      return amount
+    },
+    [topupInfo?.toss_unit_price]
+  )
+
   const calculatePaymentAmount = useCallback(
-    async (amount: number, paymentType: string) => {
+    async (
+      amount: number,
+      paymentType: string,
+      amountMode: TopupAmountMode = topupAmountMode
+    ) => {
       try {
         setCalculating(true)
-        const request = { amount }
+        const request = getOrganizationAmountModeRequest(
+          amount,
+          paymentType,
+          amountMode
+        )
         const response = isStripePayment(paymentType)
           ? await calculateOrganizationStripeAmount(request)
           : isPayPalPayment(paymentType)
             ? await calculateOrganizationPayPalAmount(request)
             : isWaffoPancakePayment(paymentType)
               ? await calculateOrganizationWaffoPancakeAmount(request)
-              : await calculateOrganizationAmount(request)
+              : isTossPayment(paymentType)
+                ? await calculateOrganizationTossAmount(request)
+                : await calculateOrganizationAmount(request)
 
         if (isApiSuccess(response) && response.data) {
-          const value = parseFloat(response.data)
+          const quote = isTossPayment(paymentType)
+            ? parseTossQuoteData(response.data)
+            : null
+          const value =
+            quote?.charge_amount ?? parseFloat(String(response.data))
           setPaymentAmount(value)
           return value
         }
@@ -213,7 +258,7 @@ export function OrganizationWallet() {
         setCalculating(false)
       }
     },
-    []
+    [topupAmountMode]
   )
 
   useEffect(() => {
@@ -227,6 +272,12 @@ export function OrganizationWallet() {
   const getCurrentPaymentType = useCallback(() => {
     return selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
   }, [selectedPaymentMethod, topupInfo])
+
+  const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTopupAmountMode(mode)
+    setSelectedPreset(null)
+    void calculatePaymentAmount(topupAmount, getCurrentPaymentType(), mode)
+  }
 
   const handleSelectPreset = (preset: PresetAmount) => {
     setTopupAmount(preset.value)
@@ -244,7 +295,12 @@ export function OrganizationWallet() {
     setSelectedPaymentMethod(method)
     setPaymentLoading(method.type)
     try {
-      if (topupAmount < getMinTopupAmount(topupInfo)) return
+      const amountForMinimum = getAmountForMinimumCheck(
+        topupAmount,
+        method.type,
+        topupAmountMode
+      )
+      if (amountForMinimum < getMinTopupAmount(topupInfo)) return
       await calculatePaymentAmount(topupAmount, method.type)
       setConfirmDialogOpen(true)
     } finally {
@@ -270,13 +326,66 @@ export function OrganizationWallet() {
             })
           : isWaffoPancakePayment(paymentType)
             ? await requestOrganizationWaffoPancakePayment({ amount })
-            : await requestOrganizationPayment({
-                amount,
-                payment_method: paymentType,
-              })
+            : isTossPayment(paymentType)
+              ? await requestOrganizationTossPayment({
+                  amount,
+                  amount_mode: topupAmountMode,
+                  payment_method: 'toss',
+                })
+              : await requestOrganizationPayment({
+                  amount,
+                  payment_method: paymentType,
+                })
 
       if (!isApiSuccess(response)) {
         toast.error(response.message || i18next.t('Payment request failed'))
+        return
+      }
+
+      if (isTossPayment(paymentType)) {
+        const data = response.data as
+          | {
+              client_key: string
+              customer_key: string
+              order_id: string
+              order_name: string
+              amount: number
+              success_url: string
+              fail_url: string
+            }
+          | undefined
+        if (!data) {
+          toast.error(response.message || i18next.t('Payment request failed'))
+          return
+        }
+        const {
+          client_key,
+          customer_key,
+          order_id,
+          order_name,
+          amount: chargeAmount,
+          success_url,
+          fail_url,
+        } = data
+
+        try {
+          const tossPayments = await loadTossPayments(client_key)
+          const payment = tossPayments.payment({ customerKey: customer_key })
+
+          await payment.requestPayment({
+            method: 'CARD',
+            amount: { currency: 'KRW', value: chargeAmount },
+            orderId: order_id,
+            orderName: order_name,
+            successUrl: success_url,
+            failUrl: fail_url,
+          })
+        } catch (error) {
+          const tossError = error as { code?: string }
+          if (tossError.code && tossError.code !== 'PAY_PROCESS_CANCELED') {
+            toast.error(t('Payment request failed'))
+          }
+        }
         return
       }
 
@@ -459,6 +568,9 @@ export function OrganizationWallet() {
                     onSelectPreset={handleSelectPreset}
                     topupAmount={topupAmount}
                     onTopupAmountChange={handleTopupAmountChange}
+                    amountMode={topupAmountMode}
+                    onAmountModeChange={handleTopupAmountModeChange}
+                    tossUnitPrice={topupInfo?.toss_unit_price}
                     paymentAmount={paymentAmount}
                     calculating={calculating}
                     onPaymentMethodSelect={handlePaymentMethodSelect}
@@ -531,6 +643,8 @@ export function OrganizationWallet() {
         topupAmount={topupAmount}
         paymentAmount={paymentAmount}
         paymentMethod={selectedPaymentMethod}
+        amountMode={topupAmountMode}
+        tossUnitPrice={topupInfo?.toss_unit_price}
         calculating={calculating}
         processing={processing}
         discountRate={getDiscountRate()}
