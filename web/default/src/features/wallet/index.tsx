@@ -402,10 +402,10 @@ export function Wallet(props: WalletProps) {
   )
 
   useEffect(() => {
-    if (
-      paymentSettingTab &&
-      paymentSettingTabs.some((tab) => tab.kind === paymentSettingTab)
-    ) {
+    const currentTab = paymentSettingTabs.find(
+      (tab) => tab.kind === paymentSettingTab
+    )
+    if (currentTab && !currentTab.disabled) {
       return
     }
     setPaymentSettingTab(getInitialWalletPaymentSetting(paymentSettingTabs))
