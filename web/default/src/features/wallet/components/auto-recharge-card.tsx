@@ -41,6 +41,8 @@ interface AutoRechargeCardProps {
   processing: boolean
   canManage: boolean
   permissionMessageKey?: string
+  creationDisabled?: boolean
+  creationDisabledMessageKey?: string
   onCreateScheduled: (payload: WalletAutoRechargeRequest) => Promise<boolean>
   onCreateThreshold: (payload: WalletAutoRechargeRequest) => Promise<boolean>
   onCancel: (id: number) => Promise<boolean>
@@ -140,6 +142,8 @@ export function AutoRechargeCard({
   processing,
   canManage,
   permissionMessageKey = 'You do not have permission to manage this.',
+  creationDisabled = false,
+  creationDisabledMessageKey = 'Cancel the current payment setting before choosing another one.',
   onCreateScheduled,
   onCreateThreshold,
   onCancel,
@@ -174,6 +178,8 @@ export function AutoRechargeCard({
   )
 
   const disabled = loading || processing || !canManage
+  const creationLocked = creationDisabled && !activePolicy
+  const creationButtonDisabled = disabled || creationLocked
   const scheduledGroups = useMemo(
     () => groupScheduledPresetOptions(availablePresets),
     [availablePresets]
@@ -281,6 +287,12 @@ export function AutoRechargeCard({
           </div>
         ) : null}
 
+        {creationLocked ? (
+          <div className='text-muted-foreground text-sm'>
+            {t(creationDisabledMessageKey)}
+          </div>
+        ) : null}
+
         {!activePolicy && availablePresets.length > 0 ? (
           <div className={cn('space-y-3', !canManage && 'opacity-60')}>
             {mode === 'scheduled' ? (
@@ -301,7 +313,7 @@ export function AutoRechargeCard({
                               ? 'default'
                               : 'outline'
                           }
-                          disabled={disabled}
+                          disabled={creationButtonDisabled}
                           onClick={() =>
                             setSelectedScheduledPeriodKey(group.period.key)
                           }
@@ -324,7 +336,7 @@ export function AutoRechargeCard({
                           key={`${selectedScheduledGroup.period.key}:${option.amount}`}
                           type='button'
                           variant='outline'
-                          disabled={disabled}
+                          disabled={creationButtonDisabled}
                           onClick={() =>
                             void handleSelectPreset(option.preset.id)
                           }
@@ -354,7 +366,7 @@ export function AutoRechargeCard({
                               ? 'default'
                               : 'outline'
                           }
-                          disabled={disabled}
+                          disabled={creationButtonDisabled}
                           onClick={() => void handleThresholdAmountClick(group)}
                           className='h-10'
                         >
@@ -376,7 +388,7 @@ export function AutoRechargeCard({
                           key={`${selectedThresholdGroup.amount}:${option.thresholdAmount}`}
                           type='button'
                           variant='outline'
-                          disabled={disabled}
+                          disabled={creationButtonDisabled}
                           onClick={() =>
                             void handleSelectPreset(option.preset.id)
                           }

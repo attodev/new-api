@@ -309,4 +309,76 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /10000/)
     assert.match(html, /30000/)
   })
+
+  test('disables scheduled preset creation when another payment setting is active', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'scheduled',
+        policies: [],
+        presets: [
+          {
+            id: 1,
+            type: 'scheduled',
+            target_scope: 'all',
+            name: 'Monthly 10000',
+            amount: 10000,
+            interval_unit: 'month',
+            interval_value: 1,
+            enabled: true,
+          },
+        ],
+        loading: false,
+        processing: false,
+        canManage: true,
+        creationDisabled: true,
+        creationDisabledMessageKey:
+          'Cancel the current payment setting before choosing another one.',
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(
+      html,
+      /Cancel the current payment setting before choosing another one\./
+    )
+    assert.match(html, /disabled/)
+  })
+
+  test('does not block cancelling an existing policy when creation is locked', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'threshold',
+        policies: [
+          {
+            id: 7,
+            type: 'threshold',
+            target_type: 'user',
+            target_id: 1,
+            status: 'active',
+            amount: 10000,
+            threshold_amount: 3000,
+          },
+        ],
+        presets: [],
+        loading: false,
+        processing: false,
+        canManage: true,
+        creationDisabled: true,
+        creationDisabledMessageKey:
+          'Cancel the current payment setting before choosing another one.',
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Current policy/)
+    assert.match(html, /Cancel/)
+    assert.doesNotMatch(
+      html,
+      /Cancel the current payment setting before choosing another one\./
+    )
+  })
 })
