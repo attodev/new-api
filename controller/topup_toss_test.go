@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTossPayMoney(t *testing.T) {
@@ -144,4 +147,182 @@ func TestGetTossTopUpQuoteQuotaMode(t *testing.T) {
 	if quote.CreditQuota != 5000000 {
 		t.Fatalf("CreditQuota = %d want 5000000", quote.CreditQuota)
 	}
+}
+
+func setupTossControllerTest(t *testing.T) {
+	t.Helper()
+	setupOrganizationControllerTestDB(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.TopUp{}))
+
+	originalTossEnabled := setting.TossEnabled
+	originalClientKey := setting.TossClientKey
+	originalSecretKey := setting.TossSecretKey
+	originalTestMode := setting.TossTestMode
+	originalServerAddress := system_setting.ServerAddress
+	originalMinTopUp := setting.TossMinTopUp
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+
+	setting.TossEnabled = true
+	setting.TossTestMode = false
+	setting.TossClientKey = "ck_test_toss"
+	setting.TossSecretKey = "sk_test_toss"
+	system_setting.ServerAddress = "https://pay.example.com"
+	setting.TossMinTopUp = 1000
+	setting.TossUnitPrice = 1300
+	common.QuotaPerUnit = 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+
+	t.Cleanup(func() {
+		setting.TossEnabled = originalTossEnabled
+		setting.TossClientKey = originalClientKey
+		setting.TossSecretKey = originalSecretKey
+		setting.TossTestMode = originalTestMode
+		system_setting.ServerAddress = originalServerAddress
+		setting.TossMinTopUp = originalMinTopUp
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	})
+}
+
+func TestRequestTossAmountQuotaModeReturnsQuoteWhenChargeMeetsMin(t *testing.T) {
+	setupTossControllerTest(t)
+
+	user := model.User{
+		Id:       1,
+		Username: "toss-user",
+		Password: "x",
+		Role:     common.RoleCommonUser,
+		AffCode:  "toss-user",
+		Group:    "default",
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+
+	res := performOrganizationRequest(
+		RequestTossAmount,
+		user,
+		http.MethodPost,
+		"/api/user/toss/amount",
+		`{"amount":1,"amount_mode":"quota","payment_method":"toss"}`,
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+
+	var payload struct {
+		Message string `json:"message"`
+		Data    struct {
+			AmountMode   string  `json:"amount_mode"`
+			InputAmount  int64   `json:"input_amount"`
+			ChargeAmount int64   `json:"charge_amount"`
+			CreditAmount float64 `json:"credit_amount"`
+			CreditQuota  int     `json:"credit_quota"`
+			UnitPrice    float64 `json:"unit_price"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.Equal(t, "success", payload.Message)
+	require.Equal(t, model.TossTopUpAmountModeQuota, payload.Data.AmountMode)
+	require.Equal(t, int64(1), payload.Data.InputAmount)
+	require.Equal(t, int64(1300), payload.Data.ChargeAmount)
+	require.Equal(t, 1.0, payload.Data.CreditAmount)
+	require.Equal(t, 500000, payload.Data.CreditQuota)
+	require.Equal(t, 1300.0, payload.Data.UnitPrice)
+}
+
+func TestRequestTossPayQuotaModeReturnsStructuredFieldsAndPersistsCreditAmount(t *testing.T) {
+	setupTossControllerTest(t)
+
+	user := model.User{
+		Id:       2,
+		Username: "toss-pay-user",
+		Password: "x",
+		Role:     common.RoleCommonUser,
+		AffCode:  "toss-pay-user",
+		Group:    "default",
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+
+	res := performOrganizationRequest(
+		RequestTossPay,
+		user,
+		http.MethodPost,
+		"/api/user/toss/pay",
+		`{"amount":1,"amount_mode":"quota","payment_method":"toss"}`,
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+
+	var payload struct {
+		Message string `json:"message"`
+		Data    struct {
+			OrderID      string  `json:"order_id"`
+			Amount       int64   `json:"amount"`
+			ChargeAmount int64   `json:"charge_amount"`
+			CreditAmount float64 `json:"credit_amount"`
+			CreditQuota  int     `json:"credit_quota"`
+			UnitPrice    float64 `json:"unit_price"`
+			AmountMode   string  `json:"amount_mode"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.Equal(t, "success", payload.Message)
+	require.NotEmpty(t, payload.Data.OrderID)
+	require.Equal(t, int64(1300), payload.Data.Amount)
+	require.Equal(t, int64(1300), payload.Data.ChargeAmount)
+	require.Equal(t, 1.0, payload.Data.CreditAmount)
+	require.Equal(t, 500000, payload.Data.CreditQuota)
+	require.Equal(t, 1300.0, payload.Data.UnitPrice)
+	require.Equal(t, model.TossTopUpAmountModeQuota, payload.Data.AmountMode)
+
+	var topUp model.TopUp
+	require.NoError(t, model.DB.Where("trade_no = ?", payload.Data.OrderID).First(&topUp).Error)
+	require.Equal(t, int64(1300), topUp.Amount)
+	require.Equal(t, 1.0, topUp.Money)
+}
+
+func TestOrganizationTossAmountQuotaModeUsesChargeForMinValidation(t *testing.T) {
+	setupTossControllerTest(t)
+
+	owner := model.User{
+		Id:               3,
+		Username:         "org-owner",
+		Password:         "x",
+		Role:             common.RoleCommonUser,
+		OrganizationId:   7,
+		OrganizationRole: model.OrganizationRoleOwner,
+		AffCode:          "org-owner",
+		Group:            "default",
+	}
+	org := model.Organization{
+		Id:          7,
+		Name:        "Acme",
+		OwnerUserId: owner.Id,
+		Quota:       1000,
+		Status:      model.OrganizationStatusEnabled,
+	}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	res := performOrganizationRequest(
+		RequestOrganizationTossAmount,
+		owner,
+		http.MethodPost,
+		"/api/organization/toss/amount",
+		`{"amount":1,"amount_mode":"quota","payment_method":"toss"}`,
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	var payload struct {
+		Message string `json:"message"`
+		Data    struct {
+			AmountMode   string `json:"amount_mode"`
+			ChargeAmount int64  `json:"charge_amount"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.Equal(t, "success", payload.Message)
+	require.Equal(t, model.TossTopUpAmountModeQuota, payload.Data.AmountMode)
+	require.Equal(t, int64(1300), payload.Data.ChargeAmount)
 }

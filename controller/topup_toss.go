@@ -59,13 +59,13 @@ func RequestTossAmount(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
-	if req.Amount < int64(setting.TossMinTopUp) {
-		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
-		return
-	}
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
+	if quote.ChargeKRW < int64(setting.TossMinTopUp) {
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
+		return
+	}
 	if quote.ChargeKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
@@ -102,16 +102,16 @@ func RequestTossPay(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
-	if req.Amount < int64(setting.TossMinTopUp) {
-		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
-		return
-	}
 
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 
 	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
 	chargedKRW := quote.ChargeKRW
+	if chargedKRW < int64(setting.TossMinTopUp) {
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
+		return
+	}
 	if chargedKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return

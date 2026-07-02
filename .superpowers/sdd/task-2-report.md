@@ -64,3 +64,39 @@ ok  	github.com/QuantumNous/new-api/controller	0.069s
 
 ## Concerns
 - `go test` requires escalated execution in this environment because the Go build cache lives outside the writable workspace.
+
+---
+
+## Review Follow-up
+
+### What I fixed
+- Moved Toss minimum-topup validation in `RequestTossAmount` and `RequestTossPay` from raw `req.Amount` to the computed quote charge (`quote.ChargeKRW` / `chargedKRW`), so quota-mode requests are validated in KRW after conversion instead of being rejected for sending credit units.
+- Kept KRW mode behavior backward-compatible because KRW quotes preserve `ChargeKRW == req.Amount`.
+- Added controller regression coverage for:
+  - `/api/user/toss/amount` quota mode returning the structured quote payload when converted KRW meets the minimum,
+  - `/api/user/toss/pay` quota mode returning the structured quote fields,
+  - `/api/user/toss/pay` persisting `TopUp.Money` as `quote.CreditAmount`,
+  - `/api/organization/toss/amount` inheriting the same quota-mode minimum validation behavior.
+
+### Tests run and output
+- `GOCACHE=/tmp/new-api-go-build-cache go test ./controller -run 'TestGetTossTopUpQuote|TestRequestToss|TestOrganizationToss' -count=1`
+
+```text
+ok  	github.com/QuantumNous/new-api/controller	0.151s
+```
+
+- `GOCACHE=/tmp/new-api-go-build-cache go test ./model ./controller -run 'TestQuoteTossTopUp|TestGetTossTopUpQuote|TestGetTossPayMoney|TestValidateTossConfirmAmount|TestRequestToss|TestOrganizationToss' -count=1`
+
+```text
+ok  	github.com/QuantumNous/new-api/model	0.102s
+ok  	github.com/QuantumNous/new-api/controller	0.186s
+```
+
+### Files changed
+- `controller/topup_toss.go`
+- `controller/topup_toss_test.go`
+
+### Self-review
+- The fix stays inside the Task 2-owned files and does not touch unrelated payment paths.
+- The new tests exercise the controller endpoints directly, including the organization wrapper and persisted `TopUp` row.
+- `controller/topup.go` already contained `toss_unit_price` in this worktree, so no additional edit was needed there for this follow-up.
