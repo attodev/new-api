@@ -29,6 +29,7 @@ import type {
   PaymentRequest,
   PaymentResponse,
   StripePaymentResponse,
+  TossPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
   WaffoPaymentRequest,
@@ -198,6 +199,15 @@ export async function calculateOrganizationWaffoPancakeAmount(
   return res.data
 }
 
+export async function calculateOrganizationTossAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/toss/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
 export async function requestOrganizationPayment(
   request: PaymentRequest
 ): Promise<PaymentResponse> {
@@ -250,6 +260,15 @@ export async function requestOrganizationWaffoPancakePayment(
   request: WaffoPancakePaymentRequest
 ): Promise<WaffoPancakePaymentResponse> {
   const res = await api.post('/api/organization/waffo-pancake/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationTossPayment(
+  request: PaymentRequest
+): Promise<TossPaymentResponse> {
+  const res = await api.post('/api/organization/toss/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data

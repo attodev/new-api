@@ -38,6 +38,7 @@ export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
+export type TopupAmountMode = 'krw' | 'quota'
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type PayPalPaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
@@ -46,6 +47,14 @@ export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
 >
+export interface TossTopupQuote {
+  amount_mode?: TopupAmountMode
+  input_amount?: number
+  charge_amount: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+}
 export type TossPaymentResponse = ApiResponse<{
   client_key: string
   customer_key: string
@@ -54,6 +63,11 @@ export type TossPaymentResponse = ApiResponse<{
   amount: number
   success_url: string
   fail_url: string
+  charge_amount?: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+  amount_mode?: TopupAmountMode
 }>
 
 export type WaffoPancakePaymentResponse = ApiResponse<
@@ -179,6 +193,8 @@ export interface TopupInfo {
   enable_toss_topup?: boolean
   /** Minimum topup amount for Toss (KRW) */
   toss_min_topup?: number
+  /** Toss unit price in KRW for 1 wallet credit unit */
+  toss_unit_price?: number
   /** Whether Toss billing (recurring subscription) is enabled */
   enable_toss_billing?: boolean
   /** Whether redemption code usage is enabled */
@@ -215,6 +231,8 @@ export interface PaymentRequest {
   amount: number
   /** Payment method identifier */
   payment_method: string
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
@@ -241,6 +259,8 @@ export interface WaffoPancakePaymentRequest {
 export interface AmountRequest {
   /** Topup amount to calculate */
   amount: number
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
