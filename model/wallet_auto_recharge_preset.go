@@ -195,6 +195,10 @@ func walletAutoRechargePresetMatchesTarget(scope string, targetType string) bool
 		(scope == WalletAutoRechargePresetTargetOrganization && targetType == TopUpTargetTypeOrganization)
 }
 
+func walletAutoRechargePresetHasValidThresholdQuota(preset WalletAutoRechargePreset) bool {
+	return preset.Type != WalletAutoRechargeTypeThreshold || preset.ThresholdQuota > 0
+}
+
 func GetWalletAutoRechargePresetForTarget(id int, rechargeType string, targetType string) (*WalletAutoRechargePreset, error) {
 	var preset WalletAutoRechargePreset
 	if err := DB.First(&preset, id).Error; err != nil {
@@ -209,6 +213,9 @@ func GetWalletAutoRechargePresetForTarget(id int, rechargeType string, targetTyp
 	if !walletAutoRechargePresetMatchesTarget(preset.TargetScope, targetType) {
 		return nil, errors.New("wallet auto recharge preset is not available for target")
 	}
+	if !walletAutoRechargePresetHasValidThresholdQuota(preset) {
+		return nil, errors.New("wallet auto recharge preset threshold quota is invalid")
+	}
 	return &preset, nil
 }
 
@@ -216,6 +223,7 @@ func ListWalletAutoRechargePresetsForTarget(targetType string) ([]WalletAutoRech
 	var rows []WalletAutoRechargePreset
 	err := DB.Where("enabled = ?", true).
 		Where("target_scope = ? OR target_scope = ?", targetType, WalletAutoRechargePresetTargetAll).
+		Where("type <> ? OR threshold_quota > ?", WalletAutoRechargeTypeThreshold, 0).
 		Order("sort_order asc, id asc").
 		Find(&rows).Error
 	return rows, err

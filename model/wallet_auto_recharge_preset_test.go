@@ -56,6 +56,7 @@ func TestWalletAutoRechargePresetTargetFiltering(t *testing.T) {
 		Name:            "개인 자동충전",
 		Amount:          10000,
 		ThresholdAmount: 5000,
+		ThresholdQuota:  500000,
 		Enabled:         true,
 	})
 	require.NoError(t, err)
@@ -66,6 +67,83 @@ func TestWalletAutoRechargePresetTargetFiltering(t *testing.T) {
 
 	_, err = GetWalletAutoRechargePresetForTarget(1, WalletAutoRechargeTypeThreshold, TopUpTargetTypeOrganization)
 	require.ErrorContains(t, err, "wallet auto recharge preset is not available for target")
+}
+
+func TestListWalletAutoRechargePresetsForTargetExcludesZeroQuotaThresholdPresets(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+
+	_, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetScope:     WalletAutoRechargePresetTargetUser,
+		Name:            "legacy user threshold",
+		Amount:          10000,
+		ThresholdAmount: 5000,
+		ThresholdQuota:  0,
+		SortOrder:       1,
+		Enabled:         true,
+	})
+	require.NoError(t, err)
+
+	positiveThreshold, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:           WalletAutoRechargeTypeThreshold,
+		TargetScope:    WalletAutoRechargePresetTargetAll,
+		Name:           "valid threshold",
+		Amount:         10000,
+		ThresholdQuota: 500000,
+		SortOrder:      2,
+		Enabled:        true,
+	})
+	require.NoError(t, err)
+
+	scheduled, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:          WalletAutoRechargeTypeScheduled,
+		TargetScope:   WalletAutoRechargePresetTargetUser,
+		Name:          "valid scheduled",
+		Amount:        10000,
+		IntervalUnit:  WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1,
+		SortOrder:     3,
+		Enabled:       true,
+	})
+	require.NoError(t, err)
+
+	rows, err := ListWalletAutoRechargePresetsForTarget(TopUpTargetTypeUser)
+
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	require.Equal(t, []int{positiveThreshold.Id, scheduled.Id}, []int{rows[0].Id, rows[1].Id})
+}
+
+func TestGetWalletAutoRechargePresetForTargetRejectsZeroQuotaThresholdPreset(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+
+	legacyThreshold, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:            WalletAutoRechargeTypeThreshold,
+		TargetScope:     WalletAutoRechargePresetTargetUser,
+		Name:            "legacy threshold",
+		Amount:          10000,
+		ThresholdAmount: 5000,
+		ThresholdQuota:  0,
+		Enabled:         true,
+	})
+	require.NoError(t, err)
+
+	validThreshold, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:           WalletAutoRechargeTypeThreshold,
+		TargetScope:    WalletAutoRechargePresetTargetUser,
+		Name:           "valid threshold",
+		Amount:         10000,
+		ThresholdQuota: 500000,
+		Enabled:        true,
+	})
+	require.NoError(t, err)
+
+	_, err = GetWalletAutoRechargePresetForTarget(legacyThreshold.Id, WalletAutoRechargeTypeThreshold, TopUpTargetTypeUser)
+	require.ErrorContains(t, err, "wallet auto recharge preset threshold quota is invalid")
+
+	preset, err := GetWalletAutoRechargePresetForTarget(validThreshold.Id, WalletAutoRechargeTypeThreshold, TopUpTargetTypeUser)
+	require.NoError(t, err)
+	require.Equal(t, validThreshold.Id, preset.Id)
 }
 
 func TestDisableWalletAutoRechargePresetKeepsRow(t *testing.T) {

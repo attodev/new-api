@@ -161,7 +161,12 @@ export function groupThresholdPresetOptions(
   const map = new Map<number, ThresholdQuotaGroup>()
 
   for (const preset of [...presets]
-    .filter((item) => item.enabled && item.type === 'threshold')
+    .filter(
+      (item) =>
+        item.enabled &&
+        item.type === 'threshold' &&
+        (item.threshold_quota ?? 0) > 0
+    )
     .sort(byPresetOrder)) {
     const thresholdQuota = preset.threshold_quota ?? 0
     const group = map.get(thresholdQuota) ?? { thresholdQuota, amounts: [] }
@@ -331,7 +336,7 @@ export function buildPresetSavePlan(
   )) {
     for (const thresholdQuota of uniqueNumbers(
       desired.threshold.thresholdQuotas
-    )) {
+    ).filter((value) => value > 0)) {
       const request = thresholdRequest(
         amount,
         thresholdQuota,

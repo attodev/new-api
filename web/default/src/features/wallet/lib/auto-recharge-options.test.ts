@@ -105,6 +105,27 @@ describe('auto recharge option helpers', () => {
     ])
   })
 
+  test('ignores zero quota threshold presets', () => {
+    const groups = groupThresholdPresetOptions([
+      preset({
+        id: 1,
+        type: 'threshold',
+        amount: 10000,
+        threshold_amount: 5000,
+        threshold_quota: 0,
+      }),
+      preset({
+        id: 2,
+        type: 'threshold',
+        amount: 30000,
+        threshold_quota: 500000,
+      }),
+    ])
+
+    expect(groups.map((group) => group.thresholdQuota)).toEqual([500000])
+    expect(groups[0].amounts.map((item) => item.preset.id)).toEqual([2])
+  })
+
   test('builds admin option state from existing presets', () => {
     const state = buildAdminOptionState([
       preset({
@@ -191,6 +212,25 @@ describe('auto recharge option helpers', () => {
       },
     })
 
+    expect(plan.create[0]).toMatchObject({
+      type: 'threshold',
+      amount: 10000,
+      threshold_amount: 0,
+      threshold_quota: 500000,
+    })
+  })
+
+  test('save plan skips non-positive threshold quotas when creating presets', () => {
+    const plan = buildPresetSavePlan([], {
+      scheduled: { targetScope: 'all', chargeImmediately: true, periods: [] },
+      threshold: {
+        targetScope: 'all',
+        rechargeAmounts: [10000],
+        thresholdQuotas: [0, 500000],
+      },
+    })
+
+    expect(plan.create).toHaveLength(1)
     expect(plan.create[0]).toMatchObject({
       type: 'threshold',
       amount: 10000,
