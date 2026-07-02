@@ -1124,10 +1124,10 @@ Add these keys to every locale file under `web/default/src/i18n/locales/*.json`:
 English `en.json`:
 
 ```json
-"원 기준": "KRW based",
-"할당량 기준": "Quota based",
-"충전": "Credit",
-"결제": "Pay",
+"KRW based": "KRW based",
+"Quota based": "Quota based",
+"Credit": "Credit",
+"Pay": "Pay",
 "Credit amount": "Credit amount",
 "Payment amount": "Payment amount"
 ```
@@ -1135,10 +1135,10 @@ English `en.json`:
 Chinese `zh.json`:
 
 ```json
-"원 기준": "按韩元",
-"할당량 기준": "按额度",
-"충전": "充值",
-"결제": "支付",
+"KRW based": "按韩元",
+"Quota based": "按额度",
+"Credit": "充值",
+"Pay": "支付",
 "Credit amount": "充值额度",
 "Payment amount": "支付金额"
 ```
@@ -1146,10 +1146,10 @@ Chinese `zh.json`:
 French `fr.json`:
 
 ```json
-"원 기준": "Basé sur le KRW",
-"할당량 기준": "Basé sur le quota",
-"충전": "Crédit",
-"결제": "Payer",
+"KRW based": "Basé sur le KRW",
+"Quota based": "Basé sur le quota",
+"Credit": "Crédit",
+"Pay": "Payer",
 "Credit amount": "Montant crédité",
 "Payment amount": "Montant du paiement"
 ```
@@ -1157,10 +1157,10 @@ French `fr.json`:
 Japanese `ja.json`:
 
 ```json
-"원 기준": "ウォン基準",
-"할당량 기준": "割当量基準",
-"충전": "チャージ",
-"결제": "支払い",
+"KRW based": "ウォン基準",
+"Quota based": "割当量基準",
+"Credit": "チャージ",
+"Pay": "支払い",
 "Credit amount": "チャージ量",
 "Payment amount": "支払い金額"
 ```
@@ -1168,10 +1168,10 @@ Japanese `ja.json`:
 Russian `ru.json`:
 
 ```json
-"원 기준": "По KRW",
-"할당량 기준": "По квоте",
-"충전": "Пополнение",
-"결제": "Оплата",
+"KRW based": "По KRW",
+"Quota based": "По квоте",
+"Credit": "Пополнение",
+"Pay": "Оплата",
 "Credit amount": "Сумма пополнения",
 "Payment amount": "Сумма платежа"
 ```
@@ -1179,10 +1179,10 @@ Russian `ru.json`:
 Vietnamese `vi.json`:
 
 ```json
-"원 기준": "Theo KRW",
-"할당량 기준": "Theo hạn mức",
-"충전": "Nạp",
-"결제": "Thanh toán",
+"KRW based": "Theo KRW",
+"Quota based": "Theo hạn mức",
+"Credit": "Nạp",
+"Pay": "Thanh toán",
 "Credit amount": "Số dư được nạp",
 "Payment amount": "Số tiền thanh toán"
 ```
