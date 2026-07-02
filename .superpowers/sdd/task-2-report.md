@@ -1,9 +1,9 @@
-# Task 2 Report: Auto Recharge Creation Lock
+# Task 2 Report: Backend Toss Controllers and Topup Info
 
 ## Status
-- Implemented creation locking in `AutoRechargeCard`.
-- Added component tests for locked preset creation and active-policy cancellation.
-- Kept the change scoped to the requested component and test files.
+- Implemented Toss controller quote handling and top-up info exposure in the Task 2-owned controller files only.
+- Preserved the legacy `getTossPayMoney` helper and existing Toss confirm/webhook flow.
+- Kept default `amount_mode` behavior backward-compatible by routing through the model quote normalizer.
 
 ## TDD Evidence
 
@@ -11,48 +11,56 @@
 Command:
 
 ```bash
-cd web/default
-bun test src/features/wallet/components/auto-recharge-card.test.ts
+go test ./controller -run 'TestGetTossTopUpQuote' -count=1
 ```
 
 Observed failure:
 
 ```text
-AssertionError: The input did not match the regular expression /Cancel the current payment setting before choosing another one\./.
-(fail) auto recharge preset UI helpers > disables scheduled preset creation when another payment setting is active
-
-15 pass
-1 fail
-Ran 16 tests across 1 file. [277.00ms]
+# github.com/QuantumNous/new-api/controller [github.com/QuantumNous/new-api/controller.test]
+controller/topup_toss_test.go:110:11: undefined: getTossTopUpQuote
+controller/topup_toss_test.go:136:11: undefined: getTossTopUpQuote
+FAIL	github.com/QuantumNous/new-api/controller [build failed]
+FAIL
 ```
+
+Note: the first sandboxed `go test` attempt failed before compilation because the Go build cache path was read-only; rerunning with escalation was required to capture the real RED failure above.
 
 ### GREEN
 Command:
 
 ```bash
-cd web/default
-bun test src/features/wallet/components/auto-recharge-card.test.ts
+go test ./model ./controller -run 'TestQuoteTossTopUp|TestGetTossTopUpQuote|TestGetTossPayMoney|TestValidateTossConfirmAmount' -count=1
 ```
 
 Observed success:
 
 ```text
-16 pass
-0 fail
-Ran 16 tests across 1 file. [274.00ms]
+ok  	github.com/QuantumNous/new-api/model	0.095s
+ok  	github.com/QuantumNous/new-api/controller	0.069s
 ```
 
 ## Files Changed
-- `web/default/src/features/wallet/components/auto-recharge-card.tsx`
-- `web/default/src/features/wallet/components/auto-recharge-card.test.ts`
+- `controller/topup.go`
+- `controller/topup_toss.go`
+- `controller/topup_toss_test.go`
 
 ## Implementation Notes
-- Added `creationDisabled?: boolean` and `creationDisabledMessageKey?: string` props.
-- Added the exact default lock message key from the brief.
-- Created `creationLocked = creationDisabled && !activePolicy`.
-- Preset selection buttons now use `creationButtonDisabled`; cancel still uses the original `disabled` value.
-- Rendered the lock message through `t(creationDisabledMessageKey)`.
+- Added `AmountMode string` to `TossPayRequest`.
+- Added `getTossTopUpQuote(amount, amountMode, group)` as the controller wrapper around `model.QuoteTossTopUp(...)`.
+- Changed `RequestTossAmount` to return the structured quote object and reject zero/invalid charge or quota results with `MsgTopupAmountTooLow2`.
+- Changed `RequestTossPay` to:
+  - derive all Toss pay amounts from the quote,
+  - store `TopUp.Money` as `quote.CreditAmount`,
+  - include `amount`, `charge_amount`, `credit_amount`, `credit_quota`, `unit_price`, and `amount_mode` in the pay response.
+- Added `toss_unit_price` to `GetTopUpInfo`.
+- Preserved `getTossPayMoney` unchanged for legacy callers and existing tests.
+
+## Self-Review
+- Confirmed scope stayed inside the three Task 2-owned files.
+- Verified Toss-only amount mode changes do not touch Stripe, PayPal, Waffo, Waffo Pancake, Creem, or Epay code paths.
+- Confirmed JSON handling changes were not needed beyond existing controller binding and response patterns.
+- Confirmed absent `amount_mode` still resolves to KRW mode via `model.NormalizeTossTopUpAmountMode`.
 
 ## Concerns
-- Locale sync is intentionally deferred to Task 4 per the brief.
-- Existing unrelated untracked file `new-api-bin` was left untouched.
+- `go test` requires escalated execution in this environment because the Go build cache lives outside the writable workspace.

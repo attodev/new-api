@@ -26,6 +26,7 @@ const tossAPIBase = "https://api.tosspayments.com"
 
 type TossPayRequest struct {
 	Amount        int64  `json:"amount"`
+	AmountMode    string `json:"amount_mode"`
 	PaymentMethod string `json:"payment_method"`
 }
 
@@ -44,6 +45,10 @@ func getTossPayMoney(amountKRW int64, group string) int64 {
 	return model.TossTopUpChargedKRW(amountKRW, group)
 }
 
+func getTossTopUpQuote(amount int64, amountMode string, group string) model.TossTopUpQuote {
+	return model.QuoteTossTopUp(amount, amountMode, group)
+}
+
 func RequestTossAmount(c *gin.Context) {
 	var req TossPayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -60,8 +65,12 @@ func RequestTossAmount(c *gin.Context) {
 	}
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
-	charged := getTossPayMoney(req.Amount, user.Group)
-	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatInt(charged, 10)})
+	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
+	if quote.ChargeKRW <= 0 || quote.CreditQuota <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "success", "data": quote})
 }
 
 // isValidServerAddress reports whether addr is an absolute http(s) URL with a host.
@@ -101,8 +110,9 @@ func RequestTossPay(c *gin.Context) {
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 
-	chargedKRW := getTossPayMoney(req.Amount, user.Group)
-	if chargedKRW <= 0 {
+	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
+	chargedKRW := quote.ChargeKRW
+	if chargedKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
@@ -124,7 +134,7 @@ func RequestTossPay(c *gin.Context) {
 		TargetType:      getTopUpTargetType(c),
 		TargetId:        getTopUpTargetId(c),
 		Amount:          chargedKRW,
-		Money:           model.TossUSDEquivalent(chargedKRW),
+		Money:           quote.CreditAmount,
 		TradeNo:         orderId,
 		ProviderOrderId: orderId,
 		PaymentMethod:   model.PaymentMethodToss,
@@ -142,13 +152,18 @@ func RequestTossPay(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"client_key":   setting.TossActiveClientKey(),
-			"customer_key": customerKey,
-			"order_id":     orderId,
-			"order_name":   fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
-			"amount":       chargedKRW,
-			"success_url":  serverBase + "/api/toss/confirm",
-			"fail_url":     serverBase + "/api/toss/fail",
+			"client_key":    setting.TossActiveClientKey(),
+			"customer_key":  customerKey,
+			"order_id":      orderId,
+			"order_name":    fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
+			"amount":        chargedKRW,
+			"charge_amount": chargedKRW,
+			"credit_amount": quote.CreditAmount,
+			"credit_quota":  quote.CreditQuota,
+			"unit_price":    quote.UnitPrice,
+			"amount_mode":   quote.AmountMode,
+			"success_url":   serverBase + "/api/toss/confirm",
+			"fail_url":      serverBase + "/api/toss/fail",
 		},
 	})
 }

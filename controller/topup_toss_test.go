@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
@@ -90,5 +91,57 @@ func TestIsTossCancelStatus(t *testing.T) {
 		if got := isTossCancelStatus(status); got != want {
 			t.Errorf("isTossCancelStatus(%q)=%v want %v", status, got, want)
 		}
+	}
+}
+
+func TestGetTossTopUpQuoteDefaultsToKRWMode(t *testing.T) {
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 1300
+	common.QuotaPerUnit = 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	defer func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	}()
+
+	quote := getTossTopUpQuote(13000, "", "default")
+
+	if quote.AmountMode != model.TossTopUpAmountModeKRW {
+		t.Fatalf("AmountMode = %q want %q", quote.AmountMode, model.TossTopUpAmountModeKRW)
+	}
+	if quote.ChargeKRW != 13000 {
+		t.Fatalf("ChargeKRW = %d want 13000", quote.ChargeKRW)
+	}
+	if quote.CreditQuota != 5000000 {
+		t.Fatalf("CreditQuota = %d want 5000000", quote.CreditQuota)
+	}
+}
+
+func TestGetTossTopUpQuoteQuotaMode(t *testing.T) {
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 1300
+	common.QuotaPerUnit = 500000
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	defer func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	}()
+
+	quote := getTossTopUpQuote(10, model.TossTopUpAmountModeQuota, "default")
+
+	if quote.AmountMode != model.TossTopUpAmountModeQuota {
+		t.Fatalf("AmountMode = %q want quota", quote.AmountMode)
+	}
+	if quote.ChargeKRW != 13000 {
+		t.Fatalf("ChargeKRW = %d want 13000", quote.ChargeKRW)
+	}
+	if quote.CreditQuota != 5000000 {
+		t.Fatalf("CreditQuota = %d want 5000000", quote.CreditQuota)
 	}
 }
