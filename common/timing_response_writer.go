@@ -10,6 +10,10 @@ import (
 // the most recent Write()/WriteString() call. It is used to approximate the
 // end-to-end latency's end point ("last byte written to the client"),
 // including the final chunk of a streaming response.
+//
+// Not safe for concurrent use: it assumes the single per-request goroutine
+// model of net/http/gin, where all writes to c.Writer happen sequentially
+// from the request-handling goroutine.
 type TimingResponseWriter struct {
 	gin.ResponseWriter
 	lastWrite time.Time
