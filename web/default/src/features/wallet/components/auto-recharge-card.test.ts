@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs'
 import { before, describe, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
+import { formatQuota } from '@/lib/format'
 import {
   AutoRechargeCard,
   buildPresetCreatePayload,
@@ -129,6 +130,37 @@ describe('auto recharge card helpers', () => {
 
     assert.match(html, /Only the organization owner can change auto payments/)
     assert.doesNotMatch(html, /You do not have permission to manage this\./)
+  })
+
+  test('renders active threshold policy with quota threshold', () => {
+    const html = renderWithI18n(
+      React.createElement(AutoRechargeCard, {
+        mode: 'threshold',
+        policies: [
+          {
+            id: 7,
+            type: 'threshold',
+            target_type: 'user',
+            target_id: 42,
+            status: 'active',
+            amount: 10000,
+            threshold_amount: 1000,
+            threshold_quota: 500000,
+          },
+        ],
+        presets: [],
+        loading: false,
+        processing: false,
+        canManage: true,
+        onCreateScheduled: async () => false,
+        onCreateThreshold: async () => false,
+        onCancel: async () => false,
+      })
+    )
+
+    assert.match(html, /Threshold quota/)
+    assert.ok(html.includes(formatQuota(500000)))
+    assert.doesNotMatch(html, /Threshold balance/)
   })
 })
 
@@ -274,7 +306,7 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /Register card and set auto recharge/)
   })
 
-  test('renders threshold presets as recharge amount choices', () => {
+  test('renders threshold quota sentence before recharge amount choices', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
         mode: 'threshold',
@@ -286,7 +318,8 @@ describe('auto recharge preset UI helpers', () => {
             target_scope: 'all',
             name: 'Auto 10000',
             amount: 10000,
-            threshold_amount: 1000,
+            threshold_amount: 0,
+            threshold_quota: 500000,
             enabled: true,
           },
           {
@@ -295,7 +328,8 @@ describe('auto recharge preset UI helpers', () => {
             target_scope: 'all',
             name: 'Auto 30000',
             amount: 30000,
-            threshold_amount: 5000,
+            threshold_amount: 0,
+            threshold_quota: 500000,
             enabled: true,
           },
         ],
@@ -308,10 +342,12 @@ describe('auto recharge preset UI helpers', () => {
       })
     )
 
+    assert.match(html, /When remaining quota is below/)
+    assert.match(html, /charge the following amount/)
+    assert.ok(html.includes(formatQuota(500000)))
     assert.match(html, /Choose recharge amount/)
-    assert.match(html, /10000/)
-    assert.match(html, /30000/)
-    assert.match(html, /Register card and set auto recharge/)
+    assert.match(html, /10000원/)
+    assert.match(html, /30000원/)
   })
 
   test('requires confirming the selected preset before creating auto recharge', () => {

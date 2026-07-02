@@ -18,9 +18,18 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { formatQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   getScheduledPeriodLabelKey,
   groupScheduledPresetOptions,
@@ -152,7 +161,7 @@ export function AutoRechargeCard({
   const [selectedScheduledPeriodKey, setSelectedScheduledPeriodKey] = useState<
     string | null
   >(null)
-  const [selectedThresholdAmount, setSelectedThresholdAmount] = useState<
+  const [selectedThresholdQuota, setSelectedThresholdQuota] = useState<
     number | null
   >(null)
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null)
@@ -195,8 +204,9 @@ export function AutoRechargeCard({
       (group) => group.period.key === selectedScheduledPeriodKey
     ) ?? scheduledGroups[0]
   const selectedThresholdGroup =
-    thresholdGroups.find((group) => group.amount === selectedThresholdAmount) ??
-    null
+    thresholdGroups.find(
+      (group) => group.thresholdQuota === selectedThresholdQuota
+    ) ?? thresholdGroups[0]
 
   const handleSelectPreset = async (presetId: number) => {
     const payload = buildPresetCreatePayload(presetId)
@@ -210,17 +220,6 @@ export function AutoRechargeCard({
   const handleCancel = async () => {
     if (!activePolicy) return
     await onCancel(activePolicy.id)
-  }
-
-  const handleThresholdAmountClick = (
-    group: (typeof thresholdGroups)[number]
-  ) => {
-    setSelectedThresholdAmount(group.amount)
-    if (group.thresholds.length === 1) {
-      setSelectedPresetId(group.thresholds[0].preset.id)
-      return
-    }
-    setSelectedPresetId(null)
   }
 
   const handleSubmitSelectedPreset = async () => {
@@ -252,8 +251,8 @@ export function AutoRechargeCard({
                     </div>
                   ) : (
                     <div className='text-muted-foreground text-sm'>
-                      {t('Threshold balance')}:{' '}
-                      {activePolicy.threshold_amount ?? 0}
+                      {t('Threshold quota')}:{' '}
+                      {formatQuota(activePolicy.threshold_quota ?? 0)}
                     </div>
                   )}
                   <div className='text-muted-foreground text-sm'>
@@ -364,40 +363,59 @@ export function AutoRechargeCard({
             ) : (
               <>
                 {thresholdGroups.length > 0 ? (
+                  <div className='space-y-3'>
+                    <div className='text-sm font-medium'>
+                      {t('When remaining quota is below')}
+                    </div>
+                    <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+                      <span className='text-muted-foreground text-sm'>
+                        {t('When remaining quota is below')}
+                      </span>
+                      <Select
+                        value={String(
+                          selectedThresholdGroup?.thresholdQuota ?? ''
+                        )}
+                        onValueChange={(value) => {
+                          setSelectedThresholdQuota(Number(value))
+                          setSelectedPresetId(null)
+                        }}
+                        disabled={creationButtonDisabled}
+                      >
+                        <SelectTrigger className='w-full sm:w-44'>
+                          <SelectValue placeholder={t('Threshold quota')}>
+                            {selectedThresholdGroup
+                              ? formatQuota(selectedThresholdGroup.thresholdQuota)
+                              : null}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectGroup>
+                            {thresholdGroups.map((group) => (
+                              <SelectItem
+                                key={group.thresholdQuota}
+                                value={String(group.thresholdQuota)}
+                              >
+                                {formatQuota(group.thresholdQuota)}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <span className='text-muted-foreground text-sm'>
+                        {t('charge the following amount')}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                {selectedThresholdGroup ? (
                   <div className='space-y-2'>
                     <div className='text-sm font-medium'>
                       {t('Choose recharge amount')}
                     </div>
                     <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
-                      {thresholdGroups.map((group) => (
+                      {selectedThresholdGroup.amounts.map((option) => (
                         <Button
-                          key={group.amount}
-                          type='button'
-                          variant={
-                            selectedThresholdGroup?.amount === group.amount
-                              ? 'default'
-                              : 'outline'
-                          }
-                          disabled={creationButtonDisabled}
-                          onClick={() => handleThresholdAmountClick(group)}
-                          className='h-10'
-                        >
-                          {group.amount}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {selectedThresholdGroup &&
-                selectedThresholdGroup.thresholds.length > 1 ? (
-                  <div className='space-y-2'>
-                    <div className='text-sm font-medium'>
-                      {t('Choose threshold balance')}
-                    </div>
-                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
-                      {selectedThresholdGroup.thresholds.map((option) => (
-                        <Button
-                          key={`${selectedThresholdGroup.amount}:${option.thresholdAmount}`}
+                          key={`${selectedThresholdGroup.thresholdQuota}:${option.amount}`}
                           type='button'
                           variant={
                             selectedPresetId === option.preset.id
@@ -408,7 +426,7 @@ export function AutoRechargeCard({
                           onClick={() => setSelectedPresetId(option.preset.id)}
                           className='h-10'
                         >
-                          {option.thresholdAmount}
+                          {option.amount}원
                         </Button>
                       ))}
                     </div>
