@@ -116,4 +116,43 @@ describe('RechargeFormCard amount modes', () => {
     assert.match(html, /Pay/)
     assert.match(html, /13,000원/)
   })
+
+  test('keeps standard presets when Toss is mixed with other providers', () => {
+    const mixedTopupInfo: TopupInfo = {
+      ...topupInfo,
+      enable_stripe_topup: true,
+      pay_methods: [
+        { name: 'Toss', type: 'toss', min_topup: 1000 },
+        { name: 'Stripe', type: 'stripe', min_topup: 10 },
+      ],
+    }
+
+    const html = renderWithI18n(
+      <RechargeFormCard
+        topupInfo={mixedTopupInfo}
+        presetAmounts={[{ value: 10 }, { value: 20 }]}
+        selectedPreset={10}
+        onSelectPreset={() => undefined}
+        topupAmount={10}
+        onTopupAmountChange={() => undefined}
+        paymentAmount={10}
+        calculating={false}
+        onPaymentMethodSelect={() => undefined}
+        paymentLoading={null}
+        redemptionCode=''
+        onRedemptionCodeChange={() => undefined}
+        onRedeem={() => undefined}
+        redeeming={false}
+        amountMode='krw'
+        onAmountModeChange={() => undefined}
+        tossUnitPrice={1300}
+      />
+    )
+
+    assert.doesNotMatch(html, /KRW based/)
+    assert.doesNotMatch(html, /Quota based/)
+    assert.doesNotMatch(html, /10,000원/)
+    assert.match(html, />10</)
+    assert.match(html, /Stripe/)
+  })
 })

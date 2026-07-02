@@ -93,6 +93,31 @@ interface RechargeFormCardProps {
   showRedemption?: boolean
 }
 
+function isTossOnlyAmountModeFlow(
+  topupInfo: TopupInfo | null,
+  enableWaffoTopup?: boolean,
+  enableWaffoPancakeTopup?: boolean
+) {
+  const standardMethods = topupInfo?.pay_methods ?? []
+  const hasNonTossStandardMethod = standardMethods.some(
+    (method) => !isTossPayment(method.type)
+  )
+  const hasNonTossConfiguredTopup =
+    !!topupInfo?.enable_online_topup ||
+    !!topupInfo?.enable_stripe_topup ||
+    !!topupInfo?.enable_paypal_topup ||
+    !!topupInfo?.enable_waffo_topup ||
+    !!topupInfo?.enable_waffo_pancake_topup ||
+    !!enableWaffoTopup ||
+    !!enableWaffoPancakeTopup
+
+  return (
+    !!topupInfo?.enable_toss_topup &&
+    !hasNonTossStandardMethod &&
+    !hasNonTossConfiguredTopup
+  )
+}
+
 export function RechargeFormCard({
   topupInfo,
   presetAmounts,
@@ -155,7 +180,13 @@ export function RechargeFormCard({
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
-  const usesTossAmountMode = !!topupInfo?.enable_toss_topup && !!onAmountModeChange
+  const usesTossAmountMode =
+    !!onAmountModeChange &&
+    isTossOnlyAmountModeFlow(
+      topupInfo,
+      enableWaffoTopup,
+      enableWaffoPancakeTopup
+    )
   const activeAmountMode = amountMode ?? 'krw'
   const tossPresetValues =
     activeAmountMode === 'krw' ? TOSS_KRW_PRESETS : TOSS_QUOTA_PRESETS
@@ -254,7 +285,7 @@ export function RechargeFormCard({
         <div className='space-y-4 sm:space-y-6'>
           {hasConfigurableTopup && (
             <>
-              {topupInfo?.enable_toss_topup && onAmountModeChange ? (
+              {usesTossAmountMode && onAmountModeChange ? (
                 <div className='grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-1'>
                   <Button
                     type='button'
