@@ -826,6 +826,33 @@ export function DetailsDialog(props: DetailsDialogProps) {
               )}
             </div>
 
+            {showTiming &&
+              other?.e2e_ms != null &&
+              other?.llm_ms != null &&
+              other?.gateway_ms != null && (
+                <DetailSection label={t('Timing Breakdown')}>
+                  <DetailRow
+                    label={t('Total (End-to-End)')}
+                    value={formatUseTime(other.e2e_ms / 1000)}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('Model Provider')}
+                    value={formatUseTime(other.llm_ms / 1000)}
+                    mono
+                  />
+                  <DetailRow
+                    label={t('Gateway Overhead')}
+                    value={`${formatUseTime(other.gateway_ms / 1000)} (${
+                      other.e2e_ms > 0
+                        ? ((other.gateway_ms / other.e2e_ms) * 100).toFixed(1)
+                        : '0.0'
+                    }%)`}
+                    mono
+                  />
+                </DetailSection>
+              )}
+
             {/* Request conversion (admin only, not for refund) */}
             {showConversion && (
               <DetailSection label={t('Request Conversion')}>
