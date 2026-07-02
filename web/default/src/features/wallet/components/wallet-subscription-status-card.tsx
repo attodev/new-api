@@ -199,6 +199,7 @@ export function WalletSubscriptionStatusCard({
               variant='ghost'
               size='icon'
               className='h-8 w-8'
+              aria-label={t('Refresh subscription status')}
               onClick={() => void onRefresh()}
               disabled={refreshing}
             >

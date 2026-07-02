@@ -156,12 +156,7 @@ describe('auto recharge preset UI helpers', () => {
       getVisibleAutoRechargeModes(
         [
           {
-            id: 1,
             type: 'scheduled',
-            target_scope: 'all',
-            name: '월 1회',
-            amount: 10000,
-            enabled: true,
           },
         ],
         [],
@@ -176,7 +171,14 @@ describe('auto recharge preset UI helpers', () => {
     assert.deepEqual(
       getVisibleAutoRechargeModes(
         [],
-        [{ id: 7, type: 'threshold', status: 'active', amount: 10000 } as never],
+        [
+          {
+            id: 7,
+            type: 'threshold',
+            status: 'active',
+            amount: 10000,
+          } as never,
+        ],
         true,
         true
       ),

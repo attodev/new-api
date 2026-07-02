@@ -81,6 +81,7 @@ describe('WalletSubscriptionStatusCard', () => {
 
     assert.match(html, /My Subscriptions/)
     assert.match(html, /Pro Plan/)
+    assert.match(html, /aria-label="Refresh subscription status"/)
     assert.match(html, /Auto-renew active/)
     assert.doesNotMatch(html, /Subscribe Now/)
     assert.doesNotMatch(html, /No plans available/)

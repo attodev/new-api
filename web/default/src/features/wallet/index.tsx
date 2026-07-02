@@ -18,12 +18,20 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { useAuthStore, type AuthUser } from '@/stores/auth-store'
 import { getSelf } from '@/lib/api'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TitledCard } from '@/components/ui/titled-card'
 import { SectionPageLayout } from '@/components/layout'
+import {
+  cancelTossAutoRenew,
+  getSelfSubscriptionFull,
+  updateBillingPreference,
+} from '@/features/subscriptions/api'
+import type { UserSubscriptionRecord } from '@/features/subscriptions/types'
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
 import {
   AutoRechargeCard,
@@ -34,8 +42,8 @@ import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
-import { SubscriptionPlansCard } from './components/subscription-plans-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
+import { WalletSubscriptionStatusCard } from './components/wallet-subscription-status-card'
 import { DEFAULT_DISCOUNT_RATE } from './constants'
 import {
   useTopupInfo,
@@ -54,6 +62,12 @@ import {
   isWaffoPancakePayment,
   isTossPayment,
 } from './lib'
+import {
+  buildWalletPaymentSettingTabs,
+  getInitialWalletPaymentSetting,
+  WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
+  type WalletPaymentSettingKind,
+} from './lib/payment-settings'
 import type {
   UserWalletData,
   PaymentMethod,
@@ -67,7 +81,8 @@ interface WalletProps {
 
 export function Wallet(props: WalletProps) {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState('topup')
+  const [paymentSettingTab, setPaymentSettingTab] =
+    useState<WalletPaymentSettingKind | null>(null)
   const [user, setUser] = useState<UserWalletData | null>(null)
   const [userLoading, setUserLoading] = useState(true)
   const setAuthUser = useAuthStore((state) => state.auth.setUser)
@@ -83,7 +98,17 @@ export function Wallet(props: WalletProps) {
   const [creemDialogOpen, setCreemDialogOpen] = useState(false)
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
-  const [showSubscriptionPanel, setShowSubscriptionPanel] = useState(true)
+  const [activeSubscriptions, setActiveSubscriptions] = useState<
+    UserSubscriptionRecord[]
+  >([])
+  const [allSubscriptions, setAllSubscriptions] = useState<
+    UserSubscriptionRecord[]
+  >([])
+  const [billingPreference, setBillingPreference] =
+    useState('subscription_first')
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
+  const [subscriptionRefreshing, setSubscriptionRefreshing] = useState(false)
+  const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
@@ -137,6 +162,34 @@ export function Wallet(props: WalletProps) {
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
+
+  const fetchSelfSubscription = useCallback(async () => {
+    try {
+      const res = await getSelfSubscriptionFull()
+      if (res.success && res.data) {
+        setBillingPreference(
+          res.data.billing_preference || 'subscription_first'
+        )
+        setActiveSubscriptions(res.data.subscriptions || [])
+        setAllSubscriptions(res.data.all_subscriptions || [])
+      } else {
+        setActiveSubscriptions([])
+        setAllSubscriptions([])
+      }
+    } catch {
+      setActiveSubscriptions([])
+      setAllSubscriptions([])
+    }
+  }, [])
+
+  useEffect(() => {
+    const init = async () => {
+      setSubscriptionLoading(true)
+      await fetchSelfSubscription()
+      setSubscriptionLoading(false)
+    }
+    void init()
+  }, [fetchSelfSubscription])
 
   useEffect(() => {
     if (props.initialShowHistory) {
@@ -270,12 +323,56 @@ export function Wallet(props: WalletProps) {
     return topupInfo?.discount?.[topupAmount] || DEFAULT_DISCOUNT_RATE
   }, [topupInfo, topupAmount])
 
-  const handleSubscriptionAvailabilityChange = useCallback(
-    (available: boolean) => {
-      setShowSubscriptionPanel(available)
+  const handleSubscriptionRefresh = useCallback(async () => {
+    setSubscriptionRefreshing(true)
+    try {
+      await fetchSelfSubscription()
+    } finally {
+      setSubscriptionRefreshing(false)
+    }
+  }, [fetchSelfSubscription])
+
+  const handleBillingPreferenceChange = useCallback(
+    async (pref: string) => {
+      const previous = billingPreference
+      setBillingPreference(pref)
+      try {
+        const res = await updateBillingPreference(pref)
+        if (res.success) {
+          toast.success(t('Updated successfully'))
+          setBillingPreference(res.data?.billing_preference || pref)
+        } else {
+          toast.error(res.message || t('Update failed'))
+          setBillingPreference(previous)
+        }
+      } catch {
+        toast.error(t('Request failed'))
+        setBillingPreference(previous)
+      }
     },
-    []
+    [billingPreference, t]
   )
+
+  const handleCancelTossAutoRenew = useCallback(async () => {
+    setCancellingAutoRenew(true)
+    try {
+      const res = await cancelTossAutoRenew()
+      if (res.success) {
+        toast.success(t('Auto-renew cancelled'))
+        await fetchSelfSubscription()
+      } else {
+        toast.error(res.message || t('Request failed'))
+      }
+    } catch {
+      toast.error(t('Request failed'))
+    } finally {
+      setCancellingAutoRenew(false)
+    }
+  }, [fetchSelfSubscription, t])
+
+  const activePaymentSubscriptions = subscriptionLoading
+    ? []
+    : activeSubscriptions
 
   const visibleAutoRechargeModes = useMemo(
     () =>
@@ -293,22 +390,29 @@ export function Wallet(props: WalletProps) {
     ]
   )
 
+  const paymentSettingTabs = useMemo(
+    () =>
+      buildWalletPaymentSettingTabs({
+        hasActiveSubscription: activePaymentSubscriptions.length > 0,
+        visibleAutoRechargeModes,
+        policies: walletAutoRecharge.policies,
+      }),
+    [
+      activePaymentSubscriptions.length,
+      visibleAutoRechargeModes,
+      walletAutoRecharge.policies,
+    ]
+  )
+
   useEffect(() => {
     if (
-      activeTab !== 'topup' &&
-      !visibleAutoRechargeModes.includes(activeTab as 'scheduled' | 'threshold')
+      paymentSettingTab &&
+      paymentSettingTabs.some((tab) => tab.kind === paymentSettingTab)
     ) {
-      setActiveTab('topup')
+      return
     }
-  }, [activeTab, visibleAutoRechargeModes])
-
-  const tabValues = ['topup', ...visibleAutoRechargeModes]
-  const tabsListClassName =
-    tabValues.length >= 3
-      ? 'grid w-full grid-cols-3 sm:w-fit'
-      : tabValues.length === 2
-        ? 'grid w-full grid-cols-2 sm:w-fit'
-        : 'grid w-full grid-cols-1 sm:w-fit'
+    setPaymentSettingTab(getInitialWalletPaymentSetting(paymentSettingTabs))
+  }, [paymentSettingTab, paymentSettingTabs])
 
   return (
     <>
@@ -318,122 +422,147 @@ export function Wallet(props: WalletProps) {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={user} loading={userLoading} />
 
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className='w-full gap-4'
+            <div
+              className={
+                paymentSettingTabs.length > 0
+                  ? 'grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:items-start'
+                  : 'grid gap-4'
+              }
             >
-              <TabsList className={tabsListClassName}>
-                <TabsTrigger value='topup'>{t('Top up')}</TabsTrigger>
-                {visibleAutoRechargeModes.includes('scheduled') ? (
-                  <TabsTrigger value='scheduled'>
-                    {t('Scheduled recharge')}
-                  </TabsTrigger>
-                ) : null}
-                {visibleAutoRechargeModes.includes('threshold') ? (
-                  <TabsTrigger value='threshold'>
-                    {t('Auto recharge')}
-                  </TabsTrigger>
-                ) : null}
-              </TabsList>
+              <div id='wallet-add-funds' className='scroll-mt-4'>
+                <RechargeFormCard
+                  topupInfo={topupInfo}
+                  presetAmounts={presetAmounts}
+                  selectedPreset={selectedPreset}
+                  onSelectPreset={handleSelectPreset}
+                  topupAmount={topupAmount}
+                  onTopupAmountChange={handleTopupAmountChange}
+                  paymentAmount={paymentAmount}
+                  calculating={calculating}
+                  onPaymentMethodSelect={handlePaymentMethodSelect}
+                  paymentLoading={paymentLoading}
+                  redemptionCode={redemptionCode}
+                  onRedemptionCodeChange={setRedemptionCode}
+                  onRedeem={handleRedeem}
+                  redeeming={redeeming}
+                  topupLink={topupInfo?.topup_link}
+                  loading={topupLoading}
+                  priceRatio={(status?.price as number) || 1}
+                  usdExchangeRate={effectiveUsdExchangeRate}
+                  onOpenBilling={() => setBillingDialogOpen(true)}
+                  creemProducts={topupInfo?.creem_products}
+                  enableCreemTopup={topupInfo?.enable_creem_topup}
+                  onCreemProductSelect={handleCreemProductSelect}
+                  enableWaffoTopup={topupInfo?.enable_waffo_topup}
+                  waffoPayMethods={topupInfo?.waffo_pay_methods}
+                  waffoMinTopup={topupInfo?.waffo_min_topup}
+                  onWaffoMethodSelect={handleWaffoMethodSelect}
+                  enableWaffoPancakeTopup={
+                    topupInfo?.enable_waffo_pancake_topup
+                  }
+                />
+              </div>
 
-              <TabsContent value='topup'>
-                <div className='space-y-4'>
-                  <div
-                    className={
-                      showSubscriptionPanel
-                        ? 'grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:items-start'
-                        : 'grid gap-4'
+              {paymentSettingTabs.length > 0 && paymentSettingTab ? (
+                <TitledCard
+                  title={t('Payment settings')}
+                  description={t('Choose one active payment setting at a time')}
+                  contentClassName='space-y-4'
+                >
+                  <Tabs
+                    value={paymentSettingTab}
+                    onValueChange={(value) =>
+                      setPaymentSettingTab(value as WalletPaymentSettingKind)
                     }
                   >
-                    <div id='wallet-add-funds' className='scroll-mt-4'>
-                      <RechargeFormCard
-                        topupInfo={topupInfo}
-                        presetAmounts={presetAmounts}
-                        selectedPreset={selectedPreset}
-                        onSelectPreset={handleSelectPreset}
-                        topupAmount={topupAmount}
-                        onTopupAmountChange={handleTopupAmountChange}
-                        paymentAmount={paymentAmount}
-                        calculating={calculating}
-                        onPaymentMethodSelect={handlePaymentMethodSelect}
-                        paymentLoading={paymentLoading}
-                        redemptionCode={redemptionCode}
-                        onRedemptionCodeChange={setRedemptionCode}
-                        onRedeem={handleRedeem}
-                        redeeming={redeeming}
-                        topupLink={topupInfo?.topup_link}
-                        loading={topupLoading}
-                        priceRatio={(status?.price as number) || 1}
-                        usdExchangeRate={effectiveUsdExchangeRate}
-                        onOpenBilling={() => setBillingDialogOpen(true)}
-                        creemProducts={topupInfo?.creem_products}
-                        enableCreemTopup={topupInfo?.enable_creem_topup}
-                        onCreemProductSelect={handleCreemProductSelect}
-                        enableWaffoTopup={topupInfo?.enable_waffo_topup}
-                        waffoPayMethods={topupInfo?.waffo_pay_methods}
-                        waffoMinTopup={topupInfo?.waffo_min_topup}
-                        onWaffoMethodSelect={handleWaffoMethodSelect}
-                        enableWaffoPancakeTopup={
-                          topupInfo?.enable_waffo_pancake_topup
+                    <TabsList className='grid w-full grid-cols-3'>
+                      {paymentSettingTabs.map((tab) => (
+                        <TabsTrigger
+                          key={tab.kind}
+                          value={tab.kind}
+                          disabled={tab.disabled}
+                        >
+                          {tab.kind === 'subscription'
+                            ? t('Subscription')
+                            : tab.kind === 'threshold'
+                              ? t('Auto recharge')
+                              : t('Scheduled recharge')}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    <TabsContent value='subscription'>
+                      <WalletSubscriptionStatusCard
+                        activeSubscriptions={activePaymentSubscriptions}
+                        allSubscriptions={allSubscriptions}
+                        billingPreference={billingPreference}
+                        refreshing={subscriptionRefreshing}
+                        cancellingAutoRenew={cancellingAutoRenew}
+                        onRefresh={handleSubscriptionRefresh}
+                        onBillingPreferenceChange={
+                          handleBillingPreferenceChange
                         }
+                        onCancelTossAutoRenew={handleCancelTossAutoRenew}
                       />
-                    </div>
+                    </TabsContent>
 
-                    <SubscriptionPlansCard
-                      topupInfo={topupInfo}
-                      onAvailabilityChange={
-                        handleSubscriptionAvailabilityChange
-                      }
-                      userQuota={user?.quota}
-                      onPurchaseSuccess={fetchUser}
-                    />
-                  </div>
+                    <TabsContent value='threshold'>
+                      <AutoRechargeCard
+                        mode='threshold'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'threshold'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
 
-                  <AffiliateRewardsCard
-                    user={user}
-                    affiliateLink={affiliateLink}
-                    onTransfer={() => setTransferDialogOpen(true)}
-                    complianceConfirmed={
-                      topupInfo?.payment_compliance_confirmed !== false
-                    }
-                    loading={affiliateLoading}
-                  />
-                </div>
-              </TabsContent>
-
-              {visibleAutoRechargeModes.includes('scheduled') ? (
-                <TabsContent value='scheduled'>
-                  <AutoRechargeCard
-                    mode='scheduled'
-                    policies={walletAutoRecharge.policies}
-                    presets={walletAutoRecharge.presets}
-                    loading={walletAutoRecharge.loading}
-                    processing={walletAutoRecharge.processing}
-                    canManage
-                    onCreateScheduled={walletAutoRecharge.createScheduled}
-                    onCreateThreshold={walletAutoRecharge.createThreshold}
-                    onCancel={walletAutoRecharge.cancel}
-                  />
-                </TabsContent>
+                    <TabsContent value='scheduled'>
+                      <AutoRechargeCard
+                        mode='scheduled'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'scheduled'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </TitledCard>
               ) : null}
+            </div>
 
-              {visibleAutoRechargeModes.includes('threshold') ? (
-                <TabsContent value='threshold'>
-                  <AutoRechargeCard
-                    mode='threshold'
-                    policies={walletAutoRecharge.policies}
-                    presets={walletAutoRecharge.presets}
-                    loading={walletAutoRecharge.loading}
-                    processing={walletAutoRecharge.processing}
-                    canManage
-                    onCreateScheduled={walletAutoRecharge.createScheduled}
-                    onCreateThreshold={walletAutoRecharge.createThreshold}
-                    onCancel={walletAutoRecharge.cancel}
-                  />
-                </TabsContent>
-              ) : null}
-            </Tabs>
+            <AffiliateRewardsCard
+              user={user}
+              affiliateLink={affiliateLink}
+              onTransfer={() => setTransferDialogOpen(true)}
+              complianceConfirmed={
+                topupInfo?.payment_compliance_confirmed !== false
+              }
+              loading={affiliateLoading}
+            />
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>

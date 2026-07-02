@@ -1,200 +1,90 @@
-# Task 4 Report
+# Task 4 Report: Wallet Page Integration and Verification
 
 ## Status
 
 DONE_WITH_CONCERNS
 
+## Summary
+
+- Integrated the personal wallet page with the wallet payment-setting helpers.
+- Kept ordinary top-up on the left and moved subscription/auto-recharge/scheduled recharge controls into a right-side `Payment settings` card when at least one setting tab is visible.
+- Removed wallet-page subscription purchase plans; wallet now only shows active subscription status in this area.
+- Loaded self subscription state and wired refresh, billing preference update, and Toss auto-renew cancellation handlers.
+- Enforced frontend mutual exclusion by disabling unconfigured payment setting tabs and passing the lock message to auto-recharge creation controls.
+- Added an i18n-backed accessible label to the subscription refresh icon button.
+- Added translations for new wallet strings in `en`, `zh`, `fr`, `ja`, `kr`, `ru`, and `vi`.
+- Cleaned up a focused wallet test fixture so TypeScript uses the helper's narrow input contract.
+
 ## Files Changed
 
-- `web/default/src/features/wallet/types.ts`
-- `web/default/src/features/wallet/api.ts`
-- `web/default/src/features/wallet/hooks/use-wallet-auto-recharge.ts`
-- `web/default/src/features/wallet/components/auto-recharge-card.tsx`
-- `web/default/src/features/wallet/hooks/index.ts`
+- `web/default/src/features/wallet/index.tsx`
+- `web/default/src/features/wallet/components/auto-recharge-card.test.ts`
+- `web/default/src/features/wallet/components/wallet-subscription-status-card.tsx`
+- `web/default/src/features/wallet/components/wallet-subscription-status-card.test.ts`
+- `web/default/src/i18n/locales/en.json`
+- `web/default/src/i18n/locales/fr.json`
+- `web/default/src/i18n/locales/ja.json`
+- `web/default/src/i18n/locales/kr.json`
+- `web/default/src/i18n/locales/ru.json`
+- `web/default/src/i18n/locales/vi.json`
+- `web/default/src/i18n/locales/zh.json`
 
-## What Changed
-
-- Added wallet auto-recharge frontend types for policy records, request payloads, and Toss billing-auth responses.
-- Added scoped wallet auto-recharge API helpers for user and organization endpoints.
-- Added `useWalletAutoRecharge` to fetch policies, launch Toss billing auth for scheduled/threshold flows, and cancel existing policies.
-- Added a compact `AutoRechargeCard` for scheduled and threshold modes with current-policy summary, form controls, submit action, and cancel action.
-- Exported the new hook from the wallet hooks barrel to match existing project pattern.
-
-## Typecheck Output
-
-Command run:
-
-```bash
-cd web/default
-BUN_TMPDIR=/tmp bun install
-bun run typecheck
-```
-
-Install result:
+## Verification
 
 ```text
-bun install v1.3.14 (0d9b296a)
-
-Done! Checked 1286 packages (no changes) [80.00ms]
+$ cd web/default && bun run i18n:sync
+i18n sync done. Report: /tmp/new-api-wallet-auto-recharge/web/default/src/i18n/locales/_reports/_sync-report.json
 ```
 
-Typecheck result:
+Sync report showed `missingCount: 0` and `extrasCount: 0` for every locale.
 
 ```text
-$ tsc -b
-src/features/organizations/components/organization-dashboard.tsx(720,13): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
-src/features/organizations/components/organization-users-table.tsx(83,3): error TS6133: 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.
-src/features/organizations/components/organization-users-table.tsx(104,7): error TS6133: 'ORGANIZATION_ROLES' is declared but its value is never read.
-src/features/organizations/components/organization-users-table.tsx(862,41): error TS2322: Property 'asChild' does not exist on type 'IntrinsicAttributes & Props<unknown>'.
-src/features/system-settings/billing/index.tsx(27,7): error TS2740: Type '{ ... }' is missing properties from type 'BillingSettings'.
-src/features/system-settings/models/vendor-discount-visual-editor.tsx(344,56): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | number'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): error TS2769: No overload matches this call.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(90,48): error TS2769: No overload matches this call.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(91,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(92,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(93,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(94,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(95,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(96,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(97,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/task-logs-filter-bar.tsx(82,20): error TS2769: No overload matches this call.
-src/features/usage-logs/components/task-logs-filter-bar.tsx(84,48): error TS2769: No overload matches this call.
-src/features/usage-logs/components/usage-logs-mobile-card.tsx(203,63): error TS2339: Property 'created_at' does not exist on type 'NonNullable<TData>'.
-src/features/usage-logs/components/usage-logs-mobile-card.tsx(204,58): error TS2339: Property 'type' does not exist on type 'NonNullable<TData>'.
-src/features/usage-logs/components/usage-logs-table.tsx(92,5): error TS2322: Type 'UseNavigateResult<string>' is not assignable to type 'NavigateFn'.
-src/features/usage-logs/index.tsx(201,15): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
-src/i18n/languages.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+$ cd web/default && bun test src/features/wallet/lib/payment-settings.test.ts src/features/wallet/components/auto-recharge-card.test.ts src/features/wallet/components/wallet-subscription-status-card.test.ts
+23 pass
+0 fail
+Ran 23 tests across 3 files.
 ```
 
-No typecheck errors were reported from the wallet task files above.
+```text
+$ cd web/default && bun test src/features/wallet
+33 pass
+0 fail
+Ran 33 tests across 6 files.
+```
 
-## New i18n Keys Introduced
+```text
+$ cd web/default && ./node_modules/.bin/prettier --check ...
+All matched files use Prettier code style!
+```
 
-- `Scheduled recharge`
-- `Auto recharge`
-- `Recharge amount`
-- `Threshold balance`
-- `Charge immediately`
-- `Cancel`
-- `Current policy`
-- `Charge interval`
-- `day`
-- `month`
-- `Next charge`
-- `Card`
-- `No policy configured`
-- `You do not have permission to manage this.`
-- `Interval value`
-- `Minimum recharge amount is {{amount}}.`
-- `Please enter a valid interval value.`
-- `Please enter a valid threshold balance.`
+```text
+$ cd web/default && bun run build:check
+$ tsc -b && rsbuild build
+```
+
+`build:check` failed during TypeScript checking before Rsbuild ran. The remaining errors are outside the Task 4 wallet integration surface, except an existing `bun:test` type-resolution issue in another wallet test file. Examples from the final run:
+
+- `src/features/organizations/components/organization-dashboard.tsx(720,13): Type '(organizationId: string) => void' is not assignable to type '(value: string | null, ...) => void'.`
+- `src/features/organizations/components/organization-users-table.tsx(83,3): 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.`
+- `src/features/system-settings/billing/index.tsx(27,7): ... missing properties from type 'BillingSettings': PayPalClientId, PayPalClientSecret, PayPalWebhookID, PayPalSandbox, and 2 more.`
+- `src/features/system-settings/integrations/wallet-auto-recharge-presets-section.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+- `src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): No overload matches this call.`
+- `src/features/wallet/lib/auto-recharge-options.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+- `src/i18n/languages.test.ts(1,40): Cannot find module 'bun:test' or its corresponding type declarations.`
+
+I fixed the only `build:check` error that was inside the focused Task 4 test files (`auto-recharge-card.test.ts` excess properties for `getVisibleAutoRechargeModes`). No errors from `web/default/src/features/wallet/index.tsx`, `wallet-subscription-status-card.tsx`, or `auto-recharge-card.test.ts` remained in the final `build:check` output.
 
 ## Self-Review
 
-- Kept the API layer scope-aware for both `/api/user/...` and `/api/organization/...`.
-- Matched the existing Toss billing hook behavior by accepting both `success === true` and `message === 'success'`.
-- Kept the card compact and dependency-free, reusing existing UI primitives only.
-- Avoided touching wallet page composition, organization screens, locales, backend code, and package metadata.
+- Confirmed `SubscriptionPlansCard`, `showSubscriptionPanel`, `handleSubscriptionAvailabilityChange`, and top-level wallet payment tabs were removed from `wallet/index.tsx`.
+- Confirmed wallet subscription UI is hidden while initial subscription state is loading or when there are no active subscriptions.
+- Confirmed subscription, threshold auto recharge, and scheduled recharge tabs are built through `buildWalletPaymentSettingTabs`.
+- Confirmed disabled auto-recharge modes receive `creationDisabled` and `WALLET_PAYMENT_SETTING_LOCK_MESSAGE`.
+- Confirmed ordinary top-up remains the left-side primary wallet action and `AffiliateRewardsCard` remains below the grid.
+- Confirmed new user-facing strings use `t('English source key')` and have locale entries.
 
 ## Concerns
 
-- Project-wide frontend typecheck is currently red because of unrelated existing errors outside the task-owned wallet files.
-- `AutoRechargeCard` introduces new translation keys that still need locale entries in Task 5.
-
-## Review Fixes
-
-- Replaced Korean `t('...')` source keys in `auto-recharge-card.tsx` with English source keys to match the repo's frontend i18n convention.
-- Added explicit money-input parsing so blank strings are rejected while explicit `0` remains valid for threshold mode.
-- Kept existing auto-recharge policies on refresh failures in `use-wallet-auto-recharge.ts` instead of clearing them.
-- Added a focused regression test covering the English mode-title keys and blank-vs-zero money parsing.
-
-## Additional Validation
-
-Regression test:
-
-```text
-$ BUN_TMPDIR=/tmp bun test src/features/wallet/components/auto-recharge-card.test.ts
-bun test v1.3.14 (0d9b296a)
-
-src/features/wallet/components/auto-recharge-card.test.ts:
-(pass) auto recharge card helpers > uses English source i18n keys for mode titles
-(pass) auto recharge card helpers > treats blank money input as invalid while preserving explicit zero
-
- 2 pass
- 0 fail
-Ran 2 tests across 1 file.
-```
-
-Focused static check:
-
-```text
-$ BUN_TMPDIR=/tmp bun run typecheck
-$ tsc -b
-```
-
-Task-owned file status:
-
-- No typecheck errors were reported from:
-  - `src/features/wallet/components/auto-recharge-card.tsx`
-  - `src/features/wallet/hooks/use-wallet-auto-recharge.ts`
-  - `src/features/wallet/components/auto-recharge-card.test.ts`
-
-Remaining typecheck failures are unrelated pre-existing errors in organizations, system-settings, usage-logs, and `src/i18n/languages.test.ts`.
-
-## Remaining Task 4 Fix
-
-- Replaced the active-policy hydration truthiness checks in `auto-recharge-card.tsx` with a small exported helper that uses explicit nullish checks for `amount`, `threshold_amount`, and `interval_value`, so persisted `0` values hydrate back into the form instead of falling through to empty-string or default fallbacks.
-- Reused that helper inside the component effect so the tested path matches the runtime hydration path exactly.
-- Added a focused regression test proving an active policy with `amount: 0`, `threshold_amount: 0`, and `interval_value: 0` is preserved during hydration.
-
-## Remaining Task 4 Validation
-
-Focused regression test after the fix:
-
-```text
-$ BUN_TMPDIR=/tmp bun test src/features/wallet/components/auto-recharge-card.test.ts
-bun test v1.3.14 (0d9b296a)
-
-src/features/wallet/components/auto-recharge-card.test.ts:
-(pass) auto recharge card helpers > uses English source i18n keys for mode titles [0.24ms]
-(pass) auto recharge card helpers > treats blank money input as invalid while preserving explicit zero [0.08ms]
-(pass) auto recharge card helpers > preserves explicit zero values when hydrating an active policy [0.13ms]
-
- 3 pass
- 0 fail
-Ran 3 tests across 1 file. [559.00ms]
-```
-
-Project typecheck re-run:
-
-```text
-$ BUN_TMPDIR=/tmp bun run typecheck
-$ tsc -b
-src/features/organizations/components/organization-dashboard.tsx(720,13): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
-src/features/organizations/components/organization-users-table.tsx(83,3): error TS6133: 'getActiveOrganizationSubscriptionUserIds' is declared but its value is never read.
-src/features/organizations/components/organization-users-table.tsx(104,7): error TS6133: 'ORGANIZATION_ROLES' is declared but its value is never read.
-src/features/organizations/components/organization-users-table.tsx(862,41): error TS2322: Property 'asChild' does not exist on type 'IntrinsicAttributes & Props<unknown>'.
-src/features/system-settings/billing/index.tsx(27,7): error TS2740: Type '{ ... }' is missing properties from type 'BillingSettings'.
-src/features/system-settings/models/vendor-discount-visual-editor.tsx(344,56): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string | number'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(88,20): error TS2769: No overload matches this call.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(90,48): error TS2769: No overload matches this call.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(91,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(92,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(93,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(94,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(95,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(96,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/common-logs-filter-bar.tsx(97,7): error TS2322: Type '{} | undefined' is not assignable to type 'string | undefined'.
-src/features/usage-logs/components/task-logs-filter-bar.tsx(82,20): error TS2769: No overload matches this call.
-src/features/usage-logs/components/task-logs-filter-bar.tsx(84,48): error TS2769: No overload matches this call.
-src/features/usage-logs/components/usage-logs-mobile-card.tsx(203,63): error TS2339: Property 'created_at' does not exist on type 'NonNullable<TData>'.
-src/features/usage-logs/components/usage-logs-mobile-card.tsx(204,58): error TS2339: Property 'type' does not exist on type 'NonNullable<TData>'.
-src/features/usage-logs/components/usage-logs-table.tsx(92,5): error TS2322: Type 'UseNavigateResult<string>' is not assignable to type 'NavigateFn'.
-src/features/usage-logs/index.tsx(201,15): error TS2322: Type '(organizationId: string) => void' is not assignable to type '(value: string | null, eventDetails: SelectRootChangeEventDetails) => void'.
-src/i18n/languages.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
-```
-
-No typecheck errors were reported from:
-
-- `src/features/wallet/components/auto-recharge-card.tsx`
-- `src/features/wallet/components/auto-recharge-card.test.ts`
+- `bun run build:check` is still red because of pre-existing/unrelated TypeScript issues listed above.
+- Manual browser inspection was not performed; verification was limited to static review and automated tests/build command output.
+- `bun run i18n:sync` generated untracked untranslated report files under `web/default/src/i18n/locales/_reports/`; they were not staged.
