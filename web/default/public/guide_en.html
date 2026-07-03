@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Usage Guide — AlRouter</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./landing.css" />
+    <link rel="stylesheet" href="./guide.css" />
+  </head>
+  <body>
+    <!-- ── GNB ── -->
+    <nav class="gnb">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 1100 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z" fill="#0EA5E9" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z" fill="#EC4899" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z" fill="#EC4899" />
+        </svg>
+        <a href="/index_en.html" style="color: inherit; text-decoration: none;">AlRouter</a>
+      </div>
+      <ul class="gnb-menu">
+        <li><a href="/index_en.html#about">About</a></li>
+        <li><a href="/index_en.html#pricing">Models &amp; Pricing</a></li>
+        <li><a href="/guide_en.html" class="active">Guide</a></li>
+      </ul>
+      <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="gnb-right">
+        <button class="lang-switch" onclick="this.classList.toggle('open')">
+          <i data-lucide="languages"></i>
+          <div class="lang-dropdown"><a href="./guide_en.html">English<span class="check">✓</span></a><a href="./guide.html">한국어</a></div>
+        </button>
+        <div class="gnb-divider"></div>
+        <a href="/sign-in" class="btn-login">Log in</a>
+        <a href="/sign-in" class="btn-primary">Get Started</a>
+      </div>
+    </nav>
+
+    <!-- ── Content ── -->
+    <div class="guide-wrap">
+      <div class="guide-head">
+        <span class="guide-eyebrow">Guide</span>
+        <h1>How to connect AlRouter in your CLI</h1>
+        <p>Watch the video for a quick overview, or follow the step-by-step guide below. You can set environment variables directly, or register everything at once with CC Switch.</p>
+      </div>
+
+      <!-- Group picker -->
+      <div class="guide-group-picker" role="tablist">
+        <button class="guide-group-btn" data-group="manual" aria-selected="true">Manual setup <span class="g-n">1</span></button>
+        <button class="guide-group-btn reco" data-group="ccswitch" aria-selected="false">⭐ CC Switch <span class="g-n">soon</span></button>
+      </div>
+
+      <!-- ══════════ Group: Manual setup ══════════ -->
+      <div class="guide-group active" id="guide-group-manual">
+        <div class="guide-tabbar" role="tablist">
+          <button class="guide-tab-btn" data-tab="anthropic" aria-selected="true" role="tab"><span class="t-dot" style="background:#d97757"></span>Anthropic</button>
+          <!-- Uncomment when dedicated video/content is ready
+          <button class="guide-tab-btn" data-tab="openai" aria-selected="false" role="tab"><span class="t-dot" style="background:#10a37f"></span>OpenAI</button>
+          <button class="guide-tab-btn" data-tab="gemini" aria-selected="false" role="tab"><span class="t-dot" style="background:#4285f4"></span>Gemini</button>
+          -->
+        </div>
+
+        <!-- Anthropic panel -->
+        <section class="guide-panel active" id="guide-panel-anthropic">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon"><img src="/logo_claude.svg" alt="Claude" /></div>
+            <div>
+              <h2>Anthropic-format CLI</h2>
+              <div class="sub">Claude Code, etc. · configure via environment variables</div>
+            </div>
+          </div>
+
+          <div class="guide-video-frame">
+            <video controls preload="metadata" poster="/guide-manual-anthropic-poster.png">
+              <source src="/guide-manual-anthropic.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <div class="guide-video-meta">
+            <div>
+              <h3>Connect AlRouter in Claude Code</h3>
+              <div class="sub">About 1 min · screen recording + narration</div>
+            </div>
+          </div>
+
+          <div class="guide-divider">Video not loading? You can follow the written steps below</div>
+
+          <div class="guide-written">
+            <h3>Step-by-step</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Create an API key</h4></div>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it. You'll use this single key for all the setup below.</p>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Set environment variables</h4></div>
+                  <p>Open <span class="mono">~/.zshrc</span> in your terminal, add the base URL and API key, then apply the settings.</p>
+                  <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="cm"># add to the bottom of the file</span>
+<span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+<span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                  </div>
+                  <div class="guide-term" style="margin-top:6px;">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ source ~/.zshrc</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Verify the connection</h4></div>
+                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection. If the Anthropic base URL shows alrouter.ai, you're all set.</p>
+                  <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Test</h4></div>
+                  <p>Enter a simple prompt to confirm the connection works.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
+<span class="cm">Claude Code connected</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Check usage</h4></div>
+                  <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu. The 'Overview' page also shows a recent usage summary.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-note">
+              <span class="mark">TIP</span>
+              <p>OpenAI-format CLIs just add <span class="mono">/v1</span> to the base URL, and Gemini uses <span class="mono">/v1beta</span> — the method is otherwise identical.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Uncomment when dedicated video/content is ready (OpenAI)
+        <section class="guide-panel" id="guide-panel-openai">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon" style="background:#10a37f">◆</div>
+            <div>
+              <h2>OpenAI-format CLI</h2>
+              <div class="sub">Aider, Codex, etc. · add /v1 to the base URL</div>
+            </div>
+          </div>
+          <div class="guide-video-frame">
+            <div class="guide-video-placeholder"><span class="vp-tag">Video coming soon</span></div>
+          </div>
+        </section>
+        -->
+
+        <!-- Uncomment when dedicated video/content is ready (Gemini)
+        <section class="guide-panel" id="guide-panel-gemini">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon" style="background:#4285f4">●</div>
+            <div>
+              <h2>Gemini-format CLI</h2>
+              <div class="sub">Gemini CLI, etc. · /v1beta path</div>
+            </div>
+          </div>
+          <div class="guide-video-frame">
+            <div class="guide-video-placeholder"><span class="vp-tag">Video coming soon</span></div>
+          </div>
+        </section>
+        -->
+      </div>
+
+      <!-- ══════════ Group: CC Switch (coming soon) ══════════ -->
+      <div class="guide-group" id="guide-group-ccswitch">
+        <div class="guide-coming-soon">
+          <div class="cs-icon">🛠️</div>
+          <h3>CC Switch guide coming soon</h3>
+          <p>We're preparing a guide for CC Switch, which lets you manage multiple CLIs from a single app. Coming soon.</p>
+          <span class="cs-tag">Coming soon</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <footer>
+      <div class="footer-bottom">
+        <span>© 2026 ATTO Research. All rights reserved.</span>
+      </div>
+    </footer>
+
+    <script src="./guide.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,170 @@
+/* ── AlRouter 사용 가이드 전용 스타일 (landing.css 위에 얹힘) ── */
+
+.guide-wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+.guide-wrap .mono,
+.guide-written .mono {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 0.92em; background: rgba(255,255,255,0.06);
+  padding: 1px 5px; border-radius: 5px; color: #c9d6ea;
+}
+
+/* Page header */
+.guide-head { padding: 56px 0 16px; }
+.guide-eyebrow {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #0EA5E9; font-weight: 700; margin-bottom: 12px; display: block;
+}
+.guide-head h1 { font-size: 32px; font-weight: 800; margin: 0 0 12px; line-height: 1.3; color: #f9fafb; }
+.guide-head p { color: #9ca3af; font-size: 15px; max-width: 66ch; margin: 0; }
+
+/* Group picker (수동 설정 / CC Switch) */
+.guide-group-picker { display: flex; gap: 10px; margin: 24px 0 20px; flex-wrap: wrap; }
+.guide-group-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 10px;
+  border: 1px solid #283245; background: #1a2333;
+  color: #9ca3af; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.guide-group-btn .g-n {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 10px; background: #151d2b; color: #6b7688;
+  padding: 2px 7px; border-radius: 999px;
+}
+.guide-group-btn[aria-selected="true"] { color: #f9fafb; border-color: #0EA5E9; background: rgba(14,165,233,0.1); }
+.guide-group-btn[aria-selected="true"] .g-n { background: #0EA5E9; color: #fff; }
+.guide-group-btn.reco[aria-selected="true"] { border-color: #34d399; background: rgba(52,211,153,0.1); }
+.guide-group-btn.reco[aria-selected="true"] .g-n { background: #22c55e; }
+
+/* Tabs */
+.guide-tabbar { display: flex; gap: 6px; border-bottom: 1px solid #283245; margin-bottom: 32px; overflow-x: auto; }
+.guide-tab-btn {
+  display: flex; align-items: center; gap: 9px; padding: 14px 18px;
+  background: none; border: none; color: #9ca3af;
+  font-size: 14.5px; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; font-family: inherit;
+}
+.guide-tab-btn .t-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.guide-tab-btn[aria-selected="true"] { color: #f9fafb; border-bottom-color: #0EA5E9; }
+.guide-tab-btn:hover { color: #f9fafb; }
+
+.guide-group { display: none; }
+.guide-group.active { display: block; }
+.guide-panel { display: none; padding-bottom: 88px; }
+.guide-panel.active { display: block; }
+
+.guide-panel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.guide-panel-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0;
+  overflow: hidden;
+}
+.guide-panel-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.guide-panel-head h2 { font-size: 20px; margin: 0; color: #f9fafb; }
+.guide-panel-head .sub { color: #6b7688; font-size: 13px; }
+.guide-panel-lede { color: #9ca3af; font-size: 13.5px; margin: 0 0 28px; max-width: 72ch; }
+
+/* Video hero */
+.guide-video-frame {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  background: #0a0f1a; border: 1px solid #283245; border-radius: 16px; overflow: hidden;
+}
+.guide-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.guide-video-placeholder {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; color: #6b7688;
+  background: linear-gradient(160deg, #1c2740 0%, #0e1524 100%);
+}
+.guide-video-placeholder .vp-tag {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px; color: #7dd3fc; background: rgba(14,165,233,0.15);
+  border: 1px solid rgba(14,165,233,0.3); padding: 4px 12px; border-radius: 999px;
+}
+.guide-video-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+.guide-video-meta h3 { font-size: 18px; margin: 0; color: #f9fafb; }
+.guide-video-meta .sub { color: #6b7688; font-size: 13px; margin-top: 2px; }
+
+/* divider between video and written guide */
+.guide-divider { display: flex; align-items: center; gap: 12px; margin: 36px 0 24px; color: #6b7688; font-size: 12px; }
+.guide-divider::before, .guide-divider::after { content: ""; flex: 1; height: 1px; background: #283245; }
+
+/* Written steps */
+.guide-written h3 { font-size: 15px; margin: 0 0 4px; color: #f9fafb; }
+.guide-step-track { display: flex; flex-direction: column; gap: 14px; }
+.guide-step {
+  display: grid; grid-template-columns: 52px 1fr; gap: 0;
+  background: #1a2333; border: 1px solid #283245; border-radius: 12px; overflow: hidden;
+}
+.guide-step-num-wrap {
+  background: #151d2b; border-right: 1px solid #283245;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 18px;
+}
+.guide-step-num { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 13.5px; font-weight: 700; }
+.guide-step-body { padding: 16px 20px; }
+.guide-step-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.guide-step-body h4 { margin: 0; font-size: 14.5px; color: #f9fafb; }
+.guide-step-time {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px; color: #6b7688; white-space: nowrap;
+}
+.guide-step-body p { margin: 0 0 10px; color: #9ca3af; font-size: 13px; }
+.guide-step-body p:last-child { margin-bottom: 0; }
+
+.guide-pitfall {
+  display: flex; gap: 8px; background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25); border-radius: 8px;
+  padding: 8px 11px; margin-bottom: 10px; font-size: 12px; color: #fca5a5;
+}
+.guide-pitfall b {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #f87171; flex-shrink: 0; padding-top: 1px;
+}
+
+.guide-term {
+  background: #0a0f1a; border: 1px solid #1c2536; border-radius: 9px; overflow: hidden;
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 12.5px; margin-top: 4px;
+}
+.guide-term-bar { display: flex; align-items: center; gap: 6px; padding: 8px 11px; border-bottom: 1px solid #1c2536; }
+.guide-term-bar i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+.guide-term-bar i:nth-child(1) { background: #ff5f57; }
+.guide-term-bar i:nth-child(2) { background: #febc2e; }
+.guide-term-bar i:nth-child(3) { background: #28c840; }
+.guide-term-bar .fname { margin-left: 6px; font-size: 10px; color: #6b7688; }
+.guide-term pre { margin: 0; padding: 12px 14px; overflow-x: auto; color: #c9d6ea; white-space: pre; }
+.guide-term .c1 { color: #6bd9f0; }
+.guide-term .c2 { color: #7ee6a8; }
+.guide-term .c3 { color: #f4b8e0; }
+.guide-term .cm { color: #54617a; }
+
+.guide-note {
+  display: flex; gap: 11px; background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25); border-radius: 11px; padding: 14px 16px; margin-top: 18px;
+}
+.guide-note .mark { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-weight: 700; color: #f59e0b; flex-shrink: 0; }
+.guide-note p { margin: 0; font-size: 13px; color: #d8b479; }
+
+/* Coming soon (CC Switch) */
+.guide-coming-soon {
+  border: 1px dashed #283245; border-radius: 16px; padding: 56px 32px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.guide-coming-soon .cs-icon {
+  width: 56px; height: 56px; border-radius: 14px; background: #1a2333; border: 1px solid #283245;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.guide-coming-soon h3 { margin: 0; font-size: 17px; color: #f9fafb; }
+.guide-coming-soon p { margin: 0; color: #9ca3af; font-size: 13.5px; max-width: 52ch; }
+.guide-coming-soon .cs-tag {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 11px; background: #242e42; color: #6b7688; padding: 4px 10px; border-radius: 999px;
+}
+
+@media (max-width: 680px) {
+  .guide-wrap { padding: 0 18px; }
+  .guide-head h1 { font-size: 26px; }
+  .guide-step { grid-template-columns: 1fr; }
+  .guide-step-num-wrap { display: none; }
+}

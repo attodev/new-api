@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>사용 가이드 — AlRouter</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./landing.css" />
+    <link rel="stylesheet" href="./guide.css" />
+  </head>
+  <body>
+    <!-- ── GNB ── -->
+    <nav class="gnb">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 1100 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z" fill="#0EA5E9" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z" fill="#EC4899" />
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z" fill="#EC4899" />
+        </svg>
+        <a href="/index.html" style="color: inherit; text-decoration: none;">AlRouter</a>
+      </div>
+      <ul class="gnb-menu">
+        <li><a href="/index.html#about">서비스 소개</a></li>
+        <li><a href="/index.html#pricing">모델 &amp; 가격</a></li>
+        <li><a href="/guide.html" class="active">사용 가이드</a></li>
+      </ul>
+      <button class="gnb-hamburger" aria-label="메뉴 열기" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="gnb-right">
+        <button class="lang-switch" onclick="this.classList.toggle('open')">
+          <i data-lucide="languages"></i>
+          <div class="lang-dropdown"><a href="./guide_en.html">English</a><a href="./guide.html">한국어<span class="check">✓</span></a></div>
+        </button>
+        <div class="gnb-divider"></div>
+        <a href="/sign-in" class="btn-login">로그인</a>
+        <a href="/sign-in" class="btn-primary">체험해보기</a>
+      </div>
+    </nav>
+
+    <!-- ── 본문 ── -->
+    <div class="guide-wrap">
+      <div class="guide-head">
+        <span class="guide-eyebrow">사용 가이드</span>
+        <h1>AlRouter를 CLI에서 연결하는 방법</h1>
+        <p>영상으로 빠르게 보거나, 아래 단계별 설명을 따라 직접 연결해 보세요.</p> 
+        <p>환경변수를 직접 등록하거나, CC Switch로 한 번에 등록할 수 있습니다.</p>
+      </div>
+
+      <!-- 그룹 선택 -->
+      <div class="guide-group-picker" role="tablist">
+        <button class="guide-group-btn" data-group="manual" aria-selected="true">수동 설정 <span class="g-n">1</span></button>
+        <button class="guide-group-btn reco" data-group="ccswitch" aria-selected="false">⭐ CC Switch <span class="g-n">준비 중</span></button>
+      </div>
+
+      <!-- ══════════ 그룹: 수동 설정 ══════════ -->
+      <div class="guide-group active" id="guide-group-manual">
+        <div class="guide-tabbar" role="tablist">
+          <button class="guide-tab-btn" data-tab="anthropic" aria-selected="true" role="tab"><span class="t-dot" style="background:#d97757"></span>Anthropic</button>
+          <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제
+          <button class="guide-tab-btn" data-tab="openai" aria-selected="false" role="tab"><span class="t-dot" style="background:#10a37f"></span>OpenAI</button>
+          <button class="guide-tab-btn" data-tab="gemini" aria-selected="false" role="tab"><span class="t-dot" style="background:#4285f4"></span>Gemini</button>
+          -->
+        </div>
+
+        <!-- Anthropic 패널 -->
+        <section class="guide-panel active" id="guide-panel-anthropic">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon"><img src="/logo_claude.svg" alt="Claude" /></div>
+            <div>
+              <h2>Claude Code에서 AlRouter 연결하기</h2>
+              <div class="sub">약 1분 · 화면 녹화 + 내레이션</div>
+            </div>
+          </div>
+
+          <div class="guide-video-frame">
+            <video controls preload="metadata" poster="/guide-manual-anthropic-poster.png">
+              <source src="/guide-manual-anthropic.mp4" type="video/mp4" />
+            </video>
+          </div>
+
+          <div class="guide-divider">영상이 잘 안 보이시나요? 아래 글로도 따라 하실 수 있습니다</div>
+
+          <div class="guide-written">
+            <h3>단계별로 따라 하기</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>API 키 발급</h4></div>
+                  <p>대시보드 'API 키' 메뉴로 이동해 새로운 API 키를 생성하고, 생성된 키를 복사합니다. 이 키 하나로 이후 모든 설정에 사용합니다.</p>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>환경변수 등록</h4></div>
+                  <p>터미널에서 <span class="mono">~/.zshrc</span> 파일을 열고 base URL과 API 키를 추가한 뒤, 설정을 적용합니다.</p>
+                  <div class="guide-pitfall"><b>주의</b>아래 예시의 키 값 대신, 실제로 발급받은 키 값을 입력해 주세요.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="cm"># 파일 맨 아래에 추가</span>
+<span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+<span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                  </div>
+                  <div class="guide-term" style="margin-top:6px;">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ source ~/.zshrc</pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>연결 확인</h4></div>
+                  <p>새 터미널에서 claude를 실행한 뒤, <span class="mono">/status</span>로 AlRouter 연결을 확인합니다. Anthropic base URL 항목에 alrouter.ai가 표시되면 정상입니다.</p>
+                  <div class="guide-pitfall"><b>주의</b>환경변수는 새로 여는 터미널부터 적용됩니다. 등록 전에 열려 있던 터미널이면 새 창에서 실행하세요.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>테스트</h4></div>
+                  <p>간단한 프롬프트를 입력해 정상적으로 연결됐는지 확인합니다.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; 연동 테스트입니다. "Claude Code 연결 성공"이라고만 답해주세요.</span>
+<span class="cm">Claude Code 연결 성공</span></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>사용량 확인</h4></div>
+                  <p>모든 요청은 '사용 로그' 메뉴에서 키별로 토큰과 비용까지 확인할 수 있습니다. '개요' 화면에서도 최근 사용량을 요약해서 볼 수 있습니다.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-note">
+              <span class="mark">TIP</span>
+              <p>OpenAI 포맷 CLI는 base URL 뒤에 <span class="mono">/v1</span>, Gemini는 <span class="mono">/v1beta</span>만 다를 뿐 방식은 동일합니다.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제 (OpenAI)
+        <section class="guide-panel" id="guide-panel-openai">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon" style="background:#10a37f">◆</div>
+            <div>
+              <h2>OpenAI 포맷 CLI</h2>
+              <div class="sub">Aider, Codex 등 · base URL 뒤에 /v1</div>
+            </div>
+          </div>
+          <div class="guide-video-frame">
+            <div class="guide-video-placeholder"><span class="vp-tag">영상 준비 중</span></div>
+          </div>
+        </section>
+        -->
+
+        <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제 (Gemini)
+        <section class="guide-panel" id="guide-panel-gemini">
+          <div class="guide-panel-head">
+            <div class="guide-panel-icon" style="background:#4285f4">●</div>
+            <div>
+              <h2>Gemini 포맷 CLI</h2>
+              <div class="sub">Gemini CLI 등 · /v1beta 경로</div>
+            </div>
+          </div>
+          <div class="guide-video-frame">
+            <div class="guide-video-placeholder"><span class="vp-tag">영상 준비 중</span></div>
+          </div>
+        </section>
+        -->
+      </div>
+
+      <!-- ══════════ 그룹: CC Switch (준비 중) ══════════ -->
+      <div class="guide-group" id="guide-group-ccswitch">
+        <div class="guide-coming-soon">
+          <div class="cs-icon">🛠️</div>
+          <h3>CC Switch 연동 가이드 준비 중</h3>
+          <p>여러 CLI를 한 앱에서 관리할 수 있는 CC Switch 연동 가이드를 준비하고 있습니다. 곧 공개할 예정입니다.</p>
+          <span class="cs-tag">준비 중</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 간단 푸터 ── -->
+    <footer>
+      <div class="footer-bottom">
+        <span>© 2026 ATTO Research. All rights reserved.</span>
+      </div>
+    </footer>
+
+    <script src="./guide.js" defer></script>
+  </body>
+</html>
