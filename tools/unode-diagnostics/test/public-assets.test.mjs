@@ -42,4 +42,7 @@ test('browser workbench public assets expose required UI and API wiring', async 
     assert.match(js, new RegExp(endpoint.replaceAll('/', '\\/')));
   }
   assert.match(js, /from '\.\/ui-helpers\.js'/);
+  assert.match(js, /els\.target\.addEventListener\('change'/);
+  assert.match(js, /els\['base-url'\]\.value = baseUrlForTarget\(els\.target\.value, state\.config\?\.display \|\| \{\}\);/);
+  assert.doesNotMatch(js, /els\.target\.addEventListener\('change'[\s\S]*!\s*els\['base-url'\]\.value\.trim\(\)/);
 });

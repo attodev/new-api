@@ -39,3 +39,8 @@ export function itemSearchText(item = {}) {
     ...summaryHintTokens(item.summary?.hints)
   ].join(' ').toLowerCase();
 }
+
+export function baseUrlForTarget(target, display = {}) {
+  if (target === 'alrouter') return display.NEW_API_BASE_URL || '';
+  return display.UNODE_BASE_URL || '';
+}

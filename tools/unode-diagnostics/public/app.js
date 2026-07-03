@@ -1,4 +1,4 @@
-import { displayValue, itemSearchText } from './ui-helpers.js';
+import { baseUrlForTarget, displayValue, itemSearchText } from './ui-helpers.js';
 
 const state = {
   config: null,
@@ -97,18 +97,12 @@ async function api(path, options = {}) {
   return payload ?? {};
 }
 
-function baseUrlForTarget(target) {
-  const display = state.config?.display || {};
-  if (target === 'alrouter') return display.NEW_API_BASE_URL || '';
-  return display.UNODE_BASE_URL || '';
-}
-
 function applyPreset(preset) {
   if (!preset) return;
   els['preset-select'].value = preset.id;
   els.target.value = preset.target || 'unode';
   els.method.value = String(preset.method || 'POST').toUpperCase();
-  els['base-url'].value = preset.baseUrl || baseUrlForTarget(preset.target);
+  els['base-url'].value = preset.baseUrl || baseUrlForTarget(preset.target, state.config?.display || {});
   els.path.value = preset.path || '';
   els['headers-json'].value = pretty(preset.headers || {});
   els['body-json'].value = pretty(preset.body || {});
@@ -260,7 +254,7 @@ function restoreHistoryItem(item) {
   state.selectedHistoryId = item.id || '';
   els.target.value = item.target || 'unode';
   els.method.value = String(request.method || 'POST').toUpperCase();
-  els['base-url'].value = parts.baseUrl || baseUrlForTarget(item.target);
+  els['base-url'].value = parts.baseUrl || baseUrlForTarget(item.target, state.config?.display || {});
   els.path.value = parts.path || '';
   els['headers-json'].value = pretty(request.headers || {});
   els['body-json'].value = pretty(request.body || {});
@@ -323,7 +317,7 @@ async function loadConfig() {
 
   const preset = state.presets.find((item) => item.id === els['preset-select'].value);
   if (preset && !els['base-url'].value.trim()) {
-    els['base-url'].value = baseUrlForTarget(preset.target);
+    els['base-url'].value = baseUrlForTarget(preset.target, state.config?.display || {});
   }
 }
 
@@ -397,7 +391,7 @@ function wireEvents() {
     applyPreset(preset);
   });
   els.target.addEventListener('change', () => {
-    if (!els['base-url'].value.trim()) els['base-url'].value = baseUrlForTarget(els.target.value);
+    els['base-url'].value = baseUrlForTarget(els.target.value, state.config?.display || {});
   });
   els['history-filter'].addEventListener('input', renderHistory);
 }

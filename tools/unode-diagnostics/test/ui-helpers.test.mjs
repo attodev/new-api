@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { displayValue, itemSearchText, summaryHintTokens } from '../public/ui-helpers.js';
+import { baseUrlForTarget, displayValue, itemSearchText, summaryHintTokens } from '../public/ui-helpers.js';
 
 test('summaryHintTokens preserves array hint text for history filtering', () => {
   const tokens = summaryHintTokens([
@@ -53,4 +53,15 @@ test('displayValue renders arrays and object hint maps as readable labels', () =
   assert.equal(displayValue(['request id: rid-1', 'web search requests: 2']), 'request id: rid-1, web search requests: 2');
   assert.equal(displayValue({ hasWebSearchText: true, note: 'manual' }), 'hasWebSearchText, note: manual');
   assert.equal(displayValue({ hasWebSearchText: false }), '-');
+});
+
+test('baseUrlForTarget returns the URL matching the selected target', () => {
+  const display = {
+    UNODE_BASE_URL: 'https://www.unodetech.xyz',
+    NEW_API_BASE_URL: 'https://alrouter.ai'
+  };
+
+  assert.equal(baseUrlForTarget('unode', display), 'https://www.unodetech.xyz');
+  assert.equal(baseUrlForTarget('alrouter', display), 'https://alrouter.ai');
+  assert.equal(baseUrlForTarget('unknown', display), 'https://www.unodetech.xyz');
 });
