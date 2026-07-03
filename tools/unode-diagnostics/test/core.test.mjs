@@ -187,6 +187,90 @@ test('history store appends and reads masked JSONL records newest first', async 
   }
 });
 
+test('history store scrubs token-shaped strings from ordinary text fields', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await appendHistory(filePath, {
+      presetId: 'text-secrets',
+      target: 'alrouter',
+      request: {
+        headers: {},
+        body: {
+          prompt: 'ordinary prompt mentioning sk-prompt-abcdef for reproduction'
+        }
+      },
+      response: {
+        status: 500,
+        headers: {},
+        bodyText: 'upstream returned Bearer sk-bodytext-123456 and sk-response-abcdef',
+        json: { error: 'provider rejected sk-json-abcdef' }
+      },
+      summary: { classification: 'request_error' }
+    });
+
+    const raw = await readFile(filePath, 'utf8');
+    assert.equal(raw.includes('ordinary prompt mentioning'), true);
+    assert.equal(raw.includes('sk-prompt-abcdef'), false);
+    assert.equal(raw.includes('sk-bodytext-123456'), false);
+    assert.equal(raw.includes('sk-response-abcdef'), false);
+    assert.equal(raw.includes('sk-json-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistory returns empty list for missing files', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const history = await readHistory(path.join(dir, 'missing.jsonl'));
+    assert.deepEqual(history, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistory includes request error sentinel for corrupt JSONL lines', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await writeFile(filePath, [
+      JSON.stringify({
+        id: 'valid',
+        createdAt: '2026-07-03T00:00:00.000Z',
+        presetId: 'valid',
+        summary: { classification: 'tool_not_used' }
+      }),
+      '{not-valid-json'
+    ].join('\n'));
+
+    const history = await readHistory(filePath);
+    const sentinel = history.find((record) => record.presetId === 'corrupt-history-line');
+    assert.equal(sentinel.summary.classification, 'request_error');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistoryById returns null for missing records', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await appendHistory(filePath, {
+      presetId: 'present',
+      target: 'unode',
+      request: { headers: {}, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'tool_not_used' }
+    });
+
+    const loaded = await readHistoryById(filePath, 'missing');
+    assert.equal(loaded, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('buildPresets returns four editable diagnostic presets', () => {
   const presets = buildPresets({
     UNODE_BASE_URL: 'https://www.unodetech.xyz',

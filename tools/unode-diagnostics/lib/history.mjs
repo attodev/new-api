@@ -1,7 +1,17 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { maskSecrets } from './masking.mjs';
+import { maskSecrets, maskValue } from './masking.mjs';
+
+const SK_TOKEN_SOURCE = 'sk-[A-Za-z0-9][A-Za-z0-9_-]{7,}';
+const BEARER_SK_TOKEN_PATTERN = new RegExp(
+  `(^|[^A-Za-z0-9_-])(Bearer\\s+)(${SK_TOKEN_SOURCE})(?=$|[^A-Za-z0-9_-])`,
+  'gi'
+);
+const STANDALONE_SK_TOKEN_PATTERN = new RegExp(
+  `(^|[^A-Za-z0-9_-])(${SK_TOKEN_SOURCE})(?=$|[^A-Za-z0-9_-])`,
+  'g'
+);
 
 function newHistoryId() {
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -9,13 +19,40 @@ function newHistoryId() {
   return `diag_${stamp}_${suffix}`;
 }
 
+function scrubSecretString(value) {
+  return value
+    .replace(BEARER_SK_TOKEN_PATTERN, (_, boundary, bearerPrefix, token) => {
+      return `${boundary}${maskValue(`${bearerPrefix}${token}`)}`;
+    })
+    .replace(STANDALONE_SK_TOKEN_PATTERN, (_, boundary, token) => {
+      return `${boundary}${maskValue(token)}`;
+    });
+}
+
+function scrubSecretStrings(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => scrubSecretStrings(item));
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [key, child] of Object.entries(value)) {
+      out[key] = scrubSecretStrings(child);
+    }
+    return out;
+  }
+  if (typeof value === 'string') {
+    return scrubSecretString(value);
+  }
+  return value;
+}
+
 export async function appendHistory(filePath, record) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  const stored = maskSecrets({
+  const stored = scrubSecretStrings(maskSecrets({
     ...record,
     id: newHistoryId(),
     createdAt: new Date().toISOString()
-  });
+  }));
   await appendFile(filePath, `${JSON.stringify(stored)}\n`, 'utf8');
   return stored;
 }
