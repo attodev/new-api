@@ -18,9 +18,12 @@ test('browser workbench public assets expose required UI and API wiring', async 
     'history-filter',
     'preset-select',
     'load-env',
+    'load-models',
     'send-request',
     'target',
     'method',
+    'model-select',
+    'model-status',
     'base-url',
     'path',
     'headers-json',
@@ -38,10 +41,13 @@ test('browser workbench public assets expose required UI and API wiring', async 
   assert.match(css, /\.request-pane/);
   assert.match(css, /\.response-pane/);
 
-  for (const endpoint of ['/api/config', '/api/presets', '/api/history', '/api/send', '/api/history/']) {
+  for (const endpoint of ['/api/config', '/api/presets', '/api/models', '/api/history', '/api/send', '/api/history/']) {
     assert.match(js, new RegExp(endpoint.replaceAll('/', '\\/')));
   }
   assert.match(js, /from '\.\/ui-helpers\.js'/);
+  assert.match(js, /function setBodyModel/);
+  assert.match(js, /body\.model = modelId/);
+  assert.match(js, /els\['model-select'\]\.addEventListener\('change'/);
   assert.match(js, /els\.target\.addEventListener\('change'/);
   assert.match(js, /els\['base-url'\]\.value = baseUrlForTarget\(els\.target\.value, state\.config\?\.display \|\| \{\}\);/);
   assert.doesNotMatch(js, /els\.target\.addEventListener\('change'[\s\S]*!\s*els\['base-url'\]\.value\.trim\(\)/);

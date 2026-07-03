@@ -9,6 +9,7 @@ import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
 import { appendHistory, readHistory, readHistoryById } from '../lib/history.mjs';
 import { prepareOutboundRequest } from '../lib/http-client.mjs';
 import { maskSecrets } from '../lib/masking.mjs';
+import { fetchTargetModels, modelsRequestForTarget, normalizeModelList } from '../lib/models.mjs';
 import { buildPresets } from '../lib/presets.mjs';
 import { summarizeExchange } from '../lib/summary.mjs';
 import { createDiagnosticsServer } from '../server.mjs';
@@ -374,6 +375,69 @@ test('prepareOutboundRequest expands env placeholders and builds URL', () => {
   assert.equal(prepared.bodyText, '{"model":"claude-sonnet-4-6"}');
 });
 
+test('normalizeModelList supports common provider model list shapes', () => {
+  assert.deepEqual(normalizeModelList({
+    data: [
+      { id: 'gpt-4.1', owned_by: 'openai' },
+      { id: 'claude-sonnet-4-20250514', display_name: 'Claude Sonnet 4' },
+      { id: 'gpt-4.1', owned_by: 'duplicate' }
+    ]
+  }), [
+    { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', created: '', ownedBy: '' },
+    { id: 'gpt-4.1', label: 'gpt-4.1', created: '', ownedBy: 'openai' }
+  ]);
+
+  assert.deepEqual(normalizeModelList({
+    models: ['model-b', { name: 'model-a', provider: 'provider-a' }]
+  }), [
+    { id: 'model-a', label: 'model-a', created: '', ownedBy: 'provider-a' },
+    { id: 'model-b', label: 'model-b', created: '', ownedBy: '' }
+  ]);
+});
+
+test('modelsRequestForTarget builds target-scoped model list requests', () => {
+  const unode = modelsRequestForTarget('unode', {
+    UNODE_BASE_URL: 'https://www.unodetech.xyz/',
+    UNODE_RELAY_API_KEY: 'sk-unode'
+  });
+  const alrouter = modelsRequestForTarget('alrouter', {
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router'
+  });
+
+  assert.equal(unode.url, 'https://www.unodetech.xyz/v1/models');
+  assert.equal(unode.headers.authorization, 'Bearer sk-unode');
+  assert.equal(unode.headers['x-api-key'], 'sk-unode');
+  assert.equal(alrouter.url, 'https://alrouter.ai/v1/models');
+  assert.equal(alrouter.headers.authorization, 'Bearer sk-router');
+  assert.throws(() => modelsRequestForTarget('attacker', {}), /target must be one of/);
+});
+
+test('fetchTargetModels returns normalized model ids without exposing auth', async () => {
+  const result = await fetchTargetModels('alrouter', {
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router-secret-abcdef'
+  }, async (url, init) => {
+    assert.equal(url, 'https://alrouter.ai/v1/models');
+    assert.equal(init.headers.authorization, 'Bearer sk-router-secret-abcdef');
+    return new Response(JSON.stringify({
+      data: [
+        { id: 'claude-sonnet-4-20250514', display_name: 'Claude Sonnet 4' }
+      ]
+    }), { status: 200 });
+  });
+
+  assert.deepEqual(result, {
+    target: 'alrouter',
+    url: 'https://alrouter.ai/v1/models',
+    status: 200,
+    models: [
+      { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', created: '', ownedBy: '' }
+    ]
+  });
+  assert.equal(JSON.stringify(result).includes('sk-router-secret-abcdef'), false);
+});
+
 test('diagnostics server config route does not expose raw secrets', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
   try {
@@ -393,6 +457,62 @@ test('diagnostics server config route does not expose raw secrets', async () => 
     assert.equal(payload.includes('admin-access-secret-123456'), false);
     assert.equal(response.json.display.NEW_API_RELAY_API_KEY, 'sk-r...cdef');
     assert.equal(response.json.display.NEW_API_ADMIN_ACCESS_TOKEN, 'admi...3456');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server models route fetches selected target models', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  const seen = [];
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async (url, init) => {
+        seen.push({ url, init });
+        return new Response(JSON.stringify({
+          data: [
+            { id: 'model-z' },
+            { id: 'model-a', display_name: 'Model A' }
+          ]
+        }), { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, { url: '/api/models?target=alrouter' });
+
+    assert.equal(response.status, 200);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].url, 'https://alrouter.ai/v1/models');
+    assert.equal(seen[0].init.headers.authorization, 'Bearer sk-router-secret-abcdef');
+    assert.deepEqual(response.json.models.map((model) => model.id), ['model-a', 'model-z']);
+    assert.equal(JSON.stringify(response.json).includes('sk-router-secret-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server models route rejects unknown targets before fetch', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, { url: '/api/models?target=attacker' });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.json.error, 'invalid_target');
+    assert.equal(fetchCalls, 0);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

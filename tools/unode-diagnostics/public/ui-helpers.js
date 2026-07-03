@@ -44,3 +44,9 @@ export function baseUrlForTarget(target, display = {}) {
   if (target === 'alrouter') return display.NEW_API_BASE_URL || '';
   return display.UNODE_BASE_URL || '';
 }
+
+export function modelOptionLabel(model = {}) {
+  const id = String(model.id ?? '');
+  const label = String(model.label ?? id);
+  return label && label !== id ? `${id} - ${label}` : id;
+}

@@ -1,9 +1,10 @@
-import { baseUrlForTarget, displayValue, itemSearchText } from './ui-helpers.js';
+import { baseUrlForTarget, displayValue, itemSearchText, modelOptionLabel } from './ui-helpers.js';
 
 const state = {
   config: null,
   presets: [],
   history: [],
+  modelsByTarget: {},
   selectedHistoryId: ''
 };
 
@@ -18,7 +19,10 @@ const ids = [
   'history-filter',
   'history-list',
   'load-env',
+  'load-models',
   'method',
+  'model-select',
+  'model-status',
   'path',
   'preset-select',
   'reload-history',
@@ -106,6 +110,7 @@ function applyPreset(preset) {
   els.path.value = preset.path || '';
   els['headers-json'].value = pretty(preset.headers || {});
   els['body-json'].value = pretty(preset.body || {});
+  renderTargetModels();
   state.selectedHistoryId = '';
   setMessage(els['request-error']);
   setMessage(els['request-status'], `Preset loaded: ${preset.label || preset.id}`);
@@ -149,6 +154,62 @@ function readRequestForm() {
     body: parseJsonEditor(els['body-json'], 'Body'),
     authMode: 'env'
   };
+}
+
+function readBodyJsonForModel() {
+  const body = parseJsonEditor(els['body-json'], 'Body');
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('Body JSON must be an object to set model');
+  }
+  return body;
+}
+
+function currentBodyModel() {
+  try {
+    const raw = els['body-json'].value.trim();
+    if (!raw) return '';
+    const body = JSON.parse(raw);
+    return typeof body?.model === 'string' ? body.model : '';
+  } catch {
+    return '';
+  }
+}
+
+function setBodyModel(modelId) {
+  const body = readBodyJsonForModel();
+  body.model = modelId;
+  els['body-json'].value = pretty(body);
+}
+
+function renderModelOptions(models = [], selectedModel = currentBodyModel()) {
+  clearChildren(els['model-select']);
+  const ids = new Set(models.map((model) => model.id));
+
+  if (selectedModel && !ids.has(selectedModel)) {
+    const option = document.createElement('option');
+    option.value = selectedModel;
+    option.textContent = `${selectedModel} (current)`;
+    els['model-select'].append(option);
+  }
+
+  for (const model of models) {
+    const option = document.createElement('option');
+    option.value = model.id;
+    option.textContent = modelOptionLabel(model);
+    els['model-select'].append(option);
+  }
+
+  els['model-select'].disabled = !els['model-select'].options.length;
+  if (selectedModel) els['model-select'].value = selectedModel;
+}
+
+function renderTargetModels() {
+  const models = state.modelsByTarget[els.target.value] || [];
+  renderModelOptions(models);
+  setMessage(
+    els['model-status'],
+    models.length ? `${models.length} models loaded for ${els.target.value}` : 'No models loaded'
+  );
 }
 
 function renderConfig() {
@@ -258,6 +319,7 @@ function restoreHistoryItem(item) {
   els.path.value = parts.path || '';
   els['headers-json'].value = pretty(request.headers || {});
   els['body-json'].value = pretty(request.body || {});
+  renderTargetModels();
   els['preset-select'].value = item.presetId || '';
   setMessage(els['request-error']);
   setMessage(els['request-status'], `History restored: ${item.id || 'selected item'}`);
@@ -346,6 +408,33 @@ async function loadHistoryItem(id) {
   }
 }
 
+async function loadModels() {
+  const target = els.target.value;
+  setMessage(els['request-error']);
+  setMessage(els['model-status'], `Loading models for ${target}...`);
+  els['load-models'].disabled = true;
+
+  try {
+    const data = await api(`/api/models?target=${encodeURIComponent(target)}`);
+    const models = data.models || [];
+    state.modelsByTarget[target] = models;
+
+    const current = currentBodyModel();
+    const selectedModel = current && models.some((model) => model.id === current)
+      ? current
+      : models[0]?.id || current;
+
+    renderModelOptions(models, selectedModel);
+    if (selectedModel) setBodyModel(selectedModel);
+    setMessage(els['model-status'], `${models.length} models loaded for ${target}`);
+  } catch (error) {
+    setMessage(els['request-error'], error.message);
+    setMessage(els['model-status'], 'Model load failed');
+  } finally {
+    els['load-models'].disabled = false;
+  }
+}
+
 async function sendRequest() {
   setMessage(els['request-error']);
   let request;
@@ -386,12 +475,23 @@ function wireEvents() {
     loadHistory().catch((error) => setMessage(els['request-error'], error.message));
   });
   els['send-request'].addEventListener('click', sendRequest);
+  els['load-models'].addEventListener('click', loadModels);
+  els['model-select'].addEventListener('change', () => {
+    try {
+      setBodyModel(els['model-select'].value);
+      setMessage(els['model-status'], `Model set: ${els['model-select'].value}`);
+      setMessage(els['request-error']);
+    } catch (error) {
+      setMessage(els['request-error'], error.message);
+    }
+  });
   els['preset-select'].addEventListener('change', () => {
     const preset = state.presets.find((item) => item.id === els['preset-select'].value);
     applyPreset(preset);
   });
   els.target.addEventListener('change', () => {
     els['base-url'].value = baseUrlForTarget(els.target.value, state.config?.display || {});
+    renderTargetModels();
   });
   els['history-filter'].addEventListener('input', renderHistory);
 }
@@ -400,6 +500,7 @@ async function init() {
   wireEvents();
   renderConfig();
   renderSummary(null);
+  renderModelOptions();
   try {
     await loadConfig();
     await loadPresets();

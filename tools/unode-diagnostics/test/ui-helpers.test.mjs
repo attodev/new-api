@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { baseUrlForTarget, displayValue, itemSearchText, summaryHintTokens } from '../public/ui-helpers.js';
+import { baseUrlForTarget, displayValue, itemSearchText, modelOptionLabel, summaryHintTokens } from '../public/ui-helpers.js';
 
 test('summaryHintTokens preserves array hint text for history filtering', () => {
   const tokens = summaryHintTokens([
@@ -64,4 +64,9 @@ test('baseUrlForTarget returns the URL matching the selected target', () => {
   assert.equal(baseUrlForTarget('unode', display), 'https://www.unodetech.xyz');
   assert.equal(baseUrlForTarget('alrouter', display), 'https://alrouter.ai');
   assert.equal(baseUrlForTarget('unknown', display), 'https://www.unodetech.xyz');
+});
+
+test('modelOptionLabel includes display names when available', () => {
+  assert.equal(modelOptionLabel({ id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' }), 'claude-sonnet-4-20250514 - Claude Sonnet 4');
+  assert.equal(modelOptionLabel({ id: 'gpt-4.1', label: 'gpt-4.1' }), 'gpt-4.1');
 });

@@ -81,6 +81,15 @@
           <input id="path" spellcheck="false" placeholder="/v1/messages" />
         </label>
 
+        <div class="model-grid">
+          <label class="field">
+            <span>Model</span>
+            <select id="model-select"></select>
+          </label>
+          <button id="load-models" type="button">Load models</button>
+        </div>
+        <div id="model-status" class="message muted">No models loaded</div>
+
         <div class="editor-grid">
           <label class="field editor-field">
             <span>Headers JSON</span>

@@ -231,6 +231,18 @@ textarea {
   gap: 8px;
 }
 
+.model-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 8px;
+  align-items: end;
+}
+
+.model-grid button {
+  margin-top: 0;
+  min-height: 36px;
+}
+
 .editor-grid,
 .response-split {
   display: grid;
@@ -363,6 +375,10 @@ textarea {
   color: #b42318;
 }
 
+.muted {
+  color: #687385;
+}
+
 .empty-state {
   border: 1px dashed #cbd3df;
   border-radius: 6px;
@@ -434,6 +450,7 @@ textarea {
   }
 
   .form-grid,
+  .model-grid,
   .summary-grid,
   .config-row {
     grid-template-columns: minmax(0, 1fr);

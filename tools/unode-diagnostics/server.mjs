@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadEnvConfig } from './lib/env.mjs';
 import { appendHistory, readHistory, readHistoryById } from './lib/history.mjs';
 import { expandEnvTemplates, prepareOutboundRequest, sendDiagnosticRequest } from './lib/http-client.mjs';
+import { fetchTargetModels } from './lib/models.mjs';
 import { buildPresets } from './lib/presets.mjs';
 import { summarizeExchange } from './lib/summary.mjs';
 
@@ -285,6 +286,14 @@ export function createDiagnosticsServer(options = {}) {
       if (pathname === '/api/presets') {
         if (req.method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
         return sendJson(res, 200, { presets: buildPresets() });
+      }
+
+      if (pathname === '/api/models') {
+        if (req.method !== 'GET') return sendMethodNotAllowed(res, ['GET']);
+        const target = requestUrl.searchParams.get('target') || '';
+        const config = await loadEnvConfig(repoRoot);
+        const result = await fetchTargetModels(target, config.secrets, fetchImpl);
+        return sendJson(res, 200, result);
       }
 
       if (pathname === '/api/history') {
