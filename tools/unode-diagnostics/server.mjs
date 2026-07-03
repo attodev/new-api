@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { loadEnvConfig } from './lib/env.mjs';
 import { appendHistory, readHistory, readHistoryById } from './lib/history.mjs';
-import { sendDiagnosticRequest } from './lib/http-client.mjs';
+import { expandEnvTemplates, prepareOutboundRequest, sendDiagnosticRequest } from './lib/http-client.mjs';
 import { buildPresets } from './lib/presets.mjs';
 import { summarizeExchange } from './lib/summary.mjs';
 
@@ -14,6 +14,8 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(moduleDir, '../..');
 const defaultPublicDir = path.join(moduleDir, 'public');
 const defaultHistoryPath = path.join(moduleDir, 'data/history.jsonl');
+const ALLOWED_SEND_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
+const SENSITIVE_ENV_KEY_PATTERN = /(KEY|TOKEN|SECRET|PASSWORD)/i;
 
 const MIME_TYPES = new Map([
   ['.css', 'text/css; charset=utf-8'],
@@ -46,6 +48,17 @@ function sendMethodNotAllowed(res, methods) {
   res.end();
 }
 
+function requestError(statusCode, errorCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.errorCode = errorCode;
+  return error;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 async function readJsonBody(req) {
   const chunks = [];
   let size = 0;
@@ -70,6 +83,23 @@ async function readJsonBody(req) {
     const error = new Error('invalid JSON request body');
     error.statusCode = 400;
     throw error;
+  }
+}
+
+function isLocalHostname(hostname) {
+  const normalized = hostname.toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1' || normalized === '[::1]';
+}
+
+function allowsLocalOrigin(req) {
+  const origin = req.headers.origin || req.headers.referer;
+  if (!origin) return true;
+
+  try {
+    const originUrl = new URL(origin);
+    return isLocalHostname(originUrl.hostname) && (!req.headers.host || originUrl.host === req.headers.host);
+  } catch {
+    return false;
   }
 }
 
@@ -151,6 +181,85 @@ function historyRecordFromExchange(input, exchange, summary) {
   };
 }
 
+function allowedOriginsFromEnv(env) {
+  const origins = new Set();
+  for (const key of ['UNODE_BASE_URL', 'NEW_API_BASE_URL']) {
+    const value = String(env[key] ?? '').trim();
+    if (!value) continue;
+    try {
+      origins.add(new URL(value).origin);
+    } catch {
+      continue;
+    }
+  }
+  return origins;
+}
+
+function assertAllowedAbsoluteUrl(value, allowedOrigins, fieldName) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw requestError(400, 'invalid_request', `${fieldName} is invalid`);
+  }
+  if (!allowedOrigins.has(url.origin)) {
+    throw requestError(400, 'invalid_request', `${fieldName} origin is not allowed`);
+  }
+}
+
+function knownSecretsFromEnv(env) {
+  return Object.entries(env)
+    .filter(([key, value]) => SENSITIVE_ENV_KEY_PATTERN.test(key) && value)
+    .map(([, value]) => String(value));
+}
+
+function validateSendInput(input, env) {
+  if (!isPlainObject(input)) {
+    throw requestError(400, 'invalid_request', 'request body must be a JSON object');
+  }
+
+  if (input.method !== undefined && typeof input.method !== 'string') {
+    throw requestError(400, 'invalid_request', 'method must be a string');
+  }
+  const method = String(input.method ?? 'GET').toUpperCase();
+  if (!ALLOWED_SEND_METHODS.has(method)) {
+    throw requestError(400, 'invalid_request', 'method is not allowed');
+  }
+
+  if (input.headers !== undefined && !isPlainObject(input.headers)) {
+    throw requestError(400, 'invalid_request', 'headers must be an object');
+  }
+  if (typeof input.baseUrl !== 'string' || !input.baseUrl.trim()) {
+    throw requestError(400, 'invalid_request', 'baseUrl is required');
+  }
+  if (typeof input.path !== 'string' || !input.path.trim()) {
+    throw requestError(400, 'invalid_request', 'path is required');
+  }
+
+  const allowedOrigins = allowedOriginsFromEnv(env);
+  if (allowedOrigins.size === 0) {
+    throw requestError(400, 'invalid_request', 'no allowed outbound origins are configured');
+  }
+
+  const expandedBaseUrl = expandEnvTemplates(input.baseUrl, env).trim();
+  const expandedPath = expandEnvTemplates(input.path, env).trim();
+  assertAllowedAbsoluteUrl(expandedBaseUrl, allowedOrigins, 'baseUrl');
+  if (/^https?:\/\//i.test(expandedPath)) {
+    assertAllowedAbsoluteUrl(expandedPath, allowedOrigins, 'path');
+  }
+
+  let preparedUrl;
+  try {
+    preparedUrl = new URL(prepareOutboundRequest(input, env).url);
+  } catch {
+    throw requestError(400, 'invalid_request', 'outbound URL is invalid');
+  }
+
+  if (!allowedOrigins.has(preparedUrl.origin)) {
+    throw requestError(400, 'invalid_request', 'outbound URL origin is not allowed');
+  }
+}
+
 export function createDiagnosticsServer(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const publicDir = options.publicDir ?? defaultPublicDir;
@@ -193,11 +302,17 @@ export function createDiagnosticsServer(options = {}) {
 
       if (pathname === '/api/send') {
         if (req.method !== 'POST') return sendMethodNotAllowed(res, ['POST']);
+        if (!allowsLocalOrigin(req)) return sendJson(res, 403, { error: 'forbidden' });
         const input = await readJsonBody(req);
         const config = await loadEnvConfig(repoRoot);
+        validateSendInput(input, config.secrets);
         const exchange = await sendDiagnosticRequest(input, config.secrets, fetchImpl);
         const summary = summarizeExchange(exchange);
-        const stored = await appendHistory(historyPath, historyRecordFromExchange(input, exchange, summary));
+        const stored = await appendHistory(
+          historyPath,
+          historyRecordFromExchange(input, exchange, summary),
+          knownSecretsFromEnv(config.secrets)
+        );
         return sendJson(res, 200, { item: stored });
       }
 
@@ -210,7 +325,8 @@ export function createDiagnosticsServer(options = {}) {
     } catch (error) {
       const statusCode = error.statusCode && Number.isInteger(error.statusCode) ? error.statusCode : 500;
       return sendJson(res, statusCode, {
-        error: statusCode >= 500 ? 'internal_server_error' : error.message
+        error: statusCode >= 500 ? 'internal_server_error' : error.errorCode ?? error.message,
+        ...(statusCode >= 500 ? {} : { message: error.message })
       });
     }
   });

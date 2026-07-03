@@ -29,30 +29,47 @@ function scrubSecretString(value) {
     });
 }
 
-function scrubSecretStrings(value) {
+function knownSecretValues(knownSecrets) {
+  return [...new Set(knownSecrets.map((secret) => String(secret)).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+}
+
+function redactKnownSecretString(value, knownSecrets) {
+  let redacted = value;
+  for (const secret of knownSecrets) {
+    redacted = redacted.split(secret).join(maskValue(secret));
+  }
+  return redacted;
+}
+
+function scrubSecretStringValue(value, knownSecrets) {
+  return scrubSecretString(redactKnownSecretString(value, knownSecrets));
+}
+
+function scrubSecretStrings(value, knownSecrets = []) {
   if (Array.isArray(value)) {
-    return value.map((item) => scrubSecretStrings(item));
+    return value.map((item) => scrubSecretStrings(item, knownSecrets));
   }
   if (value && typeof value === 'object') {
     const out = {};
     for (const [key, child] of Object.entries(value)) {
-      out[key] = scrubSecretStrings(child);
+      out[scrubSecretStringValue(key, knownSecrets)] = scrubSecretStrings(child, knownSecrets);
     }
     return out;
   }
   if (typeof value === 'string') {
-    return scrubSecretString(value);
+    return scrubSecretStringValue(value, knownSecrets);
   }
   return value;
 }
 
-export async function appendHistory(filePath, record) {
+export async function appendHistory(filePath, record, knownSecrets = []) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const stored = scrubSecretStrings(maskSecrets({
     ...record,
     id: newHistoryId(),
     createdAt: new Date().toISOString()
-  }));
+  }), knownSecretValues(knownSecrets));
   await appendFile(filePath, `${JSON.stringify(stored)}\n`, 'utf8');
   return stored;
 }

