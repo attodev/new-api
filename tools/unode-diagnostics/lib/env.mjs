@@ -30,7 +30,7 @@ export function parseDotenv(content) {
   return env;
 }
 
-export async function loadEnvConfig(repoRoot = process.cwd()) {
+export async function loadEnvConfig(repoRoot = process.cwd(), envSource = process.env) {
   const envPath = path.join(repoRoot, '.env');
   let parsed = {};
   try {
@@ -45,7 +45,7 @@ export async function loadEnvConfig(repoRoot = process.cwd()) {
   const missing = [];
 
   for (const key of REQUIRED_ENV) {
-    const value = parsed[key] ?? process.env[key] ?? '';
+    const value = parsed[key] ?? envSource[key] ?? '';
     if (!value) missing.push(key);
     values[key] = value;
     secrets[key] = value;

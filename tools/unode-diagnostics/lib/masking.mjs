@@ -1,20 +1,26 @@
 const SECRET_KEY_NAMES = new Set([
   'authorization',
-  'x-api-key',
-  'api-key',
-  'x-goog-api-key',
-  'new-api-user',
-  'cookie',
-  'set-cookie',
+  'x_api_key',
   'api_key',
+  'x_goog_api_key',
+  'new_api_user',
+  'cookie',
+  'set_cookie',
   'access_token',
+  'refresh_token',
+  'client_secret',
   'token',
+  'tokens',
   'key'
 ]);
 
 function looksSecretKey(key) {
-  const normalized = String(key).toLowerCase();
-  return SECRET_KEY_NAMES.has(normalized) || normalized.includes('token') || normalized.includes('api_key');
+  const normalized = String(key)
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return SECRET_KEY_NAMES.has(normalized);
 }
 
 export function maskValue(value) {
