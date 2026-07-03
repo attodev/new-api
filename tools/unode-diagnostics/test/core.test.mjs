@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
 import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
+import { appendHistory, readHistory, readHistoryById } from '../lib/history.mjs';
 import { maskSecrets } from '../lib/masking.mjs';
 import { buildPresets } from '../lib/presets.mjs';
 import { summarizeExchange } from '../lib/summary.mjs';
@@ -148,6 +149,42 @@ test('maskSecrets leaves token counters visible but masks common secret key shap
   assert.equal(masked.credentials.refreshToken, 'refr...cdef');
   assert.equal(masked.credentials.client_secret, 'clie...3456');
   assert.deepEqual(masked.credentials.tokens, ['sk-s...3456', 'sk-s...cdef']);
+});
+
+test('history store appends and reads masked JSONL records newest first', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    const first = await appendHistory(filePath, {
+      presetId: 'first',
+      target: 'unode',
+      request: { headers: { Authorization: 'Bearer sk-first-123456' }, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'tool_not_used' }
+    });
+    const second = await appendHistory(filePath, {
+      presetId: 'second',
+      target: 'alrouter',
+      request: { headers: { 'x-api-key': 'sk-second-abcdef' }, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'web_search_used' }
+    });
+
+    const history = await readHistory(filePath);
+    assert.equal(history.length, 2);
+    assert.equal(history[0].id, second.id);
+    assert.equal(history[1].id, first.id);
+    assert.equal(history[0].request.headers['x-api-key'], 'sk-s...cdef');
+
+    const loaded = await readHistoryById(filePath, first.id);
+    assert.equal(loaded.presetId, 'first');
+
+    const raw = await readFile(filePath, 'utf8');
+    assert.equal(raw.includes('sk-first-123456'), false);
+    assert.equal(raw.includes('sk-second-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('buildPresets returns four editable diagnostic presets', () => {
