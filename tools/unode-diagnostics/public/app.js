@@ -42,6 +42,12 @@ function pretty(value) {
 function displayValue(value, fallback = '-') {
   if (value == null || value === '') return fallback;
   if (Array.isArray(value)) return value.length ? value.join(', ') : fallback;
+  if (typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([, child]) => child)
+      .map(([key]) => key);
+    return entries.length ? entries.join(', ') : fallback;
+  }
   return String(value);
 }
 
@@ -276,6 +282,12 @@ function restoreHistoryItem(item) {
 }
 
 function itemSearchText(item) {
+  const hints = item.summary?.hints && typeof item.summary.hints === 'object'
+    ? Object.entries(item.summary.hints)
+      .filter(([, value]) => value)
+      .map(([key]) => key)
+    : [];
+
   return [
     item.id,
     item.createdAt,
@@ -285,7 +297,7 @@ function itemSearchText(item) {
     item.request?.url,
     item.response?.status,
     item.summary?.classification,
-    ...(item.summary?.hints || [])
+    ...hints
   ].join(' ').toLowerCase();
 }
 
