@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
 import { appendHistory, readHistory, readHistoryById } from '../lib/history.mjs';
+import { prepareOutboundRequest } from '../lib/http-client.mjs';
 import { maskSecrets } from '../lib/masking.mjs';
 import { buildPresets } from '../lib/presets.mjs';
 import { summarizeExchange } from '../lib/summary.mjs';
@@ -289,6 +290,27 @@ test('buildPresets returns four editable diagnostic presets', () => {
   assert.equal(presets[0].path, '/v1/messages');
   assert.equal(presets[3].body.web_search_options.search_context_size, 'low');
   assert.equal(presets[3].headers.authorization, 'Bearer ${NEW_API_RELAY_API_KEY}-${NEW_API_CHANNEL_ID}');
+});
+
+test('prepareOutboundRequest expands env placeholders and builds URL', () => {
+  const prepared = prepareOutboundRequest({
+    method: 'POST',
+    baseUrl: '${NEW_API_BASE_URL}',
+    path: '/v1/chat/completions',
+    headers: {
+      authorization: 'Bearer ${NEW_API_RELAY_API_KEY}-${NEW_API_CHANNEL_ID}',
+      'content-type': 'application/json'
+    },
+    body: { model: 'claude-sonnet-4-6' }
+  }, {
+    NEW_API_BASE_URL: 'https://alrouter.ai/',
+    NEW_API_RELAY_API_KEY: 'sk-router',
+    NEW_API_CHANNEL_ID: '4'
+  });
+
+  assert.equal(prepared.url, 'https://alrouter.ai/v1/chat/completions');
+  assert.equal(prepared.headers.authorization, 'Bearer sk-router-4');
+  assert.equal(prepared.bodyText, '{"model":"claude-sonnet-4-6"}');
 });
 
 test('summarizeExchange detects Claude Code session and web search usage', () => {
