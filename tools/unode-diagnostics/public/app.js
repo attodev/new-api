@@ -1,3 +1,5 @@
+import { displayValue, itemSearchText } from './ui-helpers.js';
+
 const state = {
   config: null,
   presets: [],
@@ -37,18 +39,6 @@ const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'
 function pretty(value) {
   if (typeof value === 'string') return value;
   return JSON.stringify(value ?? {}, null, 2);
-}
-
-function displayValue(value, fallback = '-') {
-  if (value == null || value === '') return fallback;
-  if (Array.isArray(value)) return value.length ? value.join(', ') : fallback;
-  if (typeof value === 'object') {
-    const entries = Object.entries(value)
-      .filter(([, child]) => child)
-      .map(([key]) => key);
-    return entries.length ? entries.join(', ') : fallback;
-  }
-  return String(value);
 }
 
 function setMessage(element, message = '') {
@@ -279,26 +269,6 @@ function restoreHistoryItem(item) {
   setMessage(els['request-status'], `History restored: ${item.id || 'selected item'}`);
   renderResponse(item);
   renderHistory();
-}
-
-function itemSearchText(item) {
-  const hints = item.summary?.hints && typeof item.summary.hints === 'object'
-    ? Object.entries(item.summary.hints)
-      .filter(([, value]) => value)
-      .map(([key]) => key)
-    : [];
-
-  return [
-    item.id,
-    item.createdAt,
-    item.presetId,
-    item.target,
-    item.request?.method,
-    item.request?.url,
-    item.response?.status,
-    item.summary?.classification,
-    ...hints
-  ].join(' ').toLowerCase();
 }
 
 function renderHistory() {

@@ -41,4 +41,5 @@ test('browser workbench public assets expose required UI and API wiring', async 
   for (const endpoint of ['/api/config', '/api/presets', '/api/history', '/api/send', '/api/history/']) {
     assert.match(js, new RegExp(endpoint.replaceAll('/', '\\/')));
   }
+  assert.match(js, /from '\.\/ui-helpers\.js'/);
 });
