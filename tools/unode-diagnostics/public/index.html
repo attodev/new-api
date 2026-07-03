@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>unode Diagnostics Workbench</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>unode Diagnostics Workbench</h1>
+        <p id="workbench-status">Local request diagnostics</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="load-env" type="button">Load .env</button>
+        <button id="send-request" class="primary" type="button">Send API</button>
+      </div>
+    </header>
+
+    <main class="workbench" aria-label="Diagnostics workbench">
+      <aside class="pane history-pane" aria-label="History">
+        <div class="pane-title">
+          <div>
+            <h2>History</h2>
+            <span id="history-count" class="subtle">0 records</span>
+          </div>
+          <button id="reload-history" class="icon-button" type="button" title="Reload history">Reload</button>
+        </div>
+        <label class="field">
+          <span>Filter history</span>
+          <input id="history-filter" type="search" autocomplete="off" placeholder="classification, preset, URL" />
+        </label>
+        <div id="history-list" class="history-list" aria-live="polite"></div>
+      </aside>
+
+      <section class="pane request-pane" aria-label="Request editor">
+        <div class="pane-title">
+          <div>
+            <h2>Request</h2>
+            <span id="request-status" class="subtle">No request sent</span>
+          </div>
+          <span id="env-status" class="badge neutral">env not loaded</span>
+        </div>
+
+        <div id="config-display" class="config-grid" aria-label="Masked configuration"></div>
+
+        <label class="field">
+          <span>Preset</span>
+          <select id="preset-select"></select>
+        </label>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Target</span>
+            <select id="target">
+              <option value="unode">direct unode</option>
+              <option value="alrouter">ALRouter</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Method</span>
+            <select id="method">
+              <option>GET</option>
+              <option selected>POST</option>
+              <option>PUT</option>
+              <option>PATCH</option>
+              <option>DELETE</option>
+              <option>HEAD</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Base URL</span>
+          <input id="base-url" spellcheck="false" placeholder="https://example.invalid" />
+        </label>
+
+        <label class="field">
+          <span>Path</span>
+          <input id="path" spellcheck="false" placeholder="/v1/messages" />
+        </label>
+
+        <div class="editor-grid">
+          <label class="field editor-field">
+            <span>Headers JSON</span>
+            <textarea id="headers-json" spellcheck="false" autocomplete="off"></textarea>
+          </label>
+          <label class="field editor-field">
+            <span>Body JSON</span>
+            <textarea id="body-json" spellcheck="false" autocomplete="off"></textarea>
+          </label>
+        </div>
+
+        <div id="request-error" class="message error" role="alert"></div>
+      </section>
+
+      <section class="pane response-pane" aria-label="Response viewer">
+        <div class="pane-title">
+          <div>
+            <h2>Response</h2>
+            <span id="response-status" class="subtle">Waiting for response</span>
+          </div>
+          <span id="classification" class="badge neutral">none</span>
+        </div>
+
+        <div id="summary" class="summary-grid" aria-label="Response summary"></div>
+
+        <div class="response-split">
+          <label class="field response-field">
+            <span>Response Headers</span>
+            <textarea id="response-headers" readonly spellcheck="false"></textarea>
+          </label>
+          <label class="field response-field">
+            <span>Response Body</span>
+            <textarea id="response-body" readonly spellcheck="false"></textarea>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
