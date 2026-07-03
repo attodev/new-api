@@ -216,3 +216,140 @@ test('summarizeExchange classifies plain tool-unavailable text as suspected Clau
 
   assert.equal(summary.classification, 'claude_code_session_suspected');
 });
+
+test('summarizeExchange classifies request errors before tool and session signals', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 500,
+      headers: { 'x-cc-session-id': 'session-3' },
+      json: {
+        content: [
+          { type: 'server_tool_use', name: 'web_search' },
+          { type: 'tool_result', content: { error_code: 'too_many_requests' } }
+        ],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 1
+          }
+        }
+      },
+      bodyText: 'Claude Web Search called 1 times, cost: 4500'
+    }
+  });
+
+  assert.equal(summary.classification, 'request_error');
+});
+
+test('summarizeExchange classifies web search usage from usage counters', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '검색 결과입니다.' }],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 2
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(summary.webSearchRequests, 2);
+  assert.equal(summary.classification, 'web_search_used');
+});
+
+test('summarizeExchange classifies successful responses without tool signals as not used', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '일반 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.classification, 'tool_not_used');
+});
+
+test('summarizeExchange classifies records without status or signals as unknown', () => {
+  const summary = summarizeExchange({
+    response: {
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '상태 코드가 없는 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.classification, 'unknown');
+});
+
+test('summarizeExchange reads mixed-case request id headers', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {
+        'X-OneAPI-Request-ID': 'rid-mixed'
+      },
+      json: {
+        content: [{ type: 'text', text: '일반 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.requestId, 'rid-mixed');
+});
+
+test('summarizeExchange extracts OpenAI message content for classification', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: 'I cannot use web search from this session.'
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  assert.deepEqual(summary.contentTypes, ['message_text']);
+  assert.equal(summary.classification, 'claude_code_session_suspected');
+});
+
+test('summarizeExchange recursively extracts nested tool error codes', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [
+          {
+            type: 'tool_result',
+            content: [
+              {
+                type: 'json',
+                payload: {
+                  details: {
+                    error_code: 'too_many_requests'
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  });
+
+  assert.deepEqual(summary.toolErrorCodes, ['too_many_requests']);
+  assert.equal(summary.classification, 'tool_rate_limited');
+});

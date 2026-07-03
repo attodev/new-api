@@ -75,14 +75,29 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function collectErrorCodes(value, codes) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectErrorCodes(item, codes);
+    }
+    return;
+  }
+
+  if (!value || typeof value !== 'object') return;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'error_code' && typeof child === 'string') {
+      codes.push(child);
+      continue;
+    }
+    collectErrorCodes(child, codes);
+  }
+}
+
 function toolErrorCodes(blocks) {
   const codes = [];
   for (const block of blocks) {
-    if (!block || typeof block !== 'object') continue;
-    if (typeof block.error_code === 'string') codes.push(block.error_code);
-    if (block.content && typeof block.content === 'object' && typeof block.content.error_code === 'string') {
-      codes.push(block.content.error_code);
-    }
+    collectErrorCodes(block, codes);
   }
   return unique(codes);
 }
