@@ -19,3 +19,20 @@ Open the printed local URL.
 - History is written to `tools/unode-diagnostics/data/history.jsonl`.
 - Stored history masks authentication headers and token-like body fields.
 - Do not paste customer prompts or confidential customer data into diagnostics.
+
+## Verification
+
+```bash
+cd tools/unode-diagnostics
+npm test
+npm start
+```
+
+Then open `http://127.0.0.1:5179`.
+
+Run the four presets once and confirm:
+
+- response summary is populated
+- history persists after browser refresh
+- clicking a history item restores the request and response panes
+- `tools/unode-diagnostics/data/history.jsonl` contains masked auth values only
