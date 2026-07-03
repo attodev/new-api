@@ -6,6 +6,8 @@ import test from 'node:test';
 
 import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
 import { maskSecrets } from '../lib/masking.mjs';
+import { buildPresets } from '../lib/presets.mjs';
+import { summarizeExchange } from '../lib/summary.mjs';
 
 test('parseDotenv handles comments, quotes, and equals signs', () => {
   const env = parseDotenv(`
@@ -146,4 +148,71 @@ test('maskSecrets leaves token counters visible but masks common secret key shap
   assert.equal(masked.credentials.refreshToken, 'refr...cdef');
   assert.equal(masked.credentials.client_secret, 'clie...3456');
   assert.deepEqual(masked.credentials.tokens, ['sk-s...3456', 'sk-s...cdef']);
+});
+
+test('buildPresets returns four editable diagnostic presets', () => {
+  const presets = buildPresets({
+    UNODE_BASE_URL: 'https://www.unodetech.xyz',
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router',
+    NEW_API_CHANNEL_ID: '4'
+  });
+
+  assert.equal(presets.length, 4);
+  assert.deepEqual(presets.map((preset) => preset.id), [
+    'direct-messages-web-search',
+    'direct-chat-web-search-options',
+    'alrouter-messages-forced-channel',
+    'alrouter-chat-web-search-options'
+  ]);
+  assert.equal(presets[0].path, '/v1/messages');
+  assert.equal(presets[3].body.web_search_options.search_context_size, 'low');
+  assert.equal(presets[3].headers.authorization, 'Bearer ${NEW_API_RELAY_API_KEY}-${NEW_API_CHANNEL_ID}');
+});
+
+test('summarizeExchange detects Claude Code session and web search usage', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {
+        'x-cc-session-id': 'session-1',
+        'x-oneapi-request-id': 'rid-1'
+      },
+      json: {
+        content: [
+          { type: 'server_tool_use', name: 'web_search' },
+          { type: 'bash_code_execution_tool_result', content: { error_code: 'too_many_requests' } },
+          { type: 'text', text: 'Claude Web Search called 1 times, cost: 4500' }
+        ],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 1
+          }
+        }
+      },
+      bodyText: 'Claude Web Search called 1 times, cost: 4500'
+    }
+  });
+
+  assert.equal(summary.hasCcSessionId, true);
+  assert.equal(summary.requestId, 'rid-1');
+  assert.deepEqual(summary.contentTypes, ['server_tool_use', 'bash_code_execution_tool_result', 'text']);
+  assert.deepEqual(summary.toolErrorCodes, ['too_many_requests']);
+  assert.equal(summary.webSearchRequests, 1);
+  assert.equal(summary.classification, 'tool_rate_limited');
+});
+
+test('summarizeExchange classifies plain tool-unavailable text as suspected Claude Code session', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-cc-session-id': 'session-2' },
+      json: {
+        content: [{ type: 'text', text: '저는 웹 검색 도구를 사용할 수 없습니다.' }]
+      },
+      bodyText: '저는 웹 검색 도구를 사용할 수 없습니다.'
+    }
+  });
+
+  assert.equal(summary.classification, 'claude_code_session_suspected');
 });
