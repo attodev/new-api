@@ -69,3 +69,25 @@ test('maskSecrets masks auth headers and token-like body fields', () => {
   assert.equal(masked.request.body.nested.access_token, 'acce...cdef');
   assert.equal(masked.request.body.nested.regular, 'visible');
 });
+
+test('maskSecrets preserves arrays and objects under secret-like keys', () => {
+  const masked = maskSecrets({
+    tokens: ['sk-secret-123456', 'sk-secret-abcdef'],
+    'set-cookie': ['session-secret-123456', 'refresh-secret-abcdef'],
+    token: {
+      primary: 'sk-secret-123456',
+      nested: {
+        refresh: 'refresh-secret-abcdef'
+      }
+    }
+  });
+
+  assert.deepEqual(masked.tokens, ['sk-s...3456', 'sk-s...cdef']);
+  assert.deepEqual(masked['set-cookie'], ['sess...3456', 'refr...cdef']);
+  assert.deepEqual(masked.token, {
+    primary: 'sk-s...3456',
+    nested: {
+      refresh: 'refr...cdef'
+    }
+  });
+});

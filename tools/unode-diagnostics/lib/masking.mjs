@@ -27,15 +27,16 @@ export function maskValue(value) {
 }
 
 export function maskSecrets(value, parentKey = '') {
+  const shouldMask = looksSecretKey(parentKey);
   if (Array.isArray(value)) {
     return value.map((item) => maskSecrets(item, parentKey));
   }
   if (value && typeof value === 'object') {
     const out = {};
     for (const [key, child] of Object.entries(value)) {
-      out[key] = looksSecretKey(key) ? maskValue(child) : maskSecrets(child, key);
+      out[key] = maskSecrets(child, shouldMask ? parentKey : key);
     }
     return out;
   }
-  return looksSecretKey(parentKey) ? maskValue(value) : value;
+  return shouldMask ? maskValue(value) : value;
 }
