@@ -20,6 +20,7 @@ type TopUp struct {
 	TargetId           int     `json:"target_id" gorm:"default:0;index"`
 	Amount             int64   `json:"amount"`
 	Money              float64 `json:"money"`
+	Quota              int     `json:"quota" gorm:"default:0"`
 	TradeNo            string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
 	ProviderOrderId    string  `json:"provider_order_id" gorm:"type:varchar(255);index"`
 	ProviderOrderTime  int64   `json:"provider_order_time" gorm:"default:0;index"`
@@ -122,6 +123,28 @@ func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int) error {
 		}
 		return nil
 	}
+}
+
+func CreditedQuotaForTopUp(topUp *TopUp) int {
+	if topUp != nil && topUp.Quota > 0 {
+		return topUp.Quota
+	}
+	if topUp == nil {
+		return 0
+	}
+	return int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+}
+
+func CreditedQuotaForTossTopUp(topUp *TopUp) int {
+	if topUp != nil && topUp.Quota > 0 {
+		return topUp.Quota
+	}
+	if topUp != nil && topUp.Amount > 0 {
+		if quota := TossCreditQuotaFromKRW(topUp.Amount); quota > 0 {
+			return quota
+		}
+	}
+	return CreditedQuotaForTopUp(topUp)
 }
 
 func GetTopUpById(id int) *TopUp {
@@ -490,9 +513,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		// calculate quota to credit:
 		// - Stripe/PayPal/Toss orders: Money is USD amount after group-rate conversion, multiply by QuotaPerUnit
 		// - Other orders (e.g. Epay): Amount is USD amount, multiply by QuotaPerUnit
-		if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal || topUp.PaymentProvider == PaymentProviderToss {
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(dQuotaPerUnit).IntPart())
+		if topUp.PaymentProvider == PaymentProviderToss {
+			quotaToAdd = CreditedQuotaForTossTopUp(topUp)
+		} else if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal {
+			quotaToAdd = CreditedQuotaForTopUp(topUp)
 		} else {
 			dAmount := decimal.NewFromInt(topUp.Amount)
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
@@ -779,7 +803,7 @@ func RechargeToss(tradeNo string, paymentKey string, callerIp string) (err error
 			return err
 		}
 
-		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		quotaToAdd = CreditedQuotaForTossTopUp(topUp)
 		if quotaToAdd <= 0 {
 			return errors.New("invalid top-up quota")
 		}

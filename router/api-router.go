@@ -67,6 +67,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/subscription/toss/fail/:trade_no", controller.SubscriptionTossBillingFail)
 		apiRouter.GET("/subscription/toss/confirm", controller.SubscriptionTossBillingConfirm)
 		apiRouter.GET("/subscription/toss/fail", controller.SubscriptionTossBillingFail)
+		apiRouter.GET("/wallet/auto-recharge/toss/confirm", controller.WalletAutoRechargeTossConfirm)
+		apiRouter.GET("/wallet/auto-recharge/toss/fail", controller.WalletAutoRechargeTossFail)
 		// :env separates test vs prod URLs so the operator can register each
 		// in Pancake's matching webhook slot; handler enforces env match.
 		apiRouter.POST("/waffo-pancake/webhook/:env", controller.WaffoPancakeWebhook)
@@ -105,6 +107,12 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/aff", controller.GetAffCode)
 				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
+				selfRoute.GET("/wallet/auto-recharge", controller.GetWalletAutoRecharge)
+				selfRoute.GET("/wallet/auto-recharge/presets", controller.GetWalletAutoRechargePresets)
+				selfRoute.POST("/wallet/auto-recharge/scheduled", middleware.CriticalRateLimit(), controller.RequestWalletScheduledRecharge)
+				selfRoute.POST("/wallet/auto-recharge/threshold", middleware.CriticalRateLimit(), controller.RequestWalletThresholdRecharge)
+				selfRoute.DELETE("/wallet/auto-recharge/pending/:trade_no", controller.CancelPendingWalletAutoRecharge)
+				selfRoute.DELETE("/wallet/auto-recharge/:id", controller.CancelWalletAutoRecharge)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
 				selfRoute.POST("/amount", controller.RequestAmount)
@@ -165,6 +173,15 @@ func SetApiRouter(router *gin.Engine) {
 			}
 		}
 
+		adminRoute := apiRouter.Group("/admin")
+		adminRoute.Use(middleware.AdminAuth())
+		{
+			adminRoute.GET("/wallet/auto-recharge/presets", controller.ListWalletAutoRechargePresets)
+			adminRoute.POST("/wallet/auto-recharge/presets", controller.CreateWalletAutoRechargePreset)
+			adminRoute.PUT("/wallet/auto-recharge/presets/:id", controller.UpdateWalletAutoRechargePreset)
+			adminRoute.DELETE("/wallet/auto-recharge/presets/:id", controller.DeleteWalletAutoRechargePreset)
+		}
+
 		organizationsRoute := apiRouter.Group("/organizations")
 		organizationsRoute.Use(middleware.RootAuth())
 		{
@@ -199,6 +216,12 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.PUT("/subscription/users/:id", controller.AssignOrganizationUserSubscription)
 			organizationRoute.DELETE("/subscription/users/:id", controller.CancelOrganizationUserSubscription)
 			organizationRoute.GET("/wallet", controller.GetOrganizationWallet)
+			organizationRoute.GET("/wallet/auto-recharge", controller.GetOrganizationWalletAutoRecharge)
+			organizationRoute.GET("/wallet/auto-recharge/presets", controller.GetOrganizationWalletAutoRechargePresets)
+			organizationRoute.POST("/wallet/auto-recharge/scheduled", middleware.CriticalRateLimit(), controller.RequestOrganizationWalletScheduledRecharge)
+			organizationRoute.POST("/wallet/auto-recharge/threshold", middleware.CriticalRateLimit(), controller.RequestOrganizationWalletThresholdRecharge)
+			organizationRoute.DELETE("/wallet/auto-recharge/pending/:trade_no", controller.CancelPendingOrganizationWalletAutoRecharge)
+			organizationRoute.DELETE("/wallet/auto-recharge/:id", controller.CancelOrganizationWalletAutoRecharge)
 			organizationRoute.GET("/topup/self", controller.GetOrganizationTopUps)
 			organizationRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationEpay)
 			organizationRoute.POST("/amount", controller.RequestOrganizationAmount)

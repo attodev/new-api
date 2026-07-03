@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useEffect } from 'react'
 import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { formatCurrencyFromUSD } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -40,13 +41,21 @@ import {
   getPaymentIcon,
   getMinTopupAmount,
   calculatePresetPricing,
+  isTossPayment,
 } from '../lib'
+import {
+  TOSS_KRW_PRESETS,
+  TOSS_QUOTA_PRESETS,
+  formatWonAmount,
+  getTossPreview,
+} from '../lib/topup-amount-mode'
 import type {
   PaymentMethod,
   PresetAmount,
   TopupInfo,
   CreemProduct,
   WaffoPayMethod,
+  TopupAmountMode,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
 
@@ -57,6 +66,9 @@ interface RechargeFormCardProps {
   onSelectPreset: (preset: PresetAmount) => void
   topupAmount: number
   onTopupAmountChange: (amount: number) => void
+  amountMode?: TopupAmountMode
+  onAmountModeChange?: (mode: TopupAmountMode) => void
+  tossUnitPrice?: number
   paymentAmount: number
   calculating: boolean
   onPaymentMethodSelect: (method: PaymentMethod) => void
@@ -81,6 +93,31 @@ interface RechargeFormCardProps {
   showRedemption?: boolean
 }
 
+function isTossOnlyAmountModeFlow(
+  topupInfo: TopupInfo | null,
+  enableWaffoTopup?: boolean,
+  enableWaffoPancakeTopup?: boolean
+) {
+  const standardMethods = topupInfo?.pay_methods ?? []
+  const hasNonTossStandardMethod = standardMethods.some(
+    (method) => !isTossPayment(method.type)
+  )
+  const hasNonTossConfiguredTopup =
+    !!topupInfo?.enable_online_topup ||
+    !!topupInfo?.enable_stripe_topup ||
+    !!topupInfo?.enable_paypal_topup ||
+    !!topupInfo?.enable_waffo_topup ||
+    !!topupInfo?.enable_waffo_pancake_topup ||
+    !!enableWaffoTopup ||
+    !!enableWaffoPancakeTopup
+
+  return (
+    !!topupInfo?.enable_toss_topup &&
+    !hasNonTossStandardMethod &&
+    !hasNonTossConfiguredTopup
+  )
+}
+
 export function RechargeFormCard({
   topupInfo,
   presetAmounts,
@@ -88,6 +125,9 @@ export function RechargeFormCard({
   onSelectPreset,
   topupAmount,
   onTopupAmountChange,
+  amountMode,
+  onAmountModeChange,
+  tossUnitPrice,
   paymentAmount,
   calculating,
   onPaymentMethodSelect,
@@ -140,6 +180,36 @@ export function RechargeFormCard({
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
+  const usesTossAmountMode =
+    !!onAmountModeChange &&
+    isTossOnlyAmountModeFlow(
+      topupInfo,
+      enableWaffoTopup,
+      enableWaffoPancakeTopup
+    )
+  const activeAmountMode = amountMode ?? 'krw'
+  const tossPresetValues =
+    activeAmountMode === 'krw' ? TOSS_KRW_PRESETS : TOSS_QUOTA_PRESETS
+  const amountPresets: PresetAmount[] = usesTossAmountMode
+    ? tossPresetValues.map((value) => ({ value }))
+    : presetAmounts
+  const customPreview = usesTossAmountMode
+    ? getTossPreview(topupAmount, activeAmountMode, tossUnitPrice)
+    : null
+  const customPreviewLabel =
+    usesTossAmountMode && activeAmountMode === 'krw'
+      ? t('Credit amount')
+      : usesTossAmountMode
+        ? t('Payment amount')
+        : t('Amount to pay:')
+  const customPreviewText =
+    customPreview && activeAmountMode === 'krw'
+      ? `${t('Credit')} +${formatCurrencyFromUSD(customPreview.creditAmount)}`
+      : customPreview
+        ? formatWonAmount(paymentAmount || customPreview.chargeAmount)
+        : formatCurrency(paymentAmount)
+  const customInputMin =
+    usesTossAmountMode && activeAmountMode === 'quota' ? 1 : minTopup
 
   if (loading) {
     return (
@@ -215,13 +285,77 @@ export function RechargeFormCard({
         <div className='space-y-4 sm:space-y-6'>
           {hasConfigurableTopup && (
             <>
-              {presetAmounts.length > 0 && (
+              {usesTossAmountMode && onAmountModeChange ? (
+                <div className='grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-1'>
+                  <Button
+                    type='button'
+                    variant={activeAmountMode === 'krw' ? 'default' : 'ghost'}
+                    onClick={() => onAmountModeChange('krw')}
+                    aria-pressed={activeAmountMode === 'krw'}
+                  >
+                    {t('KRW based')}
+                  </Button>
+                  <Button
+                    type='button'
+                    variant={
+                      activeAmountMode === 'quota' ? 'default' : 'ghost'
+                    }
+                    onClick={() => onAmountModeChange('quota')}
+                    aria-pressed={activeAmountMode === 'quota'}
+                  >
+                    {t('Quota based')}
+                  </Button>
+                </div>
+              ) : null}
+
+              {amountPresets.length > 0 && (
                 <div className='space-y-2.5 sm:space-y-3'>
                   <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                     {t('Amount')}
                   </Label>
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 md:grid-cols-4'>
-                    {presetAmounts.map((preset, index) => {
+                    {amountPresets.map((preset, index) => {
+                      if (usesTossAmountMode) {
+                        const preview = getTossPreview(
+                          preset.value,
+                          activeAmountMode,
+                          tossUnitPrice
+                        )
+                        const primary =
+                          activeAmountMode === 'krw'
+                            ? formatWonAmount(preset.value)
+                            : formatNumber(preset.value)
+                        const secondary =
+                          activeAmountMode === 'krw'
+                            ? `${t('Credit')} +${formatCurrencyFromUSD(
+                                preview.creditAmount
+                              )}`
+                            : `${t('Pay')} ${formatWonAmount(
+                                preview.chargeAmount
+                              )}`
+
+                        return (
+                          <Button
+                            key={index}
+                            variant='outline'
+                            className={cn(
+                              'hover:border-foreground flex min-h-16 flex-col items-start rounded-lg px-3 py-2.5 text-left whitespace-normal sm:min-h-[72px] sm:p-4',
+                              selectedPreset === preset.value
+                                ? 'border-foreground bg-foreground/5 dark:border-foreground dark:bg-foreground/10'
+                                : 'border-muted'
+                            )}
+                            onClick={() => onSelectPreset(preset)}
+                          >
+                            <div className='text-base font-semibold sm:text-lg'>
+                              {primary}
+                            </div>
+                            <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
+                              {secondary}
+                            </div>
+                          </Button>
+                        )
+                      }
+
                       const discount =
                         preset.discount ||
                         topupInfo?.discount?.[preset.value] ||
@@ -288,19 +422,19 @@ export function RechargeFormCard({
                     type='number'
                     value={localAmount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    min={minTopup}
-                    placeholder={`Minimum ${minTopup}`}
+                    min={customInputMin}
+                    placeholder={`Minimum ${customInputMin}`}
                     className='h-9 text-base sm:h-10 sm:text-lg'
                   />
                   <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
                     <span className='text-muted-foreground truncate text-xs'>
-                      {t('Amount to pay:')}
+                      {customPreviewLabel}
                     </span>
                     {calculating ? (
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {customPreviewText}
                       </span>
                     )}
                   </div>
@@ -315,7 +449,17 @@ export function RechargeFormCard({
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
                     {topupInfo?.pay_methods?.map((method) => {
                       const minTopup = method.min_topup || 0
-                      const disabled = minTopup > topupAmount
+                      const amountForMinimum =
+                        usesTossAmountMode &&
+                        isTossPayment(method.type) &&
+                        activeAmountMode === 'quota'
+                          ? getTossPreview(
+                              topupAmount,
+                              activeAmountMode,
+                              tossUnitPrice
+                            ).chargeAmount
+                          : topupAmount
+                      const disabled = minTopup > amountForMinimum
 
                       const button = (
                         <Button

@@ -17,11 +17,9 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -125,6 +123,7 @@ func doTossAPIRequestWithSecret(ctx context.Context, method, endpoint string, bo
 
 type TossPayRequest struct {
 	Amount        int64  `json:"amount"`
+	AmountMode    string `json:"amount_mode"`
 	PaymentMethod string `json:"payment_method"`
 }
 
@@ -157,46 +156,12 @@ func tossSecretFromCredential(ctx context.Context, encrypted, fallback string) s
 	return secret
 }
 
-// getTossPayMoney returns the KRW amount to charge for the given entered amount.
-// It applies both the group top-up ratio and the amount-based discount (keyed on
-// the entered amount), mirroring getPayPalPayMoney for provider parity.
-// getTossPayMoney converts an entered amount (in display units, same model as PayPal/$)
-// to the KRW to charge: chargedKRW = units × TossUnitPrice × groupRatio × discount.
-// This keeps Toss internally identical to the USD/unit model (Money = chargedKRW/TossUnitPrice
-// = units, quota = Money × QuotaPerUnit) while charging in KRW.
-func getTossPayMoney(amountUnits int64, group string) int64 {
-	amt := decimal.NewFromInt(amountUnits)
-	// When the platform displays quota as raw tokens, the entered amount is tokens; convert to units.
-	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
-		amt = amt.Div(decimal.NewFromFloat(common.QuotaPerUnit))
-	}
-	ratio := common.GetTopupGroupRatio(group)
-	if ratio == 0 {
-		ratio = 1
-	}
-	discount := 1.0
-	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountUnits)]; ok && ds > 0 {
-		discount = ds
-	}
-	unit := setting.TossUnitPrice
-	if unit <= 0 {
-		return 0
-	}
-	return amt.
-		Mul(decimal.NewFromFloat(unit)).
-		Mul(decimal.NewFromFloat(ratio)).
-		Mul(decimal.NewFromFloat(discount)).
-		Round(0).
-		IntPart()
+func getTossPayMoney(amountKRW int64, group string) int64 {
+	return model.TossTopUpChargedKRW(amountKRW, group)
 }
 
-// tossUSDEquivalent converts charged KRW to the USD-equivalent stored in Money.
-func tossUSDEquivalent(chargedKRW int64) float64 {
-	unit := setting.TossUnitPrice
-	if unit <= 0 {
-		return 0
-	}
-	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
+func getTossTopUpQuote(amount int64, amountMode string, group string) model.TossTopUpQuote {
+	return model.QuoteTossTopUp(amount, amountMode, group)
 }
 
 func RequestTossAmount(c *gin.Context) {
@@ -209,18 +174,18 @@ func RequestTossAmount(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
-	if req.Amount < int64(setting.TossMinTopUp) {
+	id := c.GetInt("id")
+	user, _ := model.GetUserById(id, false)
+	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
+	if quote.ChargeKRW < int64(setting.TossMinTopUp) {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
 		return
 	}
-	id := c.GetInt("id")
-	user, _ := model.GetUserById(id, false)
-	charged := getTossPayMoney(req.Amount, user.Group)
-	if !model.IsTossCardAmountPayableKRW(charged) {
+	if quote.ChargeKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatInt(charged, 10)})
+	c.JSON(http.StatusOK, gin.H{"message": "success", "data": quote})
 }
 
 // isValidServerAddress reports whether addr can be used as a Toss callback base.
@@ -260,16 +225,17 @@ func RequestTossPay(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentNotConfigured)
 		return
 	}
-	if req.Amount < int64(setting.TossMinTopUp) {
-		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
-		return
-	}
 
 	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 
-	chargedKRW := getTossPayMoney(req.Amount, user.Group)
-	if !model.IsTossCardAmountPayableKRW(chargedKRW) {
+	quote := getTossTopUpQuote(req.Amount, req.AmountMode, user.Group)
+	chargedKRW := quote.ChargeKRW
+	if chargedKRW < int64(setting.TossMinTopUp) {
+		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooSmall, map[string]any{"Min": setting.TossMinTopUp})
+		return
+	}
+	if chargedKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
@@ -297,7 +263,8 @@ func RequestTossPay(c *gin.Context) {
 		TargetType:         getTopUpTargetType(c),
 		TargetId:           getTopUpTargetId(c),
 		Amount:             chargedKRW,
-		Money:              tossUSDEquivalent(chargedKRW),
+		Money:              quote.CreditAmount,
+		Quota:              quote.CreditQuota,
 		TradeNo:            orderId,
 		ProviderOrderId:    orderId,
 		ProviderCredential: providerCredential,
@@ -316,13 +283,18 @@ func RequestTossPay(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"client_key":   setting.TossActiveClientKey(),
-			"customer_key": customerKey,
-			"order_id":     orderId,
-			"order_name":   fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
-			"amount":       chargedKRW,
-			"success_url":  serverBase + "/api/toss/confirm",
-			"fail_url":     serverBase + "/api/toss/fail",
+			"client_key":    setting.TossActiveClientKey(),
+			"customer_key":  customerKey,
+			"order_id":      orderId,
+			"order_name":    fmt.Sprintf("크레딧 충전 %d원", chargedKRW),
+			"amount":        chargedKRW,
+			"charge_amount": chargedKRW,
+			"credit_amount": quote.CreditAmount,
+			"credit_quota":  quote.CreditQuota,
+			"unit_price":    quote.UnitPrice,
+			"amount_mode":   quote.AmountMode,
+			"success_url":   serverBase + "/api/toss/confirm",
+			"fail_url":      serverBase + "/api/toss/fail",
 		},
 	})
 }

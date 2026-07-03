@@ -21,6 +21,7 @@ import i18next from 'i18next'
 import { toast } from 'sonner'
 import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import { requestTossPayment, isApiSuccess } from '../api'
+import type { TopupAmountMode } from '../types'
 
 // ============================================================================
 // Toss Payment Hook
@@ -30,51 +31,58 @@ import { requestTossPayment, isApiSuccess } from '../api'
 export function useTossPayment() {
   const [processing, setProcessing] = useState(false)
 
-  const processTossPayment = useCallback(async (topupAmount: number) => {
-    try {
-      setProcessing(true)
-      const amount = Math.floor(topupAmount)
-      const response = await requestTossPayment({ amount, payment_method: 'toss' })
+  const processTossPayment = useCallback(
+    async (topupAmount: number, amountMode?: TopupAmountMode) => {
+      try {
+        setProcessing(true)
+        const amount = Math.floor(topupAmount)
+        const response = await requestTossPayment({
+          amount,
+          amount_mode: amountMode,
+          payment_method: 'toss',
+        })
 
-      if (!isApiSuccess(response) || !response.data) {
-        toast.error(response.message || i18next.t('Payment request failed'))
+        if (!isApiSuccess(response) || !response.data) {
+          toast.error(response.message || i18next.t('Payment request failed'))
+          return false
+        }
+
+        const {
+          client_key,
+          customer_key,
+          order_id,
+          order_name,
+          amount: chargeAmount,
+          success_url,
+          fail_url,
+        } = response.data
+
+        const tossPayments = await loadTossPayments(client_key)
+        const payment = tossPayments.payment({ customerKey: customer_key })
+
+        await payment.requestPayment({
+          method: 'CARD',
+          amount: { currency: 'KRW', value: chargeAmount },
+          orderId: order_id,
+          orderName: order_name,
+          successUrl: success_url,
+          failUrl: fail_url,
+        })
+        // requestPayment가 결제창으로 리다이렉트하므로 이 지점 이후는 도달하지 않는다.
+        return true
+      } catch (err) {
+        // 유저가 결제창을 닫으면 SDK가 PAY_PROCESS_CANCELED로 reject한다 — 조용히 실패 처리.
+        const e = err as { code?: string; message?: string }
+        if (e?.code && e.code !== 'PAY_PROCESS_CANCELED') {
+          toast.error(i18next.t('Payment request failed'))
+        }
         return false
+      } finally {
+        setProcessing(false)
       }
-
-      const {
-        client_key,
-        customer_key,
-        order_id,
-        order_name,
-        amount: chargeAmount,
-        success_url,
-        fail_url,
-      } = response.data
-
-      const tossPayments = await loadTossPayments(client_key)
-      const payment = tossPayments.payment({ customerKey: customer_key })
-
-      await payment.requestPayment({
-        method: 'CARD',
-        amount: { currency: 'KRW', value: chargeAmount },
-        orderId: order_id,
-        orderName: order_name,
-        successUrl: success_url,
-        failUrl: fail_url,
-      })
-      // requestPayment가 결제창으로 리다이렉트하므로 이 지점 이후는 도달하지 않는다.
-      return true
-    } catch (err) {
-      // 유저가 결제창을 닫으면 SDK가 PAY_PROCESS_CANCELED로 reject한다 — 조용히 실패 처리.
-      const e = err as { code?: string; message?: string }
-      if (e?.code && e.code !== 'PAY_PROCESS_CANCELED') {
-        toast.error(i18next.t('Payment request failed'))
-      }
-      return false
-    } finally {
-      setProcessing(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   return { processing, processTossPayment }
 }

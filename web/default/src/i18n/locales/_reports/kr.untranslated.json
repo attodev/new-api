@@ -1,6 +1,7 @@
 {
   "API key is loading, please try again in a moment": "API 키를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.",
   "AWS Bedrock Claude Compat": "AWS Bedrock Claude Compat",
+  "Client Key": "Client Key",
   "Doubao Coding Plan": "Doubao Coding Plan",
   "e.g. llama3.1:8b": "e.g. llama3.1:8b",
   "e.g. my-gitlab": "e.g. my-gitlab",
@@ -45,6 +46,5 @@
   "Tokenizer": "Tokenizer",
   "Underground": "Underground",
   "Vision": "Vision",
-  "Waffo Aggregator Gateway": "Waffo Aggregator Gateway",
-  "Client Key": "Client Key"
+  "Waffo Aggregator Gateway": "Waffo Aggregator Gateway"
 }

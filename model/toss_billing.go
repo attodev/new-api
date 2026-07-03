@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -32,6 +33,9 @@ const (
 	BillingKeyStatusPendingRevocation = "pending_revocation"
 	BillingKeyStatusRevoked           = "revoked"
 	TossBillingMaxFails               = 3
+
+	TossTopUpAmountModeKRW   = "krw"
+	TossTopUpAmountModeQuota = "quota"
 )
 
 var ErrTossBillingKeyAlreadyDeleted = errors.New("toss billing key already deleted")
@@ -123,6 +127,132 @@ func truncateRunes(value string, maxRunes int) string {
 		return value
 	}
 	return string(runes[:maxRunes])
+}
+
+// TossTopUpChargedKRW returns the KRW amount charged for a Toss top-up amount.
+// The input amount is the user-entered KRW/quota-equivalent amount; group
+// top-up ratios and amount discounts are applied to the actual card charge.
+func TossTopUpChargedKRW(amountKRW int64, group string) int64 {
+	ratio := common.GetTopupGroupRatio(group)
+	if ratio == 0 {
+		ratio = 1
+	}
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amountKRW)]; ok && ds > 0 {
+		discount = ds
+	}
+	return decimal.NewFromInt(amountKRW).
+		Mul(decimal.NewFromFloat(ratio)).
+		Mul(decimal.NewFromFloat(discount)).
+		Round(0).
+		IntPart()
+}
+
+// TossUSDEquivalent converts charged KRW to the USD-equivalent stored in TopUp.Money.
+func TossUSDEquivalent(chargedKRW int64) float64 {
+	unit := setting.TossUnitPrice
+	if unit <= 0 {
+		unit = 1
+	}
+	return decimal.NewFromInt(chargedKRW).Div(decimal.NewFromFloat(unit)).InexactFloat64()
+}
+
+func TossCreditQuotaFromKRW(chargedKRW int64) int {
+	unit := setting.TossUnitPrice
+	if unit <= 0 || chargedKRW <= 0 {
+		return 0
+	}
+	return int(decimal.NewFromInt(chargedKRW).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+		Div(decimal.NewFromFloat(unit)).
+		IntPart())
+}
+
+type TossTopUpQuote struct {
+	AmountMode   string  `json:"amount_mode"`
+	InputAmount  int64   `json:"input_amount"`
+	ChargeKRW    int64   `json:"charge_amount"`
+	CreditAmount float64 `json:"credit_amount"`
+	CreditQuota  int     `json:"credit_quota"`
+	UnitPrice    float64 `json:"unit_price"`
+}
+
+func NormalizeTossTopUpAmountMode(amountMode string) string {
+	switch amountMode {
+	case TossTopUpAmountModeQuota:
+		return TossTopUpAmountModeQuota
+	default:
+		return TossTopUpAmountModeKRW
+	}
+}
+
+func tossTopUpUnitPrice() float64 {
+	return setting.TossUnitPrice
+}
+
+func tossTopUpPriceFactor(amount int64, group string) float64 {
+	ratio := common.GetTopupGroupRatio(group)
+	if ratio == 0 {
+		ratio = 1
+	}
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amount)]; ok && ds > 0 {
+		discount = ds
+	}
+	return ratio * discount
+}
+
+func QuoteTossTopUp(amount int64, amountMode string, group string) TossTopUpQuote {
+	mode := NormalizeTossTopUpAmountMode(amountMode)
+	unit := tossTopUpUnitPrice()
+	if unit <= 0 {
+		return TossTopUpQuote{
+			AmountMode:  mode,
+			InputAmount: amount,
+			UnitPrice:   0,
+		}
+	}
+	factor := tossTopUpPriceFactor(amount, group)
+
+	quote := TossTopUpQuote{
+		AmountMode:  mode,
+		InputAmount: amount,
+		UnitPrice:   unit,
+	}
+	if amount <= 0 {
+		return quote
+	}
+
+	switch mode {
+	case TossTopUpAmountModeQuota:
+		credit := decimal.NewFromInt(amount)
+		charge := credit.
+			Mul(decimal.NewFromFloat(unit)).
+			Mul(decimal.NewFromFloat(factor)).
+			Round(0).
+			IntPart()
+		quote.ChargeKRW = charge
+		quote.CreditAmount = credit.InexactFloat64()
+		quote.CreditQuota = int(credit.
+			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+			IntPart())
+	default:
+		charge := decimal.NewFromInt(amount)
+		unitDec := decimal.NewFromFloat(unit)
+		factorDec := decimal.NewFromFloat(factor)
+		credit := charge.
+			Div(unitDec).
+			Div(factorDec)
+		quote.ChargeKRW = amount
+		quote.CreditAmount = credit.InexactFloat64()
+		quote.CreditQuota = int(decimal.NewFromInt(amount).
+			Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
+			Div(unitDec).
+			Div(factorDec).
+			IntPart())
+	}
+
+	return quote
 }
 
 // tossNextBillingTime returns when to charge the next period: a lead BEFORE endUnix so the

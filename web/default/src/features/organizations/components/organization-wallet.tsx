@@ -21,28 +21,44 @@ import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth-store'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import { isApiSuccess } from '@/features/wallet/api'
+import {
+  AutoRechargeCard,
+  getVisibleAutoRechargeModes,
+} from '@/features/wallet/components/auto-recharge-card'
 import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from '@/features/wallet/components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from '@/features/wallet/components/dialogs/payment-confirm-dialog'
 import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
 import { WalletStatsCard } from '@/features/wallet/components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE } from '@/features/wallet/constants'
-import { useTopupInfo } from '@/features/wallet/hooks'
+import { useTopupInfo, useWalletAutoRecharge } from '@/features/wallet/hooks'
 import {
   getDefaultPaymentType,
   getMinTopupAmount,
+  isPayPalPayment,
+  isStripePayment,
+  isTossPayment,
+  isWaffoPancakePayment,
+  shouldOpenPaymentConfirmDialog,
   submitPaymentForm,
 } from '@/features/wallet/lib'
+import {
+  getTossPreview,
+  parseTossQuoteData,
+} from '@/features/wallet/lib/topup-amount-mode'
 import type {
   CreemProduct,
   PaymentMethod,
   PresetAmount,
-  TossPaymentResponse,
+  TopupAmountMode,
+  TossTopupQuote,
   UserWalletData,
 } from '@/features/wallet/types'
 import {
@@ -61,7 +77,6 @@ import {
   requestOrganizationWaffoPancakePayment,
   requestOrganizationWaffoPayment,
 } from '../api'
-import { getOrganizationWalletPaymentFlow } from '../lib/organization-wallet-payment'
 import type { Organization } from '../types'
 
 function getPaymentUrl(data: unknown): string | null {
@@ -96,15 +111,41 @@ function isSafeHttpUrl(value: string): boolean {
   }
 }
 
+export function canManageOrganizationAutoRecharge(
+  ownerUserId: number | null | undefined,
+  currentUserId: number | null | undefined
+) {
+  return (
+    ownerUserId !== null &&
+    ownerUserId !== undefined &&
+    ownerUserId === currentUserId
+  )
+}
+
+export function getOrganizationAmountModeRequest(
+  amount: number,
+  paymentType: string,
+  amountMode: TopupAmountMode
+) {
+  return isTossPayment(paymentType)
+    ? { amount, amount_mode: amountMode }
+    : { amount }
+}
+
 export function OrganizationWallet() {
   const { t } = useTranslation()
+  const [activeTab, setActiveTab] = useState('topup')
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizationLoading, setOrganizationLoading] = useState(true)
   const [topupAmount, setTopupAmount] = useState(0)
+  const [topupAmountMode, setTopupAmountMode] = useState<TopupAmountMode>('krw')
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
   const [paymentAmount, setPaymentAmount] = useState(0)
+  const [tossQuote, setTossQuote] = useState<Partial<TossTopupQuote> | null>(
+    null
+  )
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null)
@@ -114,9 +155,18 @@ export function OrganizationWallet() {
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
 
+  const currentUser = useAuthStore((state) => state.auth.user)
   const { status } = useStatus()
   const { currency } = useSystemConfig()
   const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
+  const canManageAutoRecharge = canManageOrganizationAutoRecharge(
+    organization?.owner_user_id,
+    currentUser?.id
+  )
+  const walletAutoRecharge = useWalletAutoRecharge(
+    'organization',
+    canManageAutoRecharge
+  )
 
   const effectiveUsdExchangeRate = useMemo(() => {
     return currency?.quotaDisplayType === 'USD'
@@ -161,38 +211,62 @@ export function OrganizationWallet() {
     void fetchOrganization()
   }, [fetchOrganization])
 
+  const getAmountForMinimumCheck = useCallback(
+    (amount: number, paymentType: string, amountMode: TopupAmountMode) => {
+      if (isTossPayment(paymentType) && amountMode === 'quota') {
+        return getTossPreview(amount, amountMode, topupInfo?.toss_unit_price)
+          .chargeAmount
+      }
+      return amount
+    },
+    [topupInfo?.toss_unit_price]
+  )
+
   const calculatePaymentAmount = useCallback(
-    async (amount: number, paymentType: string) => {
+    async (
+      amount: number,
+      paymentType: string,
+      amountMode: TopupAmountMode = topupAmountMode
+    ) => {
       try {
         setCalculating(true)
-        const request = { amount }
-        const flow = getOrganizationWalletPaymentFlow(paymentType)
-        const response =
-          flow === 'stripe'
-            ? await calculateOrganizationStripeAmount(request)
-            : flow === 'paypal'
-              ? await calculateOrganizationPayPalAmount(request)
-              : flow === 'waffo_pancake'
-                ? await calculateOrganizationWaffoPancakeAmount(request)
-                : flow === 'toss'
-                  ? await calculateOrganizationTossAmount(request)
-                  : await calculateOrganizationAmount(request)
+        const request = getOrganizationAmountModeRequest(
+          amount,
+          paymentType,
+          amountMode
+        )
+        const response = isStripePayment(paymentType)
+          ? await calculateOrganizationStripeAmount(request)
+          : isPayPalPayment(paymentType)
+            ? await calculateOrganizationPayPalAmount(request)
+            : isWaffoPancakePayment(paymentType)
+              ? await calculateOrganizationWaffoPancakeAmount(request)
+              : isTossPayment(paymentType)
+                ? await calculateOrganizationTossAmount(request)
+                : await calculateOrganizationAmount(request)
 
         if (isApiSuccess(response) && response.data) {
-          const value = parseFloat(response.data)
+          const quote = isTossPayment(paymentType)
+            ? parseTossQuoteData(response.data)
+            : null
+          setTossQuote(isTossPayment(paymentType) ? quote : null)
+          const value =
+            quote?.charge_amount ?? parseFloat(String(response.data))
           setPaymentAmount(value)
           return value
         }
+        setTossQuote(null)
         setPaymentAmount(0)
         return 0
       } catch {
+        setTossQuote(null)
         setPaymentAmount(0)
         return 0
       } finally {
         setCalculating(false)
       }
     },
-    []
+    [topupAmountMode]
   )
 
   useEffect(() => {
@@ -206,6 +280,12 @@ export function OrganizationWallet() {
   const getCurrentPaymentType = useCallback(() => {
     return selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
   }, [selectedPaymentMethod, topupInfo])
+
+  const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTopupAmountMode(mode)
+    setSelectedPreset(null)
+    void calculatePaymentAmount(topupAmount, getCurrentPaymentType(), mode)
+  }
 
   const handleSelectPreset = (preset: PresetAmount) => {
     setTopupAmount(preset.value)
@@ -223,9 +303,19 @@ export function OrganizationWallet() {
     setSelectedPaymentMethod(method)
     setPaymentLoading(method.type)
     try {
-      if (topupAmount < getMinTopupAmount(topupInfo)) return
-      await calculatePaymentAmount(topupAmount, method.type)
-      setConfirmDialogOpen(true)
+      const amountForMinimum = getAmountForMinimumCheck(
+        topupAmount,
+        method.type,
+        topupAmountMode
+      )
+      if (amountForMinimum < getMinTopupAmount(topupInfo)) return
+      const paymentAmount = await calculatePaymentAmount(
+        topupAmount,
+        method.type
+      )
+      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }
@@ -237,58 +327,87 @@ export function OrganizationWallet() {
     try {
       const amount = Math.floor(topupAmount)
       const paymentType = selectedPaymentMethod.type
-      const flow = getOrganizationWalletPaymentFlow(paymentType)
-      const response =
-        flow === 'stripe'
-          ? await requestOrganizationStripePayment({
+      const response = isStripePayment(paymentType)
+        ? await requestOrganizationStripePayment({
+            amount,
+            payment_method: 'stripe',
+          })
+        : isPayPalPayment(paymentType)
+          ? await requestOrganizationPayPalPayment({
               amount,
-              payment_method: 'stripe',
+              payment_method: 'paypal',
             })
-          : flow === 'paypal'
-            ? await requestOrganizationPayPalPayment({
-                amount,
-                payment_method: 'paypal',
-              })
-            : flow === 'waffo_pancake'
-              ? await requestOrganizationWaffoPancakePayment({ amount })
-              : flow === 'toss'
-                ? await requestOrganizationTossPayment({
-                    amount,
-                    payment_method: 'toss',
-                  })
-                : await requestOrganizationPayment({
-                    amount,
-                    payment_method: paymentType,
-                  })
+          : isWaffoPancakePayment(paymentType)
+            ? await requestOrganizationWaffoPancakePayment({ amount })
+            : isTossPayment(paymentType)
+              ? await requestOrganizationTossPayment({
+                  amount,
+                  amount_mode: topupAmountMode,
+                  payment_method: 'toss',
+                })
+              : await requestOrganizationPayment({
+                  amount,
+                  payment_method: paymentType,
+                })
 
       if (!isApiSuccess(response)) {
         toast.error(response.message || i18next.t('Payment request failed'))
         return
       }
 
-      if (flow === 'toss') {
-        const data = (response as TossPaymentResponse).data
+      if (isTossPayment(paymentType)) {
+        const data = response.data as
+          | {
+              client_key: string
+              customer_key: string
+              order_id: string
+              order_name: string
+              amount: number
+              success_url: string
+              fail_url: string
+            }
+          | undefined
         if (!data) {
           toast.error(response.message || i18next.t('Payment request failed'))
           return
         }
-        const tossPayments = await loadTossPayments(data.client_key)
-        const payment = tossPayments.payment({ customerKey: data.customer_key })
-        await payment.requestPayment({
-          method: 'CARD',
-          amount: { currency: 'KRW', value: data.amount },
-          orderId: data.order_id,
-          orderName: data.order_name,
-          successUrl: data.success_url,
-          failUrl: data.fail_url,
-        })
-        setConfirmDialogOpen(false)
+        const {
+          client_key,
+          customer_key,
+          order_id,
+          order_name,
+          amount: chargeAmount,
+          success_url,
+          fail_url,
+        } = data
+
+        try {
+          const tossPayments = await loadTossPayments(client_key)
+          const payment = tossPayments.payment({ customerKey: customer_key })
+
+          await payment.requestPayment({
+            method: 'CARD',
+            amount: { currency: 'KRW', value: chargeAmount },
+            orderId: order_id,
+            orderName: order_name,
+            successUrl: success_url,
+            failUrl: fail_url,
+          })
+        } catch (error) {
+          const tossError = error as { code?: string }
+          if (tossError.code && tossError.code !== 'PAY_PROCESS_CANCELED') {
+            toast.error(t('Payment request failed'))
+          }
+        }
         return
       }
 
       const payLink = getPayLink(response.data)
-      if ((flow === 'stripe' || flow === 'paypal') && payLink) {
-        if (flow === 'paypal') {
+      if (
+        (isStripePayment(paymentType) || isPayPalPayment(paymentType)) &&
+        payLink
+      ) {
+        if (isPayPalPayment(paymentType)) {
           window.location.href = payLink
         } else {
           window.open(payLink, '_blank')
@@ -321,11 +440,8 @@ export function OrganizationWallet() {
         toast.success(t('Redirecting to payment page...'))
         setConfirmDialogOpen(false)
       }
-    } catch (error) {
-      const e = error as { code?: string }
-      if (e?.code !== 'PAY_PROCESS_CANCELED') {
-        toast.error(t('Payment request failed'))
-      }
+    } catch {
+      toast.error(t('Payment request failed'))
     } finally {
       setProcessing(false)
     }
@@ -389,6 +505,39 @@ export function OrganizationWallet() {
     return topupInfo?.discount?.[topupAmount] || DEFAULT_DISCOUNT_RATE
   }, [topupAmount, topupInfo])
 
+  const visibleAutoRechargeModes = useMemo(
+    () =>
+      getVisibleAutoRechargeModes(
+        walletAutoRecharge.presets.filter((preset) => preset.enabled),
+        walletAutoRecharge.policies,
+        walletAutoRecharge.presetsLoaded,
+        walletAutoRecharge.policiesLoaded
+      ),
+    [
+      walletAutoRecharge.policies,
+      walletAutoRecharge.presets,
+      walletAutoRecharge.policiesLoaded,
+      walletAutoRecharge.presetsLoaded,
+    ]
+  )
+
+  useEffect(() => {
+    if (
+      activeTab !== 'topup' &&
+      !visibleAutoRechargeModes.includes(activeTab as 'scheduled' | 'threshold')
+    ) {
+      setActiveTab('topup')
+    }
+  }, [activeTab, visibleAutoRechargeModes])
+
+  const tabValues = ['topup', ...visibleAutoRechargeModes]
+  const tabsListClassName =
+    tabValues.length >= 3
+      ? 'grid w-full grid-cols-3 sm:w-fit'
+      : tabValues.length === 2
+        ? 'grid w-full grid-cols-2 sm:w-fit'
+        : 'grid w-full grid-cols-1 sm:w-fit'
+
   return (
     <>
       <SectionPageLayout>
@@ -404,37 +553,98 @@ export function OrganizationWallet() {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={walletUser} loading={organizationLoading} />
 
-            <div id='organization-wallet-add-funds' className='scroll-mt-4'>
-              <RechargeFormCard
-                topupInfo={topupInfo}
-                presetAmounts={presetAmounts}
-                selectedPreset={selectedPreset}
-                onSelectPreset={handleSelectPreset}
-                topupAmount={topupAmount}
-                onTopupAmountChange={handleTopupAmountChange}
-                paymentAmount={paymentAmount}
-                calculating={calculating}
-                onPaymentMethodSelect={handlePaymentMethodSelect}
-                paymentLoading={paymentLoading}
-                redemptionCode=''
-                onRedemptionCodeChange={() => undefined}
-                onRedeem={() => undefined}
-                redeeming={false}
-                loading={topupLoading}
-                priceRatio={(status?.price as number) || 1}
-                usdExchangeRate={effectiveUsdExchangeRate}
-                onOpenBilling={() => setBillingDialogOpen(true)}
-                creemProducts={topupInfo?.creem_products}
-                enableCreemTopup={topupInfo?.enable_creem_topup}
-                onCreemProductSelect={handleCreemProductSelect}
-                enableWaffoTopup={topupInfo?.enable_waffo_topup}
-                waffoPayMethods={topupInfo?.waffo_pay_methods}
-                waffoMinTopup={topupInfo?.waffo_min_topup}
-                onWaffoMethodSelect={handleWaffoMethodSelect}
-                enableWaffoPancakeTopup={topupInfo?.enable_waffo_pancake_topup}
-                showRedemption={false}
-              />
-            </div>
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className='w-full gap-4'
+            >
+              <TabsList className={tabsListClassName}>
+                <TabsTrigger value='topup'>{t('Top up')}</TabsTrigger>
+                {visibleAutoRechargeModes.includes('scheduled') ? (
+                  <TabsTrigger value='scheduled'>
+                    {t('Scheduled recharge')}
+                  </TabsTrigger>
+                ) : null}
+                {visibleAutoRechargeModes.includes('threshold') ? (
+                  <TabsTrigger value='threshold'>
+                    {t('Auto recharge')}
+                  </TabsTrigger>
+                ) : null}
+              </TabsList>
+
+              <TabsContent value='topup'>
+                <div id='organization-wallet-add-funds' className='scroll-mt-4'>
+                  <RechargeFormCard
+                    topupInfo={topupInfo}
+                    presetAmounts={presetAmounts}
+                    selectedPreset={selectedPreset}
+                    onSelectPreset={handleSelectPreset}
+                    topupAmount={topupAmount}
+                    onTopupAmountChange={handleTopupAmountChange}
+                    amountMode={topupAmountMode}
+                    onAmountModeChange={handleTopupAmountModeChange}
+                    tossUnitPrice={topupInfo?.toss_unit_price}
+                    paymentAmount={paymentAmount}
+                    calculating={calculating}
+                    onPaymentMethodSelect={handlePaymentMethodSelect}
+                    paymentLoading={paymentLoading}
+                    redemptionCode=''
+                    onRedemptionCodeChange={() => undefined}
+                    onRedeem={() => undefined}
+                    redeeming={false}
+                    loading={topupLoading}
+                    priceRatio={(status?.price as number) || 1}
+                    usdExchangeRate={effectiveUsdExchangeRate}
+                    onOpenBilling={() => setBillingDialogOpen(true)}
+                    creemProducts={topupInfo?.creem_products}
+                    enableCreemTopup={topupInfo?.enable_creem_topup}
+                    onCreemProductSelect={handleCreemProductSelect}
+                    enableWaffoTopup={topupInfo?.enable_waffo_topup}
+                    waffoPayMethods={topupInfo?.waffo_pay_methods}
+                    waffoMinTopup={topupInfo?.waffo_min_topup}
+                    onWaffoMethodSelect={handleWaffoMethodSelect}
+                    enableWaffoPancakeTopup={
+                      topupInfo?.enable_waffo_pancake_topup
+                    }
+                    showRedemption={false}
+                  />
+                </div>
+              </TabsContent>
+
+              {visibleAutoRechargeModes.includes('scheduled') ? (
+                <TabsContent value='scheduled'>
+                  <AutoRechargeCard
+                    mode='scheduled'
+                    policies={walletAutoRecharge.policies}
+                    presets={walletAutoRecharge.presets}
+                    loading={walletAutoRecharge.loading}
+                    processing={walletAutoRecharge.processing}
+                    canManage={canManageAutoRecharge}
+                    permissionMessageKey='Only the organization owner can change auto payments'
+                    onCreateScheduled={walletAutoRecharge.createScheduled}
+                    onCreateThreshold={walletAutoRecharge.createThreshold}
+                    onCancel={walletAutoRecharge.cancel}
+                  />
+                </TabsContent>
+              ) : null}
+
+              {visibleAutoRechargeModes.includes('threshold') ? (
+                <TabsContent value='threshold'>
+                  <AutoRechargeCard
+                    mode='threshold'
+                    policies={walletAutoRecharge.policies}
+                    presets={walletAutoRecharge.presets}
+                    loading={walletAutoRecharge.loading}
+                    processing={walletAutoRecharge.processing}
+                    canManage={canManageAutoRecharge}
+                    permissionMessageKey='Only the organization owner can change auto payments'
+                    onCreateScheduled={walletAutoRecharge.createScheduled}
+                    onCreateThreshold={walletAutoRecharge.createThreshold}
+                    onCancel={walletAutoRecharge.cancel}
+                  />
+                </TabsContent>
+              ) : null}
+            </Tabs>
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
@@ -446,6 +656,9 @@ export function OrganizationWallet() {
         topupAmount={topupAmount}
         paymentAmount={paymentAmount}
         paymentMethod={selectedPaymentMethod}
+        amountMode={topupAmountMode}
+        tossUnitPrice={topupInfo?.toss_unit_price}
+        tossQuote={tossQuote}
         calculating={calculating}
         processing={processing}
         discountRate={getDiscountRate()}

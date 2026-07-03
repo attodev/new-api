@@ -18,19 +18,32 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getSelf } from '@/lib/api'
+import { toast } from 'sonner'
 import { useAuthStore, type AuthUser } from '@/stores/auth-store'
+import { getSelf } from '@/lib/api'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TitledCard } from '@/components/ui/titled-card'
 import { SectionPageLayout } from '@/components/layout'
+import {
+  cancelTossAutoRenew,
+  getSelfSubscriptionFull,
+  updateBillingPreference,
+} from '@/features/subscriptions/api'
+import type { UserSubscriptionRecord } from '@/features/subscriptions/types'
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
+import {
+  AutoRechargeCard,
+  getVisibleAutoRechargeModes,
+} from './components/auto-recharge-card'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
-import { SubscriptionPlansCard } from './components/subscription-plans-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
+import { WalletSubscriptionStatusCard } from './components/wallet-subscription-status-card'
 import { DEFAULT_DISCOUNT_RATE } from './constants'
 import {
   useTopupInfo,
@@ -38,6 +51,7 @@ import {
   useAffiliate,
   useRedemption,
   useCreemPayment,
+  useWalletAutoRecharge,
   useWaffoPayment,
   useWaffoPancakePayment,
   useTossPayment,
@@ -47,12 +61,22 @@ import {
   getMinTopupAmount,
   isWaffoPancakePayment,
   isTossPayment,
+  shouldOpenPaymentConfirmDialog,
 } from './lib'
+import {
+  buildWalletPaymentSettingTabs,
+  getInitialWalletPaymentSetting,
+  getWalletPaymentSettingTabsGridClass,
+  WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
+  type WalletPaymentSettingKind,
+} from './lib/payment-settings'
+import { getTossPreview } from './lib/topup-amount-mode'
 import type {
   UserWalletData,
   PaymentMethod,
   PresetAmount,
   CreemProduct,
+  TopupAmountMode,
 } from './types'
 
 interface WalletProps {
@@ -61,10 +85,13 @@ interface WalletProps {
 
 export function Wallet(props: WalletProps) {
   const { t } = useTranslation()
+  const [paymentSettingTab, setPaymentSettingTab] =
+    useState<WalletPaymentSettingKind | null>(null)
   const [user, setUser] = useState<UserWalletData | null>(null)
   const [userLoading, setUserLoading] = useState(true)
   const setAuthUser = useAuthStore((state) => state.auth.setUser)
   const [topupAmount, setTopupAmount] = useState(0)
+  const [topupAmountMode, setTopupAmountMode] = useState<TopupAmountMode>('krw')
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>()
@@ -76,11 +103,22 @@ export function Wallet(props: WalletProps) {
   const [creemDialogOpen, setCreemDialogOpen] = useState(false)
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
-  const [showSubscriptionPanel, setShowSubscriptionPanel] = useState(true)
+  const [activeSubscriptions, setActiveSubscriptions] = useState<
+    UserSubscriptionRecord[]
+  >([])
+  const [allSubscriptions, setAllSubscriptions] = useState<
+    UserSubscriptionRecord[]
+  >([])
+  const [billingPreference, setBillingPreference] =
+    useState('subscription_first')
+  const [subscriptionStatusKnown, setSubscriptionStatusKnown] = useState(false)
+  const [subscriptionRefreshing, setSubscriptionRefreshing] = useState(false)
+  const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
   const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
+  const walletAutoRecharge = useWalletAutoRecharge('user', true)
 
   // Calculate effective exchange rate - when display type is USD, use rate of 1
   const effectiveUsdExchangeRate = useMemo(() => {
@@ -94,6 +132,7 @@ export function Wallet(props: WalletProps) {
     processing,
     calculatePaymentAmount,
     processPayment,
+    tossQuote,
   } = usePayment()
   const {
     affiliateLink,
@@ -107,6 +146,23 @@ export function Wallet(props: WalletProps) {
   const { processing: pancakeProcessing, processWaffoPancakePayment } =
     useWaffoPancakePayment()
   const { processing: tossProcessing, processTossPayment } = useTossPayment()
+
+  const getAmountModeForPaymentType = useCallback(
+    (paymentType: string) =>
+      isTossPayment(paymentType) ? topupAmountMode : undefined,
+    [topupAmountMode]
+  )
+
+  const getAmountForMinimumCheck = useCallback(
+    (amount: number, paymentType: string, amountMode: TopupAmountMode) => {
+      if (isTossPayment(paymentType) && amountMode === 'quota') {
+        return getTossPreview(amount, amountMode, topupInfo?.toss_unit_price)
+          .chargeAmount
+      }
+      return amount
+    },
+    [topupInfo?.toss_unit_price]
+  )
 
   // Fetch and refresh user data
   const fetchUser = useCallback(async () => {
@@ -130,6 +186,30 @@ export function Wallet(props: WalletProps) {
     fetchUser()
   }, [fetchUser])
 
+  const fetchSelfSubscription = useCallback(async () => {
+    try {
+      const res = await getSelfSubscriptionFull()
+      if (res.success && res.data) {
+        setBillingPreference(
+          res.data.billing_preference || 'subscription_first'
+        )
+        setActiveSubscriptions(res.data.subscriptions || [])
+        setAllSubscriptions(res.data.all_subscriptions || [])
+        setSubscriptionStatusKnown(true)
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch subscription data:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    const init = async () => {
+      await fetchSelfSubscription()
+    }
+    void init()
+  }, [fetchSelfSubscription])
+
   useEffect(() => {
     if (props.initialShowHistory) {
       setBillingDialogOpen(true)
@@ -145,27 +225,57 @@ export function Wallet(props: WalletProps) {
 
       // Calculate initial payment amount with default payment type
       const defaultPaymentType = getDefaultPaymentType(topupInfo)
-      calculatePaymentAmount(minTopup, defaultPaymentType)
+      calculatePaymentAmount(
+        minTopup,
+        defaultPaymentType,
+        getAmountModeForPaymentType(defaultPaymentType)
+      )
     }
-  }, [topupInfo, topupAmount, calculatePaymentAmount])
+  }, [
+    topupInfo,
+    topupAmount,
+    calculatePaymentAmount,
+    getAmountModeForPaymentType,
+  ])
 
   // Get current payment type (selected or default)
   const getCurrentPaymentType = useCallback(() => {
     return selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
   }, [selectedPaymentMethod, topupInfo])
 
+  const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTopupAmountMode(mode)
+    setSelectedPreset(null)
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      topupAmount,
+      paymentType,
+      isTossPayment(paymentType) ? mode : undefined
+    )
+  }
+
   // Handle preset selection
   const handleSelectPreset = (preset: PresetAmount) => {
     setTopupAmount(preset.value)
     setSelectedPreset(preset.value)
-    calculatePaymentAmount(preset.value, getCurrentPaymentType())
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      preset.value,
+      paymentType,
+      getAmountModeForPaymentType(paymentType)
+    )
   }
 
   // Handle topup amount change
   const handleTopupAmountChange = (amount: number) => {
     setTopupAmount(amount)
     setSelectedPreset(null)
-    calculatePaymentAmount(amount, getCurrentPaymentType())
+    const paymentType = getCurrentPaymentType()
+    calculatePaymentAmount(
+      amount,
+      paymentType,
+      getAmountModeForPaymentType(paymentType)
+    )
   }
 
   // Handle payment method selection
@@ -175,14 +285,25 @@ export function Wallet(props: WalletProps) {
 
     try {
       // Validate minimum topup
-      const minTopup = getMinTopupAmount(topupInfo)
-      if (topupAmount < minTopup) {
+      const minTopup = method.min_topup || getMinTopupAmount(topupInfo)
+      const amountForMinimum = getAmountForMinimumCheck(
+        topupAmount,
+        method.type,
+        topupAmountMode
+      )
+      if (amountForMinimum < minTopup) {
         return
       }
 
       // Calculate payment amount and show confirmation dialog
-      await calculatePaymentAmount(topupAmount, method.type)
-      setConfirmDialogOpen(true)
+      const paymentAmount = await calculatePaymentAmount(
+        topupAmount,
+        method.type,
+        getAmountModeForPaymentType(method.type)
+      )
+      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+        setConfirmDialogOpen(true)
+      }
     } finally {
       setPaymentLoading(null)
     }
@@ -197,7 +318,7 @@ export function Wallet(props: WalletProps) {
     if (isWaffoPancakePayment(type)) {
       success = await processWaffoPancakePayment(topupAmount)
     } else if (isTossPayment(type)) {
-      success = await processTossPayment(topupAmount)
+      success = await processTossPayment(topupAmount, topupAmountMode)
     } else {
       success = await processPayment(topupAmount, type)
     }
@@ -262,12 +383,100 @@ export function Wallet(props: WalletProps) {
     return topupInfo?.discount?.[topupAmount] || DEFAULT_DISCOUNT_RATE
   }, [topupInfo, topupAmount])
 
-  const handleSubscriptionAvailabilityChange = useCallback(
-    (available: boolean) => {
-      setShowSubscriptionPanel(available)
+  const handleSubscriptionRefresh = useCallback(async () => {
+    setSubscriptionRefreshing(true)
+    try {
+      await fetchSelfSubscription()
+    } finally {
+      setSubscriptionRefreshing(false)
+    }
+  }, [fetchSelfSubscription])
+
+  const handleBillingPreferenceChange = useCallback(
+    async (pref: string) => {
+      const previous = billingPreference
+      setBillingPreference(pref)
+      try {
+        const res = await updateBillingPreference(pref)
+        if (res.success) {
+          toast.success(t('Updated successfully'))
+          setBillingPreference(res.data?.billing_preference || pref)
+        } else {
+          toast.error(res.message || t('Update failed'))
+          setBillingPreference(previous)
+        }
+      } catch {
+        toast.error(t('Request failed'))
+        setBillingPreference(previous)
+      }
     },
-    []
+    [billingPreference, t]
   )
+
+  const handleCancelTossAutoRenew = useCallback(async () => {
+    setCancellingAutoRenew(true)
+    try {
+      const res = await cancelTossAutoRenew()
+      if (res.success) {
+        toast.success(t('Auto-renew cancelled'))
+        await fetchSelfSubscription()
+      } else {
+        toast.error(res.message || t('Request failed'))
+      }
+    } catch {
+      toast.error(t('Request failed'))
+    } finally {
+      setCancellingAutoRenew(false)
+    }
+  }, [fetchSelfSubscription, t])
+
+  const activePaymentSubscriptions = activeSubscriptions
+
+  const visibleAutoRechargeModes = useMemo(
+    () =>
+      getVisibleAutoRechargeModes(
+        walletAutoRecharge.presets.filter((preset) => preset.enabled),
+        walletAutoRecharge.policies,
+        walletAutoRecharge.presetsLoaded,
+        walletAutoRecharge.policiesLoaded
+      ),
+    [
+      walletAutoRecharge.policies,
+      walletAutoRecharge.presets,
+      walletAutoRecharge.policiesLoaded,
+      walletAutoRecharge.presetsLoaded,
+    ]
+  )
+
+  const paymentSettingTabs = useMemo(
+    () =>
+      buildWalletPaymentSettingTabs({
+        hasActiveSubscription: activePaymentSubscriptions.length > 0,
+        subscriptionStatusKnown,
+        visibleAutoRechargeModes,
+        policies: walletAutoRecharge.policies,
+      }),
+    [
+      activePaymentSubscriptions.length,
+      subscriptionStatusKnown,
+      visibleAutoRechargeModes,
+      walletAutoRecharge.policies,
+    ]
+  )
+
+  const paymentSettingLockMessageKey = paymentSettingTabs.find(
+    (tab) => tab.disabled && tab.disabledMessageKey
+  )?.disabledMessageKey
+
+  useEffect(() => {
+    const currentTab = paymentSettingTabs.find(
+      (tab) => tab.kind === paymentSettingTab
+    )
+    if (currentTab && !currentTab.disabled) {
+      return
+    }
+    setPaymentSettingTab(getInitialWalletPaymentSetting(paymentSettingTabs))
+  }, [paymentSettingTab, paymentSettingTabs])
 
   return (
     <>
@@ -279,7 +488,7 @@ export function Wallet(props: WalletProps) {
 
             <div
               className={
-                showSubscriptionPanel
+                paymentSettingTabs.length > 0
                   ? 'grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:items-start'
                   : 'grid gap-4'
               }
@@ -292,6 +501,9 @@ export function Wallet(props: WalletProps) {
                   onSelectPreset={handleSelectPreset}
                   topupAmount={topupAmount}
                   onTopupAmountChange={handleTopupAmountChange}
+                  amountMode={topupAmountMode}
+                  onAmountModeChange={handleTopupAmountModeChange}
+                  tossUnitPrice={topupInfo?.toss_unit_price}
                   paymentAmount={paymentAmount}
                   calculating={calculating}
                   onPaymentMethodSelect={handlePaymentMethodSelect}
@@ -318,12 +530,104 @@ export function Wallet(props: WalletProps) {
                 />
               </div>
 
-              <SubscriptionPlansCard
-                topupInfo={topupInfo}
-                onAvailabilityChange={handleSubscriptionAvailabilityChange}
-                userQuota={user?.quota}
-                onPurchaseSuccess={fetchUser}
-              />
+              {paymentSettingTabs.length > 0 && paymentSettingTab ? (
+                <TitledCard
+                  title={t('Payment settings')}
+                  description={t('Choose one active payment setting at a time')}
+                  contentClassName='space-y-4'
+                >
+                  <Tabs
+                    value={paymentSettingTab}
+                    onValueChange={(value) =>
+                      setPaymentSettingTab(value as WalletPaymentSettingKind)
+                    }
+                  >
+                    <TabsList
+                      className={getWalletPaymentSettingTabsGridClass(
+                        paymentSettingTabs.length
+                      )}
+                    >
+                      {paymentSettingTabs.map((tab) => (
+                        <TabsTrigger
+                          key={tab.kind}
+                          value={tab.kind}
+                          disabled={tab.disabled}
+                        >
+                          {tab.kind === 'subscription'
+                            ? t('Subscription')
+                            : tab.kind === 'threshold'
+                              ? t('Auto recharge')
+                              : t('Scheduled recharge')}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    {paymentSettingLockMessageKey ? (
+                      <p className='text-muted-foreground text-sm'>
+                        {t(paymentSettingLockMessageKey)}
+                      </p>
+                    ) : null}
+
+                    <TabsContent value='subscription'>
+                      <WalletSubscriptionStatusCard
+                        activeSubscriptions={activePaymentSubscriptions}
+                        allSubscriptions={allSubscriptions}
+                        billingPreference={billingPreference}
+                        refreshing={subscriptionRefreshing}
+                        cancellingAutoRenew={cancellingAutoRenew}
+                        onRefresh={handleSubscriptionRefresh}
+                        onBillingPreferenceChange={
+                          handleBillingPreferenceChange
+                        }
+                        onCancelTossAutoRenew={handleCancelTossAutoRenew}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value='threshold'>
+                      <AutoRechargeCard
+                        mode='threshold'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'threshold'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value='scheduled'>
+                      <AutoRechargeCard
+                        mode='scheduled'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'scheduled'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </TitledCard>
+              ) : null}
             </div>
 
             <AffiliateRewardsCard
@@ -346,6 +650,9 @@ export function Wallet(props: WalletProps) {
         topupAmount={topupAmount}
         paymentAmount={paymentAmount}
         paymentMethod={selectedPaymentMethod}
+        amountMode={topupAmountMode}
+        tossUnitPrice={topupInfo?.toss_unit_price}
+        tossQuote={tossQuote}
         calculating={calculating}
         processing={processing || pancakeProcessing || tossProcessing}
         discountRate={getDiscountRate()}
