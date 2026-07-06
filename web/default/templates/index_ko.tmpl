@@ -1,5 +1,6 @@
+{{define "index_ko"}}
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,59 +11,7 @@
   </head>
   <body>
     <!-- ── SECTION 1: GNB ── -->
-    <nav class="gnb">
-      <div class="logo">
-        <svg
-          class="logo-icon"
-          viewBox="0 0 1100 1100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z"
-            fill="#0EA5E9"
-          />
-          <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z"
-            fill="#EC4899"
-          />
-          <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z"
-            fill="#EC4899"
-          />
-        </svg>
-        AlRouter
-      </div>
-      <ul class="gnb-menu">
-        <li><a href="#about">About</a></li>
-        <li>
-          <a
-            href="#"
-            onclick="openPopup('Models &amp; Pricing','pricing');return false;"
-            >Models & Pricing</a
-          >
-        </li>
-        <li><a href="/guide_en.html">Guide</a></li>
-      </ul>
-      <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      <div class="gnb-right">
-        <button class="lang-switch" onclick="this.classList.toggle('open')">
-          <i data-lucide="languages"></i>
-          <div class="lang-dropdown"><a href="./index_en.html">English<span class="check">✓</span></a><a href="./index.html">한국어</a></div>
-        </button>
-        <div class="gnb-divider"></div>
-        <a href="/sign-in" class="btn-login">Log in</a>
-        <a href="/sign-in" class="btn-primary">Get Started</a>
-      </div>
-    </nav>
+    {{template "header_ko" .}}
 
     <!-- ── SECTION 2: HERO ── -->
     <div style="padding: 0">
@@ -71,34 +20,34 @@
           <div class="hero-badge">
             <i data-lucide="sparkles"></i> ATTO Research LLM Gateway
           </div>
-          <h1>Struggling with<br>AI Costs <span class="highlight">Out of Control?</span></h1>
-          <p class="hero-sub">OpenAI, Claude, Gemini — a separate contract for every model,<br>
-        budgets blowing past limits, no visibility into who's spending what.<br><br>
-        Consolidate everything with AlRouter and<br>
-        save <strong style="color:#EC4899">up to 10%</strong> off official prices.</p>
+          <h1>AI 도입했는데,<br>비용이 <span class="highlight">감당이 안 되시나요?</span></h1>
+          <p class="hero-sub">OpenAI, Claude, Gemini — 모델마다 따로 계약하고,<br>
+        예산은 초과되고, 누가 얼마나 쓰는지도 모르고.<br><br>
+        AlRouter 하나로 전부 통합하고,<br>
+        공식 가격보다 <strong style="color:#EC4899">최대 10% 절약</strong>하세요.</p>
           <div class="hero-cta">
-            <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
+            <a href="/sign-in" class="btn-hero-primary">체험해보기 →</a>
             <button
               class="btn-hero-secondary"
               onclick="
                 document.getElementById('contactOverlay').classList.add('open')
               "
             >
-              Contact Sales
+              기업 도입 문의하기
             </button>
           </div>
           <div class="hero-stats">
             <div class="stat-item">
               <div class="stat-value">10%</div>
-              <div class="stat-label">Max Cost Savings</div>
+              <div class="stat-label">최대 비용 절감</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">$0</div>
-              <div class="stat-label">Monthly Fee</div>
+              <div class="stat-value">₩0</div>
+              <div class="stat-label">월 구독료</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">1</div>
-              <div class="stat-label">API Key for Everything</div>
+              <div class="stat-value">1개</div>
+              <div class="stat-label">API 키로 전체 관리</div>
             </div>
           </div>
         </div>
@@ -110,11 +59,11 @@
             <div class="anim-wrap" id="anim">
               <video
                 id="animVideo"
-                src="alrouter_en.mp4"
+                src="alrouter_ko.mp4"
                 playsinline
                 preload="auto"
               ></video>
-              <img id="animPosterImg" class="anim-poster-img" src="./alrouter_en_poster.png" alt="" />
+              <img id="animPosterImg" class="anim-poster-img" src="./alrouter_ko_poster.png" alt="" />
               <div class="anim-hover-overlay" id="animHoverOverlay">
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
@@ -122,7 +71,7 @@
                       <span></span><span></span>
                     </div>
                   </div>
-                  <span class="anim-play-label">Pause</span>
+                  <span class="anim-play-label">일시 정지</span>
                 </div>
                 <div
                   class="anim-hover-state"
@@ -138,7 +87,7 @@
                       <polygon points="6,3 20,12 6,21" />
                     </svg>
                   </div>
-                  <span class="anim-play-label">Continue</span>
+                  <span class="anim-play-label">계속 보기</span>
                 </div>
               </div>
               <div class="anim-play-overlay" id="animPlayOverlay">
@@ -151,12 +100,12 @@
                     <polygon points="6,3 20,12 6,21" />
                   </svg>
                 </div>
-                <span class="anim-play-label">Tap to Start</span>
+                <span class="anim-play-label">눌러서 시작</span>
               </div>
               <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
                 <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
                   <img src="logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                  <div class="anim-cta-btn-text">Get Started →</div>
+                  <div class="anim-cta-btn-text">체험 신청하기 →</div>
                 </a>
                 <button
                   class="anim-end-btn anim-end-replay"
@@ -175,7 +124,7 @@
                     <polyline points="1 4 1 10 7 10" />
                     <path d="M3.51 15a9 9 0 1 0 .49-4" />
                   </svg>
-                  Watch Again
+                  다시 보기
                 </button>
               </div>
             </div>
@@ -198,31 +147,31 @@
 
     <!-- ── SECTION 4: PROBLEM ── -->
     <div class="section" id="about">
-      <span class="section-tag">Pain Points</span>
-      <h2>Does This Sound Familiar?</h2>
-      <p class="section-sub">Did AI adoption end up increasing costs and complexity? Every team faces the same struggle.</p>
+      <span class="section-tag">문제 인식</span>
+      <h2>이런 상황, 익숙하지 않으신가요?</h2>
+      <p class="section-sub">AI 도입했는데 비용은 늘고 관리는 더 복잡해졌나요? 모두 그런 어려움을 겪고 있습니다.</p>
       <div class="problem-grid">
         <div class="problem-card">
           <div class="problem-card-header">
             <div class="problem-icon"><i data-lucide="banknote"></i></div>
-            <h3>Separate Contracts, Separate Bills for Every AI Service</h3>
+            <h3>AI 서비스마다 따로 계약, 따로 청구</h3>
           </div>
-          <p>ChatGPT from OpenAI, images from Gemini, coding from Claude... With every department subscribing separately, nobody knows the total AI spend.</p>
+          <p>ChatGPT는 OpenAI, 이미지는 Gemini, 코딩 보조는 Claude... 부서마다 따로 구독하다 보니 전체 AI 비용이 얼마인지조차 모릅니다.</p>
         </div>
         <div class="problem-card">
           <div class="problem-card-header">
             <div class="problem-icon"><i data-lucide="trending-up"></i></div>
-            <h3>Cost Overruns Only Discovered at Month End</h3>
+            <h3>월말이 되어서야 비용이 터진 걸 알았습니다</h3>
           </div>
-          <p>There's no real-time visibility into who used which model and how much. You only react after the invoice arrives.</p>
+          <p>누가 어떤 모델을 얼마나 썼는지 실시간으로 알 방법이 없습니다. 청구서가 날아오고 나서야 뒤늦게 조치합니다.</p>
         </div>
         <div class="problem-card">
           <div class="problem-card-header">
             <div class="problem-icon"><i data-lucide="siren"></i></div>
-            <h3>Every Model, Every Person, Requests Never End</h3>
+            <h3>모델마다, 사람마다, 요청은 끝이 없습니다</h3>
           </div>
-          <p>GPT keys, Claude permissions, Gemini accounts... one more model, one more place to manage.</p>
-          <p style="margin-top: 8px">More AI, more requests — admins never know where to start.</p>
+          <p>GPT 키 발급, Claude 권한 설정, Gemini 계정 생성... 모델 하나 늘 때마다 관리할 곳이 하나씩 늘어납니다.</p>
+          <p style="margin-top: 8px">AI를 쓸수록 요청은 늘고, 관리자는 오늘도 어찌할 바를 모릅니다.</p>
         </div>
       </div>
     </div>
@@ -230,10 +179,10 @@
     <!-- ── SECTION 5: SOLUTION ── -->
     <div class="solution-section">
       <div class="solution-inner">
-        <span class="section-tag">Solution</span>
-        <h2>AlRouter Solves It</h2>
+        <span class="section-tag">해결책</span>
+        <h2>AlRouter가 해결합니다</h2>
         <p class="section-sub">
-          One account, one bill, complete control.<br>Manage AI usage at the organization level and pay less than official prices.
+          하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 관리하고, 공식 가격보다 저렴하게 쓰세요.
         </p>
 
         <!-- 가로 트리 다이어그램 -->
@@ -255,7 +204,7 @@
               min-width: 800px;
             "
           >
-            <!-- ── Level 3: Users들 ── -->
+            <!-- ── Level 3: 사용자들 ── -->
             <div
               style="
                 display: flex;
@@ -276,9 +225,9 @@
                   text-align: center;
                 "
               >
-                Users
+                사용자
               </div>
-              <!-- User A -->
+              <!-- 사용자 A -->
               <div
                 style="
                   background: #111827;
@@ -301,7 +250,7 @@
                   ></i>
                   <span
                     style="font-size: 12px; font-weight: 700; color: #f9fafb"
-                    >User A</span
+                    >사용자 A</span
                   >
                 </div>
                 <div
@@ -313,10 +262,10 @@
                     padding-left: 20px;
                   "
                 >
-                  Quota $50 / mo
+                  쿼터 $50 / 월
                 </div>
               </div>
-              <!-- User B -->
+              <!-- 사용자 B -->
               <div
                 style="
                   background: #111827;
@@ -339,7 +288,7 @@
                   ></i>
                   <span
                     style="font-size: 12px; font-weight: 700; color: #f9fafb"
-                    >User B</span
+                    >사용자 B</span
                   >
                 </div>
                 <div
@@ -351,10 +300,10 @@
                     padding-left: 20px;
                   "
                 >
-                  Quota $30 / mo
+                  쿼터 $30 / 월
                 </div>
               </div>
-              <!-- User C -->
+              <!-- 사용자 C -->
               <div
                 style="
                   background: #111827;
@@ -377,7 +326,7 @@
                   ></i>
                   <span
                     style="font-size: 12px; font-weight: 700; color: #f9fafb"
-                    >User C</span
+                    >사용자 C</span
                   >
                 </div>
                 <div
@@ -389,7 +338,7 @@
                     padding-left: 20px;
                   "
                 >
-                  Quota $20 / mo
+                  쿼터 $20 / 월
                 </div>
               </div>
             </div>
@@ -458,7 +407,7 @@
                   text-align: center;
                 "
               >
-                API Keys
+                API 키
               </div>
               <!-- Keys for A -->
               <div style="display: flex; flex-direction: column; gap: 4px">
@@ -611,11 +560,11 @@
                   white-space: nowrap;
                 "
               >
-                API call
+                API 호출
               </div>
             </div>
 
-            <!-- ── Level 5: AlRouter (Admin는 절대위치로 위에 배치) ── -->
+            <!-- ── Level 5: AlRouter (관리자는 절대위치로 위에 배치) ── -->
             <div
               style="
                 position: relative;
@@ -626,7 +575,7 @@
                 min-width: 150px;
               "
             >
-              <!-- Admin: AlRouter 위에 절대위치 -->
+              <!-- 관리자: AlRouter 위에 절대위치 -->
               <div
                 style="
                   position: absolute;
@@ -649,7 +598,7 @@
                     white-space: nowrap;
                   "
                 >
-                  Admin
+                  관리자
                 </div>
                 <div
                   style="
@@ -675,7 +624,7 @@
                     Admin
                   </div>
                   <div style="font-size: 10px; color: #9ca3af; margin-top: 3px">
-                    Per-user quota control
+                    사용자별 쿼터 설정
                   </div>
                 </div>
                 <div
@@ -704,7 +653,7 @@
                   margin-top: 10px;
                 "
               >
-                Gateway
+                게이트웨이
               </div>
             </div>
 
@@ -759,7 +708,7 @@
                   margin-bottom: 2px;
                 "
               >
-                AI Models
+                AI 모델
               </div>
               <div
                 class="diagram-box"
@@ -809,13 +758,13 @@
           "
         >
           <div class="diagram-result-item">
-            <i data-lucide="circle-dollar-sign"></i> Up to 10% Cost Savings
+            <i data-lucide="circle-dollar-sign"></i> 최대 10% 비용 절감
           </div>
           <div class="diagram-result-item">
-            <i data-lucide="sliders-horizontal"></i> Per-user Quota Control
+            <i data-lucide="sliders-horizontal"></i> 사용자별 쿼터 제어
           </div>
           <div class="diagram-result-item">
-            <i data-lucide="key"></i> Multiple API Keys
+            <i data-lucide="key"></i> 다중 API 키 발급
           </div>
           <div class="diagram-result-item">
             <i data-lucide="zap"></i> Pay-as-you-go
@@ -828,15 +777,15 @@
     <div class="section feature-section">
       <div class="feature-grid">
         <div class="feature-content">
-          <span class="section-tag">Cost Savings</span>
-          <h2>Up to 10% Cheaper<br>Than Official Prices</h2>
-          <p>Access major AI models through AlRouter at discounted rates vs. official APIs.<br>No subscription — pay only for what you use.</p>
+          <span class="section-tag">비용 절감</span>
+          <h2>공식 가격보다<br>최대 10% 저렴하게</h2>
+          <p>AlRouter를 통해 주요 AI 모델을 공식 API보다 할인된 가격으로 사용하세요.<br>사용한 만큼만 청구됩니다.</p>
           <table class="price-table">
             <thead>
               <tr>
-                <th>Model</th>
-                <th>Price</th>
-                <th>Savings</th>
+                <th>모델</th>
+                <th>가격</th>
+                <th>절감</th>
               </tr>
             </thead>
             <tbody>
@@ -846,7 +795,7 @@
                   rowspan="3"
                   style="text-align: center; vertical-align: middle"
                 >
-                  Official Price
+                  공식 가격
                 </td>
                 <td
                   rowspan="3"
@@ -864,28 +813,28 @@
               </tr>
             </tbody>
           </table>
-          <div class="payg-badge">💳 Pay-as-you-go — Only pay for what you use. No minimum commitment.</div>
+          <div class="payg-badge">💳 Pay-as-you-go — 쓴 만큼만. 최소 약정 없음.</div>
         </div>
         <div class="feature-visual">
           <div class="calc-card-header">
-            <span class="calc-card-title">AI Cost Calculator</span>
+            <span class="calc-card-title">AI 도입 비용 계산기</span>
             <a
               href="#"
               class="calc-card-link"
-              onclick="openPopup('Models &amp; Pricing','pricing');return false;"
-              >View All Model Prices →</a
+              onclick="openPopup('모델 & 가격표','pricing');return false;"
+              >전체 모델 가격표 보기 →</a
             >
           </div>
           <div class="calc-body">
             <div class="calc-form">
               <div class="calc-group">
-                <label>Select Model</label>
+                <label>모델 선택</label>
                 <select class="calc-select" id="calcModel">
-                  <option value="">Loading models…</option>
+                  <option value="">모델 불러오는 중…</option>
                 </select>
               </div>
               <div class="calc-group">
-                <label>Input Tokens</label>
+                <label>입력 토큰</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -894,11 +843,11 @@
                     min="0"
                     step="0.1"
                   />
-                  <span class="calc-input-suffix">M tokens</span>
+                  <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
               <div class="calc-group">
-                <label>Output Tokens</label>
+                <label>출력 토큰</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -907,21 +856,21 @@
                     min="0"
                     step="0.1"
                   />
-                  <span class="calc-input-suffix">M tokens</span>
+                  <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
               <button class="calc-btn" onclick="runCalc()">
-                Calculate
+                계산하기
               </button>
             </div>
             <div class="calc-result" id="calcResult">
-              <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
+              <div class="calc-result-hint" id="calcHint">모델과 토큰 수를 입력하고<br>계산하기를 눌러주세요</div>
               <div
                 class="calc-result-label"
                 id="calcLabel"
                 style="display: none"
               >
-                Estimated Cost
+                예상 비용
               </div>
               <div
                 class="calc-result-price"
@@ -939,9 +888,10 @@
               line-height: 1.6;
             "
           >
-            Prices shown are estimates based on public rates.<br>
-        Actual costs may vary depending on usage patterns.
-        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+            위 금액은 공개 단가 기준 예상치입니다.<br>
+        실제 도입 비용은 사용 패턴에 따라 달라질 수 있으니
+        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">기업 도입 문의</a>로
+        정확한 견적을 받아보세요.
           </p>
         </div>
       </div>
@@ -958,29 +908,29 @@
       <div class="section feature-section">
         <div class="feature-grid reverse">
           <div class="feature-content">
-            <span class="section-tag">Governance</span>
-            <h2>Manage AI Costs<br>Within Budget</h2>
-            <p>From real-time monitoring to budget limits, take complete control of AI usage.</p>
+            <span class="section-tag">거버넌스</span>
+            <h2>AI 비용, 이제<br>예산 안에서 관리하세요</h2>
+            <p>실시간 모니터링부터 예산 한도 설정까지, AI 사용을 완전히 통제하세요.</p>
             <div class="gov-points">
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
                 <div class="gov-text">
-                  <h4>Real-time Usage Monitoring</h4>
-                  <p>View usage by model, team member, and date on a single dashboard.</p>
+                  <h4>실시간 사용량 모니터링</h4>
+                  <p>모델별, 팀원별, 날짜별 사용 현황을 대시보드에서 한눈에 확인</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="wallet"></i></div>
                 <div class="gov-text">
-                  <h4>Budget Limit Controls</h4>
-                  <p>Set token quotas and spending caps in advance to prevent overage charges.</p>
+                  <h4>예산 한도 설정</h4>
+                  <p>토큰 할당량과 예산 상한을 미리 설정해 초과 청구 원천 차단</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="key-round"></i></div>
                 <div class="gov-text">
-                  <h4>Token-based API Key Management</h4>
-                  <p>Issue keys, set permissions, and assign expiry dates for each team member — all in one place.</p>
+                  <h4>토큰 기반 API 키 관리</h4>
+                  <p>팀원별 키 발급, 권한 설정, 만료일 지정을 한 곳에서</p>
                 </div>
               </div>
             </div>
@@ -988,19 +938,19 @@
           <div>
             <div class="dashboard-mock">
               <div class="dash-header">
-                <i data-lucide="bar-chart-2"></i> Model Call Analytics
+                <i data-lucide="bar-chart-2"></i> 모델 호출 분석
               </div>
               <div class="dash-stats">
                 <div class="dash-stat">
-                  <div class="ds-label">Total Budget</div>
+                  <div class="ds-label">총 달당량</div>
                   <div class="ds-value blue">$0.39</div>
                 </div>
                 <div class="dash-stat">
-                  <div class="ds-label">Requests</div>
+                  <div class="ds-label">요청 횟수</div>
                   <div class="ds-value">34</div>
                 </div>
                 <div class="dash-stat">
-                  <div class="ds-label">Total Tokens</div>
+                  <div class="ds-label">총 토큰</div>
                   <div class="ds-value pink">31,743</div>
                 </div>
               </div>
@@ -1032,10 +982,10 @@
     <!-- ── SECTION 8: FEATURE - INTEGRATION ── -->
     <div class="integration-section">
       <div class="integration-inner">
-        <span class="section-tag">Integration</span>
-        <h2>All Major AI Models, One API</h2>
+        <span class="section-tag">통합</span>
+        <h2>주요 AI 모델을 하나의 API로</h2>
         <p class="section-sub" style="margin: 0 auto; text-align: center">
-          No separate contracts per model. Use all AI models right away with a single AlRouter API.
+          모델마다 별도 계약 없이, AlRouter API 하나로 바로 사용하세요.
         </p>
         <div class="provider-logos">
           <div class="provider-logo">
@@ -1052,18 +1002,18 @@
           </div>
           <div class="provider-logo">
             <div class="logo-box"><i data-lucide="circle-ellipsis"></i></div>
-            <div class="logo-name">Others</div>
+            <div class="logo-name">기타</div>
           </div>
         </div>
         <div class="modality-tags">
           <span class="modality-tag"
-            ><i data-lucide="type"></i> Text</span
+            ><i data-lucide="type"></i> 텍스트</span
           >
           <span class="modality-tag"
-            ><i data-lucide="image"></i> Image</span
+            ><i data-lucide="image"></i> 이미지</span
           >
           <span class="modality-tag"
-            ><i data-lucide="video"></i> Video</span
+            ><i data-lucide="video"></i> 동영상</span
           >
         </div>
       </div>
@@ -1072,9 +1022,9 @@
     <!-- ── SECTION 9: PRICING PREVIEW ── -->
     <div class="pricing-section" id="pricing">
       <div class="pricing-inner">
-        <span class="section-tag">Pricing</span>
-        <h2 class="pricing-title">Transparent Pricing, No Hidden Fees</h2>
-        <p class="section-sub" style="margin: 0 auto; text-align: center">Discounted rates vs. official prices. Pay only for what you use — no subscription fee.</p>
+        <span class="section-tag">가격</span>
+        <h2 class="pricing-title">투명한 가격, 숨겨진 비용 없음</h2>
+        <p class="section-sub" style="margin: 0 auto; text-align: center">공식 가격 대비 할인된 요금으로, 사용한 만큼만 청구됩니다.</p>
         <div class="price-cards-outer">
         <div class="price-cards">
           <div class="price-card">
@@ -1100,7 +1050,7 @@
               <div class="model-provider">OpenAI</div>
             </div>
             <hr class="price-card-divider" />
-            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-label">공식 가격 대비</div>
             <div class="price-card-pct">-10%</div>
           </div>
           <div class="price-card">
@@ -1126,7 +1076,7 @@
               <div class="model-provider">Anthropic</div>
             </div>
             <hr class="price-card-divider" />
-            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-label">공식 가격 대비</div>
             <div class="price-card-pct">-10%</div>
           </div>
           <div class="price-card">
@@ -1152,7 +1102,7 @@
               <div class="model-provider">Google</div>
             </div>
             <hr class="price-card-divider" />
-            <div class="price-card-label">vs. official price</div>
+            <div class="price-card-label">공식 가격 대비</div>
             <div class="price-card-pct">-10%</div>
           </div>
         </div>
@@ -1160,8 +1110,8 @@
         <div class="pricing-cta">
           <a
             href="#"
-            onclick="openPopup('Models &amp; Pricing','pricing');return false;"
-            >View Full Pricing →</a
+            onclick="openPopup('모델 & 가격표','pricing');return false;"
+            >전체 모델 가격표 보기 →</a
           >
         </div>
       </div>
@@ -1174,128 +1124,51 @@
           <div class="cta-icon" style="color: #0ea5e9; margin-bottom: 16px">
             <i data-lucide="rocket"></i>
           </div>
-          <h3>Start Your Trial Today</h3>
-          <p>Start with a trial account and get your API key right away. You only pay for what you use.</p>
-          <a href="/sign-in" class="btn-cta-primary">Get Started →</a>
+          <h3>지금 바로 체험해보세요</h3>
+          <p>체험 계정으로 시작하고, 바로 API 키를 발급받으세요. 사용한 만큼만 청구됩니다.</p>
+          <a href="/sign-in" class="btn-cta-primary">체험해보기 →</a>
         </div>
         <div class="cta-box">
           <div class="cta-icon" style="color: #ec4899; margin-bottom: 16px">
             <i data-lucide="building-2"></i>
           </div>
-          <h3>Talk to Our Team</h3>
-          <p>Our experts will walk you through usage planning, model selection, and cost simulations.</p>
+          <h3>우리 팀에 맞는 도입 방법을 상담하세요</h3>
+          <p>사용 규모, 모델 조합, 비용 시뮬레이션을 전문 팀이 함께 검토해드립니다.</p>
           <button
             class="btn-cta-secondary"
             onclick="
               document.getElementById('contactOverlay').classList.add('open')
             "
           >
-            Contact Sales →
+            기업 도입 문의하기 →
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ── SECTION 11: FOOTER ── -->
-    <footer>
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 1100 1100" fill="none">
-              <path
-                d="M754.592 816.273C759.283 828.865 760.088 841.019 757.004 852.734C754.142 863.612 748.272 870.705 739.396 874.012L721.877 880.54C700.388 888.547 677.984 884.819 654.666 869.356C631.1 853.231 613.515 829.594 601.909 798.446L410.039 283.51C405.1 270.255 404.062 258.189 406.925 247.311C410.255 236.258 416.358 229.078 425.234 225.771L444.855 218.46C453.731 215.153 462.811 216.676 472.094 223.028C481.845 229.207 489.189 238.923 494.128 252.177L678.96 748.226C682.17 756.841 686.578 760.104 692.184 758.016L695.688 756.71C704.564 753.403 713.644 754.925 722.927 761.278C732.678 767.456 740.022 777.173 744.961 790.427L754.592 816.273Z"
-                fill="#0EA5E9"
-              />
-              <path
-                fill-rule="evenodd"
-                clip-rule="evenodd"
-                d="M508.544 606.049C516.544 525.549 265.562 334.181 139.044 345.548C5.54001 357.544 42.0206 527.077 62.5396 543.548C75.7556 554.156 90.0114 561.093 102.34 567.091C123.126 577.206 138.434 584.654 134.04 602.544C132.632 608.278 126.608 617.695 118.682 630.088C87.2113 679.292 25.7452 775.393 104.039 874.044C129.039 905.544 235.539 903.544 289.544 859.55C293.453 856.366 297.746 852.891 302.36 849.157L302.363 849.155C373.948 791.214 522.636 670.868 508.544 606.049ZM268.636 713.531L387.952 644.097C406.582 633.256 406.489 606.313 387.785 595.6L267.995 526.986C249.292 516.273 226.005 529.825 226.079 551.379L226.553 689.427C226.627 710.982 250.007 724.373 268.636 713.531Z"
-                fill="#EC4899"
-              />
-              <path
-                fill-rule="evenodd"
-                clip-rule="evenodd"
-                d="M652.539 611.042C617.039 524.542 604.837 332.143 798.037 266.543C991.237 200.943 1053.54 374.544 1037.54 444.043C1021.53 513.542 957.536 564.042 957.536 564.042C991.869 584.209 1059.94 634.542 1057.54 674.542C1055.14 714.542 1025.14 749.318 997.036 732.542C966.875 714.539 943.535 692.423 925.883 675.697C905.787 656.656 893.063 644.599 886.036 653.542C879.204 662.237 892.772 682.331 907.327 703.888C927.927 734.398 950.507 767.839 920.036 776.043C878.436 787.243 715.536 764.542 652.539 611.042ZM849.539 537.545C905.872 537.545 951.539 491.878 951.539 435.545C951.539 379.212 905.872 333.545 849.539 333.545C793.206 333.545 747.539 379.212 747.539 435.545C747.539 491.878 793.206 537.545 849.539 537.545Z"
-                fill="#EC4899"
-              />
-            </svg>
-            AlRouter
-          </div>
-          <p>Smart AI cost management.<br>LLM Gateway service by ATTO Research.</p>
-          <p style="margin-top: 10px;">Contact Us: support@alrouter.ai </p>
-        </div>
-        <div class="footer-col">
-          <h4>Company</h4>
-          <ul>
-            <li>
-              <a
-                href="https://www.atto-research.com/eng/main/main.html"
-                target="_blank"
-                rel="noopener"
-                >About ATTO Research</a
-              >
-            </li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Product</h4>
-          <ul>
-            <li><a href="#about">About</a></li>
-            <li>
-              <a
-                href="#"
-                onclick="openPopup('Models &amp; Pricing','pricing');return false;"
-                >Models & Pricing</a
-              >
-            </li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Legal</h4>
-          <ul>
-            <li>
-              <a
-                href="#"
-                onclick="openPopup('Terms of Service','terms');return false;"
-                >Terms of Service</a
-              >
-            </li>
-            <li>
-              <a
-                href="#"
-                onclick="openPopup('Privacy Policy','privacy');return false;"
-                >Privacy Policy</a
-              >
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <span>© 2026 ATTO Research. All rights reserved.</span>
-      </div>
-    </footer>
+    {{template "footer_ko" .}}
 
-    <!-- Enterprise Inquiry 모달 -->
+    <!-- 기업 도입 문의 모달 -->
     <div class="popup-overlay" id="contactOverlay">
       <div class="popup-modal">
         <div class="popup-header">
-          <h3 class="popup-title">Enterprise Inquiry</h3>
+          <h3 class="popup-title">기업 도입 문의</h3>
           <button class="popup-close" id="contactClose">✕</button>
         </div>
         <form id="contactForm" class="contact-form">
           <div class="popup-body">
             <div class="cf-group">
-              <label>Organization<span class="cf-required">*</span></label>
+              <label>기관명<span class="cf-required">*</span></label>
               <input
                 type="text"
                 name="org"
-                placeholder="Company or organization name"
+                placeholder="회사 또는 기관 이름"
                 required
               />
             </div>
             <div class="cf-group">
               <label
-                >Email<span class="cf-required">*</span></label
+                >이메일<span class="cf-required">*</span></label
               >
               <input
                 type="email"
@@ -1306,19 +1179,19 @@
             </div>
             <div class="cf-group">
               <label
-                >Phone<span class="cf-optional"
-                  >(optional)</span
+                >전화번호<span class="cf-optional"
+                  >(선택)</span
                 ></label
               >
               <input
                 type="tel"
                 name="phone"
-                placeholder="+1 000-000-0000"
+                placeholder="010-0000-0000"
               />
             </div>
             <div class="cf-group">
               <label
-                >Team Size<span class="cf-required">*</span></label
+                >도입 규모<span class="cf-required">*</span></label
               >
               <div class="cf-scale-tabs">
                 <div class="cf-scale-tab">
@@ -1329,7 +1202,7 @@
                     value="token"
                     checked
                   />
-                  <label for="scaleTypeToken">Token Usage</label>
+                  <label for="scaleTypeToken">토큰 사용량</label>
                 </div>
                 <div class="cf-scale-tab">
                   <input
@@ -1338,7 +1211,7 @@
                     id="scaleTypeHead"
                     value="headcount"
                   />
-                  <label for="scaleTypeHead">Headcount</label>
+                  <label for="scaleTypeHead">인원수</label>
                 </div>
               </div>
               <div id="scaleHeadField" style="display: none">
@@ -1349,7 +1222,7 @@
                     placeholder="0"
                     min="1"
                   />
-                  <span class="cf-num-suffix">people</span>
+                  <span class="cf-num-suffix">명</span>
                 </div>
               </div>
               <div id="scaleTokenField">
@@ -1362,7 +1235,7 @@
                       min="0"
                       step="0.1"
                     />
-                    <span class="cf-num-suffix">M input</span>
+                    <span class="cf-num-suffix">M 입력</span>
                   </div>
                   <div class="cf-num-wrap">
                     <input
@@ -1372,16 +1245,16 @@
                       min="0"
                       step="0.1"
                     />
-                    <span class="cf-num-suffix">M output</span>
+                    <span class="cf-num-suffix">M 출력</span>
                   </div>
                 </div>
-                <p class="cf-scale-hint">Enter your estimated monthly token usage from the calculator.</p>
+                <p class="cf-scale-hint">계산기에서 산정한 월 예상 토큰량을 입력하세요.</p>
               </div>
             </div>
             <div class="cf-group">
               <label
-                >Features Needed<span class="cf-optional"
-                  >(optional)</span
+                >필요 기능<span class="cf-optional"
+                  >(선택)</span
                 ></label
               >
               <div class="cf-checks">
@@ -1389,7 +1262,7 @@
                   ><input
                     type="checkbox"
                     name="features"
-                    value="Image Generation"
+                    value="이미지 생성"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1400,14 +1273,14 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >Image Generation</span
+                    >이미지 생성</span
                   ></label
                 >
                 <label class="cf-check"
                   ><input
                     type="checkbox"
                     name="features"
-                    value="Video Generation"
+                    value="비디오 생성"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1418,14 +1291,14 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >Video Generation</span
+                    >비디오 생성</span
                   ></label
                 >
                 <label class="cf-check"
                   ><input
                     type="checkbox"
                     name="features"
-                    value="Agent Builder"
+                    value="에이전트 생성"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1436,14 +1309,14 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >Agent Builder</span
+                    >에이전트 생성</span
                   ></label
                 >
                 <label class="cf-check"
                   ><input
                     type="checkbox"
                     name="features"
-                    value="Document Analysis"
+                    value="문서 분석"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1454,14 +1327,14 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >Document Analysis</span
+                    >문서 분석</span
                   ></label
                 >
                 <label class="cf-check"
                   ><input
                     type="checkbox"
                     name="features"
-                    value="Deep Research"
+                    value="딥 리서치"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1472,14 +1345,14 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >Deep Research</span
+                    >딥 리서치</span
                   ></label
                 >
                 <label class="cf-check"
                   ><input
                     type="checkbox"
                     name="features"
-                    value="AI Transformation (AX)"
+                    value="AI 전환(AX)"
                   /><span class="cf-check-box"
                     ><svg width="11" height="8" viewBox="0 0 11 8" fill="none">
                       <polyline
@@ -1490,20 +1363,20 @@
                         stroke-linejoin="round"
                       /></svg></span
                   ><span class="cf-check-label"
-                    >AI Transformation (AX)</span
+                    >AI 전환(AX)</span
                   ></label
                 >
               </div>
             </div>
             <div class="cf-group">
               <label
-                >Additional Comments<span class="cf-optional"
-                  >(optional)</span
+                >기타 의견<span class="cf-optional"
+                  >(선택)</span
                 ></label
               >
               <textarea
                 name="notes"
-                placeholder="Anything else you'd like to share with us."
+                placeholder="추가적으로 전달하고 싶은 내용을 자유롭게 작성해 주세요."
               ></textarea>
             </div>
           </div>
@@ -1514,29 +1387,14 @@
               class="cf-result"
               style="display: none"
             ></div>
-            <button type="submit" class="cf-submit">Submit →</button>
+            <button type="submit" class="cf-submit">문의하기 →</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- 팝업 -->
-    <div class="popup-overlay" id="popupOverlay">
-      <div class="popup-modal">
-        <div class="popup-header">
-          <div class="popup-header-left">
-            <h3 class="popup-title" id="popupTitle"></h3>
-            <p class="popup-note" id="popupNote" style="display: none"></p>
-          </div>
-          <button class="popup-close" id="popupClose">✕</button>
-        </div>
-        <div class="popup-body" id="popupBody"></div>
-      </div>
-    </div>
-
-
-
-
+      <script src="./popup.js" defer></script>
       <script src="./landing.js" defer></script>
   </body>
 </html>
+{{end}}

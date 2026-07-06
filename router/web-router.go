@@ -1,7 +1,9 @@
 package router
 
 import (
+	"bytes"
 	"embed"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -20,40 +22,101 @@ type ThemeAssets struct {
 	ClassicBuildFS   embed.FS
 	ClassicIndexPage []byte
 	PublicFS         embed.FS
+	TemplatesFS      embed.FS
+}
+
+// webPageData is the data passed to the shared header/footer partials so
+// they can highlight the active nav item and point links at the right page.
+type webPageData struct {
+	Active string // "about" (index pages) or "guide" (guide pages)
+}
+
+// renderWebTemplate executes a named template from tmpl with the given
+// active-nav context and returns the resulting bytes, or nil on error.
+func renderWebTemplate(tmpl *template.Template, name string, active string) []byte {
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, name, webPageData{Active: active}); err != nil {
+		common.SysLog("failed to render web template " + name + ": " + err.Error())
+		return nil
+	}
+	return buf.Bytes()
+}
+
+// devWebTemplates re-parses the templates from disk on every call so edits
+// show up on refresh without a rebuild. Only used when common.DebugEnabled.
+func devWebTemplates() *template.Template {
+	return template.Must(template.ParseGlob("web/default/templates/*.tmpl"))
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
 	classicFS := common.EmbedFolder(assets.ClassicBuildFS, "web/classic/dist")
 	themeFS := common.NewThemeAwareFS(defaultFS, classicFS)
-	publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
 
-	landingKo, _ := assets.PublicFS.ReadFile("web/default/public/index.html")
-	landingEn, _ := assets.PublicFS.ReadFile("web/default/public/index_en.html")
+	devMode := common.DebugEnabled
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
 	router.Use(middleware.Cache())
 
-	// Landing page routes — served before the SPA static handler
-	router.GET("/", func(c *gin.Context) {
-		acceptLang := c.GetHeader("Accept-Language")
-		if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
-		} else {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
+	if devMode {
+		// Dev mode: re-render templates and re-read public/ from disk on every
+		// request, so editing guide.html/index.html or the partials is visible
+		// on refresh without rebuilding the binary.
+		common.SysLog("web dev mode enabled (DEBUG=true): templates/public served live from disk")
+		render := func(c *gin.Context, name string, active string) {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", renderWebTemplate(devWebTemplates(), name, active))
 		}
-	})
-	router.GET("/index.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
-	})
-	router.GET("/index_en.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
-	})
+		router.GET("/", func(c *gin.Context) {
+			acceptLang := c.GetHeader("Accept-Language")
+			if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
+				render(c, "index_en", "about")
+			} else {
+				render(c, "index_ko", "about")
+			}
+		})
+		router.GET("/index.html", func(c *gin.Context) { render(c, "index_ko", "about") })
+		router.GET("/index_en.html", func(c *gin.Context) { render(c, "index_en", "about") })
+		router.GET("/guide.html", func(c *gin.Context) { render(c, "guide_ko", "guide") })
+		router.GET("/guide_en.html", func(c *gin.Context) { render(c, "guide_en", "guide") })
 
-	// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
-	router.Use(static.Serve("/", publicFS))
-	router.Use(static.Serve("/", themeFS))
+		router.Use(static.Serve("/", static.LocalFile("web/default/public", false)))
+		router.Use(static.Serve("/", themeFS))
+	} else {
+		publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
+		webTmpl := template.Must(template.ParseFS(assets.TemplatesFS, "web/default/templates/*.tmpl"))
+
+		landingKo := renderWebTemplate(webTmpl, "index_ko", "about")
+		landingEn := renderWebTemplate(webTmpl, "index_en", "about")
+		guideKo := renderWebTemplate(webTmpl, "guide_ko", "guide")
+		guideEn := renderWebTemplate(webTmpl, "guide_en", "guide")
+
+		// Landing page routes — served before the SPA static handler
+		router.GET("/", func(c *gin.Context) {
+			acceptLang := c.GetHeader("Accept-Language")
+			if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
+				c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
+			} else {
+				c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
+			}
+		})
+		router.GET("/index.html", func(c *gin.Context) {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
+		})
+		router.GET("/index_en.html", func(c *gin.Context) {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
+		})
+		router.GET("/guide.html", func(c *gin.Context) {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", guideKo)
+		})
+		router.GET("/guide_en.html", func(c *gin.Context) {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", guideEn)
+		})
+
+		// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
+		router.Use(static.Serve("/", publicFS))
+		router.Use(static.Serve("/", themeFS))
+	}
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
 		if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
