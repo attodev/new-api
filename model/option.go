@@ -93,6 +93,14 @@ func InitOptionMap() {
 	common.OptionMap["PayPalSandbox"] = strconv.FormatBool(setting.PayPalSandbox)
 	common.OptionMap["PayPalUnitPrice"] = strconv.FormatFloat(setting.PayPalUnitPrice, 'f', -1, 64)
 	common.OptionMap["PayPalMinTopUp"] = strconv.Itoa(setting.PayPalMinTopUp)
+	common.OptionMap["TossEnabled"] = strconv.FormatBool(setting.TossEnabled)
+	common.OptionMap["TossTestMode"] = strconv.FormatBool(setting.TossTestMode)
+	common.OptionMap["TossClientKey"] = setting.TossClientKey
+	common.OptionMap["TossSecretKey"] = setting.TossSecretKey
+	common.OptionMap["TossTestClientKey"] = setting.TossTestClientKey
+	common.OptionMap["TossTestSecretKey"] = setting.TossTestSecretKey
+	common.OptionMap["TossUnitPrice"] = strconv.FormatFloat(setting.TossUnitPrice, 'f', -1, 64)
+	common.OptionMap["TossMinTopUp"] = strconv.Itoa(setting.TossMinTopUp)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -430,6 +438,22 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.PayPalUnitPrice, _ = strconv.ParseFloat(value, 64)
 	case "PayPalMinTopUp":
 		setting.PayPalMinTopUp, _ = strconv.Atoi(value)
+	case "TossEnabled":
+		setting.TossEnabled = value == "true"
+	case "TossTestMode":
+		setting.TossTestMode = value == "true"
+	case "TossClientKey":
+		setting.TossClientKey = value
+	case "TossSecretKey":
+		setting.TossSecretKey = value
+	case "TossTestClientKey":
+		setting.TossTestClientKey = value
+	case "TossTestSecretKey":
+		setting.TossTestSecretKey = value
+	case "TossUnitPrice":
+		setting.TossUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "TossMinTopUp":
+		setting.TossMinTopUp, _ = strconv.Atoi(value)
 	case "CreemApiKey":
 		setting.CreemApiKey = value
 	case "CreemProducts":

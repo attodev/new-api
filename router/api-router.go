@@ -60,6 +60,9 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/waffo/webhook", controller.WaffoWebhook)
 		apiRouter.GET("/paypal/capture", controller.PayPalCapture)
 		apiRouter.POST("/paypal/webhook", controller.PayPalWebhook)
+		apiRouter.GET("/toss/confirm", controller.TossConfirm)
+		apiRouter.GET("/toss/fail", controller.TossFail)
+		apiRouter.POST("/toss/webhook", controller.TossWebhook)
 		// :env separates test vs prod URLs so the operator can register each
 		// in Pancake's matching webhook slot; handler enforces env match.
 		apiRouter.POST("/waffo-pancake/webhook/:env", controller.WaffoPancakeWebhook)
@@ -105,6 +108,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/stripe/amount", controller.RequestStripeAmount)
 				selfRoute.POST("/paypal/pay", middleware.CriticalRateLimit(), controller.RequestPayPalPay)
 				selfRoute.POST("/paypal/amount", controller.RequestPayPalAmount)
+				selfRoute.POST("/toss/pay", middleware.CriticalRateLimit(), controller.RequestTossPay)
+				selfRoute.POST("/toss/amount", controller.RequestTossAmount)
 				selfRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestCreemPay)
 				selfRoute.POST("/waffo/amount", controller.RequestWaffoAmount)
 				selfRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestWaffoPay)
@@ -197,6 +202,8 @@ func SetApiRouter(router *gin.Engine) {
 			organizationRoute.POST("/stripe/amount", controller.RequestOrganizationStripeAmount)
 			organizationRoute.POST("/paypal/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationPayPalPay)
 			organizationRoute.POST("/paypal/amount", controller.RequestOrganizationPayPalAmount)
+			organizationRoute.POST("/toss/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationTossPay)
+			organizationRoute.POST("/toss/amount", controller.RequestOrganizationTossAmount)
 			organizationRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationCreemPay)
 			organizationRoute.POST("/waffo/amount", controller.RequestOrganizationWaffoAmount)
 			organizationRoute.POST("/waffo/pay", middleware.CriticalRateLimit(), controller.RequestOrganizationWaffoPay)
