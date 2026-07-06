@@ -16,6 +16,30 @@
     });
   }
 
+  // 가이드 영상 마지막에 체험하기 CTA 노출 (랜딩 페이지 히어로 영상과 동일한 동작)
+  var guideVideo = document.getElementById('guideVideo');
+  var guideCtaWrap = document.getElementById('guideCtaWrap');
+  var guideCtaBtn = document.getElementById('guideCtaBtn');
+  if (guideVideo && guideCtaWrap && guideCtaBtn) {
+    var CTA_LEAD_SECONDS = 5;
+    guideVideo.addEventListener('timeupdate', function () {
+      var showFrom = guideVideo.duration - CTA_LEAD_SECONDS;
+      if (guideVideo.currentTime >= showFrom && guideCtaWrap.style.display === 'none') {
+        guideCtaWrap.style.display = 'flex';
+        setTimeout(function () { guideCtaBtn.classList.add('active'); }, 50);
+      } else if (guideVideo.currentTime < showFrom && guideCtaWrap.style.display !== 'none') {
+        guideCtaBtn.classList.remove('active');
+        guideCtaWrap.style.display = 'none';
+      }
+    });
+    guideVideo.addEventListener('play', function () {
+      if (guideVideo.currentTime < guideVideo.duration - CTA_LEAD_SECONDS) {
+        guideCtaBtn.classList.remove('active');
+        guideCtaWrap.style.display = 'none';
+      }
+    });
+  }
+
   // 그룹 토글 (수동 설정 / CC Switch)
   document.querySelectorAll('.guide-group-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {

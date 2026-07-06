@@ -59,6 +59,18 @@
   background: #0a0f1a; border: 1px solid #283245; border-radius: 16px; overflow: hidden;
 }
 .guide-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* End-of-video CTA — reuses landing page's .anim-cta-* button styling (same design),
+   repositioned for this frame's 16:9 landscape shape instead of the hero's 9:16 portrait. */
+.guide-cta-wrap {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;
+  display: flex; width: 150px; pointer-events: none;
+}
+.guide-cta-wrap .anim-cta-overlay { pointer-events: auto; width: 100%; }
+.guide-cta-wrap .anim-cta-btn-text { font-size: 12px; }
+@media (max-width: 560px) {
+  .guide-cta-wrap { width: 110px; }
+}
 .guide-video-placeholder {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 10px; color: #6b7688;
