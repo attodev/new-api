@@ -787,6 +787,63 @@ test('summarizeExchange classifies web search usage from usage counters', () => 
   assert.equal(summary.classification, 'web_search_used');
 });
 
+test('summarizeExchange classifies OpenAI Responses web_search_call output as used', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-request-id': 'req-openai-search' },
+      json: {
+        object: 'response',
+        status: 'completed',
+        output: [
+          { type: 'reasoning', content: [] },
+          { type: 'web_search_call', status: 'completed', action: { type: 'search', query: 'OpenAI blog' } },
+          { type: 'web_search_call', status: 'completed', action: { type: 'open_page', url: 'https://openai.com/news/' } },
+          { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'OpenAI News - https://openai.com/news/' }] }
+        ]
+      },
+      bodyText: ''
+    }
+  });
+
+  assert.equal(summary.requestId, 'req-openai-search');
+  assert.deepEqual(summary.contentTypes, ['reasoning', 'web_search_call', 'web_search_call', 'message']);
+  assert.equal(summary.webSearchRequests, 2);
+  assert.equal(summary.classification, 'web_search_used');
+});
+
+test('summarizeExchange does not treat OpenAI chat tool_calls as completed web search', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-request-id': 'req-chat-tool-call' },
+      json: {
+        choices: [
+          {
+            finish_reason: 'tool_calls',
+            message: {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'web_search', arguments: '{}' }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      bodyText: ''
+    }
+  });
+
+  assert.deepEqual(summary.contentTypes, ['function']);
+  assert.equal(summary.webSearchRequests, 0);
+  assert.equal(summary.classification, 'tool_not_used');
+});
+
 test('summarizeExchange classifies successful responses without tool signals as not used', () => {
   const summary = summarizeExchange({
     response: {

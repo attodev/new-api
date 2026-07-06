@@ -25,6 +25,7 @@ function normalizeStatus(status) {
 function responseBlocks(json) {
   if (!json || typeof json !== 'object') return [];
   if (Array.isArray(json.content)) return json.content;
+  if (Array.isArray(json.output)) return json.output;
 
   if (Array.isArray(json.choices)) {
     const blocks = [];
@@ -34,7 +35,7 @@ function responseBlocks(json) {
 
       if (Array.isArray(message.content)) {
         blocks.push(...message.content);
-      } else if (typeof message.content === 'string') {
+      } else if (typeof message.content === 'string' && message.content) {
         blocks.push({ type: 'message_text', text: message.content });
       }
 
@@ -126,6 +127,13 @@ function textWebSearchRequests(text) {
   return Number.isFinite(count) ? count : 0;
 }
 
+function completedWebSearchCalls(blocks) {
+  return blocks.filter((block) => {
+    if (block?.type === 'web_search_call') return block.status !== 'failed';
+    return block?.type === 'server_tool_use' && block?.name === 'web_search';
+  }).length;
+}
+
 function hasUnavailableToolText(text) {
   return (
     /웹\s*검색\s*도구.*사용할\s*수\s*없/i.test(text) ||
@@ -185,7 +193,7 @@ export function summarizeExchange(record = {}) {
   const webSearchRequests = Math.max(
     usageWebSearchRequests(json),
     textWebSearchRequests(allText),
-    blocks.filter((block) => block?.type === 'server_tool_use' && block?.name === 'web_search').length
+    completedWebSearchCalls(blocks)
   );
   const classification = classify({
     status,
