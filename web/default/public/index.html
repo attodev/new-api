@@ -116,7 +116,7 @@
         <span></span>
       </button>
       <div class="gnb-right">
-        <button class="lang-switch" onclick="this.classList.toggle('open')">
+        <button class="lang-switch" aria-label="언어 선택" onclick="this.classList.toggle('open')">
           <i data-lucide="languages"></i>
           <div class="lang-dropdown"><a href="./index_en.html">English</a><a href="./index.html">한국어<span class="check">✓</span></a></div>
         </button>
@@ -125,7 +125,7 @@
         <a href="/sign-in" class="btn-primary">체험해보기</a>
       </div>
     </nav>
-
+    <main>
     <!-- ── SECTION 2: HERO ── -->
     <div style="padding: 0">
       <div class="hero">
@@ -246,11 +246,13 @@
             <button
               class="video-dot"
               id="dotStd"
+              aria-label="일반 영상 보기"
               onclick="switchVideo('std')"
             ></button>
             <button
-              class="video-dot"
+              class="video-dot active"
               id="dotLite"
+              aria-label="라이트 영상 보기"
               onclick="switchVideo('lite')"
             ></button>
           </div>
@@ -941,7 +943,7 @@
           <div class="calc-body">
             <div class="calc-form">
               <div class="calc-group">
-                <label>모델 선택</label>
+                <label for="calcModel">모델 선택</label>
                 <select class="calc-select" id="calcModel">
                   <option value="">모델 불러오는 중…</option>
                 </select>
@@ -1028,21 +1030,21 @@
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
                 <div class="gov-text">
-                  <h4>실시간 사용량 모니터링</h4>
+                  <h3>실시간 사용량 모니터링</h3>
                   <p>모델별, 팀원별, 날짜별 사용 현황을 대시보드에서 한눈에 확인</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="wallet"></i></div>
                 <div class="gov-text">
-                  <h4>예산 한도 설정</h4>
+                  <h3>예산 한도 설정</h3>
                   <p>토큰 할당량과 예산 상한을 미리 설정해 초과 청구 원천 차단</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="key-round"></i></div>
                 <div class="gov-text">
-                  <h4>토큰 기반 API 키 관리</h4>
+                  <h3>토큰 기반 API 키 관리</h3>
                   <p>팀원별 키 발급, 권한 설정, 만료일 지정을 한 곳에서</p>
                 </div>
               </div>
@@ -1259,6 +1261,7 @@
       </div>
     </div>
 
+    </main>
     <!-- ── SECTION 11: FOOTER ── -->
     <footer>
       <div class="footer-inner">

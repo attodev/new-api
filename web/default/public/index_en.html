@@ -112,7 +112,7 @@
         <span></span>
       </button>
       <div class="gnb-right">
-        <button class="lang-switch" onclick="this.classList.toggle('open')">
+        <button class="lang-switch" aria-label="Select language" onclick="this.classList.toggle('open')">
           <i data-lucide="languages"></i>
           <div class="lang-dropdown"><a href="./index_en.html">English<span class="check">✓</span></a><a href="./index.html">한국어</a></div>
         </button>
@@ -121,7 +121,7 @@
         <a href="/sign-in" class="btn-primary">Get Started</a>
       </div>
     </nav>
-
+    <main>
     <!-- ── SECTION 2: HERO ── -->
     <div style="padding: 0">
       <div class="hero">
@@ -242,11 +242,13 @@
             <button
               class="video-dot"
               id="dotStd"
+              aria-label="Watch standard video"
               onclick="switchVideo('std')"
             ></button>
             <button
-              class="video-dot"
+              class="video-dot active"
               id="dotLite"
+              aria-label="Watch lite video"
               onclick="switchVideo('lite')"
             ></button>
           </div>
@@ -937,7 +939,7 @@
           <div class="calc-body">
             <div class="calc-form">
               <div class="calc-group">
-                <label>Select Model</label>
+                <label for="calcModel">Select Model</label>
                 <select class="calc-select" id="calcModel">
                   <option value="">Loading models…</option>
                 </select>
@@ -1023,21 +1025,21 @@
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
                 <div class="gov-text">
-                  <h4>Real-time Usage Monitoring</h4>
+                  <h3>Real-time Usage Monitoring</h3>
                   <p>View usage by model, team member, and date on a single dashboard.</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="wallet"></i></div>
                 <div class="gov-text">
-                  <h4>Budget Limit Controls</h4>
+                  <h3>Budget Limit Controls</h3>
                   <p>Set token quotas and spending caps in advance to prevent overage charges.</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="key-round"></i></div>
                 <div class="gov-text">
-                  <h4>Token-based API Key Management</h4>
+                  <h3>Token-based API Key Management</h3>
                   <p>Issue keys, set permissions, and assign expiry dates for each team member — all in one place.</p>
                 </div>
               </div>
@@ -1254,6 +1256,7 @@
       </div>
     </div>
 
+    </main>
     <!-- ── SECTION 11: FOOTER ── -->
     <footer>
       <div class="footer-inner">
