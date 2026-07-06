@@ -18,24 +18,13 @@
 
   var guideVideo = document.getElementById('guideVideo');
 
-  // 가이드 영상 재생/일시정지 버튼을 크게 표시
-  // — 일시정지 상태에서는 항상 재생 버튼, 재생 중에는 마우스를 올렸을 때만 일시정지 버튼
+  // 가이드 영상 일시정지 상태에서 큰 재생 버튼을 표시
+  // — 재생 중에는 오버레이를 완전히 숨겨 네이티브 컨트롤(탐색바 등) 클릭을 가리지 않도록 함
   var guidePlayOverlay = document.getElementById('guidePlayOverlay');
-  var guideVideoFrame = document.querySelector('.guide-video-frame');
-  if (guideVideo && guidePlayOverlay && guideVideoFrame) {
-    var guideIconPlay = guidePlayOverlay.querySelector('.guide-icon-play');
-    var guideIconPause = guidePlayOverlay.querySelector('.guide-icon-pause');
-    var guideHovering = false;
-
+  if (guideVideo && guidePlayOverlay) {
     var renderGuidePlayOverlay = function () {
       if (guideVideo.paused) {
         guidePlayOverlay.classList.add('visible');
-        guideIconPlay.style.display = '';
-        guideIconPause.style.display = 'none';
-      } else if (guideHovering) {
-        guidePlayOverlay.classList.add('visible');
-        guideIconPlay.style.display = 'none';
-        guideIconPause.style.display = '';
       } else {
         guidePlayOverlay.classList.remove('visible');
       }
@@ -44,17 +33,8 @@
     guideVideo.addEventListener('play', renderGuidePlayOverlay);
     guideVideo.addEventListener('pause', renderGuidePlayOverlay);
     guideVideo.addEventListener('ended', renderGuidePlayOverlay);
-    guideVideoFrame.addEventListener('mouseenter', function () {
-      guideHovering = true;
-      renderGuidePlayOverlay();
-    });
-    guideVideoFrame.addEventListener('mouseleave', function () {
-      guideHovering = false;
-      renderGuidePlayOverlay();
-    });
     guidePlayOverlay.addEventListener('click', function () {
-      if (guideVideo.paused) guideVideo.play();
-      else guideVideo.pause();
+      guideVideo.play();
     });
     renderGuidePlayOverlay();
   }
