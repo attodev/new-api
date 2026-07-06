@@ -94,13 +94,13 @@
     function showShot(index) {
       var shots = shotList();
       if (!shots.length) return;
-      currentIndex = (index + shots.length) % shots.length;
+      currentIndex = Math.min(Math.max(index, 0), shots.length - 1);
       var img = shots[currentIndex];
       lightboxImg.src = img.src;
       lightboxImg.alt = img.alt;
       lightboxCaption.textContent = shotCaption(img);
-      lightboxPrev.disabled = shots.length < 2;
-      lightboxNext.disabled = shots.length < 2;
+      lightboxPrev.disabled = currentIndex <= 0;
+      lightboxNext.disabled = currentIndex >= shots.length - 1;
     }
 
     function openLightbox(img) {
