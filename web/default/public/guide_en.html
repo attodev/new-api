@@ -44,13 +44,14 @@
       <div class="guide-head">
         <span class="guide-eyebrow">Guide</span>
         <h1>How to connect AlRouter in your CLI</h1>
-        <p>Watch the video for a quick overview, or follow the step-by-step guide below. You can set environment variables directly, or register everything at once with CC Switch.</p>
+        <p>You can set environment variables directly, or register everything at once with CC Switch.</p>
+        <p>Watch the video, or follow the step-by-step guide below.</p>
       </div>
 
       <!-- Group picker -->
       <div class="guide-group-picker" role="tablist">
-        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><span class="t-dot" style="background:#0EA5E9"></span>Set environment variables</button>
-        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><span class="t-dot" style="background:#34d399"></span>Set up with CC Switch <span class="g-n">Coming soon</span></button>
+        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><i data-lucide="terminal"></i>Set environment variables</button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><i data-lucide="wand-2"></i>Set up with CC Switch <span class="g-n">Coming soon</span></button>
       </div>
 
       <!-- ══════════ Group: Manual setup ══════════ -->
@@ -71,7 +72,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Create an API key</h4></div>
-                  <p>Go to the 'API Keys' menu, create a new API key, and copy it. You'll use this single key for all the setup below.</p>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
                   <img class="guide-step-shot" src="/guide-step-1-apikey.png" alt="API key creation screen" loading="lazy" />
                 </div>
               </div>
@@ -81,38 +82,55 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Set environment variables</h4></div>
                   <p>Open your shell config file in the terminal, add the base URL and API key, then apply the settings. Use the values that match your CLI's format.</p>
-                  <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
 
-                  <div class="guide-provider-table">
-                    <div class="guide-provider-row">
-                      <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
-                      <div class="guide-term">
-                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">1</span>Add the environment variables to your shell config</div>
+                    <div class="guide-substep-body">
+                      <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
+
+                      <div class="guide-provider-table">
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
 <pre><span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
 <span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-your-key"</span></pre>
-                      </div>
-                    </div>
-                    <div class="guide-provider-row">
-                      <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
-                      <div class="guide-term">
-                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
 <pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
 <span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
-                      </div>
-                    </div>
-                    <div class="guide-provider-row">
-                      <span class="guide-provider-name" style="color:#4285f4">Gemini</span>
-                      <div class="guide-term">
-                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#4285f4">Gemini</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
 <pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
 <span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="guide-note">
+                        <span class="mark">TIP</span>
+                        <p>OpenAI-format CLIs only differ by <span class="mono">/v1</span> at the end of the base URL, and Gemini by <span class="mono">/v1beta</span> — otherwise the setup is identical.</p>
                       </div>
                     </div>
                   </div>
 
-                  <div class="guide-term" style="margin-top:10px;">
-                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">2</span>Apply the changes</div>
+                    <div class="guide-substep-body">
+                      <p class="guide-substep-desc">Open a new terminal, or apply the changes to your current one right away with the command below.</p>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ source ~/.zshrc</pre>
+                      </div>
+                    </div>
                   </div>
                   <img class="guide-step-shot" src="/guide-step-2-envsetup.png" alt="Environment variable setup screen" loading="lazy" />
                 </div>
@@ -122,7 +140,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
-                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection. If the base URL shows alrouter.ai, you're all set.</p>
+                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
                   <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
@@ -153,7 +171,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Check usage</h4></div>
-                  <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu. The 'Overview' page also shows a recent usage summary.</p>
+                  <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' page also shows a recent usage summary.</p>
                   <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="Usage logs screen" loading="lazy" />
                 </div>
               </div>
