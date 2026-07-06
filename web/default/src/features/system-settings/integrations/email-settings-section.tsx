@@ -93,8 +93,9 @@ export function EmailSettingsSection({
         toast.error(data.message || t('Failed to send test email'))
       }
     },
-    onError: (error: Error) => {
-      toast.error(error.message || t('Failed to send test email'))
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || t('Failed to send test email')
+      toast.error(msg)
     },
   })
 

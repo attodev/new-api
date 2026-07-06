@@ -112,8 +112,14 @@ api.interceptors.response.use(
       }
     } else if (!skip) {
       // Other errors: show error message from response or default
-      const msg =
-        error?.response?.data?.message || error?.message || t('Request failed')
+      let msg = error?.response?.data?.message
+      if (!msg) {
+        if (status) {
+          msg = t('An error occurred (Error Code: {{code}})', { code: status })
+        } else {
+          msg = error?.message || t('Request failed')
+        }
+      }
       toast.error(msg)
     }
     return Promise.reject(error)

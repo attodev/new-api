@@ -396,6 +396,7 @@
     "apps": "앱",
     "Apps": "앱",
     "apps tracked": "추적 중인 앱",
+    "Apps using the most tokens through new-api": "Apps using the most tokens through new-api",
     "are also listed here. Remove them from Models to keep the `/v1/models` response user-friendly and hide vendor-specific names.": "여기에도 나열되어 있습니다. '/v1/models' 응답을 사용자 친화적으로 유지하고 공급업체별 이름을 숨기려면 모델에서 이를 제거하세요.",
     "Are you sure you want to delete": "정말 삭제하시겠습니까?",
     "Are you sure you want to delete {{count}} model(s)? This action cannot be undone.": "{{count}}개 모델을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
@@ -4750,6 +4751,13 @@
     "Zero retention": "무보존",
     "Zhipu": "Zhipu AI",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "확대/축소"
+    "Zoom": "확대/축소",
+    "tokenInOut": "토큰 (입력/출력)",
+    "Critical": "심각",
+    "Send reset email": "비밀번호 재설정 이메일 전송",
+    "Quick Start Guide(PDF)": "퀵스타트 가이드(PDF)",
+    "Failed to send test email": "테스트 이메일 전송에 실패했습니다",
+    "Test email sent successfully": "테스트 이메일이 성공적으로 전송되었습니다",
+    "An error occurred (Error Code: {{code}})": "에러가 발생했습니다 (에러코드: {{code}})"
   }
 }

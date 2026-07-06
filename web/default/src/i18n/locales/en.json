@@ -4751,6 +4751,13 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "tokenInOut": "token InOut",
+    "Critical": "Critical",
+    "Send reset email": "Send reset email",
+    "Quick Start Guide(PDF)": "Quick Start Guide(PDF)",
+    "Failed to send test email": "Failed to send test email",
+    "Test email sent successfully": "Test email sent successfully",
+    "An error occurred (Error Code: {{code}})": "An error occurred (Error Code: {{code}})"
   }
 }
