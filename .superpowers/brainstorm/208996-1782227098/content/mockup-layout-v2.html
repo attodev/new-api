@@ -1,0 +1,114 @@
+<h2>전체 레이아웃 목업 v2</h2>
+<p class="subtitle">행별 버튼 제거 — 모든 작업은 선택 후 상단 툴바에서</p>
+
+<div class="mockup" style="max-width:860px;margin:0 auto;">
+  <div class="mockup-header">조직 사용자 관리</div>
+  <div class="mockup-body" style="padding:0;">
+
+    <!-- 상단 저장/취소 배너 (변경 있을 때만) -->
+    <div style="background:#eff6ff;border-bottom:1px solid #bfdbfe;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+      <span style="color:#1d4ed8;">📝 quota 1건 수정 · 1명 비활성화 예정 · 1명 제거 예정</span>
+      <span style="display:flex;gap:8px;">
+        <button style="padding:5px 16px;background:#2563eb;color:white;border:none;border-radius:5px;font-size:13px;cursor:pointer">저장</button>
+        <button style="padding:5px 14px;background:white;border:1px solid #d1d5db;border-radius:5px;font-size:13px;cursor:pointer">모두 취소</button>
+      </span>
+    </div>
+
+    <!-- 검색 + 선택 시 일괄 작업 툴바 -->
+    <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;gap:12px;flex-wrap:wrap;">
+      <input class="mock-input" placeholder="사용자명 또는 표시 이름으로 검색" style="max-width:260px;font-size:13px;">
+
+      <!-- 선택 시 나타남 -->
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+        <span style="color:#6b7280;">2명 선택됨</span>
+        <div style="width:1px;height:16px;background:#d1d5db;"></div>
+        <button style="padding:4px 12px;background:white;border:1px solid #d1d5db;border-radius:5px;font-size:12px;cursor:pointer;">🚫 비활성화</button>
+        <button style="padding:4px 12px;background:white;border:1px solid #fca5a5;color:#dc2626;border-radius:5px;font-size:12px;cursor:pointer;">✕ 조직에서 제거</button>
+      </div>
+    </div>
+
+    <!-- 테이블 -->
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb;">
+          <th style="padding:8px 12px;width:36px;"><input type="checkbox" title="전체 선택 (owner 제외)"></th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;">사용자명 ↕</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;">역할 ↕</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;">상태 ↕</th>
+          <th style="padding:8px 12px;text-align:left;font-weight:600;">Quota ↕</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Owner: 체크박스 비활성 -->
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:8px 12px;text-align:center;">
+            <input type="checkbox" disabled title="Owner는 변경 불가" style="opacity:0.3;cursor:not-allowed;">
+          </td>
+          <td style="padding:8px 12px;">
+            <div style="font-weight:500;">owner</div>
+            <div style="font-size:11px;color:#9ca3af;">홍길동</div>
+          </td>
+          <td style="padding:8px 12px;color:#9ca3af;">owner</td>
+          <td style="padding:8px 12px;color:#9ca3af;">활성</td>
+          <td style="padding:8px 12px;color:#9ca3af;">—</td>
+        </tr>
+
+        <!-- 정상 행 -->
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:8px 12px;text-align:center;"><input type="checkbox"></td>
+          <td style="padding:8px 12px;font-weight:500;">alice</td>
+          <td style="padding:8px 12px;">member</td>
+          <td style="padding:8px 12px;">활성</td>
+          <td style="padding:8px 12px;">$5.00</td>
+        </tr>
+
+        <!-- quota 수정 중: 노란 하이라이트 -->
+        <tr style="border-bottom:1px solid #f3f4f6;background:#fef9c3;">
+          <td style="padding:8px 12px;text-align:center;"><input type="checkbox"></td>
+          <td style="padding:8px 12px;">
+            <div style="font-weight:500;">bob</div>
+            <div style="font-size:11px;color:#92400e;">● quota 수정됨</div>
+          </td>
+          <td style="padding:8px 12px;">admin</td>
+          <td style="padding:8px 12px;">활성</td>
+          <td style="padding:8px 12px;">
+            <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">$3.00</span>
+            <span style="color:#d97706;font-weight:600;margin-left:6px;">$8.00</span>
+          </td>
+        </tr>
+
+        <!-- 비활성화 예정: 주황 하이라이트 -->
+        <tr style="border-bottom:1px solid #f3f4f6;background:#fff7ed;">
+          <td style="padding:8px 12px;text-align:center;"><input type="checkbox" checked></td>
+          <td style="padding:8px 12px;">
+            <div style="font-weight:500;">carol</div>
+            <div style="font-size:11px;color:#c2410c;">● 비활성화 예정</div>
+          </td>
+          <td style="padding:8px 12px;">member</td>
+          <td style="padding:8px 12px;color:#c2410c;">비활성(예정)</td>
+          <td style="padding:8px 12px;">$2.00</td>
+        </tr>
+
+        <!-- 제거 예정: 빨간 하이라이트 + 취소선 -->
+        <tr style="border-bottom:1px solid #f3f4f6;background:#fef2f2;">
+          <td style="padding:8px 12px;text-align:center;"><input type="checkbox" checked></td>
+          <td style="padding:8px 12px;">
+            <div style="font-weight:500;text-decoration:line-through;color:#9ca3af;">dave</div>
+            <div style="font-size:11px;color:#dc2626;">● 제거 예정</div>
+          </td>
+          <td style="padding:8px 12px;color:#d1d5db;text-decoration:line-through;">member</td>
+          <td style="padding:8px 12px;color:#d1d5db;text-decoration:line-through;">활성</td>
+          <td style="padding:8px 12px;color:#d1d5db;text-decoration:line-through;">$1.00</td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    <div style="padding:10px 16px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;">
+      총 5명 · 1/1 페이지
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">이 방향으로 괜찮으신가요?</p>

@@ -23,6 +23,8 @@ tiktoken_cache
 .gomodcache/
 .cache
 plans
+!docs/superpowers/plans/
+!docs/superpowers/plans/*.md
 .claude
 .cursor
 
@@ -36,3 +38,11 @@ data/
 token_estimator_test.go
 skills-lock.json
 .worktrees/
+
+# Generated local artifacts
+coverage*.out
+new-api-bin
+new-api.bak
+new-api.prev-*
+web/default/src/i18n/locales/_reports/
+.superpowers/brainstorm/*/state/

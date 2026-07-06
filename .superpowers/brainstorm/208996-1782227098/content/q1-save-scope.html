@@ -1,0 +1,29 @@
+<h2>저장/취소 패턴의 적용 범위</h2>
+<p class="subtitle">어떤 변경 사항까지 "저장" 버튼을 눌러야 반영되게 할까요?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>개별 행 편집만</h3>
+      <p>quota 수정, 상태 토글 → 저장 전까지 pending 상태로 표시, 저장 버튼 클릭 시 일괄 반영</p>
+      <p>조직 제거·다중 비활성화 등 <strong>일괄 작업은 즉시 반영</strong> (확인 다이얼로그 사용)</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>모든 변경 사항 통합</h3>
+      <p>quota 수정, 상태 토글, 조직 제거, 다중 비활성화 <strong>전부</strong> → 저장 버튼 클릭 시 일괄 반영</p>
+      <p>취소 버튼으로 모든 변경 내용 원복 가능</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>행 단위 인라인 저장</h3>
+      <p>각 행에 편집 모드(연필 아이콘) → 행별로 저장/취소 버튼 표시</p>
+      <p>일괄 작업(다중 선택)은 별도 툴바에서 즉시 반영 (확인 다이얼로그)</p>
+    </div>
+  </div>
+</div>
