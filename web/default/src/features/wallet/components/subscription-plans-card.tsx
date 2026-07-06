@@ -50,6 +50,7 @@ import {
   getPublicPlans,
   getSelfSubscriptionFull,
   updateBillingPreference,
+  cancelTossAutoRenew,
 } from '@/features/subscriptions/api'
 import { SubscriptionPurchaseDialog } from '@/features/subscriptions/components/dialogs/subscription-purchase-dialog'
 import { formatDuration, formatResetPeriod } from '@/features/subscriptions/lib'
@@ -112,10 +113,13 @@ export function SubscriptionPlansCard({
 
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<PlanRecord | null>(null)
+  const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false)
 
   const enableStripe = !!topupInfo?.enable_stripe_topup
   const enableCreem = !!topupInfo?.enable_creem_topup
   const enableWaffoPancake = !!topupInfo?.enable_waffo_pancake_topup
+  const enableToss = !!topupInfo?.enable_toss_billing
+  const tossUnitPrice = Number(topupInfo?.toss_unit_price || 0)
   const enableOnlineTopUp = !!topupInfo?.enable_online_topup
   const epayMethods = useMemo(
     () => getEpayMethods(topupInfo?.pay_methods),
@@ -182,6 +186,23 @@ export function SubscriptionPlansCard({
     } catch {
       toast.error(t('Request failed'))
       setBillingPreference(previous)
+    }
+  }
+
+  const handleCancelTossAutoRenew = async () => {
+    setCancellingAutoRenew(true)
+    try {
+      const res = await cancelTossAutoRenew()
+      if (res.success) {
+        toast.success(t('Auto-renew cancelled'))
+        await fetchSelfSubscription()
+      } else {
+        toast.error(res.message || t('Request failed'))
+      }
+    } catch {
+      toast.error(t('Request failed'))
+    } finally {
+      setCancellingAutoRenew(false)
     }
   }
 
@@ -495,6 +516,22 @@ export function SubscriptionPlansCard({
                       {totalAmount > 0 && isActive && (
                         <Progress value={usagePercent} className='mt-2 h-1.5' />
                       )}
+                      {isActive && subscription?.auto_renew && (
+                        <div className='mt-2 flex items-center justify-between'>
+                          <span className='text-muted-foreground text-xs'>
+                            {t('Auto-renew active')}
+                          </span>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='h-6 px-2 text-xs'
+                            onClick={handleCancelTossAutoRenew}
+                            disabled={cancellingAutoRenew}
+                          >
+                            {t('Cancel Auto-renew')}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -635,6 +672,8 @@ export function SubscriptionPlansCard({
         enableStripe={enableStripe}
         enableCreem={enableCreem}
         enableWaffoPancake={enableWaffoPancake}
+        enableToss={enableToss}
+        tossUnitPrice={tossUnitPrice}
         enableOnlineTopUp={enableOnlineTopUp}
         epayMethods={epayMethods}
         userQuota={userQuota}

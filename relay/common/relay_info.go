@@ -96,6 +96,14 @@ type RelayInfo struct {
 	StartTime         time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
+
+	// UpstreamRequestStartTime/UpstreamResponseEndTime bracket the actual
+	// outbound HTTP call to the model provider (set in
+	// relay/channel/api_request.go's doRequest()). On retry, each attempt
+	// overwrites these with its own timestamps — only the final attempt's
+	// timing is reported.
+	UpstreamRequestStartTime time.Time
+	UpstreamResponseEndTime  time.Time
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -656,6 +664,20 @@ func (info *RelayInfo) SetFirstResponseTime() {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
 	}
+}
+
+// SetUpstreamRequestStart records when the outbound HTTP call to the model
+// provider began. Safe to call multiple times across retries; the latest
+// call wins.
+func (info *RelayInfo) SetUpstreamRequestStart() {
+	info.UpstreamRequestStartTime = time.Now()
+}
+
+// SetUpstreamResponseEnd records when the model provider's response body was
+// fully read (EOF) or the call failed. Safe to call multiple times across
+// retries; the latest call wins.
+func (info *RelayInfo) SetUpstreamResponseEnd() {
+	info.UpstreamResponseEndTime = time.Now()
 }
 
 func (info *RelayInfo) HasSendResponse() bool {

@@ -64,6 +64,9 @@ export const userSubscriptionSchema = z.object({
   amount_total: z.number(),
   amount_used: z.number(),
   next_reset_time: z.number().optional(),
+  // Toss 자동결제(빌링) 연동 필드
+  auto_renew: z.boolean().optional(),
+  billing_key_id: z.number().optional(),
 })
 
 export type UserSubscription = z.infer<typeof userSubscriptionSchema>

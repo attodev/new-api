@@ -20,6 +20,8 @@ import type { TFunction } from 'i18next'
 import dayjs from '@/lib/dayjs'
 import type { SubscriptionPlan } from '../types'
 
+export const TOSS_CARD_MINIMUM_AMOUNT_KRW = 100
+
 export function formatDuration(
   plan: Partial<SubscriptionPlan>,
   t: TFunction
@@ -63,4 +65,36 @@ export function formatResetPeriod(
 export function formatTimestamp(ts: number): string {
   if (!ts) return '-'
   return dayjs(ts * 1000).format('YYYY-MM-DD HH:mm:ss')
+}
+
+export function getTossChargeKRW(
+  priceAmount: number,
+  tossUnitPrice: number
+): number {
+  const price = Number(priceAmount || 0)
+  const unit = Number(tossUnitPrice || 0)
+  if (
+    !Number.isFinite(price) ||
+    !Number.isFinite(unit) ||
+    price <= 0 ||
+    unit <= 0
+  ) {
+    return 0
+  }
+  return Math.round(price * unit)
+}
+
+export function formatTossChargeKRW(
+  priceAmount: number,
+  tossUnitPrice: number
+): string {
+  const amount = getTossChargeKRW(priceAmount, tossUnitPrice)
+  if (amount <= 0) {
+    return ''
+  }
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  }).format(amount)
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -27,8 +28,13 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 	originalUsingMySQL := common.UsingMySQL
 	originalUsingPostgreSQL := common.UsingPostgreSQL
 	originalRedisEnabled := common.RedisEnabled
+	originalTranslateMessage := common.TranslateMessage
 
 	gin.SetMode(gin.TestMode)
+	require.NoError(t, i18n.Init())
+	common.TranslateMessage = func(c *gin.Context, key string, args ...map[string]any) string {
+		return i18n.Translate(i18n.LangEn, key, args...)
+	}
 	common.UsingSQLite = true
 	common.UsingMySQL = false
 	common.UsingPostgreSQL = false
@@ -59,6 +65,7 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 		common.UsingMySQL = originalUsingMySQL
 		common.UsingPostgreSQL = originalUsingPostgreSQL
 		common.RedisEnabled = originalRedisEnabled
+		common.TranslateMessage = originalTranslateMessage
 	})
 
 	return db

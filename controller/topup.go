@@ -94,6 +94,25 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	// Toss
+	if isTossTopUpEnabled() {
+		hasToss := false
+		for _, method := range payMethods {
+			if method["type"] == model.PaymentMethodToss {
+				hasToss = true
+				break
+			}
+		}
+		if !hasToss {
+			payMethods = append(payMethods, map[string]string{
+				"name":      "Toss",
+				"type":      model.PaymentMethodToss,
+				"color":     "#0051BA",
+				"min_topup": strconv.Itoa(setting.TossMinTopUp),
+			})
+		}
+	}
+
 	// Waffo
 	enableWaffo := isWaffoTopUpEnabled()
 	if enableWaffo {
@@ -123,6 +142,10 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
+		"enable_toss_topup":                isTossTopUpEnabled(),
+		"enable_toss_billing":              isTossBillingEnabled(),
+		"toss_min_topup":                   setting.TossMinTopUp,
+		"toss_unit_price":                  setting.TossUnitPrice,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,

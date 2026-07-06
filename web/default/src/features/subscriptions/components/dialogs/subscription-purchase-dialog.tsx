@@ -48,7 +48,14 @@ import {
   paySubscriptionWaffoPancake,
   paySubscriptionBalance,
 } from '../../api'
-import { formatDuration, formatResetPeriod } from '../../lib'
+import { useTossBilling } from '../../hooks/use-toss-billing'
+import {
+  TOSS_CARD_MINIMUM_AMOUNT_KRW,
+  formatDuration,
+  formatResetPeriod,
+  formatTossChargeKRW,
+  getTossChargeKRW,
+} from '../../lib'
 import type { PlanRecord } from '../../types'
 
 interface PaymentMethod {
@@ -63,6 +70,8 @@ interface Props {
   enableStripe?: boolean
   enableCreem?: boolean
   enableWaffoPancake?: boolean
+  enableToss?: boolean
+  tossUnitPrice?: number
   enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
   purchaseLimit?: number
@@ -76,6 +85,8 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const { currency } = useSystemConfig()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
+  const { processing: tossBillingProcessing, subscribeWithToss } =
+    useTossBilling()
 
   useEffect(() => {
     if (props.open && props.epayMethods && props.epayMethods.length > 0) {
@@ -92,9 +103,11 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const hasCreem = props.enableCreem && !!plan.creem_product_id
   const hasWaffoPancake =
     props.enableWaffoPancake && !!plan.waffo_pancake_product_id
+  const hasToss = !!props.enableToss
   const hasEpay =
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
-  const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
+  const hasAnyPayment =
+    hasStripe || hasCreem || hasWaffoPancake || hasToss || hasEpay
   const selectedEpayMethodLabel =
     (props.epayMethods || []).find((m) => m.type === selectedEpayMethod)
       ?.name ||
@@ -102,6 +115,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
     t('Select payment method')
   const totalAmount = Number(plan.total_amount || 0)
   const price = Number(plan.price_amount || 0).toFixed(2)
+  const tossChargeKRW = hasToss
+    ? formatTossChargeKRW(
+        Number(plan.price_amount || 0),
+        props.tossUnitPrice || 0
+      )
+    : ''
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
       ? currency.quotaPerUnit
@@ -115,6 +134,11 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const limitReached =
     (props.purchaseLimit || 0) > 0 &&
     (props.purchaseCount || 0) >= (props.purchaseLimit || 0)
+  const tossChargeAmountKRW = hasToss
+    ? getTossChargeKRW(Number(plan.price_amount || 0), props.tossUnitPrice || 0)
+    : 0
+  const tossChargeUnavailable =
+    hasToss && tossChargeAmountKRW < TOSS_CARD_MINIMUM_AMOUNT_KRW
 
   const handlePayStripe = async () => {
     setPaying(true)
@@ -253,6 +277,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
     }
   }
 
+  const handlePayToss = async () => {
+    await subscribeWithToss(plan.id)
+    // SDK redirects to successUrl on auth completion — dialog stays open
+    // until redirect. If user cancels, we simply reset (hook handles toast).
+  }
+
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className='max-sm:w-[calc(100vw-1.5rem)] sm:max-w-md'>
@@ -312,6 +342,14 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <span className='text-sm font-medium'>{t('Amount Due')}</span>
               <span className='text-primary text-lg font-bold'>${price}</span>
             </div>
+            {tossChargeKRW && (
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-xs'>
+                  {t('Toss charge')}
+                </span>
+                <span className='text-xs font-medium'>{tossChargeKRW}</span>
+              </div>
+            )}
           </div>
 
           {limitReached && (
@@ -351,14 +389,14 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <p className='text-muted-foreground text-xs'>
                 {t('Select payment method')}
               </p>
-              {(hasStripe || hasCreem || hasWaffoPancake) && (
+              {(hasStripe || hasCreem || hasWaffoPancake || hasToss) && (
                 <div className='grid grid-cols-2 gap-2 sm:flex'>
                   {hasStripe && (
                     <Button
                       variant='outline'
                       className='flex-1'
                       onClick={handlePayStripe}
-                      disabled={paying || limitReached}
+                      disabled={paying || tossBillingProcessing || limitReached}
                     >
                       Stripe
                     </Button>
@@ -368,7 +406,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
                       variant='outline'
                       className='flex-1'
                       onClick={handlePayCreem}
-                      disabled={paying || limitReached}
+                      disabled={paying || tossBillingProcessing || limitReached}
                     >
                       Creem
                     </Button>
@@ -378,9 +416,24 @@ export function SubscriptionPurchaseDialog(props: Props) {
                       variant='outline'
                       className='flex-1'
                       onClick={handlePayWaffoPancake}
-                      disabled={paying || limitReached}
+                      disabled={paying || tossBillingProcessing || limitReached}
                     >
                       Waffo Pancake
+                    </Button>
+                  )}
+                  {hasToss && (
+                    <Button
+                      variant='outline'
+                      className='flex-1'
+                      onClick={handlePayToss}
+                      disabled={
+                        paying ||
+                        tossBillingProcessing ||
+                        limitReached ||
+                        tossChargeUnavailable
+                      }
+                    >
+                      {t('Toss Auto Pay')}
                     </Button>
                   )}
                 </div>
