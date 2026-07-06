@@ -46,7 +46,16 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>API 키 발급</h4></div>
                   <p>대시보드 'API 키' 메뉴로 이동해 새로운 API 키를 생성하고, 생성된 키를 복사합니다.<br>이 키 하나로 이후 모든 설정에 사용합니다.</p>
-                  <img class="guide-step-shot" src="/guide-step-1-apikey.png" alt="API 키 생성 화면" loading="lazy" />
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/guide-step-1-apikey-create.png" alt="API 키 생성 화면" />
+                      <figcaption>API 키 생성</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/guide-step-1-apikey-copy.png" alt="생성된 API 키 복사 화면" />
+                      <figcaption>생성된 키 복사</figcaption>
+                    </figure>
+                  </div>
                 </div>
               </div>
 
@@ -88,6 +97,8 @@
                         </div>
                       </div>
 
+                      <img class="guide-step-shot" src="/guide-step-2-envsetup-edit.png" alt="셸 설정 파일에 환경변수를 추가하는 화면" />
+
                       <div class="guide-note">
                         <span class="mark">TIP</span>
                         <p>OpenAI 포맷 CLI는 base URL 뒤에 <span class="mono">/v1</span>, Gemini는 <span class="mono">/v1beta</span>만 다를 뿐 방식은 동일합니다.</p>
@@ -103,9 +114,9 @@
                         <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ source ~/.zshrc</pre>
                       </div>
+                      <img class="guide-step-shot" src="/guide-step-2-envsetup-apply.png" alt="설정을 적용한 터미널 화면" />
                     </div>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-2-envsetup.png" alt="환경변수 등록 화면" loading="lazy" />
                 </div>
               </div>
 
@@ -121,7 +132,7 @@
 &gt; /status
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status 연결 확인 화면" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status 연결 확인 화면" />
                 </div>
               </div>
 
@@ -136,7 +147,7 @@
 <span class="c3">&gt; 연동 테스트입니다. "Claude Code 연결 성공"이라고만 답해주세요.</span>
 <span class="cm">Claude Code 연결 성공</span></pre>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="테스트 프롬프트 응답 화면" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="테스트 프롬프트 응답 화면" />
                 </div>
               </div>
 
@@ -145,7 +156,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>사용량 확인</h4></div>
                   <p>모든 요청은 '사용 로그' 메뉴에서 키별로 토큰과 비용까지 확인할 수 있습니다.<br>'개요' 화면에서도 최근 사용량을 요약해서 볼 수 있습니다.</p>
-                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="사용 로그 화면" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="사용 로그 화면" />
                 </div>
               </div>
             </div>

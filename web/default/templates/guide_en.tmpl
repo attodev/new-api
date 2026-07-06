@@ -46,7 +46,16 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Create an API key</h4></div>
                   <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
-                  <img class="guide-step-shot" src="/guide-step-1-apikey.png" alt="API key creation screen" loading="lazy" />
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/guide-step-1-apikey-create.png" alt="API key creation screen" />
+                      <figcaption>Create the API key</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/guide-step-1-apikey-copy.png" alt="Copying the generated API key" />
+                      <figcaption>Copy the generated key</figcaption>
+                    </figure>
+                  </div>
                 </div>
               </div>
 
@@ -88,6 +97,8 @@
                         </div>
                       </div>
 
+                      <img class="guide-step-shot" src="/guide-step-2-envsetup-edit.png" alt="Editing the shell config file to add environment variables" />
+
                       <div class="guide-note">
                         <span class="mark">TIP</span>
                         <p>OpenAI-format CLIs only differ by <span class="mono">/v1</span> at the end of the base URL, and Gemini by <span class="mono">/v1beta</span> — otherwise the setup is identical.</p>
@@ -103,9 +114,9 @@
                         <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ source ~/.zshrc</pre>
                       </div>
+                      <img class="guide-step-shot" src="/guide-step-2-envsetup-apply.png" alt="Terminal after applying the settings" />
                     </div>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-2-envsetup.png" alt="Environment variable setup screen" loading="lazy" />
                 </div>
               </div>
 
@@ -121,7 +132,7 @@
 &gt; /status
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status connection check screen" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status connection check screen" />
                 </div>
               </div>
 
@@ -136,7 +147,7 @@
 <span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
 <span class="cm">Claude Code connected</span></pre>
                   </div>
-                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="Test prompt response screen" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="Test prompt response screen" />
                 </div>
               </div>
 
@@ -145,7 +156,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Check usage</h4></div>
                   <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' page also shows a recent usage summary.</p>
-                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="Usage logs screen" loading="lazy" />
+                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="Usage logs screen" />
                 </div>
               </div>
             </div>
