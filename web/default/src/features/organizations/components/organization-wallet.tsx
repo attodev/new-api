@@ -26,6 +26,7 @@ import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TitledCard } from '@/components/ui/titled-card'
 import { SectionPageLayout } from '@/components/layout'
 import { isApiSuccess } from '@/features/wallet/api'
 import {
@@ -50,6 +51,13 @@ import {
   submitPaymentForm,
 } from '@/features/wallet/lib'
 import {
+  buildWalletPaymentSettingTabs,
+  getInitialWalletPaymentSetting,
+  getWalletPaymentSettingTabsGridClass,
+  WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
+  type WalletPaymentSettingKind,
+} from '@/features/wallet/lib/payment-settings'
+import {
   getTossPreview,
   parseTossQuoteData,
 } from '@/features/wallet/lib/topup-amount-mode'
@@ -60,6 +68,8 @@ import type {
   TopupAmountMode,
   TossTopupQuote,
   UserWalletData,
+  WalletAutoRechargePolicy,
+  WalletAutoRechargeType,
 } from '@/features/wallet/types'
 import {
   calculateOrganizationAmount,
@@ -132,9 +142,24 @@ export function getOrganizationAmountModeRequest(
     : { amount }
 }
 
+export function buildOrganizationWalletPaymentSettingTabs({
+  visibleAutoRechargeModes,
+  policies,
+}: {
+  visibleAutoRechargeModes: WalletAutoRechargeType[]
+  policies: Array<Pick<WalletAutoRechargePolicy, 'type' | 'status'>>
+}) {
+  return buildWalletPaymentSettingTabs({
+    hasActiveSubscription: false,
+    visibleAutoRechargeModes,
+    policies,
+  })
+}
+
 export function OrganizationWallet() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState('topup')
+  const [paymentSettingTab, setPaymentSettingTab] =
+    useState<WalletPaymentSettingKind | null>(null)
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizationLoading, setOrganizationLoading] = useState(true)
   const [topupAmount, setTopupAmount] = useState(0)
@@ -521,22 +546,28 @@ export function OrganizationWallet() {
     ]
   )
 
-  useEffect(() => {
-    if (
-      activeTab !== 'topup' &&
-      !visibleAutoRechargeModes.includes(activeTab as 'scheduled' | 'threshold')
-    ) {
-      setActiveTab('topup')
-    }
-  }, [activeTab, visibleAutoRechargeModes])
+  const paymentSettingTabs = useMemo(
+    () =>
+      buildOrganizationWalletPaymentSettingTabs({
+        visibleAutoRechargeModes,
+        policies: walletAutoRecharge.policies,
+      }),
+    [visibleAutoRechargeModes, walletAutoRecharge.policies]
+  )
 
-  const tabValues = ['topup', ...visibleAutoRechargeModes]
-  const tabsListClassName =
-    tabValues.length >= 3
-      ? 'grid w-full grid-cols-3 sm:w-fit'
-      : tabValues.length === 2
-        ? 'grid w-full grid-cols-2 sm:w-fit'
-        : 'grid w-full grid-cols-1 sm:w-fit'
+  const paymentSettingLockMessageKey = paymentSettingTabs.find(
+    (tab) => tab.disabled && tab.disabledMessageKey
+  )?.disabledMessageKey
+
+  useEffect(() => {
+    const currentTab = paymentSettingTabs.find(
+      (tab) => tab.kind === paymentSettingTab
+    )
+    if (currentTab && !currentTab.disabled) {
+      return
+    }
+    setPaymentSettingTab(getInitialWalletPaymentSetting(paymentSettingTabs))
+  }, [paymentSettingTab, paymentSettingTabs])
 
   return (
     <>
@@ -553,98 +584,134 @@ export function OrganizationWallet() {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={walletUser} loading={organizationLoading} />
 
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className='w-full gap-4'
+            <div
+              className={
+                paymentSettingTabs.length > 0
+                  ? 'grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] xl:items-start'
+                  : 'grid gap-4'
+              }
             >
-              <TabsList className={tabsListClassName}>
-                <TabsTrigger value='topup'>{t('Top up')}</TabsTrigger>
-                {visibleAutoRechargeModes.includes('scheduled') ? (
-                  <TabsTrigger value='scheduled'>
-                    {t('Scheduled recharge')}
-                  </TabsTrigger>
-                ) : null}
-                {visibleAutoRechargeModes.includes('threshold') ? (
-                  <TabsTrigger value='threshold'>
-                    {t('Auto recharge')}
-                  </TabsTrigger>
-                ) : null}
-              </TabsList>
+              <div id='organization-wallet-add-funds' className='scroll-mt-4'>
+                <RechargeFormCard
+                  topupInfo={topupInfo}
+                  presetAmounts={presetAmounts}
+                  selectedPreset={selectedPreset}
+                  onSelectPreset={handleSelectPreset}
+                  topupAmount={topupAmount}
+                  onTopupAmountChange={handleTopupAmountChange}
+                  amountMode={topupAmountMode}
+                  onAmountModeChange={handleTopupAmountModeChange}
+                  tossUnitPrice={topupInfo?.toss_unit_price}
+                  paymentAmount={paymentAmount}
+                  calculating={calculating}
+                  onPaymentMethodSelect={handlePaymentMethodSelect}
+                  paymentLoading={paymentLoading}
+                  redemptionCode=''
+                  onRedemptionCodeChange={() => undefined}
+                  onRedeem={() => undefined}
+                  redeeming={false}
+                  loading={topupLoading}
+                  priceRatio={(status?.price as number) || 1}
+                  usdExchangeRate={effectiveUsdExchangeRate}
+                  onOpenBilling={() => setBillingDialogOpen(true)}
+                  creemProducts={topupInfo?.creem_products}
+                  enableCreemTopup={topupInfo?.enable_creem_topup}
+                  onCreemProductSelect={handleCreemProductSelect}
+                  enableWaffoTopup={topupInfo?.enable_waffo_topup}
+                  waffoPayMethods={topupInfo?.waffo_pay_methods}
+                  waffoMinTopup={topupInfo?.waffo_min_topup}
+                  onWaffoMethodSelect={handleWaffoMethodSelect}
+                  enableWaffoPancakeTopup={
+                    topupInfo?.enable_waffo_pancake_topup
+                  }
+                  showRedemption={false}
+                />
+              </div>
 
-              <TabsContent value='topup'>
-                <div id='organization-wallet-add-funds' className='scroll-mt-4'>
-                  <RechargeFormCard
-                    topupInfo={topupInfo}
-                    presetAmounts={presetAmounts}
-                    selectedPreset={selectedPreset}
-                    onSelectPreset={handleSelectPreset}
-                    topupAmount={topupAmount}
-                    onTopupAmountChange={handleTopupAmountChange}
-                    amountMode={topupAmountMode}
-                    onAmountModeChange={handleTopupAmountModeChange}
-                    tossUnitPrice={topupInfo?.toss_unit_price}
-                    paymentAmount={paymentAmount}
-                    calculating={calculating}
-                    onPaymentMethodSelect={handlePaymentMethodSelect}
-                    paymentLoading={paymentLoading}
-                    redemptionCode=''
-                    onRedemptionCodeChange={() => undefined}
-                    onRedeem={() => undefined}
-                    redeeming={false}
-                    loading={topupLoading}
-                    priceRatio={(status?.price as number) || 1}
-                    usdExchangeRate={effectiveUsdExchangeRate}
-                    onOpenBilling={() => setBillingDialogOpen(true)}
-                    creemProducts={topupInfo?.creem_products}
-                    enableCreemTopup={topupInfo?.enable_creem_topup}
-                    onCreemProductSelect={handleCreemProductSelect}
-                    enableWaffoTopup={topupInfo?.enable_waffo_topup}
-                    waffoPayMethods={topupInfo?.waffo_pay_methods}
-                    waffoMinTopup={topupInfo?.waffo_min_topup}
-                    onWaffoMethodSelect={handleWaffoMethodSelect}
-                    enableWaffoPancakeTopup={
-                      topupInfo?.enable_waffo_pancake_topup
+              {paymentSettingTabs.length > 0 && paymentSettingTab ? (
+                <TitledCard
+                  title={t('Payment settings')}
+                  description={t('Choose one active payment setting at a time')}
+                  contentClassName='space-y-4'
+                >
+                  <Tabs
+                    value={paymentSettingTab}
+                    onValueChange={(value) =>
+                      setPaymentSettingTab(value as WalletPaymentSettingKind)
                     }
-                    showRedemption={false}
-                  />
-                </div>
-              </TabsContent>
+                  >
+                    <TabsList
+                      className={getWalletPaymentSettingTabsGridClass(
+                        paymentSettingTabs.length
+                      )}
+                    >
+                      {paymentSettingTabs.map((tab) => (
+                        <TabsTrigger
+                          key={tab.kind}
+                          value={tab.kind}
+                          disabled={tab.disabled}
+                        >
+                          {tab.kind === 'threshold'
+                            ? t('Auto recharge')
+                            : t('Scheduled recharge')}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    {paymentSettingLockMessageKey ? (
+                      <p className='text-muted-foreground text-sm'>
+                        {t(paymentSettingLockMessageKey)}
+                      </p>
+                    ) : null}
 
-              {visibleAutoRechargeModes.includes('scheduled') ? (
-                <TabsContent value='scheduled'>
-                  <AutoRechargeCard
-                    mode='scheduled'
-                    policies={walletAutoRecharge.policies}
-                    presets={walletAutoRecharge.presets}
-                    loading={walletAutoRecharge.loading}
-                    processing={walletAutoRecharge.processing}
-                    canManage={canManageAutoRecharge}
-                    permissionMessageKey='Only the organization owner can change auto payments'
-                    onCreateScheduled={walletAutoRecharge.createScheduled}
-                    onCreateThreshold={walletAutoRecharge.createThreshold}
-                    onCancel={walletAutoRecharge.cancel}
-                  />
-                </TabsContent>
-              ) : null}
+                    <TabsContent value='threshold'>
+                      <AutoRechargeCard
+                        mode='threshold'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage={canManageAutoRecharge}
+                        permissionMessageKey='Only the organization owner can change auto payments'
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'threshold'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
 
-              {visibleAutoRechargeModes.includes('threshold') ? (
-                <TabsContent value='threshold'>
-                  <AutoRechargeCard
-                    mode='threshold'
-                    policies={walletAutoRecharge.policies}
-                    presets={walletAutoRecharge.presets}
-                    loading={walletAutoRecharge.loading}
-                    processing={walletAutoRecharge.processing}
-                    canManage={canManageAutoRecharge}
-                    permissionMessageKey='Only the organization owner can change auto payments'
-                    onCreateScheduled={walletAutoRecharge.createScheduled}
-                    onCreateThreshold={walletAutoRecharge.createThreshold}
-                    onCancel={walletAutoRecharge.cancel}
-                  />
-                </TabsContent>
+                    <TabsContent value='scheduled'>
+                      <AutoRechargeCard
+                        mode='scheduled'
+                        policies={walletAutoRecharge.policies}
+                        presets={walletAutoRecharge.presets}
+                        loading={walletAutoRecharge.loading}
+                        processing={walletAutoRecharge.processing}
+                        canManage={canManageAutoRecharge}
+                        permissionMessageKey='Only the organization owner can change auto payments'
+                        creationDisabled={
+                          paymentSettingTabs.find(
+                            (tab) => tab.kind === 'scheduled'
+                          )?.disabled ?? false
+                        }
+                        creationDisabledMessageKey={
+                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                        }
+                        onCreateScheduled={walletAutoRecharge.createScheduled}
+                        onCreateThreshold={walletAutoRecharge.createThreshold}
+                        onCancel={walletAutoRecharge.cancel}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </TitledCard>
               ) : null}
-            </Tabs>
+            </div>
           </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
