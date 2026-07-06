@@ -38,6 +38,7 @@ export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
+export type TopupAmountMode = 'krw' | 'quota'
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type PayPalPaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
@@ -46,13 +47,27 @@ export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
 >
+export interface TossTopupQuote {
+  amount_mode?: TopupAmountMode
+  input_amount?: number
+  charge_amount: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+}
 export type TossPaymentResponse = ApiResponse<{
   client_key: string
+  customer_key: string
   order_id: string
   order_name: string
   amount: number
   success_url: string
   fail_url: string
+  charge_amount?: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+  amount_mode?: TopupAmountMode
 }>
 
 export type WaffoPancakePaymentResponse = ApiResponse<
@@ -178,8 +193,10 @@ export interface TopupInfo {
   enable_toss_topup?: boolean
   /** Minimum topup amount for Toss (KRW) */
   toss_min_topup?: number
-  /** Toss client key (public, safe to expose) */
-  toss_client_key?: string
+  /** Toss unit price in KRW for 1 wallet credit unit */
+  toss_unit_price?: number
+  /** Whether Toss billing (recurring subscription) is enabled */
+  enable_toss_billing?: boolean
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
@@ -214,6 +231,8 @@ export interface PaymentRequest {
   amount: number
   /** Payment method identifier */
   payment_method: string
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
@@ -240,6 +259,8 @@ export interface WaffoPancakePaymentRequest {
 export interface AmountRequest {
   /** Topup amount to calculate */
   amount: number
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
@@ -317,3 +338,89 @@ export interface BillingHistoryResponse {
 export interface CompleteOrderRequest {
   trade_no: string
 }
+
+export type WalletAutoRechargeType = 'scheduled' | 'threshold'
+
+export type WalletAutoRechargeTargetScope = 'user' | 'organization' | 'all'
+
+export type WalletAutoRechargeIntervalUnit = 'month' | 'day' | 'custom'
+
+export type WalletAutoRechargeStatus =
+  | 'pending'
+  | 'active'
+  | 'cancelled'
+  | 'failed'
+
+export interface WalletAutoRechargePolicy {
+  id: number
+  type: WalletAutoRechargeType
+  target_type: 'user' | 'organization'
+  target_id: number
+  amount: number
+  threshold_amount?: number
+  threshold_quota?: number
+  interval_unit?: WalletAutoRechargeIntervalUnit
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+  next_charge_time?: number
+  last_charge_time?: number
+  cooldown_until?: number
+  daily_charge_count?: number
+  status: WalletAutoRechargeStatus
+  fail_count?: number
+  last_error?: string
+  card_company?: string
+  card_number_masked?: string
+}
+
+export interface WalletAutoRechargePreset {
+  id: number
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description?: string
+  amount: number
+  threshold_amount?: number
+  threshold_quota?: number
+  interval_unit?: WalletAutoRechargeIntervalUnit
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+  sort_order?: number
+  enabled: boolean
+}
+
+export interface WalletAutoRechargePresetRequest {
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description: string
+  amount: number
+  threshold_amount: number
+  threshold_quota: number
+  interval_unit: WalletAutoRechargeIntervalUnit
+  interval_value: number
+  custom_seconds: number
+  charge_immediately: boolean
+  sort_order: number
+  enabled: boolean
+}
+
+export interface WalletAutoRechargeRequest {
+  preset_id: number
+}
+
+export type WalletAutoRechargeResponse =
+  ApiResponse<WalletAutoRechargePolicy[]>
+
+export type WalletAutoRechargePresetResponse =
+  ApiResponse<WalletAutoRechargePreset[]>
+
+export type WalletAutoRechargeTossResponse = ApiResponse<{
+  client_key: string
+  customer_key: string
+  trade_no: string
+  success_url: string
+  fail_url: string
+}>

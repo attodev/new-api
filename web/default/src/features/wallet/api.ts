@@ -41,6 +41,12 @@ import type {
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
   TossPaymentResponse,
+  WalletAutoRechargeRequest,
+  WalletAutoRechargeResponse,
+  WalletAutoRechargePreset,
+  WalletAutoRechargePresetResponse,
+  WalletAutoRechargePresetRequest,
+  WalletAutoRechargeTossResponse,
 } from './types'
 
 // ============================================================================
@@ -282,5 +288,101 @@ export async function completeOrder(
   request: CompleteOrderRequest
 ): Promise<ApiResponse> {
   const res = await api.post('/api/user/topup/complete', request)
+  return res.data
+}
+
+function walletAutoRechargeBase(scope: 'user' | 'organization') {
+  return scope === 'organization'
+    ? '/api/organization/wallet/auto-recharge'
+    : '/api/user/wallet/auto-recharge'
+}
+
+export async function getWalletAutoRecharge(
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeResponse> {
+  const res = await api.get(walletAutoRechargeBase(scope))
+  return res.data
+}
+
+export async function getWalletAutoRechargePresets(
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargePresetResponse> {
+  const res = await api.get(`${walletAutoRechargeBase(scope)}/presets`)
+  return res.data
+}
+
+export async function listAdminWalletAutoRechargePresets(): Promise<WalletAutoRechargePresetResponse> {
+  const res = await api.get('/api/admin/wallet/auto-recharge/presets')
+  return res.data
+}
+
+export async function createAdminWalletAutoRechargePreset(
+  preset: WalletAutoRechargePresetRequest
+): Promise<ApiResponse<WalletAutoRechargePreset>> {
+  const res = await api.post('/api/admin/wallet/auto-recharge/presets', preset)
+  return res.data
+}
+
+export async function updateAdminWalletAutoRechargePreset(
+  id: number,
+  preset: WalletAutoRechargePresetRequest
+): Promise<ApiResponse<WalletAutoRechargePreset>> {
+  const res = await api.put(
+    `/api/admin/wallet/auto-recharge/presets/${id}`,
+    preset
+  )
+  return res.data
+}
+
+export async function deleteAdminWalletAutoRechargePreset(
+  id: number
+): Promise<ApiResponse> {
+  const res = await api.delete(`/api/admin/wallet/auto-recharge/presets/${id}`)
+  return res.data
+}
+
+export async function requestWalletScheduledRecharge(
+  request: WalletAutoRechargeRequest,
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeTossResponse> {
+  const res = await api.post(
+    `${walletAutoRechargeBase(scope)}/scheduled`,
+    request,
+    {
+      skipBusinessError: true,
+    } as Record<string, unknown>
+  )
+  return res.data
+}
+
+export async function requestWalletThresholdRecharge(
+  request: WalletAutoRechargeRequest,
+  scope: 'user' | 'organization' = 'user'
+): Promise<WalletAutoRechargeTossResponse> {
+  const res = await api.post(
+    `${walletAutoRechargeBase(scope)}/threshold`,
+    request,
+    {
+      skipBusinessError: true,
+    } as Record<string, unknown>
+  )
+  return res.data
+}
+
+export async function cancelWalletAutoRecharge(
+  id: number,
+  scope: 'user' | 'organization' = 'user'
+): Promise<ApiResponse> {
+  const res = await api.delete(`${walletAutoRechargeBase(scope)}/${id}`)
+  return res.data
+}
+
+export async function cancelPendingWalletAutoRecharge(
+  tradeNo: string,
+  scope: 'user' | 'organization' = 'user'
+): Promise<ApiResponse> {
+  const res = await api.delete(
+    `${walletAutoRechargeBase(scope)}/pending/${encodeURIComponent(tradeNo)}`
+  )
   return res.data
 }

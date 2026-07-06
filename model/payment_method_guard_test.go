@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -137,6 +139,45 @@ func TestUpdatePendingTopUpStatus_RejectsMismatchedPaymentProvider(t *testing.T)
 			assert.Equal(t, common.TopUpStatusPending, getTopUpStatusForPaymentGuardTest(t, tc.tradeNo))
 		})
 	}
+}
+
+func TestRechargeTossUsesQuotedCreditQuotaWithoutFloatDrift(t *testing.T) {
+	truncateTables(t)
+
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 3
+	common.QuotaPerUnit = 3
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	})
+
+	insertUserForPaymentGuardTest(t, 170, 0)
+	quote := QuoteTossTopUp(1, TossTopUpAmountModeKRW, "default")
+	require.Equal(t, 1, quote.CreditQuota)
+	topUp := &TopUp{
+		UserId:          170,
+		Amount:          quote.ChargeKRW,
+		Money:           quote.CreditAmount,
+		Quota:           quote.CreditQuota,
+		TradeNo:         "toss-float-drift",
+		ProviderOrderId: "toss-float-drift",
+		PaymentMethod:   PaymentMethodToss,
+		PaymentProvider: PaymentProviderToss,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      time.Now().Unix(),
+	}
+	require.NoError(t, topUp.Insert())
+
+	err := RechargeToss(topUp.TradeNo, "payment-key", "127.0.0.1")
+	require.NoError(t, err)
+
+	assert.Equal(t, common.TopUpStatusSuccess, getTopUpStatusForPaymentGuardTest(t, topUp.TradeNo))
+	assert.Equal(t, 1, getUserQuotaForPaymentGuardTest(t, 170))
 }
 
 func TestManualCompleteTopUp_CreditsOrganizationWalletTarget(t *testing.T) {

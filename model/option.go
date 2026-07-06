@@ -94,11 +94,16 @@ func InitOptionMap() {
 	common.OptionMap["PayPalUnitPrice"] = strconv.FormatFloat(setting.PayPalUnitPrice, 'f', -1, 64)
 	common.OptionMap["PayPalMinTopUp"] = strconv.Itoa(setting.PayPalMinTopUp)
 	common.OptionMap["TossEnabled"] = strconv.FormatBool(setting.TossEnabled)
+	common.OptionMap["TossBillingEnabled"] = strconv.FormatBool(setting.TossBillingEnabled)
 	common.OptionMap["TossTestMode"] = strconv.FormatBool(setting.TossTestMode)
 	common.OptionMap["TossClientKey"] = setting.TossClientKey
 	common.OptionMap["TossSecretKey"] = setting.TossSecretKey
 	common.OptionMap["TossTestClientKey"] = setting.TossTestClientKey
 	common.OptionMap["TossTestSecretKey"] = setting.TossTestSecretKey
+	common.OptionMap["TossBillingClientKey"] = setting.TossBillingClientKey
+	common.OptionMap["TossBillingSecretKey"] = setting.TossBillingSecretKey
+	common.OptionMap["TossBillingTestClientKey"] = setting.TossBillingTestClientKey
+	common.OptionMap["TossBillingTestSecretKey"] = setting.TossBillingTestSecretKey
 	common.OptionMap["TossUnitPrice"] = strconv.FormatFloat(setting.TossUnitPrice, 'f', -1, 64)
 	common.OptionMap["TossMinTopUp"] = strconv.Itoa(setting.TossMinTopUp)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
@@ -440,6 +445,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.PayPalMinTopUp, _ = strconv.Atoi(value)
 	case "TossEnabled":
 		setting.TossEnabled = value == "true"
+	case "TossBillingEnabled":
+		setting.TossBillingEnabled = value == "true"
 	case "TossTestMode":
 		setting.TossTestMode = value == "true"
 	case "TossClientKey":
@@ -450,6 +457,14 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.TossTestClientKey = value
 	case "TossTestSecretKey":
 		setting.TossTestSecretKey = value
+	case "TossBillingClientKey":
+		setting.TossBillingClientKey = value
+	case "TossBillingSecretKey":
+		setting.TossBillingSecretKey = value
+	case "TossBillingTestClientKey":
+		setting.TossBillingTestClientKey = value
+	case "TossBillingTestSecretKey":
+		setting.TossBillingTestSecretKey = value
 	case "TossUnitPrice":
 		setting.TossUnitPrice, _ = strconv.ParseFloat(value, 64)
 	case "TossMinTopUp":

@@ -512,12 +512,15 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	info.SetUpstreamRequestStart()
 	resp, err := client.Do(req)
 	if err != nil {
+		info.SetUpstreamResponseEnd()
 		logger.LogError(c, "do request failed: "+err.Error())
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
+		info.SetUpstreamResponseEnd()
 		return nil, errors.New("resp is nil")
 	}
 
@@ -525,8 +528,14 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}
 
-	_ = req.Body.Close()
-	_ = c.Request.Body.Close()
+	resp.Body = newTimingReadCloser(resp.Body, info.SetUpstreamResponseEnd)
+
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
+	if c.Request.Body != nil {
+		_ = c.Request.Body.Close()
+	}
 	return resp, nil
 }
 

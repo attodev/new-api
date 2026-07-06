@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -8,23 +9,27 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 
 	"github.com/shopspring/decimal"
+	"github.com/thanhpk/randstr"
 	"gorm.io/gorm"
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	TargetType      string  `json:"target_type" gorm:"type:varchar(32);default:'user'"`
-	TargetId        int     `json:"target_id" gorm:"default:0;index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	ProviderOrderId string  `json:"provider_order_id" gorm:"type:varchar(128);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	Id                 int     `json:"id"`
+	UserId             int     `json:"user_id" gorm:"index"`
+	TargetType         string  `json:"target_type" gorm:"type:varchar(32);default:'user'"`
+	TargetId           int     `json:"target_id" gorm:"default:0;index"`
+	Amount             int64   `json:"amount"`
+	Money              float64 `json:"money"`
+	Quota              int     `json:"quota" gorm:"default:0"`
+	TradeNo            string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	ProviderOrderId    string  `json:"provider_order_id" gorm:"type:varchar(255);index"`
+	ProviderOrderTime  int64   `json:"provider_order_time" gorm:"default:0;index"`
+	ProviderCredential string  `json:"-" gorm:"type:text"`
+	PaymentMethod      string  `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider    string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	CreateTime         int64   `json:"create_time"`
+	CompleteTime       int64   `json:"complete_time"`
+	Status             string  `json:"status"`
 }
 
 const (
@@ -58,6 +63,14 @@ var (
 	ErrTopUpNotFound         = errors.New("topup not found")
 	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
 )
+
+type TossTopUpReconciler func(ctx context.Context, topUp TopUp) (resolved bool, err error)
+
+var tossTopUpReconciler TossTopUpReconciler
+
+func SetTossTopUpReconciler(fn TossTopUpReconciler) {
+	tossTopUpReconciler = fn
+}
 
 func (topUp *TopUp) Insert() error {
 	var err error
@@ -110,6 +123,28 @@ func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int) error {
 		}
 		return nil
 	}
+}
+
+func CreditedQuotaForTopUp(topUp *TopUp) int {
+	if topUp != nil && topUp.Quota > 0 {
+		return topUp.Quota
+	}
+	if topUp == nil {
+		return 0
+	}
+	return int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+}
+
+func CreditedQuotaForTossTopUp(topUp *TopUp) int {
+	if topUp != nil && topUp.Quota > 0 {
+		return topUp.Quota
+	}
+	if topUp != nil && topUp.Amount > 0 {
+		if quota := TossCreditQuotaFromKRW(topUp.Amount); quota > 0 {
+			return quota
+		}
+	}
+	return CreditedQuotaForTopUp(topUp)
 }
 
 func GetTopUpById(id int) *TopUp {
@@ -478,9 +513,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		// calculate quota to credit:
 		// - Stripe/PayPal/Toss orders: Money is USD amount after group-rate conversion, multiply by QuotaPerUnit
 		// - Other orders (e.g. Epay): Amount is USD amount, multiply by QuotaPerUnit
-		if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal || topUp.PaymentProvider == PaymentProviderToss {
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(dQuotaPerUnit).IntPart())
+		if topUp.PaymentProvider == PaymentProviderToss {
+			quotaToAdd = CreditedQuotaForTossTopUp(topUp)
+		} else if topUp.PaymentProvider == PaymentProviderStripe || topUp.PaymentProvider == PaymentProviderPayPal {
+			quotaToAdd = CreditedQuotaForTopUp(topUp)
 		} else {
 			dAmount := decimal.NewFromInt(topUp.Amount)
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
@@ -635,10 +671,100 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	return nil
 }
 
+// ExpireStaleTossPendingTopUps marks Toss pending orders created before cutoffUnix as expired.
+// Toss's payment window is ~30 minutes; checkout sessions the user closes (PAY_PROCESS_CANCELED)
+// send no webhook, so without this sweep their pending orders would linger forever.
+//
+// Only orders that never recorded a paymentKey are swept. At creation provider_order_id is set
+// to the orderId (== trade_no); any confirm attempt that reached RecordTossPaymentKey overwrites
+// it with the Toss paymentKey (≠ trade_no). So provider_order_id = trade_no uniquely identifies
+// orders that were never approved at Toss — the only ones safe to expire. Orders that DID record
+// a paymentKey are reconciled separately using provider_order_time, because Toss's 10-minute
+// approval deadline starts when the paymentKey is issued, not when the local order was created.
+func ExpireStaleTossPendingTopUps(cutoffUnix int64) (int64, error) {
+	res := DB.Model(&TopUp{}).
+		Where("payment_provider = ? AND status = ? AND create_time < ? AND provider_order_id = trade_no",
+			PaymentProviderToss, common.TopUpStatusPending, cutoffUnix).
+		Update("status", common.TopUpStatusExpired)
+	return res.RowsAffected, res.Error
+}
+
+func ReconcileStaleTossRecordedTopUps(ctx context.Context, cutoffUnix int64, limit int) (int64, error) {
+	if tossTopUpReconciler == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	var rows []TopUp
+	if err := DB.Where("payment_provider = ? AND status = ? AND provider_order_id <> '' AND provider_order_id <> trade_no AND ((provider_order_time > 0 AND provider_order_time < ?) OR ((provider_order_time = 0 OR provider_order_time IS NULL) AND create_time < ?))",
+		PaymentProviderToss, common.TopUpStatusPending, cutoffUnix, cutoffUnix).
+		Order("create_time asc, id asc").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return 0, err
+	}
+	var resolved int64
+	var lastErr error
+	for i := range rows {
+		ok, err := tossTopUpReconciler(ctx, rows[i])
+		if err != nil {
+			lastErr = err
+			common.SysError(fmt.Sprintf("failed to reconcile stale Toss top-up order %s: %v", rows[i].TradeNo, err))
+			continue
+		}
+		if ok {
+			resolved++
+		}
+	}
+	return resolved, lastErr
+}
+
+// RecordTossPaymentKey persists the Toss paymentKey onto the order's provider_order_id.
+// This MUST succeed before the payment is approved: the stale-pending sweep treats
+// provider_order_id == trade_no as "never approved" and expires such orders, so an
+// approved-but-unrecorded order could otherwise be wrongly expired with no credit.
+// Returns an error if the value was not persisted (row missing or update lost).
+func RecordTossPaymentKey(tradeNo string, paymentKey string) error {
+	if tradeNo == "" || paymentKey == "" {
+		return errors.New("toss paymentKey persist: missing tradeNo or paymentKey")
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	now := common.GetTimestamp()
+	if err := DB.Model(&TopUp{}).
+		Where(refCol+" = ? AND payment_provider = ?", tradeNo, PaymentProviderToss).
+		Updates(map[string]interface{}{
+			"provider_order_id":   paymentKey,
+			"provider_order_time": now,
+		}).Error; err != nil {
+		return err
+	}
+	// RowsAffected is unreliable across DBs for unchanged-value updates (MySQL returns 0),
+	// so verify the persisted value directly.
+	var topUp TopUp
+	if err := DB.Select("provider_order_id", "provider_order_time").Where(refCol+" = ?", tradeNo).First(&topUp).Error; err != nil {
+		return err
+	}
+	if topUp.ProviderOrderId != paymentKey {
+		return errors.New("toss paymentKey persist: value not stored")
+	}
+	if topUp.ProviderOrderTime <= 0 {
+		return errors.New("toss paymentKey persist: timestamp not stored")
+	}
+	return nil
+}
+
 // RechargeToss credits a successful Toss top-up idempotently.
 // The caller must validate the Toss confirm response (status DONE, amount match)
 // before calling this, and must hold the order lock.
-func RechargeToss(tradeNo string, callerIp string) (err error) {
+// paymentKey, if non-empty, is stored as ProviderOrderId for audit traceability.
+func RechargeToss(tradeNo string, paymentKey string, callerIp string) (err error) {
 	if tradeNo == "" {
 		return errors.New("payment order number not provided")
 	}
@@ -668,13 +794,16 @@ func RechargeToss(tradeNo string, callerIp string) (err error) {
 			return errors.New("top-up order status error")
 		}
 
+		if paymentKey != "" {
+			topUp.ProviderOrderId = paymentKey
+		}
 		topUp.CompleteTime = common.GetTimestamp()
 		topUp.Status = common.TopUpStatusSuccess
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
 
-		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
+		quotaToAdd = CreditedQuotaForTossTopUp(topUp)
 		if quotaToAdd <= 0 {
 			return errors.New("invalid top-up quota")
 		}
@@ -687,7 +816,7 @@ func RechargeToss(tradeNo string, callerIp string) (err error) {
 	}
 
 	if quotaToAdd > 0 {
-		RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss top-up successful — quota: %v, payment amount: %d KRW", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentProviderToss)
+		RecordTopupLog(topUp.UserId, fmt.Sprintf("Toss 충전 성공 — 적립: %v, 결제 금액: %d원", logger.FormatQuota(quotaToAdd), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentProviderToss)
 	}
 
 	return nil
@@ -815,4 +944,38 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	return nil
+}
+
+// generateTossCustomerKey returns a random Toss-compatible customerKey.
+// Toss requires customerKey to be 2–50 chars from [A-Za-z0-9_\-=.@].
+// "cust_" + 32 random alphanumeric chars = 37 chars, well within limits.
+func generateTossCustomerKey() string {
+	return "cust_" + randstr.String(32)
+}
+
+// GetOrCreateTossCustomerKey returns the user's stable Toss customerKey,
+// generating and persisting a random one on first use (race-safe via conditional update).
+func GetOrCreateTossCustomerKey(userId int) (string, error) {
+	var user User
+	if err := DB.Select("id", "toss_customer_key").Where("id = ?", userId).First(&user).Error; err != nil {
+		return "", err
+	}
+	if user.TossCustomerKey != "" {
+		return user.TossCustomerKey, nil
+	}
+	key := generateTossCustomerKey()
+	res := DB.Model(&User{}).
+		Where("id = ? AND (toss_customer_key = '' OR toss_customer_key IS NULL)", userId).
+		Update("toss_customer_key", key)
+	if res.Error != nil {
+		return "", res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Another concurrent request set it first — re-read the winner.
+		if err := DB.Select("toss_customer_key").Where("id = ?", userId).First(&user).Error; err != nil {
+			return "", err
+		}
+		return user.TossCustomerKey, nil
+	}
+	return key, nil
 }
