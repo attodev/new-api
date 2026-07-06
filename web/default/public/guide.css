@@ -145,7 +145,7 @@
 
 /* Step screen-capture image — hidden by default; guide.js reveals it once the file loads successfully */
 .guide-step-shot {
-  display: none; width: 100%; height: auto; margin-top: 10px;
+  display: none; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; margin-top: 10px;
   border: 1px solid #283245; border-radius: 8px; background: #10182a;
 }
 .guide-step-shot.is-loaded { display: block; }
