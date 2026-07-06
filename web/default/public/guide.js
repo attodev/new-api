@@ -46,4 +46,70 @@
       img.style.display = 'none';
     });
   });
+
+  // 스크린샷 확대 보기 (라이트박스) — 클릭해서 확대, 화살표로 다음/이전 이미지 넘기기
+  var lightbox = document.getElementById('shotLightbox');
+  if (lightbox) {
+    var lightboxImg = document.getElementById('shotLightboxImg');
+    var lightboxCaption = document.getElementById('shotLightboxCaption');
+    var lightboxPrev = document.getElementById('shotLightboxPrev');
+    var lightboxNext = document.getElementById('shotLightboxNext');
+    var lightboxClose = document.getElementById('shotLightboxClose');
+    var currentIndex = -1;
+
+    function shotList() {
+      return Array.prototype.slice.call(document.querySelectorAll('.guide-step-shot.is-loaded'));
+    }
+
+    function shotCaption(img) {
+      var fig = img.closest('figure');
+      var figcaption = fig && fig.querySelector('figcaption');
+      return figcaption ? figcaption.textContent : (img.alt || '');
+    }
+
+    function showShot(index) {
+      var shots = shotList();
+      if (!shots.length) return;
+      currentIndex = (index + shots.length) % shots.length;
+      var img = shots[currentIndex];
+      lightboxImg.src = img.src;
+      lightboxImg.alt = img.alt;
+      lightboxCaption.textContent = shotCaption(img);
+      lightboxPrev.disabled = shots.length < 2;
+      lightboxNext.disabled = shots.length < 2;
+    }
+
+    function openLightbox(img) {
+      var shots = shotList();
+      var index = shots.indexOf(img);
+      if (index === -1) return;
+      showShot(index);
+      lightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.guide-step-shot').forEach(function (img) {
+      img.addEventListener('click', function () {
+        if (img.classList.contains('is-loaded')) openLightbox(img);
+      });
+    });
+
+    lightboxClose.addEventListener('click', closeLightbox);
+    lightboxPrev.addEventListener('click', function () { showShot(currentIndex - 1); });
+    lightboxNext.addEventListener('click', function () { showShot(currentIndex + 1); });
+    lightbox.addEventListener('click', function (e) {
+      if (e.target === lightbox) closeLightbox();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!lightbox.classList.contains('open')) return;
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') showShot(currentIndex - 1);
+      else if (e.key === 'ArrowRight') showShot(currentIndex + 1);
+    });
+  }
 })();

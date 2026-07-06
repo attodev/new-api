@@ -184,6 +184,16 @@
       </div>
     </div>
     {{template "footer_en" .}}
+
+    <!-- Screenshot lightbox -->
+    <div class="shot-lightbox" id="shotLightbox">
+      <button class="shot-lightbox-close" id="shotLightboxClose" aria-label="Close">✕</button>
+      <button class="shot-lightbox-nav shot-lightbox-prev" id="shotLightboxPrev" aria-label="Previous image">‹</button>
+      <img class="shot-lightbox-img" id="shotLightboxImg" src="" alt="" />
+      <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="Next image">›</button>
+      <div class="shot-lightbox-caption" id="shotLightboxCaption"></div>
+    </div>
+
     <script src="./popup.js" defer></script>
     <script src="./guide.js" defer></script>
   </body>

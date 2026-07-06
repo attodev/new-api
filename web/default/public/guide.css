@@ -209,3 +209,42 @@
   .guide-step { grid-template-columns: 1fr; }
   .guide-step-num-wrap { display: none; }
 }
+
+/* Step screenshot lightbox — click a screenshot to zoom, arrow/click to browse */
+.guide-step-shot, .guide-step-shot-fig .guide-step-shot { cursor: zoom-in; }
+.shot-lightbox {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(6, 10, 18, 0.92); backdrop-filter: blur(2px);
+  align-items: center; justify-content: center; padding: 64px 24px;
+}
+.shot-lightbox.open { display: flex; }
+.shot-lightbox-img {
+  max-width: min(1100px, 100%); max-height: calc(100vh - 160px);
+  border-radius: 10px; border: 1px solid #283245; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.shot-lightbox-close {
+  position: absolute; top: 20px; right: 24px; width: 40px; height: 40px;
+  border-radius: 50%; border: 1px solid #283245; background: rgba(26,35,51,0.8);
+  color: #f9fafb; font-size: 16px; cursor: pointer;
+}
+.shot-lightbox-close:hover { background: #1a2333; }
+.shot-lightbox-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 50%; border: 1px solid #283245;
+  background: rgba(26,35,51,0.8); color: #f9fafb; font-size: 26px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.shot-lightbox-nav:hover { background: #1a2333; }
+.shot-lightbox-nav:disabled { opacity: 0.3; cursor: default; }
+.shot-lightbox-prev { left: 24px; }
+.shot-lightbox-next { right: 24px; }
+.shot-lightbox-caption {
+  position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;
+  font-size: 13px; color: #9ca3af;
+}
+@media (max-width: 680px) {
+  .shot-lightbox { padding: 24px 12px; }
+  .shot-lightbox-nav { width: 38px; height: 38px; font-size: 20px; }
+  .shot-lightbox-prev { left: 8px; }
+  .shot-lightbox-next { right: 8px; }
+}
