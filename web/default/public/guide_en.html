@@ -49,40 +49,17 @@
 
       <!-- Group picker -->
       <div class="guide-group-picker" role="tablist">
-        <button class="guide-group-btn" data-group="manual" aria-selected="true">Manual setup <span class="g-n">1</span></button>
-        <button class="guide-group-btn reco" data-group="ccswitch" aria-selected="false">⭐ CC Switch <span class="g-n">soon</span></button>
+        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><span class="t-dot" style="background:#0EA5E9"></span>Set environment variables</button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><span class="t-dot" style="background:#34d399"></span>Set up with CC Switch <span class="g-n">Coming soon</span></button>
       </div>
 
       <!-- ══════════ Group: Manual setup ══════════ -->
       <div class="guide-group active" id="guide-group-manual">
-        <div class="guide-tabbar" role="tablist">
-          <button class="guide-tab-btn" data-tab="anthropic" aria-selected="true" role="tab"><span class="t-dot" style="background:#d97757"></span>Anthropic</button>
-          <!-- Uncomment when dedicated video/content is ready
-          <button class="guide-tab-btn" data-tab="openai" aria-selected="false" role="tab"><span class="t-dot" style="background:#10a37f"></span>OpenAI</button>
-          <button class="guide-tab-btn" data-tab="gemini" aria-selected="false" role="tab"><span class="t-dot" style="background:#4285f4"></span>Gemini</button>
-          -->
-        </div>
-
-        <!-- Anthropic panel -->
-        <section class="guide-panel active" id="guide-panel-anthropic">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon"><img src="/logo_claude.svg" alt="Claude" /></div>
-            <div>
-              <h2>Anthropic-format CLI</h2>
-              <div class="sub">Claude Code, etc. · configure via environment variables</div>
-            </div>
-          </div>
-
+        <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
             <video controls preload="metadata" poster="/guide-manual-anthropic-poster.png">
               <source src="/guide-manual-anthropic.mp4" type="video/mp4" />
             </video>
-          </div>
-          <div class="guide-video-meta">
-            <div>
-              <h3>Connect AlRouter in Claude Code</h3>
-              <div class="sub">About 1 min · screen recording + narration</div>
-            </div>
           </div>
 
           <div class="guide-divider">Video not loading? You can follow the written steps below</div>
@@ -95,6 +72,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Create an API key</h4></div>
                   <p>Go to the 'API Keys' menu, create a new API key, and copy it. You'll use this single key for all the setup below.</p>
+                  <img class="guide-step-shot" src="/guide-step-1-apikey.png" alt="API key creation screen" loading="lazy" />
                 </div>
               </div>
 
@@ -102,18 +80,41 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Set environment variables</h4></div>
-                  <p>Open <span class="mono">~/.zshrc</span> in your terminal, add the base URL and API key, then apply the settings.</p>
+                  <p>Open your shell config file in the terminal, add the base URL and API key, then apply the settings. Use the values that match your CLI's format.</p>
                   <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
-                  <div class="guide-term">
-                    <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
-<pre><span class="cm"># add to the bottom of the file</span>
-<span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+
+                  <div class="guide-provider-table">
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
 <span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                      </div>
+                    </div>
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
+<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                      </div>
+                    </div>
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#4285f4">Gemini</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
+<span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                      </div>
+                    </div>
                   </div>
-                  <div class="guide-term" style="margin-top:6px;">
+
+                  <div class="guide-term" style="margin-top:10px;">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ source ~/.zshrc</pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-2-envsetup.png" alt="Environment variable setup screen" loading="lazy" />
                 </div>
               </div>
 
@@ -121,7 +122,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
-                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection. If the Anthropic base URL shows alrouter.ai, you're all set.</p>
+                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection. If the base URL shows alrouter.ai, you're all set.</p>
                   <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
@@ -129,6 +130,7 @@
 &gt; /status
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status connection check screen" loading="lazy" />
                 </div>
               </div>
 
@@ -143,6 +145,7 @@
 <span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
 <span class="cm">Claude Code connected</span></pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="Test prompt response screen" loading="lazy" />
                 </div>
               </div>
 
@@ -151,46 +154,12 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Check usage</h4></div>
                   <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu. The 'Overview' page also shows a recent usage summary.</p>
+                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="Usage logs screen" loading="lazy" />
                 </div>
               </div>
             </div>
-
-            <div class="guide-note">
-              <span class="mark">TIP</span>
-              <p>OpenAI-format CLIs just add <span class="mono">/v1</span> to the base URL, and Gemini uses <span class="mono">/v1beta</span> — the method is otherwise identical.</p>
-            </div>
           </div>
         </section>
-
-        <!-- Uncomment when dedicated video/content is ready (OpenAI)
-        <section class="guide-panel" id="guide-panel-openai">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon" style="background:#10a37f">◆</div>
-            <div>
-              <h2>OpenAI-format CLI</h2>
-              <div class="sub">Aider, Codex, etc. · add /v1 to the base URL</div>
-            </div>
-          </div>
-          <div class="guide-video-frame">
-            <div class="guide-video-placeholder"><span class="vp-tag">Video coming soon</span></div>
-          </div>
-        </section>
-        -->
-
-        <!-- Uncomment when dedicated video/content is ready (Gemini)
-        <section class="guide-panel" id="guide-panel-gemini">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon" style="background:#4285f4">●</div>
-            <div>
-              <h2>Gemini-format CLI</h2>
-              <div class="sub">Gemini CLI, etc. · /v1beta path</div>
-            </div>
-          </div>
-          <div class="guide-video-frame">
-            <div class="guide-video-placeholder"><span class="vp-tag">Video coming soon</span></div>
-          </div>
-        </section>
-        -->
       </div>
 
       <!-- ══════════ Group: CC Switch (coming soon) ══════════ -->

@@ -50,30 +50,13 @@
 
       <!-- 그룹 선택 -->
       <div class="guide-group-picker" role="tablist">
-        <button class="guide-group-btn" data-group="manual" aria-selected="true">수동 설정 <span class="g-n">1</span></button>
-        <button class="guide-group-btn reco" data-group="ccswitch" aria-selected="false">⭐ CC Switch <span class="g-n">준비 중</span></button>
+        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><span class="t-dot" style="background:#0EA5E9"></span>환경변수 직접 설정</button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><span class="t-dot" style="background:#34d399"></span>CC Switch로 한 번에 설정 <span class="g-n">준비 중</span></button>
       </div>
 
       <!-- ══════════ 그룹: 수동 설정 ══════════ -->
       <div class="guide-group active" id="guide-group-manual">
-        <div class="guide-tabbar" role="tablist">
-          <button class="guide-tab-btn" data-tab="anthropic" aria-selected="true" role="tab"><span class="t-dot" style="background:#d97757"></span>Anthropic</button>
-          <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제
-          <button class="guide-tab-btn" data-tab="openai" aria-selected="false" role="tab"><span class="t-dot" style="background:#10a37f"></span>OpenAI</button>
-          <button class="guide-tab-btn" data-tab="gemini" aria-selected="false" role="tab"><span class="t-dot" style="background:#4285f4"></span>Gemini</button>
-          -->
-        </div>
-
-        <!-- Anthropic 패널 -->
-        <section class="guide-panel active" id="guide-panel-anthropic">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon"><img src="/logo_claude.svg" alt="Claude" /></div>
-            <div>
-              <h2>Claude Code에서 AlRouter 연결하기</h2>
-              <div class="sub">약 1분 · 화면 녹화 + 내레이션</div>
-            </div>
-          </div>
-
+        <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
             <video controls preload="metadata" poster="/guide-manual-anthropic-poster.png">
               <source src="/guide-manual-anthropic.mp4" type="video/mp4" />
@@ -90,6 +73,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>API 키 발급</h4></div>
                   <p>대시보드 'API 키' 메뉴로 이동해 새로운 API 키를 생성하고, 생성된 키를 복사합니다. 이 키 하나로 이후 모든 설정에 사용합니다.</p>
+                  <img class="guide-step-shot" src="/guide-step-1-apikey.png" alt="API 키 생성 화면" loading="lazy" />
                 </div>
               </div>
 
@@ -97,18 +81,41 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>환경변수 등록</h4></div>
-                  <p>터미널에서 <span class="mono">~/.zshrc</span> 파일을 열고 base URL과 API 키를 추가한 뒤, 설정을 적용합니다.</p>
+                  <p>터미널에서 셸 설정 파일을 열고 base URL과 API 키를 추가한 뒤, 설정을 적용합니다. 사용하는 CLI의 포맷에 맞는 값을 넣으면 됩니다.</p>
                   <div class="guide-pitfall"><b>주의</b>아래 예시의 키 값 대신, 실제로 발급받은 키 값을 입력해 주세요.</div>
-                  <div class="guide-term">
-                    <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
-<pre><span class="cm"># 파일 맨 아래에 추가</span>
-<span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+
+                  <div class="guide-provider-table">
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
 <span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                      </div>
+                    </div>
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
+<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                      </div>
+                    </div>
+                    <div class="guide-provider-row">
+                      <span class="guide-provider-name" style="color:#4285f4">Gemini</span>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
+<span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                      </div>
+                    </div>
                   </div>
-                  <div class="guide-term" style="margin-top:6px;">
+
+                  <div class="guide-term" style="margin-top:10px;">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ source ~/.zshrc</pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-2-envsetup.png" alt="환경변수 등록 화면" loading="lazy" />
                 </div>
               </div>
 
@@ -116,7 +123,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>연결 확인</h4></div>
-                  <p>새 터미널에서 claude를 실행한 뒤, <span class="mono">/status</span>로 AlRouter 연결을 확인합니다. Anthropic base URL 항목에 alrouter.ai가 표시되면 정상입니다.</p>
+                  <p>새 터미널에서 claude를 실행한 뒤, <span class="mono">/status</span>로 AlRouter 연결을 확인합니다. base URL 항목에 alrouter.ai가 표시되면 정상입니다.</p>
                   <div class="guide-pitfall"><b>주의</b>환경변수는 새로 여는 터미널부터 적용됩니다. 등록 전에 열려 있던 터미널이면 새 창에서 실행하세요.</div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
@@ -124,6 +131,7 @@
 &gt; /status
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-3-status.png" alt="/status 연결 확인 화면" loading="lazy" />
                 </div>
               </div>
 
@@ -138,6 +146,7 @@
 <span class="c3">&gt; 연동 테스트입니다. "Claude Code 연결 성공"이라고만 답해주세요.</span>
 <span class="cm">Claude Code 연결 성공</span></pre>
                   </div>
+                  <img class="guide-step-shot" src="/guide-step-4-test.png" alt="테스트 프롬프트 응답 화면" loading="lazy" />
                 </div>
               </div>
 
@@ -146,46 +155,12 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>사용량 확인</h4></div>
                   <p>모든 요청은 '사용 로그' 메뉴에서 키별로 토큰과 비용까지 확인할 수 있습니다. '개요' 화면에서도 최근 사용량을 요약해서 볼 수 있습니다.</p>
+                  <img class="guide-step-shot" src="/guide-step-5-usage.png" alt="사용 로그 화면" loading="lazy" />
                 </div>
               </div>
             </div>
-
-            <div class="guide-note">
-              <span class="mark">TIP</span>
-              <p>OpenAI 포맷 CLI는 base URL 뒤에 <span class="mono">/v1</span>, Gemini는 <span class="mono">/v1beta</span>만 다를 뿐 방식은 동일합니다.</p>
-            </div>
           </div>
         </section>
-
-        <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제 (OpenAI)
-        <section class="guide-panel" id="guide-panel-openai">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon" style="background:#10a37f">◆</div>
-            <div>
-              <h2>OpenAI 포맷 CLI</h2>
-              <div class="sub">Aider, Codex 등 · base URL 뒤에 /v1</div>
-            </div>
-          </div>
-          <div class="guide-video-frame">
-            <div class="guide-video-placeholder"><span class="vp-tag">영상 준비 중</span></div>
-          </div>
-        </section>
-        -->
-
-        <!-- 추후 전용 영상/콘텐츠 준비되면 주석 해제 (Gemini)
-        <section class="guide-panel" id="guide-panel-gemini">
-          <div class="guide-panel-head">
-            <div class="guide-panel-icon" style="background:#4285f4">●</div>
-            <div>
-              <h2>Gemini 포맷 CLI</h2>
-              <div class="sub">Gemini CLI 등 · /v1beta 경로</div>
-            </div>
-          </div>
-          <div class="guide-video-frame">
-            <div class="guide-video-placeholder"><span class="vp-tag">영상 준비 중</span></div>
-          </div>
-        </section>
-        -->
       </div>
 
       <!-- ══════════ 그룹: CC Switch (준비 중) ══════════ -->

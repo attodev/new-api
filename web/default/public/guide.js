@@ -31,20 +31,19 @@
     });
   });
 
-  // 프로바이더 탭 전환 (그룹 내부에서만)
-  document.querySelectorAll('.guide-tab-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var group = btn.closest('.guide-group');
-      if (!group) return;
-      group.querySelectorAll('.guide-tab-btn').forEach(function (b) {
-        b.setAttribute('aria-selected', 'false');
-      });
-      group.querySelectorAll('.guide-panel').forEach(function (p) {
-        p.classList.remove('active');
-      });
-      btn.setAttribute('aria-selected', 'true');
-      var target = document.getElementById('guide-panel-' + btn.dataset.tab);
-      if (target) target.classList.add('active');
+  // 단계별 화면 캡처: 파일이 아직 없으면(404) 조용히 숨기고,
+  // 로드되면 보여준다. (사용자가 캡처 파일을 나중에 채워 넣는 구조)
+  document.querySelectorAll('.guide-step-shot').forEach(function (img) {
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add('is-loaded');
+      return;
+    }
+    img.addEventListener('load', function () {
+      img.classList.add('is-loaded');
+    });
+    img.addEventListener('error', function () {
+      img.classList.remove('is-loaded');
+      img.style.display = 'none';
     });
   });
 })();
