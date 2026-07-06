@@ -60,6 +60,11 @@
 }
 .guide-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
 
+/* Big play button overlay — reuses landing page's .anim-play-* styling, just squared
+   off to match this frame's border radius instead of the hero's 24px portrait card. */
+.guide-play-overlay { display: none; border-radius: 16px; }
+.guide-play-overlay.visible { display: flex; }
+
 /* End-of-video CTA — reuses landing page's .anim-cta-* button styling (same design),
    repositioned for this frame's 16:9 landscape shape instead of the hero's 9:16 portrait. */
 .guide-cta-wrap {
