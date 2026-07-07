@@ -142,7 +142,7 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
 
   const form = useForm<
     GlobalModelSettingsFormInput,
-    unknown,
+    unknown,  
     GlobalModelSettingsFormValues
   >({
     resolver: zodResolver(schema),

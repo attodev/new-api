@@ -18,7 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { formatLocalCurrencyAmount } from '@/lib/currency'
+import {
+  formatCurrencyFromUSD,
+  formatLocalCurrencyAmount,
+} from '@/lib/currency'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,8 +34,50 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DEFAULT_DISCOUNT_RATE } from '../../constants'
-import { formatCurrency, getPaymentIcon } from '../../lib'
-import type { PaymentMethod } from '../../types'
+import { formatCurrency, getPaymentIcon, isTossPayment } from '../../lib'
+import { formatWonAmount, getTossPreview } from '../../lib/topup-amount-mode'
+import type {
+  PaymentMethod,
+  TopupAmountMode,
+  TossTopupQuote,
+} from '../../types'
+
+interface TossConfirmAmountsInput {
+  topupAmount: number
+  paymentAmount: number
+  amountMode?: TopupAmountMode
+  tossUnitPrice?: number
+  tossQuote?: Partial<TossTopupQuote> | null
+}
+
+export function getTossConfirmAmounts({
+  topupAmount,
+  paymentAmount,
+  amountMode,
+  tossUnitPrice,
+  tossQuote,
+}: TossConfirmAmountsInput) {
+  const preview = getTossPreview(
+    topupAmount,
+    amountMode ?? 'krw',
+    tossUnitPrice
+  )
+  const quoteChargeAmount =
+    typeof tossQuote?.charge_amount === 'number' &&
+    Number.isFinite(tossQuote.charge_amount)
+      ? tossQuote.charge_amount
+      : null
+  const quoteCreditAmount =
+    typeof tossQuote?.credit_amount === 'number' &&
+    Number.isFinite(tossQuote.credit_amount)
+      ? tossQuote.credit_amount
+      : null
+
+  return {
+    chargeAmount: quoteChargeAmount ?? (paymentAmount || preview.chargeAmount),
+    creditAmount: quoteCreditAmount ?? preview.creditAmount,
+  }
+}
 
 interface PaymentConfirmDialogProps {
   open: boolean
@@ -41,6 +86,9 @@ interface PaymentConfirmDialogProps {
   topupAmount: number
   paymentAmount: number
   paymentMethod: PaymentMethod | undefined
+  amountMode?: TopupAmountMode
+  tossUnitPrice?: number
+  tossQuote?: Partial<TossTopupQuote> | null
   calculating: boolean
   processing: boolean
   discountRate?: number
@@ -54,13 +102,27 @@ export function PaymentConfirmDialog({
   topupAmount,
   paymentAmount,
   paymentMethod,
+  amountMode,
+  tossUnitPrice,
+  tossQuote,
   calculating,
   processing,
   discountRate = DEFAULT_DISCOUNT_RATE,
   usdExchangeRate = 1,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
-  const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
+  const isToss = paymentMethod ? isTossPayment(paymentMethod.type) : false
+  const tossAmounts = isToss
+    ? getTossConfirmAmounts({
+        topupAmount,
+        paymentAmount,
+        amountMode,
+        tossUnitPrice,
+        tossQuote,
+      })
+    : null
+  const hasDiscount =
+    !isToss && discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
   const discountAmount = hasDiscount ? originalAmount - paymentAmount : 0
 
@@ -77,38 +139,66 @@ export function PaymentConfirmDialog({
         </AlertDialogHeader>
 
         <div className='space-y-3 py-3 sm:space-y-4 sm:py-4'>
-          <div className='flex items-center justify-between'>
-            <span className='text-muted-foreground text-sm'>
-              {t('Topup Amount')}
-            </span>
-            <span className='text-lg font-semibold'>
-              {formatLocalCurrencyAmount(topupAmount * usdExchangeRate, {
-                digitsLarge: 2,
-                digitsSmall: 2,
-                abbreviate: false,
-              })}
-            </span>
-          </div>
-
-          <div className='flex items-center justify-between'>
-            <span className='text-muted-foreground text-sm'>
-              {t('You Pay')}
-            </span>
-            {calculating ? (
-              <Skeleton className='h-6 w-24' />
-            ) : (
-              <div className='flex items-baseline gap-2'>
-                <span className='text-2xl font-semibold'>
-                  {formatCurrency(paymentAmount)}
+          {isToss && tossAmounts ? (
+            <>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Payment amount')}
                 </span>
-                {hasDiscount && (
-                  <span className='text-muted-foreground text-sm line-through'>
-                    {formatCurrency(originalAmount)}
+                {calculating ? (
+                  <Skeleton className='h-6 w-24' />
+                ) : (
+                  <span className='text-lg font-semibold'>
+                    {formatWonAmount(tossAmounts.chargeAmount)}
                   </span>
                 )}
               </div>
-            )}
-          </div>
+
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Credit amount')}
+                </span>
+                <span className='text-lg font-semibold'>
+                  {formatCurrencyFromUSD(tossAmounts.creditAmount)}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('Topup Amount')}
+                </span>
+                <span className='text-lg font-semibold'>
+                  {formatLocalCurrencyAmount(topupAmount * usdExchangeRate, {
+                    digitsLarge: 2,
+                    digitsSmall: 2,
+                    abbreviate: false,
+                  })}
+                </span>
+              </div>
+
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground text-sm'>
+                  {t('You Pay')}
+                </span>
+                {calculating ? (
+                  <Skeleton className='h-6 w-24' />
+                ) : (
+                  <div className='flex items-baseline gap-2'>
+                    <span className='text-2xl font-semibold'>
+                      {formatCurrency(paymentAmount)}
+                    </span>
+                    {hasDiscount && (
+                      <span className='text-muted-foreground text-sm line-through'>
+                        {formatCurrency(originalAmount)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {hasDiscount && !calculating && (
             <div className='bg-muted/50 rounded-lg p-3'>

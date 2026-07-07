@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -37,6 +38,14 @@ var (
 	ErrSubscriptionOrderNotFound      = errors.New("subscription order not found")
 	ErrSubscriptionOrderStatusInvalid = errors.New("subscription order status invalid")
 )
+
+type TossSubscriptionOrderReconciler func(ctx context.Context, order SubscriptionOrder) (resolved bool, err error)
+
+var tossSubscriptionOrderReconciler TossSubscriptionOrderReconciler
+
+func SetTossSubscriptionOrderReconciler(fn TossSubscriptionOrderReconciler) {
+	tossSubscriptionOrderReconciler = fn
+}
 
 const (
 	subscriptionPlanCacheNamespace     = "new-api:subscription_plan:v1"
@@ -207,7 +216,11 @@ type SubscriptionOrder struct {
 	CreateTime      int64  `json:"create_time"`
 	CompleteTime    int64  `json:"complete_time"`
 
-	ProviderPayload string `json:"provider_payload" gorm:"type:text"`
+	ProviderPayload    string `json:"provider_payload" gorm:"type:text"`
+	ProviderAmount     int64  `json:"provider_amount" gorm:"default:0"`
+	ProviderCurrency   string `json:"provider_currency" gorm:"type:varchar(8);default:''"`
+	ProviderCredential string `json:"-" gorm:"type:text"`
+	BillingKeyId       int    `json:"billing_key_id" gorm:"default:0;index"`
 }
 
 func (o *SubscriptionOrder) Insert() error {
@@ -232,6 +245,36 @@ func GetSubscriptionOrderByTradeNo(tradeNo string) *SubscriptionOrder {
 	return &order
 }
 
+func AttachTossBillingKeyToOrder(tradeNo string, billingKeyId int) error {
+	if tradeNo == "" {
+		return errors.New("tradeNo is empty")
+	}
+	if billingKeyId <= 0 {
+		return errors.New("billingKeyId is invalid")
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var order SubscriptionOrder
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
+			return ErrSubscriptionOrderNotFound
+		}
+		if order.PaymentProvider != PaymentProviderToss {
+			return ErrPaymentMethodMismatch
+		}
+		if order.Status == common.TopUpStatusSuccess {
+			return nil
+		}
+		if order.Status != common.TopUpStatusPending {
+			return ErrSubscriptionOrderStatusInvalid
+		}
+		order.BillingKeyId = billingKeyId
+		return tx.Save(&order).Error
+	})
+}
+
 // User subscription instance
 type UserSubscription struct {
 	Id     int `json:"id"`
@@ -246,6 +289,12 @@ type UserSubscription struct {
 	Status    string `json:"status" gorm:"type:varchar(32);index;index:idx_user_sub_active,priority:2"` // active/expired/cancelled
 
 	Source string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin
+
+	// Toss 자동결제(빌링) 연동 필드
+	AutoRenew        bool  `json:"auto_renew" gorm:"default:false"`
+	NextBillingTime  int64 `json:"next_billing_time" gorm:"default:0;index"`
+	BillingKeyId     int   `json:"billing_key_id" gorm:"default:0;index"`
+	BillingFailCount int   `json:"billing_fail_count" gorm:"default:0"`
 
 	LastResetTime int64 `json:"last_reset_time" gorm:"type:bigint;default:0"`
 	NextResetTime int64 `json:"next_reset_time" gorm:"type:bigint;default:0;index"`
@@ -475,7 +524,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("purchase limit for this plan has been reached")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := getDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -554,7 +603,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := GetSubscriptionPlanById(order.PlanId)
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
 			return err
 		}
@@ -658,6 +707,157 @@ func ExpireSubscriptionOrder(tradeNo string, expectedPaymentProvider string) err
 		order.CompleteTime = common.GetTimestamp()
 		return tx.Save(&order).Error
 	})
+}
+
+func ExpireTossPendingSubscriptionOrderAndMarkBillingKeyPendingRevocation(tradeNo string) error {
+	if tradeNo == "" {
+		return errors.New("tradeNo is empty")
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var order SubscriptionOrder
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
+			return ErrSubscriptionOrderNotFound
+		}
+		if order.PaymentProvider != PaymentProviderToss {
+			return ErrPaymentMethodMismatch
+		}
+		if order.Status != common.TopUpStatusPending {
+			return nil
+		}
+		order.Status = common.TopUpStatusExpired
+		order.CompleteTime = common.GetTimestamp()
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+		if order.BillingKeyId <= 0 {
+			return nil
+		}
+		return tx.Model(&UserBillingKey{}).
+			Where("id = ? AND status <> ?", order.BillingKeyId, BillingKeyStatusRevoked).
+			Update("status", BillingKeyStatusPendingRevocation).Error
+	})
+}
+
+func ExpireTossPendingRenewalOrderAndMarkFailure(subId int, tradeNo string, maxFails int) (bool, error) {
+	if subId <= 0 {
+		return false, errors.New("subId is invalid")
+	}
+	if tradeNo == "" {
+		return false, errors.New("tradeNo is empty")
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	disabled := false
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var order SubscriptionOrder
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
+			return ErrSubscriptionOrderNotFound
+		}
+		if order.PaymentProvider != PaymentProviderToss {
+			return ErrPaymentMethodMismatch
+		}
+		if order.Status != common.TopUpStatusPending {
+			return nil
+		}
+		order.Status = common.TopUpStatusExpired
+		order.CompleteTime = common.GetTimestamp()
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+		var err error
+		disabled, err = markTossBillingFailureTx(tx, subId, maxFails)
+		return err
+	})
+	return disabled, err
+}
+
+func ReconcileStaleTossPendingSubscriptionOrders(ctx context.Context, cutoffUnix int64, limit int) (int64, error) {
+	if tossSubscriptionOrderReconciler == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	var rows []SubscriptionOrder
+	if err := DB.Where("payment_provider = ? AND status = ? AND create_time < ? AND billing_key_id > 0",
+		PaymentProviderToss, common.TopUpStatusPending, cutoffUnix).
+		Order("create_time asc, id asc").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return 0, err
+	}
+	var resolved int64
+	var lastErr error
+	for i := range rows {
+		ok, err := tossSubscriptionOrderReconciler(ctx, rows[i])
+		if err != nil {
+			lastErr = err
+			common.SysError(fmt.Sprintf("failed to reconcile stale Toss subscription order %s: %v", rows[i].TradeNo, err))
+			continue
+		}
+		if ok {
+			resolved++
+		}
+	}
+	return resolved, lastErr
+}
+
+func ExpireStaleTossPendingSubscriptionOrders(cutoffUnix int64) (int64, error) {
+	var expired int64
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var orders []SubscriptionOrder
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("payment_provider = ? AND status = ? AND create_time < ? AND (billing_key_id = 0 OR billing_key_id IS NULL)",
+				PaymentProviderToss, common.TopUpStatusPending, cutoffUnix).
+			Find(&orders).Error; err != nil {
+			return err
+		}
+		if len(orders) == 0 {
+			return nil
+		}
+
+		ids := make([]int, 0, len(orders))
+		keyIds := make([]int, 0, len(orders))
+		seenKeys := make(map[int]struct{})
+		for _, order := range orders {
+			ids = append(ids, order.Id)
+			if order.BillingKeyId <= 0 {
+				continue
+			}
+			if _, ok := seenKeys[order.BillingKeyId]; ok {
+				continue
+			}
+			seenKeys[order.BillingKeyId] = struct{}{}
+			keyIds = append(keyIds, order.BillingKeyId)
+		}
+
+		res := tx.Model(&SubscriptionOrder{}).
+			Where("id IN ? AND status = ?", ids, common.TopUpStatusPending).
+			Updates(map[string]interface{}{
+				"status":        common.TopUpStatusExpired,
+				"complete_time": common.GetTimestamp(),
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		expired = res.RowsAffected
+		if len(keyIds) == 0 {
+			return nil
+		}
+		return tx.Model(&UserBillingKey{}).
+			Where("id IN ? AND status <> ?", keyIds, BillingKeyStatusRevoked).
+			Update("status", BillingKeyStatusPendingRevocation).Error
+	})
+	return expired, err
 }
 
 // Admin bind (no payment). Creates a UserSubscription from a plan.
@@ -853,6 +1053,8 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 	cacheGroup := ""
 	downgradeGroup := ""
 	var userId int
+	remoteKeys := make([]tossBillingRevocationCandidate, 0)
+	seenRemoteKeys := make(map[string]int)
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var sub UserSubscription
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").
@@ -860,9 +1062,14 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 			return err
 		}
 		userId = sub.UserId
+		if sub.AutoRenew && sub.BillingKeyId > 0 {
+			collectTossBillingRevocationCandidateTx(tx, &remoteKeys, seenRemoteKeys, sub.BillingKeyId, "admin invalidate")
+			_ = MarkTossBillingKeyPendingRevocation(tx, sub.BillingKeyId)
+		}
 		if err := tx.Model(&sub).Updates(map[string]interface{}{
 			"status":     "cancelled",
 			"end_time":   now,
+			"auto_renew": false,
 			"updated_at": now,
 		}).Error; err != nil {
 			return err
@@ -883,6 +1090,7 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 	if cacheGroup != "" && userId > 0 {
 		_ = UpdateUserGroupCache(userId, cacheGroup)
 	}
+	revokeTossBillingCandidates(context.Background(), remoteKeys, "admin invalidate")
 	if downgradeGroup != "" {
 		return downgradeGroup, nil
 	}
@@ -898,6 +1106,8 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	cacheGroup := ""
 	downgradeGroup := ""
 	var userId int
+	remoteKeys := make([]tossBillingRevocationCandidate, 0)
+	seenRemoteKeys := make(map[string]int)
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var sub UserSubscription
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").
@@ -905,6 +1115,10 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 			return err
 		}
 		userId = sub.UserId
+		if sub.AutoRenew && sub.BillingKeyId > 0 {
+			collectTossBillingRevocationCandidateTx(tx, &remoteKeys, seenRemoteKeys, sub.BillingKeyId, "admin delete")
+			_ = MarkTossBillingKeyPendingRevocation(tx, sub.BillingKeyId)
+		}
 		target, err := downgradeUserGroupForSubscriptionTx(tx, &sub, now)
 		if err != nil {
 			return err
@@ -924,6 +1138,7 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	if cacheGroup != "" && userId > 0 {
 		_ = UpdateUserGroupCache(userId, cacheGroup)
 	}
+	revokeTossBillingCandidates(context.Background(), remoteKeys, "admin delete")
 	if downgradeGroup != "" {
 		return downgradeGroup, nil
 	}
@@ -940,12 +1155,35 @@ type SubscriptionPreConsumeResult struct {
 
 // ExpireDueSubscriptions marks expired subscriptions and handles group downgrade.
 func ExpireDueSubscriptions(limit int) (int, error) {
+	return expireDueSubscriptions(limit, false, false)
+}
+
+// ExpireDueSubscriptionsIncludingTossAutoRenew marks expired subscriptions,
+// including Toss auto-renew subscriptions that are normally left for the
+// recurring billing task.
+func ExpireDueSubscriptionsIncludingTossAutoRenew(limit int) (int, error) {
+	return expireDueSubscriptions(limit, true, true)
+}
+
+// ExpireDueSubscriptionsIncludingTossAutoRenewLocalOnly marks expired
+// subscriptions without calling Toss remotely. Billing keys are moved to
+// pending_revocation so remote cleanup can retry when payment operations are
+// allowed again.
+func ExpireDueSubscriptionsIncludingTossAutoRenewLocalOnly(limit int) (int, error) {
+	return expireDueSubscriptions(limit, true, false)
+}
+
+func expireDueSubscriptions(limit int, includeTossAutoRenew bool, revokeRemote bool) (int, error) {
 	if limit <= 0 {
 		limit = 200
 	}
 	now := GetDBTimestamp()
 	var subs []UserSubscription
-	if err := DB.Where("status = ? AND end_time > 0 AND end_time <= ?", "active", now).
+	query := DB.Where("status = ? AND end_time > 0 AND end_time <= ?", "active", now)
+	if !includeTossAutoRenew {
+		query = query.Where("(auto_renew = ? OR billing_key_id = 0)", commonFalseVal)
+	}
+	if err := query.
 		Order("end_time asc, id asc").
 		Limit(limit).
 		Find(&subs).Error; err != nil {
@@ -963,23 +1201,46 @@ func ExpireDueSubscriptions(limit int) (int, error) {
 	}
 	for userId := range userIds {
 		cacheGroup := ""
+		remoteKeys := make([]tossBillingRevocationCandidate, 0)
+		seenRemoteKeys := make(map[string]int)
 		err := DB.Transaction(func(tx *gorm.DB) error {
-			res := tx.Model(&UserSubscription{}).
-				Where("user_id = ? AND status = ? AND end_time > 0 AND end_time <= ?", userId, "active", now).
-				Updates(map[string]interface{}{
-					"status":     "expired",
-					"updated_at": common.GetTimestamp(),
-				})
-			if res.Error != nil {
-				return res.Error
+			var dueSubs []UserSubscription
+			dueQuery := tx.Set("gorm:query_option", "FOR UPDATE").
+				Where("user_id = ? AND status = ? AND end_time > 0 AND end_time <= ?", userId, "active", now)
+			if !includeTossAutoRenew {
+				dueQuery = dueQuery.Where("(auto_renew = ? OR billing_key_id = 0)", commonFalseVal)
 			}
-			expiredCount += int(res.RowsAffected)
+			if err := dueQuery.Find(&dueSubs).Error; err != nil {
+				return err
+			}
+			updatedAt := common.GetTimestamp()
+			for i := range dueSubs {
+				if dueSubs[i].AutoRenew && dueSubs[i].BillingKeyId > 0 {
+					if revokeRemote {
+						collectTossBillingRevocationCandidateTx(tx, &remoteKeys, seenRemoteKeys, dueSubs[i].BillingKeyId, "subscription expiry")
+					}
+					_ = MarkTossBillingKeyPendingRevocation(tx, dueSubs[i].BillingKeyId)
+				}
+				dueSubs[i].Status = "expired"
+				dueSubs[i].AutoRenew = false
+				dueSubs[i].UpdatedAt = updatedAt
+				if err := tx.Save(&dueSubs[i]).Error; err != nil {
+					return err
+				}
+			}
+			expiredCount += len(dueSubs)
 
-			// If there's an active upgraded subscription, keep current group.
+			// If there's an active upgraded subscription, keep current group. The
+			// default expiry task leaves due auto-renew subscriptions with a billing
+			// key to the billing task, so they should still protect the current group
+			// unless this fallback is explicitly expiring them too.
 			var activeSub UserSubscription
-			activeQuery := tx.Where("user_id = ? AND status = ? AND end_time > ? AND upgrade_group <> ''",
-				userId, "active", now).
-				Order("end_time desc, id desc").
+			activeQueryBuilder := tx.Where("user_id = ? AND status = ? AND upgrade_group <> '' AND end_time > ?", userId, "active", now)
+			if !includeTossAutoRenew {
+				activeQueryBuilder = tx.Where("user_id = ? AND status = ? AND upgrade_group <> '' AND (end_time > ? OR (auto_renew = ? AND billing_key_id > 0))",
+					userId, "active", now, commonTrueVal)
+			}
+			activeQuery := activeQueryBuilder.Order("end_time desc, id desc").
 				Limit(1).
 				Find(&activeSub)
 			if activeQuery.Error == nil && activeQuery.RowsAffected > 0 {
@@ -1020,6 +1281,9 @@ func ExpireDueSubscriptions(limit int) (int, error) {
 		}
 		if cacheGroup != "" {
 			_ = UpdateUserGroupCache(userId, cacheGroup)
+		}
+		if revokeRemote {
+			revokeTossBillingCandidates(context.Background(), remoteKeys, "subscription expiry")
 		}
 	}
 	return expiredCount, nil
@@ -1295,6 +1559,308 @@ func GetSubscriptionPlanInfoByUserSubscriptionId(userSubscriptionId int) (*Subsc
 	}
 	_ = getSubscriptionPlanInfoCache().SetWithTTL(cacheKey, *info, subscriptionPlanInfoCacheTTL())
 	return info, nil
+}
+
+type tossBillingRevocationCandidate struct {
+	billingKey string
+	secretKey  string
+	keyIds     []int
+}
+
+func addTossBillingRevocationCandidate(candidates *[]tossBillingRevocationCandidate, seen map[string]int, billingKey, secretKey string, keyId int) {
+	if strings.TrimSpace(billingKey) == "" || keyId <= 0 {
+		return
+	}
+	seenKey := billingKey + "\x00" + secretKey
+	if idx, ok := seen[seenKey]; ok {
+		(*candidates)[idx].keyIds = append((*candidates)[idx].keyIds, keyId)
+		return
+	}
+	seen[seenKey] = len(*candidates)
+	*candidates = append(*candidates, tossBillingRevocationCandidate{billingKey: billingKey, secretKey: secretKey, keyIds: []int{keyId}})
+}
+
+func collectTossBillingRevocationCandidateTx(tx *gorm.DB, candidates *[]tossBillingRevocationCandidate, seen map[string]int, keyId int, reason string) {
+	if keyId <= 0 {
+		return
+	}
+	billingKey, _, secretKey, err := getTossBillingKeyPlainWithSecretTx(tx, keyId)
+	if err != nil {
+		common.SysError(fmt.Sprintf("failed to decrypt Toss billing key for %s: billing_key_id=%d error=%v", reason, keyId, err))
+		return
+	}
+	addTossBillingRevocationCandidate(candidates, seen, billingKey, secretKey, keyId)
+}
+
+func revokeTossBillingCandidates(ctx context.Context, candidates []tossBillingRevocationCandidate, reason string) {
+	for _, candidate := range candidates {
+		if err := revokeTossBillingRemoteAndMarkRevoked(ctx, candidate.billingKey, candidate.secretKey, candidate.keyIds...); err != nil {
+			common.SysError(fmt.Sprintf("failed to delete Toss billing key remotely for %s: error=%v", reason, err))
+		}
+	}
+}
+
+// CompleteTossBillingOrder completes a pending Toss subscription order and marks the
+// created UserSubscription for auto-renew (billingKeyId). Idempotent on order status.
+func CompleteTossBillingOrder(tradeNo string, billingKeyId int, providerPayload string) error {
+	if tradeNo == "" {
+		return errors.New("tradeNo is empty")
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	var logUserId int
+	var upgradeGroup string
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var order SubscriptionOrder
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
+			return ErrSubscriptionOrderNotFound
+		}
+		if order.PaymentProvider != PaymentProviderToss {
+			return ErrPaymentMethodMismatch
+		}
+		if order.Status == common.TopUpStatusSuccess {
+			return nil // idempotent
+		}
+		if order.Status != common.TopUpStatusPending {
+			return ErrSubscriptionOrderStatusInvalid
+		}
+		effectiveBillingKeyId := billingKeyId
+		if effectiveBillingKeyId <= 0 {
+			effectiveBillingKeyId = order.BillingKeyId
+		}
+		if effectiveBillingKeyId <= 0 {
+			return errors.New("billingKeyId is invalid")
+		}
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
+		if err != nil {
+			return err
+		}
+		upgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
+		sub, err := CreateUserSubscriptionFromPlanTx(tx, order.UserId, plan, "order")
+		if err != nil {
+			return err
+		}
+		// Mark for auto-renew: charge a lead time before the current period ends so the
+		// renewal cron extends EndTime before ExpireDueSubscriptions can expire it.
+		sub.AutoRenew = true
+		sub.BillingKeyId = effectiveBillingKeyId
+		sub.NextBillingTime = tossNextBillingTime(sub.StartTime, sub.EndTime)
+		sub.BillingFailCount = 0
+		sub.UpdatedAt = common.GetTimestamp()
+		if err := tx.Save(sub).Error; err != nil {
+			return err
+		}
+		if err := upsertSubscriptionTopUpTx(tx, &order); err != nil {
+			return err
+		}
+		order.Status = common.TopUpStatusSuccess
+		order.CompleteTime = common.GetTimestamp()
+		order.BillingKeyId = effectiveBillingKeyId
+		if providerPayload != "" {
+			order.ProviderPayload = providerPayload
+		}
+		if err := tx.Save(&order).Error; err != nil {
+			return err
+		}
+		logUserId = order.UserId
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if upgradeGroup != "" && logUserId > 0 {
+		_ = UpdateUserGroupCache(logUserId, upgradeGroup)
+	}
+	if logUserId > 0 {
+		RecordLog(logUserId, LogTypeTopup, "Toss 자동결제 구독 시작")
+	}
+	return nil
+}
+
+// RenewTossSubscription extends a subscription for another period after a successful
+// recurring billing charge. Extends EndTime from the current EndTime (no drift), resets
+// quota usage, advances NextBillingTime, records an audit order, and clears fail count.
+func RenewTossSubscription(subId int, tradeNo string, money float64, providerAmount int64, providerPayload ...string) error {
+	payload := ""
+	if len(providerPayload) > 0 {
+		payload = providerPayload[0]
+	}
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var order SubscriptionOrder
+		orderFound := true
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				orderFound = false
+			} else {
+				return err
+			}
+		}
+		if orderFound {
+			if order.PaymentProvider != PaymentProviderToss {
+				return ErrPaymentMethodMismatch
+			}
+			if order.Status == common.TopUpStatusSuccess {
+				return nil
+			}
+			if order.Status != common.TopUpStatusPending {
+				return ErrSubscriptionOrderStatusInvalid
+			}
+		}
+
+		var sub UserSubscription
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", subId).First(&sub).Error; err != nil {
+			return err
+		}
+		plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
+		if err != nil {
+			return err
+		}
+		oldEnd := sub.EndTime
+		base := time.Unix(oldEnd, 0)
+		newEnd, err := calcPlanEndTime(base, plan)
+		if err != nil {
+			return err
+		}
+		sub.EndTime = newEnd
+		sub.NextBillingTime = tossNextBillingTime(oldEnd, newEnd)
+		sub.AmountUsed = 0
+		sub.LastResetTime = common.GetTimestamp()
+		sub.NextResetTime = calcNextResetTime(time.Unix(common.GetTimestamp(), 0), plan, newEnd)
+		sub.Status = "active"
+		sub.BillingFailCount = 0
+		sub.UpdatedAt = common.GetTimestamp()
+		if err := tx.Save(&sub).Error; err != nil {
+			return err
+		}
+		if orderFound {
+			order.Status = common.TopUpStatusSuccess
+			order.CompleteTime = common.GetTimestamp()
+			if providerAmount > 0 && order.ProviderAmount <= 0 {
+				order.ProviderAmount = providerAmount
+			}
+			if strings.TrimSpace(order.ProviderCurrency) == "" {
+				order.ProviderCurrency = "KRW"
+			}
+			if order.BillingKeyId <= 0 {
+				order.BillingKeyId = sub.BillingKeyId
+			}
+			if payload != "" {
+				order.ProviderPayload = payload
+			}
+			if strings.TrimSpace(order.ProviderCredential) == "" && sub.BillingKeyId > 0 {
+				var key UserBillingKey
+				if err := tx.Select("provider_credential").Where("id = ?", sub.BillingKeyId).First(&key).Error; err == nil {
+					order.ProviderCredential = key.ProviderCredential
+				}
+			}
+			return tx.Save(&order).Error
+		}
+
+		auditOrder := &SubscriptionOrder{
+			UserId:           sub.UserId,
+			PlanId:           sub.PlanId,
+			Money:            money,
+			TradeNo:          tradeNo,
+			PaymentMethod:    PaymentMethodToss,
+			PaymentProvider:  PaymentProviderToss,
+			Status:           common.TopUpStatusSuccess,
+			CreateTime:       common.GetTimestamp(),
+			CompleteTime:     common.GetTimestamp(),
+			ProviderPayload:  payload,
+			ProviderAmount:   providerAmount,
+			ProviderCurrency: "KRW",
+			BillingKeyId:     sub.BillingKeyId,
+		}
+		if sub.BillingKeyId > 0 {
+			var key UserBillingKey
+			if err := tx.Select("provider_credential").Where("id = ?", sub.BillingKeyId).First(&key).Error; err == nil {
+				auditOrder.ProviderCredential = key.ProviderCredential
+			}
+		}
+		return tx.Create(auditOrder).Error
+	})
+}
+
+// MarkTossBillingFailure increments the fail counter and disables auto-renew after maxFails.
+// It returns true when this call disables auto-renew.
+func MarkTossBillingFailure(subId int, maxFails int) (bool, error) {
+	disabled := false
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		disabled, err = markTossBillingFailureTx(tx, subId, maxFails)
+		return err
+	})
+	return disabled, err
+}
+
+func markTossBillingFailureTx(tx *gorm.DB, subId int, maxFails int) (bool, error) {
+	if maxFails <= 0 {
+		maxFails = 1
+	}
+	var sub UserSubscription
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", subId).First(&sub).Error; err != nil {
+		return false, err
+	}
+	sub.BillingFailCount++
+	disabled := false
+	if sub.BillingFailCount >= maxFails {
+		sub.AutoRenew = false
+		disabled = true
+		if sub.BillingKeyId > 0 {
+			_ = MarkTossBillingKeyPendingRevocation(tx, sub.BillingKeyId)
+		}
+	}
+	sub.UpdatedAt = common.GetTimestamp()
+	return disabled, tx.Save(&sub).Error
+}
+
+// GetDueTossRenewals returns active auto-renew Toss subscriptions due for charge.
+func GetDueTossRenewals(now int64, limit int) ([]UserSubscription, error) {
+	var subs []UserSubscription
+	err := DB.Where("auto_renew = ? AND billing_key_id > 0 AND next_billing_time > 0 AND next_billing_time <= ? AND status = ?",
+		commonTrueVal, now, "active").
+		Order("next_billing_time asc").Limit(limit).Find(&subs).Error
+	return subs, err
+}
+
+// CancelTossAutoRenewForUser disables auto-renew on the user's active Toss subscriptions
+// and revokes the associated billing keys. The current period stays until EndTime.
+func CancelTossAutoRenewForUser(ctx context.Context, userId int) error {
+	remoteKeys := make([]tossBillingRevocationCandidate, 0)
+	seenRemoteKeys := make(map[string]int)
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var subs []UserSubscription
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("user_id = ? AND auto_renew = ?", userId, commonTrueVal).
+			Find(&subs).Error; err != nil {
+			return err
+		}
+		for i := range subs {
+			if subs[i].BillingKeyId > 0 {
+				collectTossBillingRevocationCandidateTx(tx, &remoteKeys, seenRemoteKeys, subs[i].BillingKeyId, "user cancellation")
+			}
+			subs[i].AutoRenew = false
+			subs[i].UpdatedAt = common.GetTimestamp()
+			if err := tx.Save(&subs[i]).Error; err != nil {
+				return err
+			}
+			if subs[i].BillingKeyId > 0 {
+				_ = MarkTossBillingKeyPendingRevocation(tx, subs[i].BillingKeyId)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	revokeTossBillingCandidates(ctx, remoteKeys, fmt.Sprintf("user cancellation user_id=%d", userId))
+	return nil
 }
 
 // Update subscription used amount by delta (positive consume more, negative refund).

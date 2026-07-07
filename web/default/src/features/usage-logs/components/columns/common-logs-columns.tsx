@@ -558,12 +558,21 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
         const useTime = row.getValue('use_time') as number
         const other = parseLogOther(log.other)
+        // Prefer the precise, gateway-entry-to-last-byte e2e_ms measurement
+        // over the legacy whole-second use_time, which can be off by up to
+        // 1s due to Unix()-second truncation. Fall back for older logs that
+        // predate this metric.
+        const effectiveUseTime =
+          other?.e2e_ms != null ? other.e2e_ms / 1000 : useTime
         const frt = other?.frt
         const tokensPerSecond =
-          useTime > 0 && log.completion_tokens > 0
-            ? log.completion_tokens / useTime
+          effectiveUseTime > 0 && log.completion_tokens > 0
+            ? log.completion_tokens / effectiveUseTime
             : null
-        const timeVariant = getResponseTimeColor(useTime, log.completion_tokens)
+        const timeVariant = getResponseTimeColor(
+          effectiveUseTime,
+          log.completion_tokens
+        )
         const frtVariant = frt
           ? getFirstResponseTimeColor(frt / 1000)
           : 'neutral'
@@ -583,7 +592,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
           <div className='flex flex-col gap-1'>
             <div className='flex items-center gap-1.5'>
               <StatusBadge
-                label={formatUseTime(useTime)}
+                label={formatUseTime(effectiveUseTime)}
                 variant={timeVariant as StatusBadgeProps['variant']}
                 size='sm'
                 copyable={false}

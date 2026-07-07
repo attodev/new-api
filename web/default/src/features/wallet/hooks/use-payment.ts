@@ -24,6 +24,7 @@ import {
   calculateStripeAmount,
   calculatePayPalAmount,
   calculateWaffoPancakeAmount,
+  calculateTossAmount,
   requestPayment,
   requestStripePayment,
   requestPayPalPayment,
@@ -33,8 +34,11 @@ import {
   isStripePayment,
   isPayPalPayment,
   isWaffoPancakePayment,
+  isTossPayment,
   submitPaymentForm,
 } from '../lib'
+import { parseTossQuoteData } from '../lib/topup-amount-mode'
+import type { TopupAmountMode, TossTopupQuote } from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -42,18 +46,26 @@ import {
 
 export function usePayment() {
   const [amount, setAmount] = useState<number>(0)
+  const [tossQuote, setTossQuote] = useState<Partial<TossTopupQuote> | null>(
+    null
+  )
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
-    async (topupAmount: number, paymentType: string) => {
+    async (
+      topupAmount: number,
+      paymentType: string,
+      amountMode?: TopupAmountMode
+    ) => {
       try {
         setCalculating(true)
 
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const isPancake = isWaffoPancakePayment(paymentType)
+        const isToss = isTossPayment(paymentType)
         let response: Awaited<ReturnType<typeof calculateAmount>>
         if (isStripe) {
           response = await calculateStripeAmount({ amount: topupAmount })
@@ -61,20 +73,30 @@ export function usePayment() {
           response = await calculatePayPalAmount({ amount: topupAmount })
         } else if (isPancake) {
           response = await calculateWaffoPancakeAmount({ amount: topupAmount })
+        } else if (isToss) {
+          response = await calculateTossAmount({
+            amount: topupAmount,
+            amount_mode: amountMode,
+          })
         } else {
           response = await calculateAmount({ amount: topupAmount })
         }
 
         if (isApiSuccess(response) && response.data) {
-          const calculatedAmount = parseFloat(response.data)
+          const quote = isToss ? parseTossQuoteData(response.data) : null
+          setTossQuote(isToss ? quote : null)
+          const calculatedAmount =
+            quote?.charge_amount ?? parseFloat(String(response.data))
           setAmount(calculatedAmount)
           return calculatedAmount
         }
 
         // Don't show error for calculation, just set to 0
+        setTossQuote(null)
         setAmount(0)
         return 0
       } catch (_error) {
+        setTossQuote(null)
         setAmount(0)
         return 0
       } finally {
@@ -90,17 +112,29 @@ export function usePayment() {
       try {
         setProcessing(true)
 
+        // Toss is handled by useTossPayment in the component, not here.
+        if (isTossPayment(paymentType)) return false
+
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
         let response
         if (isStripe) {
-          response = await requestStripePayment({ amount, payment_method: 'stripe' })
+          response = await requestStripePayment({
+            amount,
+            payment_method: 'stripe',
+          })
         } else if (isPayPal) {
-          response = await requestPayPalPayment({ amount, payment_method: 'paypal' })
+          response = await requestPayPalPayment({
+            amount,
+            payment_method: 'paypal',
+          })
         } else {
-          response = await requestPayment({ amount, payment_method: paymentType })
+          response = await requestPayment({
+            amount,
+            payment_method: paymentType,
+          })
         }
 
         if (!isApiSuccess(response)) {
@@ -152,5 +186,6 @@ export function usePayment() {
     calculatePaymentAmount,
     processPayment,
     setAmount,
+    tossQuote,
   }
 }

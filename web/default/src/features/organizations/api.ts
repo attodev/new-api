@@ -29,6 +29,7 @@ import type {
   PaymentRequest,
   PaymentResponse,
   StripePaymentResponse,
+  TossPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
   WaffoPaymentRequest,
@@ -79,7 +80,9 @@ export async function updateOrganization(
   return res.data
 }
 
-export async function deleteOrganization(organizationId: number): Promise<void> {
+export async function deleteOrganization(
+  organizationId: number
+): Promise<void> {
   await api.delete(`/api/organizations/${organizationId}`)
 }
 
@@ -192,7 +195,20 @@ export async function calculateOrganizationPayPalAmount(
 export async function calculateOrganizationWaffoPancakeAmount(
   request: AmountRequest
 ): Promise<AmountResponse> {
-  const res = await api.post('/api/organization/waffo-pancake/amount', request, {
+  const res = await api.post(
+    '/api/organization/waffo-pancake/amount',
+    request,
+    {
+      skipBusinessError: true,
+    } as Record<string, unknown>
+  )
+  return res.data
+}
+
+export async function calculateOrganizationTossAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/toss/amount', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
@@ -223,6 +239,15 @@ export async function requestOrganizationPayPalPayment(
   request: PayPalPaymentRequest
 ): Promise<PayPalPaymentResponse> {
   const res = await api.post('/api/organization/paypal/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestOrganizationTossPayment(
+  request: PaymentRequest
+): Promise<TossPaymentResponse> {
+  const res = await api.post('/api/organization/toss/pay', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
@@ -309,9 +334,7 @@ export async function assignOrganizationUser(
 export async function removeOrganizationUserMembership(
   userId: number
 ): Promise<ApiResponse> {
-  const res = await api.delete(
-    `/api/organization/users/${userId}/membership`
-  )
+  const res = await api.delete(`/api/organization/users/${userId}/membership`)
   return res.data
 }
 
@@ -324,9 +347,11 @@ function appendOrganizationId(
   }
 }
 
-export async function getOrganizationSubscriptionPlans(params: {
-  organization_id?: number | null
-} = {}): Promise<ApiResponse<OrganizationSubscriptionPlan[]>> {
+export async function getOrganizationSubscriptionPlans(
+  params: {
+    organization_id?: number | null
+  } = {}
+): Promise<ApiResponse<OrganizationSubscriptionPlan[]>> {
   const search = new URLSearchParams()
   appendOrganizationId(search, params.organization_id)
   const suffix = search.toString() ? `?${search.toString()}` : ''
@@ -376,9 +401,11 @@ export async function disableOrganizationSubscriptionPlan(
   return res.data
 }
 
-export async function getOrganizationUserSubscriptions(params: {
-  organization_id?: number | null
-} = {}): Promise<ApiResponse<OrganizationUserSubscriptionRecord[]>> {
+export async function getOrganizationUserSubscriptions(
+  params: {
+    organization_id?: number | null
+  } = {}
+): Promise<ApiResponse<OrganizationUserSubscriptionRecord[]>> {
   const search = new URLSearchParams()
   appendOrganizationId(search, params.organization_id)
   const suffix = search.toString() ? `?${search.toString()}` : ''

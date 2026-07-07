@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 )
 
 func isPaymentComplianceConfirmed() bool {
@@ -24,6 +25,39 @@ func isPayPalTopUpEnabled() bool {
 	return strings.TrimSpace(setting.PayPalClientId) != "" &&
 		strings.TrimSpace(setting.PayPalClientSecret) != "" &&
 		strings.TrimSpace(setting.PayPalWebhookID) != ""
+}
+
+func isTossTopUpEnabled() bool {
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	if !setting.TossEnabled {
+		return false
+	}
+	if setting.TossUnitPrice <= 0 {
+		return false
+	}
+	return strings.TrimSpace(setting.TossActiveClientKey()) != "" &&
+		strings.TrimSpace(setting.TossActiveSecretKey()) != "" &&
+		isValidServerAddress(system_setting.ServerAddress)
+}
+
+func isTossBillingEnabled() bool {
+	// Toss recurring billing requires a separate Toss contract/MID capability; keep it
+	// opt-in even when normal Toss top-up is enabled.
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	if !setting.TossBillingEnabled {
+		return false
+	}
+	if setting.TossUnitPrice <= 0 {
+		return false
+	}
+	clientKey, secretKey := setting.TossExplicitActiveBillingKeyPair()
+	return strings.TrimSpace(clientKey) != "" &&
+		strings.TrimSpace(secretKey) != "" &&
+		isValidServerAddress(system_setting.ServerAddress)
 }
 
 func isStripeWebhookConfigured() bool {

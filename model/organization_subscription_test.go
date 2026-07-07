@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,10 +14,25 @@ import (
 
 func setupOrganizationSubscriptionTestDB(t *testing.T) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	originalDB := DB
+	originalLOGDB := LOG_DB
+	originalUsingSQLite := common.UsingSQLite
+	originalUsingMySQL := common.UsingMySQL
+	originalUsingPostgreSQL := common.UsingPostgreSQL
+	originalRedisEnabled := common.RedisEnabled
+
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 	DB = db
+	LOG_DB = db
 	common.UsingSQLite = true
+	common.UsingMySQL = false
+	common.UsingPostgreSQL = false
+	common.RedisEnabled = false
 	require.NoError(t, DB.AutoMigrate(
 		&User{},
 		&Organization{},
@@ -23,6 +40,15 @@ func setupOrganizationSubscriptionTestDB(t *testing.T) {
 		&OrganizationUserSubscription{},
 		&OrganizationSubscriptionPreConsumeRecord{},
 	))
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+		DB = originalDB
+		LOG_DB = originalLOGDB
+		common.UsingSQLite = originalUsingSQLite
+		common.UsingMySQL = originalUsingMySQL
+		common.UsingPostgreSQL = originalUsingPostgreSQL
+		common.RedisEnabled = originalRedisEnabled
+	})
 }
 
 func TestCreateOrganizationSubscriptionFromPlanCancelsExistingActiveSubscription(t *testing.T) {

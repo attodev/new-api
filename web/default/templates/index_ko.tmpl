@@ -4,7 +4,70 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AlRouter</title>
+
+    <!-- Naver Search Console -->
+    <meta name="naver-site-verification" content="71114668a24c6c89523f4d6e028a223250c70321" />
+
+
+    <!-- Primary Meta Tags -->
+    <title>AlRouter — AI API 통합 게이트웨이 | 비용 절감·사용량 관리</title>
+    <meta name="title" content="AlRouter — AI API 통합 게이트웨이" />
+    <meta name="description" content="OpenAI, Claude, Gemini 등 주요 AI를 하나의 API로. 기업 AI 도입 비용을 AlRouter로 줄이세요." />
+    <meta name="keywords" content="AI API 게이트웨이, AI API 통합, AI 비용 절감, OpenAI API 관리, Claude API, Gemini API, AI 사용량 모니터링, AI API 통합 플랫폼" />
+    <link rel="canonical" href="https://alrouter.ai/" />
+
+    <!-- hreflang -->
+    <link rel="alternate" hreflang="ko" href="https://alrouter.ai/" />
+    <link rel="alternate" hreflang="en" href="https://alrouter.ai/index_en.html" />
+    <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://alrouter.ai/" />
+    <meta property="og:title" content="AlRouter — AI API 통합 게이트웨이" />
+    <meta property="og:description" content="OpenAI, Claude, Gemini 등 주요 AI를 하나의 API로. 공식가 대비 최대 10% 절감, 팀별 사용량 관리, 예산 초과 방지." />
+    <meta property="og:image" content="https://alrouter.ai/og-image.png" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="AlRouter" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AlRouter — AI API 통합 게이트웨이" />
+    <meta name="twitter:description" content="OpenAI, Claude, Gemini 등 주요 AI를 하나의 API로 관리하세요. 비용 절감·사용량 제어·팀 거버넌스." />
+    <meta name="twitter:image" content="https://alrouter.ai/og-image.png" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "AlRouter",
+      "description": "OpenAI, Claude, Gemini 등 주요 AI 공급자를 하나의 API로 통합 관리하는 게이트웨이 서비스. 비용 절감, 사용량 모니터링, 팀 거버넌스를 지원합니다.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://alrouter.ai",
+      "inLanguage": ["ko", "en"],
+      "offers": {
+        "@type": "Offer",
+        "priceCurrency": "KRW",
+        "description": "사용량 기반 요금제, 공식가 대비 최대 10% 절감"
+      },
+      "provider": {
+        "@type": "Organization",
+        "name": "Atto Research",
+        "url": "https://alrouter.ai"
+      },
+      "featureList": [
+        "AI API 통합 관리",
+        "사용량 모니터링",
+        "예산 제어",
+        "팀별 권한 관리",
+        "OpenAI, Claude, Gemini 지원"
+      ]
+    }
+    </script>
+
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="./landing.css" />
@@ -63,7 +126,7 @@
                 playsinline
                 preload="auto"
               ></video>
-              <img id="animPosterImg" class="anim-poster-img" src="./videos/alrouter_ko_poster.png" alt="" />
+              <img id="animPosterImg" class="anim-poster-img" src="./videos/alrouter_ko_poster.png" alt="AlRouter AI API 게이트웨이 서비스 소개 영상 썸네일" />
               <div class="anim-hover-overlay" id="animHoverOverlay">
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
@@ -133,11 +196,13 @@
             <button
               class="video-dot"
               id="dotStd"
+              aria-label="일반 영상 보기"
               onclick="switchVideo('std')"
             ></button>
             <button
-              class="video-dot"
+              class="video-dot active"
               id="dotLite"
+              aria-label="라이트 영상 보기"
               onclick="switchVideo('lite')"
             ></button>
           </div>
@@ -828,7 +893,7 @@
           <div class="calc-body">
             <div class="calc-form">
               <div class="calc-group">
-                <label>모델 선택</label>
+                <label for="calcModel">모델 선택</label>
                 <select class="calc-select" id="calcModel">
                   <option value="">모델 불러오는 중…</option>
                 </select>
@@ -915,21 +980,21 @@
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="bar-chart-2"></i></div>
                 <div class="gov-text">
-                  <h4>실시간 사용량 모니터링</h4>
+                  <h3>실시간 사용량 모니터링</h3>
                   <p>모델별, 팀원별, 날짜별 사용 현황을 대시보드에서 한눈에 확인</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="wallet"></i></div>
                 <div class="gov-text">
-                  <h4>예산 한도 설정</h4>
+                  <h3>예산 한도 설정</h3>
                   <p>토큰 할당량과 예산 상한을 미리 설정해 초과 청구 원천 차단</p>
                 </div>
               </div>
               <div class="gov-point">
                 <div class="gov-icon"><i data-lucide="key-round"></i></div>
                 <div class="gov-text">
-                  <h4>토큰 기반 API 키 관리</h4>
+                  <h3>토큰 기반 API 키 관리</h3>
                   <p>팀원별 키 발급, 권한 설정, 만료일 지정을 한 곳에서</p>
                 </div>
               </div>

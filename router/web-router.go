@@ -124,6 +124,10 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			return
 		}
 		c.Header("Cache-Control", "no-cache")
+		// Toss Payments recommends this header on the page that opens the payment window so the
+		// SDK's popups/redirects aren't blocked in some browsers. The "-allow-popups" variant keeps
+		// popups this app opens (e.g. OAuth) working.
+		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 		if common.GetTheme() == "classic" {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.ClassicIndexPage)
 		} else {
