@@ -20,10 +20,13 @@
 
   // 가이드 영상 일시정지 상태에서 큰 재생 버튼을 표시
   // — 재생 중에는 오버레이를 완전히 숨겨 네이티브 컨트롤(탐색바 등) 클릭을 가리지 않도록 함
+  // — 영상이 끝난 상태(ended)에서는 이 오버레이 대신 CTA 옆의 "다시 보기" 버튼을 노출하므로 표시하지 않음
   var guidePlayOverlay = document.getElementById('guidePlayOverlay');
   if (guideVideo && guidePlayOverlay) {
     var renderGuidePlayOverlay = function () {
-      if (guideVideo.paused) {
+      if (guideVideo.ended) {
+        guidePlayOverlay.classList.remove('visible');
+      } else if (guideVideo.paused) {
         guidePlayOverlay.classList.add('visible');
       } else {
         guidePlayOverlay.classList.remove('visible');
@@ -42,6 +45,7 @@
   // 가이드 영상 마지막에 체험하기 CTA 노출 (랜딩 페이지 히어로 영상과 동일한 동작)
   var guideCtaWrap = document.getElementById('guideCtaWrap');
   var guideCtaBtn = document.getElementById('guideCtaBtn');
+  var guideReplayBtn = document.getElementById('guideReplayBtn');
   if (guideVideo && guideCtaWrap && guideCtaBtn) {
     var CTA_LEAD_SECONDS = 5;
     guideVideo.addEventListener('timeupdate', function () {
@@ -60,6 +64,19 @@
         guideCtaWrap.style.display = 'none';
       }
     });
+
+    if (guideReplayBtn) {
+      guideVideo.addEventListener('ended', function () {
+        guideReplayBtn.style.display = 'flex';
+      });
+      guideReplayBtn.addEventListener('click', function () {
+        guideReplayBtn.style.display = 'none';
+        guideCtaBtn.classList.remove('active');
+        guideCtaWrap.style.display = 'none';
+        guideVideo.currentTime = 0;
+        guideVideo.play();
+      });
+    }
   }
 
   // 그룹 토글 (수동 설정 / CC Switch)
