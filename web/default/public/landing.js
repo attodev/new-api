@@ -7,20 +7,6 @@ const STRINGS = {
   error:          isKo ? '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.'               : 'Something went wrong. Please try again later.',
   submitDefault:  isKo ? '문의하기 →'                                                  : 'Submit →',
   scaleTabLabel:  isKo ? '도입 규모 탭 전환'                                            : 'Team Size tab switch',
-  popupTerms:     isKo ? '이용약관'                                                     : 'Terms of Service',
-  popupPrivacy:   isKo ? '개인정보처리방침'                                              : 'Privacy Policy',
-  popupPricing:   isKo ? '전체 모델 및 가격표'                                           : 'Full Model & Pricing Table',
-  popupTermsUrl:  isKo ? './terms.html'                                                 : './terms_en.html',
-  popupPrivacyUrl:isKo ? './privacy.html'                                               : './privacy_en.html',
-  // renderPricingTable strings
-  pricingTitleFn: isKo
-    ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">단가는 현재 시점 기준이며 추후 변동될 수 있음</span>)`
-    : (d) => `Full Model & Pricing (as of ${d}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`,
-  pricingLoading: isKo ? '불러오는 중…'                                                 : 'Loading…',
-  pricingError:   isKo ? '가격 정보를 불러오지 못했습니다.'                               : 'Failed to load pricing data.',
-  tableModel:     isKo ? '모델명'                                                        : 'Model',
-  tableInput:     isKo ? '입력 단가 ($/M)'                                              : 'Input ($/M)',
-  tableOutput:    isKo ? '출력 단가 ($/M)'                                              : 'Output ($/M)',
   // calc strings
   calcLoadError:  isKo ? '모델 로드 실패'                                               : 'Failed to load models',
   calcInputRow:   isKo ? (m) => `입력 토큰 (${m}M)`                                    : (m) => `Input Tokens (${m}M)`,
@@ -28,10 +14,10 @@ const STRINGS = {
   calcInputRate:  isKo ? '단가 입력'                                                    : 'Input rate',
   calcOutputRate: isKo ? '단가 출력'                                                    : 'Output rate',
   // video filenames
-  videoStd:       isKo ? 'alrouter_ko.mp4'                                              : 'alrouter_en.mp4',
-  videoLite:      isKo ? 'alrouter_ko_lite.mp4'                                         : 'alrouter_en_lite.mp4',
-  posterStd:      isKo ? './alrouter_ko_poster.png'                                     : './alrouter_en_poster.png',
-  posterLite:     isKo ? './alrouter_ko_lite_poster.png'                                : './alrouter_en_lite_poster.png',
+  videoStd:       isKo ? 'videos/alrouter_ko.mp4'                                       : 'videos/alrouter_en.mp4',
+  videoLite:      isKo ? 'videos/alrouter_ko_lite.mp4'                                  : 'videos/alrouter_en_lite.mp4',
+  posterStd:      isKo ? './videos/alrouter_ko_poster.png'                              : './videos/alrouter_en_poster.png',
+  posterLite:     isKo ? './videos/alrouter_ko_lite_poster.png'                         : './videos/alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
@@ -41,6 +27,7 @@ const STRINGS = {
   const overlay = document.getElementById("contactOverlay");
   const form = document.getElementById("contactForm");
   const result = document.getElementById("contactResult");
+  if (!overlay || !form || !result) return;
 
   function closeContact() {
     overlay.classList.remove("open");
@@ -116,125 +103,7 @@ const STRINGS = {
   });
 })();
 
-// ── Popup system ──
-const POPUP_CONTENTS = {
-  terms:   { title: STRINGS.popupTerms,    iframe: STRINGS.popupTermsUrl },
-  privacy: { title: STRINGS.popupPrivacy,  iframe: STRINGS.popupPrivacyUrl },
-  pricing: { title: STRINGS.popupPricing,  wide: true, dynamic: true },
-};
-
-function openPopup(title, key) {
-  const overlay = document.getElementById('popupOverlay');
-  const modal   = overlay.querySelector('.popup-modal');
-  const body    = document.getElementById('popupBody');
-  const item    = POPUP_CONTENTS[key] || {};
-
-  document.getElementById('popupTitle').textContent = item.title || title;
-
-  if (item.iframe) {
-    modal.classList.add('wide');
-    body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
-  } else if (item.dynamic && key === 'pricing') {
-    modal.classList.add('wide');
-    renderPricingTable(body);
-  } else if (item.wide) {
-    modal.classList.add('wide');
-    body.innerHTML = item.body || '';
-  } else {
-    modal.classList.remove('wide');
-    body.innerHTML = item.body || '';
-  }
-
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-async function renderPricingTable(body) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
-  document.getElementById('popupTitle').innerHTML = STRINGS.pricingTitleFn(dateStr);
-
-  body.innerHTML = `<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">${STRINGS.pricingLoading}</p>`;
-
-  try {
-    const res  = await fetch('/api/pricing');
-    const json = await res.json();
-    const groupRatio = 2;
-
-    function getProvider(name) {
-      if (name.startsWith('claude'))  return 'Anthropic';
-      if (name.startsWith('gemini'))  return 'Google';
-      if (name.startsWith('gpt') || name.startsWith('o1') || name.startsWith('o3') || name.startsWith('o4')) return 'OpenAI';
-      return 'Other';
-    }
-
-    function getTier(name) {
-      if (name.includes('haiku') || name.includes('flash-lite')) return 1;
-      if (name.includes('sonnet') || (name.includes('flash') && !name.includes('lite'))) return 2;
-      if (name.includes('opus') || name.includes('pro')) return 3;
-      return 2;
-    }
-
-    const sorted = [...json.data].sort((a, b) => {
-      const pa = getProvider(a.model_name), pb = getProvider(b.model_name);
-      if (pa !== pb) return pa.localeCompare(pb);
-      const ta = getTier(a.model_name), tb = getTier(b.model_name);
-      if (ta !== tb) return ta - tb;
-      return a.model_name.localeCompare(b.model_name);
-    });
-
-    let lastProvider = '';
-    const rows = sorted.map(m => {
-      const discount = (m.discount_percent || 0) / 100;
-      const inputPrice  = (m.model_ratio * groupRatio * (1 - discount)).toFixed(4);
-      const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio * (1 - discount)).toFixed(4);
-      const provider = getProvider(m.model_name);
-      const providerRow = provider !== lastProvider
-        ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
-        : '';
-      lastProvider = provider;
-      return providerRow + `
-        <tr>
-          <td style="padding:10px 14px;color:#f9fafb;font-size:13px;border-bottom:1px solid #1f2937;">${m.model_name}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${inputPrice}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${outputPrice}</td>
-        </tr>`;
-    }).join('');
-
-    body.innerHTML = `
-      <div style="padding:20px 24px 0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead style="position:sticky;top:0;z-index:1;">
-            <tr style="background:#1f2937;">
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:left;border-bottom:1px solid #374151;">${STRINGS.tableModel}</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">${STRINGS.tableInput}</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">${STRINGS.tableOutput}</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      `;
-  } catch (e) {
-    body.innerHTML = `<p style="color:#f87171;font-size:13px;text-align:center;padding:24px 0;">${STRINGS.pricingError}</p>`;
-  }
-}
-
-function closePopup() {
-  const overlay = document.getElementById('popupOverlay');
-  overlay.classList.remove('open');
-  overlay.querySelector('.popup-modal').classList.remove('wide');
-  document.getElementById('popupBody').innerHTML = '';
-  document.body.style.overflow = '';
-}
-
-document.getElementById('popupClose').addEventListener('click', closePopup);
-document.getElementById('popupOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closePopup();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closePopup();
-});
+// ── Popup system (openPopup/closePopup/renderPricingTable) now lives in popup.js ──
 
 // ── Video version check ──
 (function () {

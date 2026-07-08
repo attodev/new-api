@@ -1,0 +1,226 @@
+{{define "guide_en"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Usage Guide — AlRouter</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./landing.css" />
+    <link rel="stylesheet" href="./guide.css" />
+  </head>
+  <body>
+    {{template "header_en" .}}
+    <!-- ── Content ── -->
+    <div class="guide-wrap">
+      <div class="guide-head">
+        <span class="guide-eyebrow">Guide</span>
+        <h1>How to connect AlRouter in your CLI</h1>
+        <p>You can set environment variables directly, or register everything at once with CC Switch.</p>
+        <p>Watch the video, or follow the step-by-step guide below.</p>
+      </div>
+
+      <!-- Group picker -->
+      <div class="guide-group-picker" role="tablist">
+        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><i data-lucide="terminal"></i>Set environment variables</button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><i data-lucide="wand-2"></i>Set up with CC Switch <span class="g-n">Coming soon</span></button>
+      </div>
+
+      <!-- ══════════ Group: Manual setup ══════════ -->
+      <div class="guide-group active" id="guide-group-manual">
+        <section class="guide-panel active" id="guide-panel-manual">
+          <div class="guide-video-frame">
+            <video id="guideVideo" controls preload="metadata" poster="/videos/guide-manual-anthropic-en-poster.png">
+              <source src="/videos/guide-manual-anthropic-en.mp4" type="video/mp4" />
+            </video>
+            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay">
+              <div class="anim-play-btn">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="6,3 20,12 6,21" />
+                </svg>
+              </div>
+            </div>
+            <div class="guide-cta-wrap" id="guideCtaWrap" style="display: none">
+              <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtn">
+                <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
+                <div class="anim-cta-btn-text">Get Started →</div>
+              </a>
+            </div>
+          </div>
+
+          <div class="guide-divider">Video not loading? You can follow the written steps below</div>
+
+          <div class="guide-written">
+            <h3>Step-by-step</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Create an API key</h4></div>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-create-en.png" alt="API key creation screen" />
+                      <figcaption>1-1. Create the API key</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-copy-en.png" alt="Copying the generated API key" />
+                      <figcaption>1-2. Copy the generated key</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Set environment variables</h4></div>
+                  <p>Add the environment variables for your CLI to your shell config file, then apply the changes.</p>
+
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">1</span>Add the environment variables to your shell config</div>
+                    <div class="guide-substep-body">
+                      <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
+
+                      <div class="guide-provider-table">
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+<span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
+<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#4285f4">Google</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
+<span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                          </div>
+                        </div>
+                      </div>
+
+                      <figure class="guide-step-shot-fig">
+                        <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-edit.png" alt="Editing the shell config file to add environment variables" />
+                        <figcaption>2-1. Add environment variables to the shell config</figcaption>
+                      </figure>
+
+                      <div class="guide-note">
+                        <span class="mark">TIP</span>
+                        <p>OpenAI-format CLIs only differ by <span class="mono">/v1</span> at the end of the base URL, and Google by <span class="mono">/v1beta</span> — otherwise the setup is identical.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">2</span>Apply the changes</div>
+                    <div class="guide-substep-body">
+                      <p class="guide-substep-desc">Open a new terminal, or apply the changes to your current one right away with the command below.</p>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ source ~/.zshrc</pre>
+                      </div>
+                      <figure class="guide-step-shot-fig">
+                        <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-apply.png" alt="Terminal after applying the settings" />
+                        <figcaption>2-2. Apply the changes</figcaption>
+                      </figure>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Verify the connection</h4></div>
+                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
+                  <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/guide-step-3-claude-status.png" alt="/status connection check screen" />
+                    <figcaption>3-1. /status connection check</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Test</h4></div>
+                  <p>Enter a simple prompt to confirm the connection works.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
+<span class="cm">Claude Code connected</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/guide-step-4-claude-test.png" alt="Test prompt response screen" />
+                    <figcaption>4-1. Test prompt response</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Check usage</h4></div>
+                  <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' and 'Dashboard' pages also show your usage trends as charts at a glance.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-5-log-en.png" alt="Usage logs screen" />
+                      <figcaption>5-1. Usage Logs</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-5-dashboard-en.png" alt="Dashboard chart screen" />
+                      <figcaption>5-2. Dashboard chart</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════ Group: CC Switch (coming soon) ══════════ -->
+      <div class="guide-group" id="guide-group-ccswitch">
+        <div class="guide-coming-soon">
+          <div class="cs-icon">🛠️</div>
+          <h3>CC Switch guide coming soon</h3>
+          <p>We're preparing a guide for CC Switch, which lets you manage multiple CLIs from a single app. Coming soon.</p>
+          <span class="cs-tag">Coming soon</span>
+        </div>
+      </div>
+    </div>
+    {{template "footer_en" .}}
+
+    <!-- Screenshot lightbox -->
+    <div class="shot-lightbox" id="shotLightbox">
+      <button class="shot-lightbox-close" id="shotLightboxClose" aria-label="Close">✕</button>
+      <button class="shot-lightbox-nav shot-lightbox-prev" id="shotLightboxPrev" aria-label="Previous image">‹</button>
+      <img class="shot-lightbox-img" id="shotLightboxImg" src="" alt="" />
+      <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="Next image">›</button>
+      <div class="shot-lightbox-caption" id="shotLightboxCaption"></div>
+    </div>
+
+    <script src="./popup.js" defer></script>
+    <script src="./guide.js" defer></script>
+  </body>
+</html>
+{{end}}

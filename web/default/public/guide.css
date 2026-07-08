@@ -1,0 +1,268 @@
+/* ── AlRouter 사용 가이드 전용 스타일 (landing.css 위에 얹힘) ── */
+
+.guide-wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+.guide-wrap .mono,
+.guide-written .mono {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 0.92em; background: rgba(255,255,255,0.06);
+  padding: 1px 5px; border-radius: 5px; color: #c9d6ea;
+}
+
+/* Page header */
+.guide-head { padding: 56px 0 16px; }
+.guide-eyebrow {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #0EA5E9; font-weight: 700; margin-bottom: 12px; display: block;
+}
+.guide-head h1 { font-size: 32px; font-weight: 800; margin: 0 0 12px; line-height: 1.3; color: #f9fafb; }
+.guide-head p { color: #9ca3af; font-size: 15px; max-width: 66ch; margin: 0; }
+
+/* Group picker (수동 설정 / CC Switch) — 기존 프로바이더 탭 디자인 */
+.guide-group-picker { display: flex; gap: 6px; border-bottom: 1px solid #283245; margin-bottom: 32px; overflow-x: auto; }
+.guide-group-btn {
+  display: flex; align-items: center; gap: 9px; padding: 11px 14px;
+  background: none; border: none; color: #9ca3af;
+  font-size: 14.5px; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; font-family: inherit;
+}
+.guide-group-btn .t-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.guide-group-btn i[data-lucide] { width: 13px; height: 13px; stroke-width: 2px; flex-shrink: 0; }
+.guide-group-btn .g-n {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 10px; background: #151d2b; color: #6b7688;
+  padding: 2px 7px; border-radius: 999px;
+}
+.guide-group-btn[aria-selected="true"] { color: #f9fafb; border-bottom-color: #0EA5E9; }
+.guide-group-btn:hover { color: #f9fafb; }
+
+.guide-group { display: none; }
+.guide-group.active { display: block; }
+.guide-panel { display: none; padding-bottom: 88px; }
+.guide-panel.active { display: block; }
+
+.guide-panel-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.guide-panel-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0;
+  overflow: hidden;
+}
+.guide-panel-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.guide-panel-head h2 { font-size: 20px; margin: 0; color: #f9fafb; }
+.guide-panel-head .sub { color: #6b7688; font-size: 13px; }
+.guide-panel-lede { color: #9ca3af; font-size: 13.5px; margin: 0 0 28px; max-width: 72ch; }
+
+/* Video hero */
+.guide-video-frame {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  background: #0a0f1a; border: 1px solid #283245; border-radius: 16px; overflow: hidden;
+}
+.guide-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Big play button overlay — reuses landing page's .anim-play-* styling, just squared
+   off to match this frame's border radius instead of the hero's 24px portrait card. */
+.guide-play-overlay { display: none; border-radius: 16px; }
+.guide-play-overlay.visible { display: flex; }
+
+/* End-of-video CTA — reuses landing page's .anim-cta-* button styling (same design),
+   repositioned for this frame's 16:9 landscape shape instead of the hero's 9:16 portrait. */
+.guide-cta-wrap {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;
+  display: flex; width: 150px; pointer-events: none;
+}
+.guide-cta-wrap .anim-cta-overlay { pointer-events: auto; width: 100%; }
+.guide-cta-wrap .anim-cta-btn-text { font-size: 12px; }
+@media (max-width: 560px) {
+  .guide-cta-wrap { width: 110px; }
+}
+.guide-video-placeholder {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; color: #6b7688;
+  background: linear-gradient(160deg, #1c2740 0%, #0e1524 100%);
+}
+.guide-video-placeholder .vp-tag {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px; color: #7dd3fc; background: rgba(14,165,233,0.15);
+  border: 1px solid rgba(14,165,233,0.3); padding: 4px 12px; border-radius: 999px;
+}
+.guide-video-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+.guide-video-meta h3 { font-size: 18px; margin: 0; color: #f9fafb; }
+.guide-video-meta .sub { color: #6b7688; font-size: 13px; margin-top: 2px; }
+
+/* divider between video and written guide */
+.guide-divider { display: flex; align-items: center; gap: 12px; margin: 36px 0 24px; color: #6b7688; font-size: 12px; }
+.guide-divider::before, .guide-divider::after { content: ""; flex: 1; height: 1px; background: #283245; }
+
+/* Written steps */
+.guide-written h3 { font-size: 20px; margin-bottom: 16px; color: #f9fafb; }
+.guide-step-track { display: flex; flex-direction: column; gap: 14px; }
+.guide-step {
+  display: grid; grid-template-columns: 52px 1fr; gap: 0;
+  background: #1a2333; border: 1px solid #283245; border-radius: 12px; overflow: hidden;
+}
+.guide-step-num-wrap {
+  background: #151d2b; border-right: 1px solid #283245;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 18px;
+}
+.guide-step-num { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 13.5px; font-weight: 700; }
+.guide-step-body { padding: 16px 20px; }
+.guide-step-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.guide-step-body h4 { margin: 0; font-size: 14.5px; color: #f9fafb; }
+.guide-step-time {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px; color: #6b7688; white-space: nowrap;
+}
+.guide-step-body p { margin: 0 0 10px; color: #9ca3af; font-size: 13px; }
+.guide-step-body p:last-child { margin-bottom: 0; }
+
+.guide-pitfall {
+  display: flex; gap: 8px; background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25); border-radius: 8px;
+  padding: 8px 11px; margin-bottom: 10px; font-size: 12px; color: #fca5a5;
+}
+.guide-pitfall b {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #f87171; flex-shrink: 0; padding-top: 1px;
+}
+
+.guide-substep {
+  border: 1px solid #232e42; border-radius: 10px; background: rgba(255,255,255,0.015);
+  margin-top: 14px; overflow: hidden;
+}
+.guide-substep-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 13px; background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid #232e42; font-size: 12.5px; font-weight: 700; color: #c9d6ea;
+}
+.guide-substep-num {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #0EA5E9; color: #fff;
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px; font-weight: 700;
+}
+.guide-substep-body { padding: 13px; }
+.guide-substep-body > *:last-child { margin-bottom: 0; }
+.guide-substep-desc { margin: 0 0 8px; font-size: 12.5px; color: #9ca3af; }
+
+/* Provider comparison (Anthropic / OpenAI / Gemini env var values, side by side) */
+.guide-provider-table { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.guide-provider-row { display: flex; flex-direction: column; gap: 6px; }
+.guide-provider-name {
+  font-size: 12px; font-weight: 700;
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+@media (min-width: 640px) {
+  .guide-provider-row { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .guide-provider-name { width: 84px; flex-shrink: 0; padding-top: 12px; }
+  .guide-provider-row .guide-term { flex: 1; margin-top: 0; }
+}
+
+/* Step screen-capture image — hidden by default; guide.js reveals it once the file loads successfully */
+.guide-step-shot {
+  display: none; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; margin-top: 10px;
+  border: 1px solid #283245; border-radius: 8px; background: #10182a;
+}
+.guide-step-shot.is-loaded { display: block; }
+
+/* Row of multiple captioned screen-captures for a single step (e.g. create + copy) */
+.guide-step-shot-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.guide-step-shot-fig { flex: 1 1 0; min-width: 0; max-width: 100%; margin: 10px 0 0; }
+.guide-step-shot-row .guide-step-shot-fig { margin-top: 0; }
+.guide-step-shot-fig .guide-step-shot { width: 100%; margin-top: 0; }
+.guide-step-shot-fig figcaption {
+  margin-top: 6px; font-size: 11.5px; color: #6b7688; text-align: center;
+}
+.guide-step-shot-fig .guide-step-shot:not(.is-loaded) + figcaption { display: none; }
+
+.guide-term {
+  background: #0a0f1a; border: 1px solid #1c2536; border-radius: 9px; overflow: hidden;
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 12.5px; margin-top: 4px;
+}
+.guide-term-bar { display: flex; align-items: center; gap: 6px; padding: 8px 11px; border-bottom: 1px solid #1c2536; }
+.guide-term-bar i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+.guide-term-bar i:nth-child(1) { background: #ff5f57; }
+.guide-term-bar i:nth-child(2) { background: #febc2e; }
+.guide-term-bar i:nth-child(3) { background: #28c840; }
+.guide-term-bar .fname { margin-left: 6px; font-size: 10px; color: #6b7688; }
+.guide-term pre { margin: 0; padding: 12px 14px; overflow-x: auto; color: #c9d6ea; white-space: pre; }
+.guide-term .c1 { color: #6bd9f0; }
+.guide-term .c2 { color: #7ee6a8; }
+.guide-term .c3 { color: #f4b8e0; }
+.guide-term .cm { color: #54617a; }
+
+.guide-note {
+  display: flex; gap: 8px; background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25); border-radius: 8px;
+  padding: 8px 11px; margin-top: 10px; margin-bottom: 10px; font-size: 12px;
+}
+.guide-note .mark {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  font-weight: 700; color: #f59e0b; flex-shrink: 0; padding-top: 1px;
+}
+.guide-note p { margin: 0; font-size: 12px; color: #d8b479; }
+
+/* Coming soon (CC Switch) */
+.guide-coming-soon {
+  border: 1px dashed #283245; border-radius: 16px; padding: 56px 32px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.guide-coming-soon .cs-icon {
+  width: 56px; height: 56px; border-radius: 14px; background: #1a2333; border: 1px solid #283245;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.guide-coming-soon h3 { margin: 0; font-size: 17px; color: #f9fafb; }
+.guide-coming-soon p { margin: 0; color: #9ca3af; font-size: 13.5px; max-width: 52ch; }
+.guide-coming-soon .cs-tag {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 11px; background: #242e42; color: #6b7688; padding: 4px 10px; border-radius: 999px;
+}
+
+@media (max-width: 680px) {
+  .guide-wrap { padding: 0 18px; }
+  .guide-head h1 { font-size: 26px; }
+  .guide-step { grid-template-columns: 1fr; }
+  .guide-step-num-wrap { display: none; }
+}
+
+/* Step screenshot lightbox — click a screenshot to zoom, arrow/click to browse */
+.guide-step-shot, .guide-step-shot-fig .guide-step-shot { cursor: zoom-in; }
+.shot-lightbox {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(6, 10, 18, 0.92); backdrop-filter: blur(2px);
+  align-items: center; justify-content: center; padding: 64px 24px;
+}
+.shot-lightbox.open { display: flex; }
+.shot-lightbox-img {
+  max-width: min(1100px, 100%); max-height: calc(100vh - 160px);
+  border-radius: 10px; border: 1px solid #283245; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.shot-lightbox-close {
+  position: absolute; top: 20px; right: 24px; width: 40px; height: 40px;
+  border-radius: 50%; border: 1px solid #283245; background: rgba(26,35,51,0.8);
+  color: #f9fafb; font-size: 16px; cursor: pointer;
+}
+.shot-lightbox-close:hover { background: #1a2333; }
+.shot-lightbox-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 50%; border: 1px solid #283245;
+  background: rgba(26,35,51,0.8); color: #f9fafb; font-size: 26px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.shot-lightbox-nav:hover { background: #1a2333; }
+.shot-lightbox-nav:disabled { opacity: 0.3; cursor: default; }
+.shot-lightbox-prev { left: 24px; }
+.shot-lightbox-next { right: 24px; }
+.shot-lightbox-caption {
+  position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;
+  font-size: 13px; color: #9ca3af;
+}
+@media (max-width: 680px) {
+  .shot-lightbox { padding: 24px 12px; }
+  .shot-lightbox-nav { width: 38px; height: 38px; font-size: 20px; }
+  .shot-lightbox-prev { left: 8px; }
+  .shot-lightbox-next { right: 8px; }
+}
