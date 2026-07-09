@@ -154,6 +154,15 @@
 .guide-substep-body > *:last-child { margin-bottom: 0; }
 .guide-substep-desc { margin: 0 0 8px; font-size: 12.5px; color: #9ca3af; }
 
+/* 언어(번역)에 따라 위치가 흔들리지 않도록, 문장에서 링크를 분리해 고정된 버튼으로 노출 */
+.guide-gh-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 12px; border-radius: 7px; border: 1px solid #283245; background: #1a2333;
+  color: #f9fafb; font-size: 12.5px; font-weight: 500; text-decoration: none;
+}
+.guide-gh-link svg { width: 14px; height: 14px; flex-shrink: 0; }
+.guide-gh-link:hover { background: #242e42; border-color: #384357; }
+
 /* Provider comparison (Anthropic / OpenAI / Gemini env var values, side by side) */
 .guide-provider-table { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
 .guide-provider-row { display: flex; flex-direction: column; gap: 6px; }
@@ -243,9 +252,18 @@
   align-items: center; justify-content: center; padding: 64px 24px;
 }
 .shot-lightbox.open { display: flex; }
-.shot-lightbox-img {
-  max-width: min(1100px, 100%); max-height: calc(100vh - 160px);
+.shot-lightbox-body {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: min(1100px, 100%);
+}
+/* 어떤 스크린샷이든 이 박스 크기는 고정, 이미지는 박스 안에서만 비율에 맞춰 축소 표시 */
+.shot-lightbox-img-wrap {
+  width: min(1100px, 90vw); aspect-ratio: 16 / 9; max-height: calc(100vh - 260px);
   border-radius: 10px; border: 1px solid #283245; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  background: #10182a; display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.shot-lightbox-img {
+  max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;
 }
 .shot-lightbox-close {
   position: absolute; top: 20px; right: 24px; width: 40px; height: 40px;
@@ -264,9 +282,21 @@
 .shot-lightbox-prev { left: 24px; }
 .shot-lightbox-next { right: 24px; }
 .shot-lightbox-caption {
-  position: absolute; bottom: 28px; left: 0; right: 0; text-align: center;
-  font-size: 13px; color: #9ca3af;
+  text-align: center; font-size: 13px; color: #9ca3af; margin: 28px 0 0;
 }
+.shot-lightbox-dots {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.shot-lightbox-dot {
+  width: 32px; height: 32px; padding: 0; border: none; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.shot-lightbox-dot::before {
+  content: ''; width: 9px; height: 9px; border-radius: 50%;
+  border: 1px solid #4b5568; background: transparent;
+}
+.shot-lightbox-dot:hover::before { border-color: #9ca3af; }
+.shot-lightbox-dot.active::before { background: #0EA5E9; border-color: #0EA5E9; }
 @media (max-width: 680px) {
   .shot-lightbox { padding: 24px 12px; }
   .shot-lightbox-nav { width: 38px; height: 38px; font-size: 20px; }
