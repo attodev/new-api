@@ -343,12 +343,18 @@ function runCalc() {
   const inputCost = inputM * prices.input;
   const outputCost = outputM * prices.output;
   const total = inputCost + outputCost;
-  const fmt = (v) => "$" + v.toFixed(4);
+  // 아주 큰 토큰 수를 입력해도 결과 박스를 벗어나지 않도록, 일정 금액 이상이면 축약 표기($1.2B)로 전환
+  const fmtMoney = (v, decimals) =>
+    "$" +
+    (Math.abs(v) >= 1e6
+      ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)
+      : v.toFixed(decimals));
+  const fmt = (v) => fmtMoney(v, 4);
   document.getElementById("calcHint").style.display = "none";
   document.getElementById("calcLabel").style.display = "";
   const priceEl = document.getElementById("calcPrice");
   priceEl.style.display = "";
-  priceEl.textContent = "$" + total.toFixed(2);
+  priceEl.textContent = fmtMoney(total, 2);
   document.getElementById("calcBreakdown").innerHTML =
     `<div class="calc-breakdown-row"><span>${STRINGS.calcInputRow(inputM)}</span><span>${fmt(inputCost)}</span></div>` +
     `<div class="calc-breakdown-row"><span>${STRINGS.calcOutputRow(outputM)}</span><span>${fmt(outputCost)}</span></div>` +
