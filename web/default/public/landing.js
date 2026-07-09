@@ -357,7 +357,9 @@ function runCalc() {
 }
 
 // ── Lucide icon init + lang-switch click handler ──
-lucide.createIcons();
+if (window.lucide && typeof window.lucide.createIcons === 'function') {
+  window.lucide.createIcons();
+}
 document.addEventListener("click", function (e) {
   document.querySelectorAll(".lang-switch.open").forEach(function (el) {
     if (!el.contains(e.target)) el.classList.remove("open");
