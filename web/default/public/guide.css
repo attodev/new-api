@@ -8,6 +8,13 @@
   padding: 1px 5px; border-radius: 5px; color: #c9d6ea;
 }
 
+/* /status처럼 실제로 입력하는 CLI 명령어는 일반 인라인 코드와 다르게, 터미널 느낌의 포인트 컬러로 구분 */
+.guide-wrap .mono-cmd,
+.guide-written .mono-cmd {
+  background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.3);
+  color: #7dd3fc;
+}
+
 /* Page header */
 .guide-head { padding: 56px 0 16px; }
 .guide-eyebrow {
