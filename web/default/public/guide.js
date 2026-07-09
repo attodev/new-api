@@ -92,6 +92,25 @@
   wireGuideVideo('');
   wireGuideVideo('Cc', 7);
 
+  // 스페이스바로 재생/일시정지: 영상에 포커스가 없어도, 현재 보이는 그룹의 영상을 토글
+  // (버튼/링크/입력 요소에 포커스가 있을 때는 그 요소의 기본 동작을 방해하지 않도록 무시)
+  document.addEventListener('keydown', function (e) {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    var active = document.activeElement;
+    if (active && /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(active.tagName)) return;
+    if (active && active.isContentEditable) return;
+    var activeGroup = document.querySelector('.guide-group.active');
+    var video = activeGroup && activeGroup.querySelector('video');
+    if (!video) return;
+    e.preventDefault();
+    if (video.paused || video.ended) {
+      if (video.ended) video.currentTime = 0;
+      video.play();
+    } else {
+      video.pause();
+    }
+  });
+
   // 그룹 토글 (수동 설정 / CC Switch)
   // 선택한 탭과 스크롤 위치를 sessionStorage에 저장해, 새로고침이나 언어 전환(같은 탭 내 이동) 후에도 유지되도록 함
   var GROUP_STORAGE_KEY = 'guideActiveGroup';
