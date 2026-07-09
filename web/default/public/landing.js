@@ -14,10 +14,10 @@ const STRINGS = {
   calcInputRate:  isKo ? '단가 입력'                                                    : 'Input rate',
   calcOutputRate: isKo ? '단가 출력'                                                    : 'Output rate',
   // video filenames
-  videoStd:       isKo ? 'videos/alrouter_ko.mp4'                                       : 'videos/alrouter_en.mp4',
-  videoLite:      isKo ? 'videos/alrouter_ko_lite.mp4'                                  : 'videos/alrouter_en_lite.mp4',
-  posterStd:      isKo ? './videos/alrouter_ko_poster.png'                              : './videos/alrouter_en_poster.png',
-  posterLite:     isKo ? './videos/alrouter_ko_lite_poster.png'                         : './videos/alrouter_en_lite_poster.png',
+  videoStd:       isKo ? 'videos/main/alrouter_ko.mp4'                                  : 'videos/main/alrouter_en.mp4',
+  videoLite:      isKo ? 'videos/main/alrouter_ko_lite.mp4'                             : 'videos/main/alrouter_en_lite.mp4',
+  posterStd:      isKo ? './videos/main/alrouter_ko_poster.png'                         : './videos/main/alrouter_en_poster.png',
+  posterLite:     isKo ? './videos/main/alrouter_ko_lite_poster.png'                    : './videos/main/alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
