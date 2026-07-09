@@ -18,7 +18,7 @@
 
   // 가이드 영상 하나(재생 오버레이 + 종료 시 CTA/다시보기)에 필요한 동작을 전부 연결.
   // 매뉴얼 설정 패널과 CC Switch 패널 둘 다 동일한 구조라 id 접미사만 바꿔 재사용한다.
-  function wireGuideVideo(suffix) {
+  function wireGuideVideo(suffix, ctaLeadSeconds) {
     var guideVideo = document.getElementById('guideVideo' + suffix);
     if (!guideVideo) return;
 
@@ -51,7 +51,7 @@
     var guideCtaBtn = document.getElementById('guideCtaBtn' + suffix);
     var guideReplayBtn = document.getElementById('guideReplayBtn' + suffix);
     if (guideCtaWrap && guideCtaBtn) {
-      var CTA_LEAD_SECONDS = 5;
+      var CTA_LEAD_SECONDS = ctaLeadSeconds || 5;
       guideVideo.addEventListener('timeupdate', function () {
         var showFrom = guideVideo.duration - CTA_LEAD_SECONDS;
         if (guideVideo.currentTime >= showFrom && guideCtaWrap.style.display === 'none') {
@@ -70,9 +70,14 @@
       });
 
       if (guideReplayBtn) {
-        guideVideo.addEventListener('ended', function () {
-          guideReplayBtn.style.display = 'flex';
-        });
+        // 다시보기 버튼은 실제로 영상이 끝난(ended) 상태일 때만 노출.
+        // 끝난 뒤 재생바를 앞/뒤로 당기면 ended가 풀리므로 그때마다 다시 감춘다.
+        var syncReplayBtn = function () {
+          guideReplayBtn.style.display = guideVideo.ended ? 'flex' : 'none';
+        };
+        guideVideo.addEventListener('ended', syncReplayBtn);
+        guideVideo.addEventListener('seeking', syncReplayBtn);
+        guideVideo.addEventListener('play', syncReplayBtn);
         guideReplayBtn.addEventListener('click', function () {
           guideReplayBtn.style.display = 'none';
           guideCtaBtn.classList.remove('active');
@@ -85,7 +90,7 @@
   }
 
   wireGuideVideo('');
-  wireGuideVideo('Cc');
+  wireGuideVideo('Cc', 7);
 
   // 그룹 토글 (수동 설정 / CC Switch)
   // 선택한 탭과 스크롤 위치를 sessionStorage에 저장해, 새로고침이나 언어 전환(같은 탭 내 이동) 후에도 유지되도록 함
@@ -98,6 +103,14 @@
     if (!btn || !target) return;
     document.querySelectorAll('.guide-group-btn').forEach(function (b) {
       b.setAttribute('aria-selected', 'false');
+    });
+    // 비활성화되는 그룹의 영상은 화면에서만 숨겨질 뿐 재생은 계속되므로, 탭을 떠날 때 처음 상태로 되돌린다
+    document.querySelectorAll('.guide-group.active').forEach(function (g) {
+      if (g === target) return;
+      g.querySelectorAll('video').forEach(function (v) {
+        v.pause();
+        v.currentTime = 0;
+      });
     });
     document.querySelectorAll('.guide-group').forEach(function (g) {
       g.classList.remove('active');
