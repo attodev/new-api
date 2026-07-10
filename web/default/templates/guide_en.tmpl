@@ -138,9 +138,9 @@
                             <p style="margin:0; font-size:13px; color:#c9d6ea"><b style="color:#10a37f">Codex</b> — Codex CLI manages the Base URL in a separate config file, not an environment variable.<br>Keep the API key as is, and add the value below to <span class="mono">~/.codex/config.toml</span>.</p>
                             <div class="guide-term" style="margin-top:0">
                               <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
-<pre>openai_base_url = "https://alrouter.ai/v1"</pre>
+<pre>openai_base_url = <span class="c2">"https://alrouter.ai/v1"</span></pre>
                             </div>
-                            <p class="guide-aside">After adding the setting above, using Codex may show a "Falling back from WebSockets to HTTPS" warning.<br>It doesn't affect things working, but if the warning bothers you, add the following to the same file.</p>
+                            <p class="guide-aside">After adding the setting above, using Codex may show a "Falling back from WebSockets to HTTPS" warning.<br>This doesn't affect functionality, but if you'd rather not see the warning, add the following to the same file.</p>
                             <div class="guide-term" style="margin-top:0">
                               <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
 <pre>[features]
