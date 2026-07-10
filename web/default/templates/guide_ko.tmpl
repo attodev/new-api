@@ -10,7 +10,23 @@
     <link rel="alternate" hreflang="en" href="https://alrouter.ai/en/guide" />
     <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/guide" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <script src="/lucide.min.js"></script>
+    <script>
+      (function loadLucide(retriesLeft) {
+        var s = document.createElement('script');
+        s.src = '/lucide.min.js';
+        s.onload = function () {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        };
+        s.onerror = function () {
+          if (retriesLeft > 0) {
+            setTimeout(function () { loadLucide(retriesLeft - 1); }, 600);
+          }
+        };
+        document.head.appendChild(s);
+      })(3);
+    </script>
     <link rel="stylesheet" href="/landing.css" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
@@ -88,11 +104,12 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>환경변수 등록</h4></div>
                   <p>사용 중인 CLI에 맞는 환경변수를 셸 설정 파일에 추가하고 적용합니다.</p>
+                  <p class="guide-aside">셸 설정 파일은 터미널을 열 때마다 자동으로 실행되는 설정 파일입니다 (zsh는 <span class="mono">~/.zshrc</span>, bash는 <span class="mono">~/.bash_profile</span> 또는 <span class="mono">~/.bashrc</span>).<br>여기에 환경변수를 추가해두면 새로 여는 터미널마다 매번 다시 입력할 필요 없이 자동으로 적용됩니다.</p>
 
                   <div class="guide-substep">
                     <div class="guide-substep-head"><span class="guide-substep-num">1</span>셸 설정 파일에 환경변수 추가</div>
                     <div class="guide-substep-body">
-                      <div class="guide-pitfall"><b>주의</b>아래 예시의 키 값 대신, 실제로 발급받은 키 값을 입력해 주세요.</div>
+                      <div class="guide-pitfall"><b>주의</b><p>아래 예시의 키 값 대신, 실제로 발급받은 키 값을 입력해 주세요.</p></div>
 
                       <div class="guide-provider-table">
                         <div class="guide-provider-row">
@@ -104,19 +121,31 @@
                           </div>
                         </div>
                         <div class="guide-provider-row">
-                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
-                          <div class="guide-term">
-                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
-<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
-<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
-                          </div>
-                        </div>
-                        <div class="guide-provider-row">
                           <span class="guide-provider-name" style="color:#4285f4">Google</span>
                           <div class="guide-term">
                             <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
 <pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
 <span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px">
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                            </div>
+                            <p style="margin:0; font-size:13px; color:#c9d6ea"><b style="color:#10a37f">Codex</b> — Codex CLI는 Base URL을 환경변수가 아닌 별도의 설정 파일에서 관리합니다.<br>API 키는 그대로 두고, 아래 값을 <span class="mono">~/.codex/config.toml</span>에 추가하세요.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>openai_base_url = "https://alrouter.ai/v1"</pre>
+                            </div>
+                            <p class="guide-aside">위 설정 추가 후 Codex 사용 시 "Falling back from WebSockets to HTTPS" 경고가 뜰 수 있습니다.<br>동작에는 지장이 없으나, 경고 문구가 거슬린다면 위 파일에 아래 내용을 추가로 넣어주세요.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>[features]
+responses_websockets_v2 = false</pre>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -125,11 +154,6 @@
                         <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-edit.png" alt="셸 설정 파일에 환경변수를 추가하는 화면" />
                         <figcaption>2-1. 셸 설정 파일에 환경변수 추가</figcaption>
                       </figure>
-
-                      <div class="guide-note">
-                        <span class="mark">TIP</span>
-                        <p>OpenAI 포맷 CLI는 base URL 뒤에 <span class="mono">/v1</span>, Google은 <span class="mono">/v1beta</span>만 다를 뿐 방식은 동일합니다.</p>
-                      </div>
                     </div>
                   </div>
 
@@ -155,7 +179,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>연결 확인</h4></div>
                   <p>새 터미널에서 claude를 실행한 뒤, <span class="mono mono-cmd">/status</span>로 AlRouter 연결을 확인합니다.<br>base URL 항목에 alrouter.ai가 표시되면 정상입니다.</p>
-                  <div class="guide-pitfall"><b>주의</b>환경변수는 새로 여는 터미널부터 적용됩니다. 등록 전에 열려 있던 터미널이면 새 창에서 실행하세요.</div>
+                  <div class="guide-pitfall"><b>주의</b><p>환경변수는 새로 여는 터미널부터 적용됩니다. 등록 전에 열려 있던 터미널이면 새 창에서 실행하세요.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude
@@ -320,7 +344,7 @@ $ brew install --cask cc-switch</pre>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>연결 확인</h4></div>
                   <p>Claude Code를 재시작한 후, <span class="mono mono-cmd">/status</span>로 AlRouter 연결을 확인합니다.<br>Anthropic base URL에 alrouter.ai가 표시되면 정상입니다.</p>
-                  <div class="guide-pitfall"><b>주의</b>환경 설정은 재시작 후부터 적용됩니다. 등록 전에 열려 있던 세션이면 완전히 종료 후 새로 실행하세요.</div>
+                  <div class="guide-pitfall"><b>주의</b><p>환경 설정은 재시작 후부터 적용됩니다. 등록 전에 열려 있던 세션이면 완전히 종료 후 새로 실행하세요.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude

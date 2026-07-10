@@ -10,7 +10,23 @@
     <link rel="alternate" hreflang="ko" href="https://alrouter.ai/guide" />
     <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/guide" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <script src="/lucide.min.js"></script>
+    <script>
+      (function loadLucide(retriesLeft) {
+        var s = document.createElement('script');
+        s.src = '/lucide.min.js';
+        s.onload = function () {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        };
+        s.onerror = function () {
+          if (retriesLeft > 0) {
+            setTimeout(function () { loadLucide(retriesLeft - 1); }, 600);
+          }
+        };
+        document.head.appendChild(s);
+      })(3);
+    </script>
     <link rel="stylesheet" href="/landing.css" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
@@ -88,11 +104,12 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Set environment variables</h4></div>
                   <p>Add the environment variables for your CLI to your shell config file, then apply the changes.</p>
+                  <p class="guide-aside">A shell config file runs automatically every time you open a terminal (<span class="mono">~/.zshrc</span> for zsh, <span class="mono">~/.bash_profile</span> or <span class="mono">~/.bashrc</span> for bash). <br>Adding the environment variables there means every new terminal picks them up automatically, so you don't have to re-enter them each time.</p>
 
                   <div class="guide-substep">
                     <div class="guide-substep-head"><span class="guide-substep-num">1</span>Add the environment variables to your shell config</div>
                     <div class="guide-substep-body">
-                      <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
+                      <div class="guide-pitfall"><b>Note</b><p>Replace the example key below with your actual issued key.</p></div>
 
                       <div class="guide-provider-table">
                         <div class="guide-provider-row">
@@ -104,19 +121,31 @@
                           </div>
                         </div>
                         <div class="guide-provider-row">
-                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
-                          <div class="guide-term">
-                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
-<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
-<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
-                          </div>
-                        </div>
-                        <div class="guide-provider-row">
                           <span class="guide-provider-name" style="color:#4285f4">Google</span>
                           <div class="guide-term">
                             <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
 <pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
 <span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px">
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                            </div>
+                            <p style="margin:0; font-size:13px; color:#c9d6ea"><b style="color:#10a37f">Codex</b> — Codex CLI manages the Base URL in a separate config file, not an environment variable.<br>Keep the API key as is, and add the value below to <span class="mono">~/.codex/config.toml</span>.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>openai_base_url = "https://alrouter.ai/v1"</pre>
+                            </div>
+                            <p class="guide-aside">After adding the setting above, using Codex may show a "Falling back from WebSockets to HTTPS" warning.<br>It doesn't affect things working, but if the warning bothers you, add the following to the same file.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>[features]
+responses_websockets_v2 = false</pre>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -125,11 +154,6 @@
                         <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-edit.png" alt="Editing the shell config file to add environment variables" />
                         <figcaption>2-1. Add environment variables to the shell config</figcaption>
                       </figure>
-
-                      <div class="guide-note">
-                        <span class="mark">TIP</span>
-                        <p>OpenAI-format CLIs only differ by <span class="mono">/v1</span> at the end of the base URL, and Google by <span class="mono">/v1beta</span> — otherwise the setup is identical.</p>
-                      </div>
                     </div>
                   </div>
 
@@ -155,7 +179,7 @@
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
                   <p>Run claude in a new terminal, then use <span class="mono mono-cmd">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
-                  <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
+                  <div class="guide-pitfall"><b>Note</b><p>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude
@@ -320,7 +344,7 @@ $ brew install --cask cc-switch</pre>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
                   <p>Restart Claude Code, then check the AlRouter connection with <span class="mono mono-cmd">/status</span>.<br>If the Anthropic base URL shows alrouter.ai, it's working correctly.</p>
-                  <div class="guide-pitfall"><b>Note</b>Settings take effect after restarting. If a session was open before registering, quit it completely and start a new one.</div>
+                  <div class="guide-pitfall"><b>Note</b><p>Settings take effect after restarting. If a session was open before registering, quit it completely and start a new one.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude
