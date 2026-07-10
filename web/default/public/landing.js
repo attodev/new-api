@@ -14,10 +14,10 @@ const STRINGS = {
   calcInputRate:  isKo ? '단가 입력'                                                    : 'Input rate',
   calcOutputRate: isKo ? '단가 출력'                                                    : 'Output rate',
   // video filenames
-  videoStd:       isKo ? 'videos/alrouter_ko.mp4'                                       : 'videos/alrouter_en.mp4',
-  videoLite:      isKo ? 'videos/alrouter_ko_lite.mp4'                                  : 'videos/alrouter_en_lite.mp4',
-  posterStd:      isKo ? './videos/alrouter_ko_poster.png'                              : './videos/alrouter_en_poster.png',
-  posterLite:     isKo ? './videos/alrouter_ko_lite_poster.png'                         : './videos/alrouter_en_lite_poster.png',
+  videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
+  videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
+  posterStd:      isKo ? '/videos/main/alrouter_ko_poster.png'                          : '/videos/main/alrouter_en_poster.png',
+  posterLite:     isKo ? '/videos/main/alrouter_ko_lite_poster.png'                     : '/videos/main/alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
@@ -343,12 +343,18 @@ function runCalc() {
   const inputCost = inputM * prices.input;
   const outputCost = outputM * prices.output;
   const total = inputCost + outputCost;
-  const fmt = (v) => "$" + v.toFixed(4);
+  // 아주 큰 토큰 수를 입력해도 결과 박스를 벗어나지 않도록, 일정 금액 이상이면 축약 표기($1.2B)로 전환
+  const fmtMoney = (v, decimals) =>
+    "$" +
+    (Math.abs(v) >= 1e6
+      ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)
+      : v.toFixed(decimals));
+  const fmt = (v) => fmtMoney(v, 4);
   document.getElementById("calcHint").style.display = "none";
   document.getElementById("calcLabel").style.display = "";
   const priceEl = document.getElementById("calcPrice");
   priceEl.style.display = "";
-  priceEl.textContent = "$" + total.toFixed(2);
+  priceEl.textContent = fmtMoney(total, 2);
   document.getElementById("calcBreakdown").innerHTML =
     `<div class="calc-breakdown-row"><span>${STRINGS.calcInputRow(inputM)}</span><span>${fmt(inputCost)}</span></div>` +
     `<div class="calc-breakdown-row"><span>${STRINGS.calcOutputRow(outputM)}</span><span>${fmt(outputCost)}</span></div>` +
@@ -357,7 +363,9 @@ function runCalc() {
 }
 
 // ── Lucide icon init + lang-switch click handler ──
-lucide.createIcons();
+if (window.lucide && typeof window.lucide.createIcons === 'function') {
+  window.lucide.createIcons();
+}
 document.addEventListener("click", function (e) {
   document.querySelectorAll(".lang-switch.open").forEach(function (el) {
     if (!el.contains(e.target)) el.classList.remove("open");

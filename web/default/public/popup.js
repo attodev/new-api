@@ -1,6 +1,6 @@
 'use strict';
 // ── Shared popup system (terms / privacy / pricing) ──
-// Used by index.html, index_en.html, guide.html, guide_en.html.
+// Used by /, /en, /guide, /en/guide.
 const popupIsKo = document.documentElement.lang === 'ko';
 
 const POPUP_STRINGS = {

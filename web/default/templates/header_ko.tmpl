@@ -24,12 +24,12 @@
             fill="#EC4899"
           />
         </svg>
-        {{if eq .Active "guide"}}<a href="/index.html" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
+        {{if eq .Active "guide"}}<a href="/" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
       </div>
       <ul class="gnb-menu">
         {{if eq .Active "guide"}}
-        <li><a href="/index.html#about">서비스 소개</a></li>
-        <li><a href="/index.html#pricing">모델 &amp; 가격</a></li>
+        <li><a href="/#about">서비스 소개</a></li>
+        <li><a href="/#pricing">모델 &amp; 가격</a></li>
         {{else}}
         <li><a href="#about">서비스 소개</a></li>
         <li>
@@ -40,8 +40,8 @@
           >
         </li>
         {{end}}
-        {{/* Temporarily hidden from nav — page still reachable directly via /guide.html
-        <li><a href="/guide.html"{{if eq .Active "guide"}} class="active"{{end}}>사용 가이드</a></li>
+        {{/* Temporarily hidden from nav — page still reachable directly via /guide
+        <li><a href="/guide"{{if eq .Active "guide"}} class="active"{{end}}>사용 가이드</a></li>
         */}}
       </ul>
       <button class="gnb-hamburger" aria-label="메뉴 열기" aria-expanded="false">
@@ -52,7 +52,7 @@
       <div class="gnb-right">
         <button class="lang-switch" onclick="this.classList.toggle('open')">
           <i data-lucide="languages"></i>
-          <div class="lang-dropdown"><a href="./{{if eq .Active "guide"}}guide_en.html{{else}}index_en.html{{end}}">English</a><a href="./{{if eq .Active "guide"}}guide.html{{else}}index.html{{end}}">한국어<span class="check">✓</span></a></div>
+          <div class="lang-dropdown"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}">English</a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}">한국어<span class="check">✓</span></a></div>
         </button>
         <div class="gnb-divider"></div>
         <a href="/sign-in" class="btn-login">로그인</a>

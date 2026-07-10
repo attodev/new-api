@@ -443,9 +443,14 @@ body {
 }
 .calc-result-hint { font-size:15px; color:#7dd3fc; text-align:center; line-height:1.8; font-weight:500; }
 .calc-result-label { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
-.calc-result-price { font-size:34px; font-weight:800; color:#0EA5E9; line-height:1; margin-bottom:14px; }
-.calc-breakdown { display:flex; flex-direction:column; gap:5px; width:100%; }
-.calc-breakdown-row { display:flex; justify-content:space-between; font-size:11px; color:#6b7280; }
+.calc-result-price {
+  font-size:34px; font-weight:800; color:#0EA5E9; line-height:1; margin-bottom:14px;
+  max-width:100%; overflow-wrap:anywhere; word-break:break-word; text-align:center;
+}
+.calc-breakdown { display:flex; flex-direction:column; gap:5px; width:100%; min-width:0; }
+.calc-breakdown-row { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#6b7280; }
+.calc-breakdown-row span:first-child { min-width:0; overflow-wrap:anywhere; }
+.calc-breakdown-row span:last-child { flex-shrink:0; overflow-wrap:anywhere; word-break:break-word; text-align:right; }
 
 /* ── 7. FEATURE: GOVERNANCE ── */
 .gov-points { display: flex; flex-direction: column; gap: 20px; }

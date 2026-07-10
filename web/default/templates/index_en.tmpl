@@ -10,16 +10,16 @@
     <meta name="title" content="AlRouter — Unified AI API Gateway" />
     <meta name="description" content="One API for OpenAI, Claude, Gemini, and more. Simplify your enterprise AI stack with AlRouter." />
     <meta name="keywords" content="alrouter, AlRouter, AI API gateway, unified AI API, AI cost management, OpenAI API, Claude API, Gemini API, multi-provider AI, AI usage monitoring, enterprise AI" />
-    <link rel="canonical" href="https://alrouter.ai/index_en.html" />
+    <link rel="canonical" href="https://alrouter.ai/en" />
 
     <!-- hreflang -->
-    <link rel="alternate" hreflang="en" href="https://alrouter.ai/index_en.html" />
+    <link rel="alternate" hreflang="en" href="https://alrouter.ai/en" />
     <link rel="alternate" hreflang="ko" href="https://alrouter.ai/" />
     <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://alrouter.ai/index_en.html" />
+    <meta property="og:url" content="https://alrouter.ai/en" />
     <meta property="og:title" content="AlRouter — Unified AI API Gateway" />
     <meta property="og:description" content="One API for OpenAI, Claude, Gemini, and more. Simplify your enterprise AI stack with AlRouter." />
     <meta property="og:image" content="https://alrouter.ai/og-image.png" />
@@ -68,8 +68,8 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="./landing.css" />
+    <script src="/lucide.min.js"></script>
+    <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
     <!-- ── SECTION 1: GNB ── -->
@@ -121,11 +121,11 @@
             <div class="anim-wrap" id="anim">
               <video
                 id="animVideo"
-                src="videos/alrouter_en.mp4"
+                src="/videos/main/alrouter_en.mp4"
                 playsinline
                 preload="auto"
               ></video>
-              <img id="animPosterImg" class="anim-poster-img" src="./videos/alrouter_en_poster.png" alt="AlRouter AI API Gateway service introduction video thumbnail" />
+              <img id="animPosterImg" class="anim-poster-img" src="/videos/main/alrouter_en_poster.png" alt="AlRouter AI API Gateway service introduction video thumbnail" />
               <div class="anim-hover-overlay" id="animHoverOverlay">
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
@@ -166,7 +166,7 @@
               </div>
               <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
                 <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
-                  <img src="logo.svg" alt="AlRouter" class="anim-cta-logo" />
+                  <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
                   <div class="anim-cta-btn-text">Get Started →</div>
                 </a>
                 <button
@@ -1454,9 +1454,14 @@
         </form>
       </div>
     </div>
+<<<<<<< HEAD
       <script src="./popup.js" defer></script>
       <script src="./landing.js" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
+=======
+      <script src="/popup.js" defer></script>
+      <script src="/landing.js" defer></script>
+>>>>>>> team
   </body>
 </html>
 {{end}}

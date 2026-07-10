@@ -75,10 +75,16 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 				render(c, "index_ko", "about")
 			}
 		})
-		router.GET("/index.html", func(c *gin.Context) { render(c, "index_ko", "about") })
-		router.GET("/index_en.html", func(c *gin.Context) { render(c, "index_en", "about") })
-		router.GET("/guide.html", func(c *gin.Context) { render(c, "guide_ko", "guide") })
-		router.GET("/guide_en.html", func(c *gin.Context) { render(c, "guide_en", "guide") })
+		router.GET("/en", func(c *gin.Context) { render(c, "index_en", "about") })
+		router.GET("/guide", func(c *gin.Context) { render(c, "guide_ko", "guide") })
+		router.GET("/en/guide", func(c *gin.Context) { render(c, "guide_en", "guide") })
+
+		// Legacy filename URLs — redirect to the clean equivalents so old
+		// bookmarks/links still work but the address bar no longer shows .html
+		router.GET("/index.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/") })
+		router.GET("/index_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en") })
+		router.GET("/guide.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/guide") })
+		router.GET("/guide_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en/guide") })
 
 		router.Use(static.Serve("/", static.LocalFile("web/default/public", false)))
 		router.Use(static.Serve("/", themeFS))
@@ -100,18 +106,22 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 				c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
 			}
 		})
-		router.GET("/index.html", func(c *gin.Context) {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
-		})
-		router.GET("/index_en.html", func(c *gin.Context) {
+		router.GET("/en", func(c *gin.Context) {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
 		})
-		router.GET("/guide.html", func(c *gin.Context) {
+		router.GET("/guide", func(c *gin.Context) {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", guideKo)
 		})
-		router.GET("/guide_en.html", func(c *gin.Context) {
+		router.GET("/en/guide", func(c *gin.Context) {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", guideEn)
 		})
+
+		// Legacy filename URLs — redirect to the clean equivalents so old
+		// bookmarks/links still work but the address bar no longer shows .html
+		router.GET("/index.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/") })
+		router.GET("/index_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en") })
+		router.GET("/guide.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/guide") })
+		router.GET("/guide_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en/guide") })
 
 		// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
 		router.Use(static.Serve("/", publicFS))

@@ -5,10 +5,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Usage Guide — AlRouter</title>
-    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="./landing.css" />
-    <link rel="stylesheet" href="./guide.css" />
+    <link rel="canonical" href="https://alrouter.ai/en/guide" />
+    <link rel="alternate" hreflang="en" href="https://alrouter.ai/en/guide" />
+    <link rel="alternate" hreflang="ko" href="https://alrouter.ai/guide" />
+    <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/guide" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <script src="/lucide.min.js"></script>
+    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
     {{template "header_en" .}}
@@ -24,15 +28,15 @@
       <!-- Group picker -->
       <div class="guide-group-picker" role="tablist">
         <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><i data-lucide="terminal"></i>Set environment variables</button>
-        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><i data-lucide="wand-2"></i>Set up with CC Switch <span class="g-n">Coming soon</span></button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><i data-lucide="wand-2"></i>Set up with CC Switch</button>
       </div>
 
       <!-- ══════════ Group: Manual setup ══════════ -->
       <div class="guide-group active" id="guide-group-manual">
         <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
-            <video id="guideVideo" controls preload="metadata" poster="/videos/guide-manual-anthropic-en-poster.png">
-              <source src="/videos/guide-manual-anthropic-en.mp4" type="video/mp4" />
+            <video id="guideVideo" controls preload="metadata" poster="/videos/guide/guide-manual-anthropic-en-poster.png">
+              <source src="/videos/guide/guide-manual-anthropic-en.mp4" type="video/mp4" />
             </video>
             <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay">
               <div class="anim-play-btn">
@@ -46,6 +50,13 @@
                 <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
                 <div class="anim-cta-btn-text">Get Started →</div>
               </a>
+              <button class="anim-end-btn anim-end-replay" id="guideReplayBtn" style="display: none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-4" />
+                </svg>
+                Watch Again
+              </button>
             </div>
           </div>
 
@@ -143,7 +154,7 @@
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
-                  <p>Run claude in a new terminal, then use <span class="mono">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
+                  <p>Run claude in a new terminal, then use <span class="mono mono-cmd">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
                   <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
@@ -198,14 +209,169 @@
         </section>
       </div>
 
-      <!-- ══════════ Group: CC Switch (coming soon) ══════════ -->
+      <!-- ══════════ Group: CC Switch ══════════ -->
       <div class="guide-group" id="guide-group-ccswitch">
-        <div class="guide-coming-soon">
-          <div class="cs-icon">🛠️</div>
-          <h3>CC Switch guide coming soon</h3>
-          <p>We're preparing a guide for CC Switch, which lets you manage multiple CLIs from a single app. Coming soon.</p>
-          <span class="cs-tag">Coming soon</span>
-        </div>
+        <section class="guide-panel active" id="guide-panel-ccswitch">
+          <div class="guide-video-frame">
+            <video id="guideVideoCc" controls preload="metadata" poster="/videos/guide/guide-cc-anthropic-en-poster.png">
+              <source src="/videos/guide/guide-cc-anthropic-en.mp4" type="video/mp4" />
+            </video>
+            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc">
+              <div class="anim-play-btn">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="6,3 20,12 6,21" />
+                </svg>
+              </div>
+            </div>
+            <div class="guide-cta-wrap" id="guideCtaWrapCc" style="display: none">
+              <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtnCc">
+                <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
+                <div class="anim-cta-btn-text">Get Started →</div>
+              </a>
+              <button class="anim-end-btn anim-end-replay" id="guideReplayBtnCc" style="display: none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-4" />
+                </svg>
+                Watch Again
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-divider">Video not loading? You can follow the written steps below</div>
+
+          <div class="guide-written">
+            <h3>Step-by-step</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">0</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Install CC Switch</h4></div>
+                  <p>If it's already installed, you can skip this step.</p>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">1</span>macOS · Homebrew (recommended)</div>
+                    <div class="guide-substep-body">
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ brew tap farion1231/ccswitch
+$ brew install --cask cc-switch</pre>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">2</span>macOS / Windows · GitHub Releases</div>
+                    <div class="guide-substep-body">
+                      <p class="guide-substep-desc">Download and run the installer for your OS.</p>
+                      <a class="guide-gh-link" href="https://github.com/farion1231/cc-switch/releases" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+                        <span>Download from GitHub Releases</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Create an API key</h4></div>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-create-en.png" alt="API key creation screen" />
+                      <figcaption>1-1. Create the API key</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-copy-en.png" alt="Copying the generated API key" />
+                      <figcaption>1-2. Copy the generated key</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Register automatically with CC Switch</h4></div>
+                  <p>From the API key's More menu, select "CC Switch," then enter the provider and default model — CC Switch opens.<br>Review the details and click "Import" to complete the registration.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-input-form-en.png" alt="CC Switch input form" />
+                      <figcaption>2-1. Select the provider and default model</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-import-view.png" alt="CC Switch import confirmation screen" />
+                      <figcaption>2-2. Review the details and click "Import"</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-import-success.png" alt="CC Switch import complete screen" />
+                      <figcaption>2-3. Import complete</figcaption>
+                    </figure>
+                  </div>
+                  <div class="guide-note">
+                    <span class="mark">TIP</span>
+                    <p>Switching your selection in the CC Switch list lets you easily switch back to the official provider anytime.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Verify the connection</h4></div>
+                  <p>Restart Claude Code, then check the AlRouter connection with <span class="mono mono-cmd">/status</span>.<br>If the Anthropic base URL shows alrouter.ai, it's working correctly.</p>
+                  <div class="guide-pitfall"><b>Note</b>Settings take effect after restarting. If a session was open before registering, quit it completely and start a new one.</div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide-cc/cc-step3-status.png" alt="/status connection check screen" />
+                    <figcaption>3-1. /status connection check</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Test</h4></div>
+                  <p>Enter a simple prompt to confirm the connection works.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
+<span class="cm">Claude Code connected</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide-cc/cc-step4-test.png" alt="Test prompt response screen" />
+                    <figcaption>4-1. Test prompt response</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Check usage</h4></div>
+                  <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' and 'Dashboard' pages also show your usage trends as charts at a glance.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-5-log-en.png" alt="Usage logs screen" />
+                      <figcaption>5-1. Usage Logs</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/guide-step-5-dashboard-en.png" alt="Dashboard chart screen" />
+                      <figcaption>5-2. Dashboard chart</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
     {{template "footer_en" .}}
@@ -214,13 +380,18 @@
     <div class="shot-lightbox" id="shotLightbox">
       <button class="shot-lightbox-close" id="shotLightboxClose" aria-label="Close">✕</button>
       <button class="shot-lightbox-nav shot-lightbox-prev" id="shotLightboxPrev" aria-label="Previous image">‹</button>
-      <img class="shot-lightbox-img" id="shotLightboxImg" src="" alt="" />
+      <div class="shot-lightbox-body">
+        <div class="shot-lightbox-img-wrap">
+          <img class="shot-lightbox-img" id="shotLightboxImg" src="" alt="" />
+        </div>
+        <div class="shot-lightbox-caption" id="shotLightboxCaption"></div>
+        <div class="shot-lightbox-dots" id="shotLightboxDots"></div>
+      </div>
       <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="Next image">›</button>
-      <div class="shot-lightbox-caption" id="shotLightboxCaption"></div>
     </div>
 
-    <script src="./popup.js" defer></script>
-    <script src="./guide.js" defer></script>
+    <script src="/popup.js" defer></script>
+    <script src="/guide.js" defer></script>
   </body>
 </html>
 {{end}}

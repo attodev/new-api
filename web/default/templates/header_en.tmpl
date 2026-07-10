@@ -24,12 +24,12 @@
             fill="#EC4899"
           />
         </svg>
-        {{if eq .Active "guide"}}<a href="/index_en.html" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
+        {{if eq .Active "guide"}}<a href="/en" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
       </div>
       <ul class="gnb-menu">
         {{if eq .Active "guide"}}
-        <li><a href="/index_en.html#about">About</a></li>
-        <li><a href="/index_en.html#pricing">Models &amp; Pricing</a></li>
+        <li><a href="/en#about">About</a></li>
+        <li><a href="/en#pricing">Models &amp; Pricing</a></li>
         {{else}}
         <li><a href="#about">About</a></li>
         <li>
@@ -40,8 +40,8 @@
           >
         </li>
         {{end}}
-        {{/* Temporarily hidden from nav — page still reachable directly via /guide_en.html
-        <li><a href="/guide_en.html"{{if eq .Active "guide"}} class="active"{{end}}>Guide</a></li>
+        {{/* Temporarily hidden from nav — page still reachable directly via /en/guide
+        <li><a href="/en/guide"{{if eq .Active "guide"}} class="active"{{end}}>Guide</a></li>
         */}}
       </ul>
       <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">
@@ -52,7 +52,7 @@
       <div class="gnb-right">
         <button class="lang-switch" onclick="this.classList.toggle('open')">
           <i data-lucide="languages"></i>
-          <div class="lang-dropdown"><a href="./{{if eq .Active "guide"}}guide_en.html{{else}}index_en.html{{end}}">English<span class="check">✓</span></a><a href="./{{if eq .Active "guide"}}guide.html{{else}}index.html{{end}}">한국어</a></div>
+          <div class="lang-dropdown"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}">English<span class="check">✓</span></a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}">한국어</a></div>
         </button>
         <div class="gnb-divider"></div>
         <a href="/sign-in" class="btn-login">Log in</a>
