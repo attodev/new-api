@@ -1,6 +1,7 @@
 {{define "header_en"}}
     <nav class="gnb">
       <div class="logo">
+        <a href="/en" style="display: contents; color: inherit; text-decoration: none;">
         <svg
           class="logo-icon"
           viewBox="0 0 1100 1100"
@@ -24,14 +25,15 @@
             fill="#EC4899"
           />
         </svg>
-        {{if eq .Active "guide"}}<a href="/en" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
+        AlRouter
+        </a>
       </div>
       <ul class="gnb-menu">
         {{if eq .Active "guide"}}
-        <li><a href="/en#about">About</a></li>
-        <li><a href="/en#pricing">Models &amp; Pricing</a></li>
+        <li><a href="/en">About</a></li>
         {{else}}
         <li><a href="#about">About</a></li>
+        {{end}}
         <li>
           <a
             href="#"
@@ -39,7 +41,6 @@
             >Models & Pricing</a
           >
         </li>
-        {{end}}
         <li><a href="/en/guide"{{if eq .Active "guide"}} class="active"{{end}}>Guide</a></li>
       </ul>
       <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">

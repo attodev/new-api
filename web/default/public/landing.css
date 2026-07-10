@@ -696,7 +696,7 @@ cursor:pointer; transition:opacity 0.2s, transform 0.15s;
         /* ── 비디오 플레이어 ── */
         .anim-wrap { position: relative; width: min(360px, 100%); aspect-ratio: 9/16; overflow: hidden; border-radius: 24px; box-shadow: 0 30px 90px rgba(0,0,0,0.7); background: #000; cursor: pointer; }
         .video-indicator { display: flex; gap: 0; justify-content: center; margin-top: 0; }
-        .video-dot { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; cursor: pointer; border: none; padding: 0; transition: transform 0.2s; }
+        .video-dot { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: transparent; cursor: pointer; border: none; padding: 0; transition: transform 0.2s; }
         .video-dot::after { content: ''; display: block; width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: background 0.2s, transform 0.2s; }
         .video-dot:hover::after { background: rgba(255,255,255,0.5); transform: scale(1.2); }
         .video-dot.active::after { background: rgba(255,255,255,0.85); transform: scale(1.35); }
