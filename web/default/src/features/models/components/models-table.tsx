@@ -233,6 +233,7 @@ export function ModelsTable() {
       applyHeaderSize
       toolbarProps={{
         searchPlaceholder: t('Filter by model name...'),
+        searchDebounceMs: 400,
         filters: [
           {
             columnId: 'status',

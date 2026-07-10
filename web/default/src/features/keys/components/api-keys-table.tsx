@@ -331,6 +331,7 @@ export function ApiKeysTable() {
       skeletonKeyPrefix='api-keys-skeleton'
       toolbarProps={{
         searchPlaceholder: t('Filter by name...'),
+        searchDebounceMs: 400,
         additionalSearch: (
           <Input
             placeholder={t('Filter by API key...')}
