@@ -1,8 +1,9 @@
 # Toss Payments 공식 문서 기준 구현 감사 및 하드닝 보고서
 
 - 작성일: 2026-07-12
-- 통합 기준: `toss` 브랜치, 기준 HEAD 4171f875b 이후 변경
-- 코드 반영 커밋: `474e12e70`, `1e596af12`, `34a33c78f`
+- 최초 감사 기준: `toss` 브랜치, HEAD 4171f875b 이후 변경
+- 현재 리베이스 기준: `origin/team` HEAD 0bf89b004 (2026-07-13)
+- 코드 반영 커밋: `2c619a31e`, `28fe73ad5`, `c0f4b5a71`
 - 문서 상태: 최종 반복 검토 결과를 반영한 운영 인계용 문서
 - 검토 범위: 일반 결제, 개인·조직 지갑 충전, 구독 자동결제, 지갑 자동충전, 취소·환불, 웹훅, 정산 복구, 설정·키 교체, 마이그레이션, 프론트엔드, 테스트
 
@@ -998,6 +999,8 @@ Toss 핵심 패키지와 위에 명시한 집중 테스트는 통과했다. 이 
 또한 Default `build:check`의 TypeScript 단계는 기존 organization·usage-log·vendor-discount·`bun:test` typing 오류로 실패했다. `bun:test` import는 기준 HEAD에도 존재해 테스트 타입 설정 문제임을 확인했고 production build와 Default 132개 테스트는 통과했다. Default ESLint는 기존 dependency tree의 `brace_expansion_1.expand` 오류로 시작하지 못했다. Classic 전체 i18n lint도 저장소 전역의 기존 hardcoded string 330건을 보고했지만, Classic 변경 파일 ESLint·Prettier·테스트·production build는 통과했다.
 
 ## 12. 추가 권장 작업
+
+실제 사람 검증은 [Toss Payments 사람 수동 테스트 시나리오](2026-07-12-toss-payments-manual-test-scenarios.md)에 준비물, 단계, 기대 결과, 증거, 정리 절차별로 정리했다. 병합 전에는 최소 P0 스모크 세트를 실행하고 미실행 항목을 위험으로 명시한다.
 
 현재 구현의 안전성을 더 높이기 위한 후속 작업은 다음과 같다.
 

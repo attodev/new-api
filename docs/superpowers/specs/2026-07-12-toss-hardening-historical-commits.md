@@ -1,13 +1,14 @@
 # Toss Payments 기존 실제 커밋 이력 부록
 
 - 작성일: 2026-07-12
-- 통합 기준 HEAD: 4171f875b
+- 최초 감사 기준 HEAD: 4171f875b
+- 현재 리베이스 기준 HEAD: 0bf89b004 (`origin/team`, 2026-07-13)
 - 반영 브랜치: toss
 - 목적: 기존 Toss baseline 140개와 2026-07-12 공식문서 감사 통합 커밋을 분리
 
 ## 1. 범위와 결론
 
-Toss 초기 도입과 wallet auto-recharge는 다음 140개 실제 이력으로 통합 기준 HEAD에 들어와 있다. 공식 문서 재감사 하드닝은 그 위에 `toss` 브랜치의 별도 통합 커밋으로 반영했다.
+Toss 초기 도입과 wallet auto-recharge는 다음 140개 실제 이력으로 최초 감사 기준 HEAD에 들어와 있다. 공식 문서 재감사 하드닝은 그 위에서 개발한 뒤, 2026-07-13 최신 `origin/team`의 0bf89b004 위로 리베이스했다.
 
 | 구간 | 실제 커밋 수 | 내용 |
 |---|---:|---|
@@ -19,7 +20,7 @@ Toss 초기 도입과 wallet auto-recharge는 다음 140개 실제 이력으로 
 따라서 다음 세 표현을 구분해야 한다.
 
 - **실제 과거 커밋**: 아래 140개, hash 존재
-- **현재 하드닝 통합 커밋**: `474e12e70`, `1e596af12`, `34a33c78f`와 문서 커밋
+- **현재 하드닝 통합 커밋**: `2c619a31e`, `28fe73ad5`, `c0f4b5a71`, `7e9a4efb7`과 후속 수동 QA 문서 커밋
 - **C01–C18**: 실제 hash와 일대일 대응하지 않는 세부 리뷰·추적 단위
 
 ## 2. 병합 구조
@@ -40,7 +41,10 @@ f9c064ea0 + 52fff1c0f
 ee24f2ca6 + 5e24138a7
   └─ f75ba651e  team 계열에 Toss 기능 반입
       └─ 791d998e2  translation branch와 team 병합
-          └─ ... 현재 HEAD 4171f875b
+          └─ ... 최초 감사 기준 HEAD 4171f875b
+              └─ ... team 후속 10개 커밋 ...
+                  └─ 현재 rebase 기준 HEAD 0bf89b004
+                      └─ 2c619a31e ... 현재 Toss 하드닝 커밋 체인
 ~~~
 
 핵심 merge인 1ac852781은 단순 merge metadata가 아니다. 다음 파일에 충돌 해결 결과가 포함됐다.
@@ -350,5 +354,5 @@ git show --summary 791d998e2
 - 설계·계획·report untrack commit도 140개 총계에 포함한다.
 - merge commit을 부모 branch commit과 별도 기능 구현으로 중복 계산하지 않는다.
 - a3f805f9a는 46개 파일의 통합 hardening이라 하나의 작은 주제로 설명하면 안 된다.
-- C01–C18에는 단일 hash를 붙이지 않는다. 대형 shared file 의존성 때문에 실제 반영은 세 개의 코드 통합 커밋과 문서 커밋을 사용했다.
-- C01–C15와 backend C18은 `474e12e70`, C16과 Default locale은 `1e596af12`, C17과 Classic locale은 `34a33c78f`에서 찾는다.
+- C01–C18에는 단일 hash를 붙이지 않는다. 대형 shared file 의존성 때문에 실제 반영은 세 개의 코드 통합 커밋과 `7e9a4efb7` 문서 커밋을 사용했다.
+- C01–C15와 backend C18은 `2c619a31e`, C16과 Default locale은 `28fe73ad5`, C17과 Classic locale은 `c0f4b5a71`에서 찾는다.

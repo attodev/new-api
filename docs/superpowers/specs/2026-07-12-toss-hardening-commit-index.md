@@ -2,19 +2,21 @@
 
 - 작성일: 2026-07-12
 - 반영 브랜치: toss
-- 통합 기준 HEAD: 4171f875b
-- 대상: 기준 HEAD 이후 Toss Payments 공식 문서 재감사·수정 결과
+- 최초 감사 기준 HEAD: 4171f875b
+- 현재 리베이스 기준 HEAD: 0bf89b004 (`origin/team`, 2026-07-13)
+- 대상: 최초 감사 기준 이후 Toss Payments 공식 문서 재감사·수정 결과와 최신 `team` 반영
 
 ## 1. 가장 먼저 알아야 할 점
 
-이번 반복 감사의 변경은 처음에는 HEAD 4171f875b 이후 하나의 큰 미커밋 작업 트리였다. 최종 검증 뒤 `toss` 브랜치에는 다음과 같이 컴파일·빌드 가능한 큰 경계로 반영했다.
+이번 반복 감사의 변경은 처음에는 HEAD 4171f875b 이후 하나의 큰 미커밋 작업 트리였다. 최종 검증 뒤 `toss` 브랜치에는 다음과 같이 컴파일·빌드 가능한 큰 경계로 반영했다. 2026-07-13에는 최신 `origin/team`의 10개 후속 커밋을 반영하기 위해 0bf89b004 위로 리베이스했으며, 아래 표는 리베이스 뒤의 현재 hash다.
 
 | 실제 커밋 | 반영 범위 |
 |---|---|
-| `474e12e70` | backend·runtime·운영 121개 파일: C01–C15, backend C18a–C18c |
-| `1e596af12` | Default frontend 56개 파일: C16a–C16e와 Default locale |
-| `34a33c78f` | Classic frontend 25개 파일: C17과 Classic locale |
-| 문서 커밋 | 원래 감사 보고서와 이번 commit index·상세·manifest·history 문서 |
+| `2c619a31e` | backend·runtime·운영 121개 파일: C01–C15, backend C18a–C18c |
+| `28fe73ad5` | Default frontend 56개 파일: C16a–C16e와 Default locale |
+| `c0f4b5a71` | Classic frontend 25개 파일: C17과 Classic locale |
+| `7e9a4efb7` | 원래 감사 보고서와 commit index·상세·manifest·history 문서 |
+| 후속 수동 QA 문서 커밋 | 사람이 실행할 test MID·브라우저·웹훅·장애·DB 시나리오 |
 
 따라서 이 문서 묶음에서 C01부터 C18은 실제 commit hash와 일대일 대응하지 않는 **논리 리뷰 단위**다. 변경량이 큰 C16과 C18은 각각 다섯 개와 네 개의 권장 하위 단위로 나누며, 세밀한 재구성·리뷰 기준은 총 25개다. 실제 반영은 대형 shared file의 hunk 의존성과 중간 커밋 컴파일 위험을 피하기 위해 위 통합 커밋 경계를 사용했다.
 
@@ -37,6 +39,7 @@
 | [변경 파일 완전 매핑](2026-07-12-toss-hardening-file-manifest.md) | Toss 범위 203개 파일을 primary logical commit에 매핑 |
 | [기존 실제 커밋 부록](2026-07-12-toss-hardening-historical-commits.md) | 이미 HEAD에 포함된 Toss baseline commit history |
 | [공식 문서 기준 최종 감사 보고서](2026-07-12-toss-payments-official-docs-audit-and-hardening.md) | 요구사항별 통합 설명, 배포 체크리스트, runbook |
+| [사람 수동 테스트 시나리오](2026-07-12-toss-payments-manual-test-scenarios.md) | test MID·개인·조직·구독·자동충전·웹훅·장애·다중 DB 수동 검증 |
 
 ## 3. 논리 커밋 목록
 
@@ -224,7 +227,7 @@ go vet . ./controller ./model ./service ./middleware ./router ./setting ./i18n
 
 ## 8. 작업 트리 범위
 
-원래 코드·프론트엔드·운영·감사 보고서 범위는 203개이며, 이번 커밋 문서 6개를 더한 최종 Toss 산출물은 209개다. 다음 54개 경로는 작업 트리에 존재하지만 Toss 커밋에서 제외했다.
+원래 코드·프론트엔드·운영·감사 보고서 범위는 203개이며, commit 문서 6개와 후속 수동 QA 문서 1개를 더한 현재 Toss 산출물은 210개다. 다음 54개 경로는 작업 트리에 존재하지만 Toss 커밋에서 제외했다.
 
 - .aionrs 내부 세션 파일
 - .understand-anything 내부의 기존 overlay

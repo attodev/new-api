@@ -1,7 +1,8 @@
 # Toss Payments 하드닝 변경 파일 완전 매핑
 
 - 작성일: 2026-07-12
-- 통합 기준 HEAD: 4171f875b
+- 최초 감사 기준 HEAD: 4171f875b
+- 현재 리베이스 기준 HEAD: 0bf89b004 (`origin/team`, 2026-07-13)
 - 반영 브랜치: toss
 - 범위: 위 공식 문서 감사에서 변경된 Toss 관련 파일 203개
 
@@ -16,7 +17,7 @@ Toss 하드닝은 원래 하나의 큰 working tree diff였다. 대형 파일 �
 - 실제 stage 시에는 shared file을 git add -p로 나눠야 한다.
 - 아래 203개 경로는 중복 없이 한 번씩만 나타난다.
 
-이 문서 요청으로 새로 만든 commit index·detail·history·manifest 문서 6개는 203개 원본 변경 범위에 포함하지 않는다. 원래 감사 산출물인 공식 문서 감사 보고서는 C18d에 포함한다. 따라서 최종 Toss staging·commit 대상은 원본 203개와 신규 문서 6개를 합한 209개다.
+이 문서 요청으로 새로 만든 commit index·detail·history·manifest 문서 6개는 203개 원본 변경 범위에 포함하지 않는다. 원래 감사 산출물인 공식 문서 감사 보고서는 C18d에 포함한다. 최초 통합은 원본 203개와 commit 문서 6개를 합한 209개였고, 후속 [사람 수동 테스트 시나리오](2026-07-12-toss-payments-manual-test-scenarios.md)를 더한 현재 브랜치의 Toss 산출물은 210개다.
 
 ## 2. 집계
 
