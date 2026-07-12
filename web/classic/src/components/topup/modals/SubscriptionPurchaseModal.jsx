@@ -52,9 +52,12 @@ const SubscriptionPurchaseModal = ({
   enableOnlineTopUp = false,
   enableStripeTopUp = false,
   enableCreemTopUp = false,
+  enableTossBilling = false,
+  tossCheckout = null,
   purchaseLimitInfo = null,
   onPayStripe,
   onPayCreem,
+  onPayToss,
   onPayEpay,
 }) => {
   const plan = selectedPlan?.plan;
@@ -68,8 +71,14 @@ const SubscriptionPurchaseModal = ({
   // 只有当管理员开启支付网关 AND 套餐配置了对应的支付ID时才显示
   const hasStripe = enableStripeTopUp && !!plan?.stripe_price_id;
   const hasCreem = enableCreemTopUp && !!plan?.creem_product_id;
+  const hasToss =
+    enableTossBilling &&
+    tossCheckout?.plan_id === plan?.id &&
+    Number.isSafeInteger(tossCheckout?.provider_amount) &&
+    tossCheckout.provider_amount >= 100 &&
+    tossCheckout?.provider_currency === 'KRW';
   const hasEpay = enableOnlineTopUp && epayMethods.length > 0;
-  const hasAnyPayment = hasStripe || hasCreem || hasEpay;
+  const hasAnyPayment = hasStripe || hasCreem || hasToss || hasEpay;
   const purchaseLimit = Number(purchaseLimitInfo?.limit || 0);
   const purchaseCount = Number(purchaseLimitInfo?.count || 0);
   const purchaseLimitReached =
@@ -84,7 +93,10 @@ const SubscriptionPurchaseModal = ({
         </div>
       }
       visible={visible}
-      onCancel={onCancel}
+      onCancel={() => {
+        if (!paying) onCancel();
+      }}
+      maskClosable={!paying}
       footer={null}
       size='small'
       centered
@@ -166,6 +178,19 @@ const SubscriptionPurchaseModal = ({
                   {displayPrice}
                 </Text>
               </div>
+              {hasToss && (
+                <div className='flex justify-between items-center'>
+                  <Text strong className='text-slate-700 dark:text-slate-200'>
+                    Toss：
+                  </Text>
+                  <Text strong className='text-slate-900 dark:text-slate-100'>
+                    {new Intl.NumberFormat('ko-KR').format(
+                      tossCheckout.provider_amount,
+                    )}{' '}
+                    KRW
+                  </Text>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -185,8 +210,8 @@ const SubscriptionPurchaseModal = ({
                 {t('选择支付方式')}：
               </Text>
 
-              {/* Stripe / Creem */}
-              {(hasStripe || hasCreem) && (
+              {/* Stripe / Creem / Toss billing auth */}
+              {(hasStripe || hasCreem || hasToss) && (
                 <div className='flex gap-2'>
                   {hasStripe && (
                     <Button
@@ -210,6 +235,18 @@ const SubscriptionPurchaseModal = ({
                       disabled={purchaseLimitReached}
                     >
                       Creem
+                    </Button>
+                  )}
+                  {hasToss && (
+                    <Button
+                      theme='light'
+                      className='flex-1'
+                      icon={<IconCreditCard />}
+                      onClick={onPayToss}
+                      loading={paying}
+                      disabled={purchaseLimitReached}
+                    >
+                      Toss
                     </Button>
                   )}
                 </div>
