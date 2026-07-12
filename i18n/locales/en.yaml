@@ -412,6 +412,7 @@ topup.fetch_products_failed: "Failed to fetch product list"
 
 # Subscription payment messages
 subscription_payment.invalid_params: "Invalid parameters"
+payment.personal_billing_org_active: "Personal payments are unavailable while you belong to an organization. Use the organization wallet instead."
 
 # Playground messages
 playground.no_access_token: "Access token is not supported for playground"

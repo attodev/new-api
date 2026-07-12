@@ -162,17 +162,21 @@ func TestWalletAutoRechargeCreateRequiresPresetAndCopiesSnapshot(t *testing.T) {
 		user,
 		http.MethodPost,
 		"/api/user/wallet/auto-recharge/scheduled",
-		`{"preset_id":`+strconv.Itoa(preset.Id)+`,"amount":999999,"interval_unit":"day","interval_value":9}`,
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`,"preset_fingerprint":"`+preset.TermsFingerprint+`","amount":999999,"interval_unit":"day","interval_value":9}`,
 	)
 	require.Equal(t, http.StatusOK, res.Code)
 	var payload struct {
 		Success bool `json:"success"`
 		Data    struct {
-			TradeNo string `json:"trade_no"`
+			TradeNo           string                              `json:"trade_no"`
+			PresetFingerprint string                              `json:"preset_fingerprint"`
+			Policy            model.WalletAutoRechargePresetTerms `json:"policy"`
 		} `json:"data"`
 	}
 	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
 	require.True(t, payload.Success)
+	require.Equal(t, preset.TermsFingerprint, payload.Data.PresetFingerprint)
+	require.Equal(t, preset.Terms(), payload.Data.Policy)
 
 	var policy model.WalletAutoRecharge
 	require.NoError(t, model.DB.First(&policy, "auth_trade_no = ?", payload.Data.TradeNo).Error)
@@ -180,5 +184,46 @@ func TestWalletAutoRechargeCreateRequiresPresetAndCopiesSnapshot(t *testing.T) {
 	require.Equal(t, float64(20000), policy.Amount)
 	require.Equal(t, model.WalletAutoRechargeIntervalMonth, policy.IntervalUnit)
 	require.Equal(t, 1, policy.IntervalValue)
-	require.True(t, policy.ChargeImmediately)
+	require.False(t, policy.ChargeImmediately)
+}
+
+func TestWalletAutoRechargeCreateRejectsStalePresetFingerprintWithoutPendingPolicy(t *testing.T) {
+	setupWalletAutoRechargePresetControllerTestDB(t)
+	enableTossBillingForTest(t)
+	user := model.User{Id: 4, Username: "stale-preset-owner", Role: common.RoleCommonUser, AffCode: "stale-preset-owner"}
+	require.NoError(t, model.DB.Create(&user).Error)
+	preset, err := model.CreateWalletAutoRechargePreset(model.WalletAutoRechargePresetRequest{
+		Type: model.WalletAutoRechargeTypeScheduled, TargetScope: model.WalletAutoRechargePresetTargetUser,
+		Name: "월 1회 10000원", Amount: 10000, IntervalUnit: model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1, Enabled: true,
+	})
+	require.NoError(t, err)
+	staleFingerprint := preset.TermsFingerprint
+
+	_, err = model.UpdateWalletAutoRechargePreset(preset.Id, model.WalletAutoRechargePresetRequest{
+		Type: model.WalletAutoRechargeTypeScheduled, TargetScope: model.WalletAutoRechargePresetTargetUser,
+		Name: "월 1회 100000원", Amount: 100000, IntervalUnit: model.WalletAutoRechargeIntervalMonth,
+		IntervalValue: 1, Enabled: true,
+	})
+	require.NoError(t, err)
+
+	res := performOrganizationRequest(
+		RequestWalletScheduledRecharge,
+		user,
+		http.MethodPost,
+		"/api/user/wallet/auto-recharge/scheduled",
+		`{"preset_id":`+strconv.Itoa(preset.Id)+`,"preset_fingerprint":"`+staleFingerprint+`"}`,
+	)
+	require.Equal(t, http.StatusOK, res.Code)
+	var payload struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+	require.False(t, payload.Success)
+	require.Contains(t, payload.Message, "preset terms changed")
+
+	var count int64
+	require.NoError(t, model.DB.Model(&model.WalletAutoRecharge{}).Count(&count).Error)
+	require.Zero(t, count)
 }

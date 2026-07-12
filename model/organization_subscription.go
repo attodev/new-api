@@ -8,6 +8,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrganizationSubscriptionPlan struct {
@@ -251,7 +252,7 @@ func getActiveOrRenewOrganizationUserSubscriptionTx(tx *gorm.DB, organizationId 
 		return nil, nil, errors.New("transaction is nil")
 	}
 	var sub OrganizationUserSubscription
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("organization_id = ? AND user_id = ? AND status = ? AND end_time > ?", organizationId, userId, "active", now).
 		Order("end_time asc, id asc").
 		First(&sub).Error; err == nil {
@@ -264,7 +265,7 @@ func getActiveOrRenewOrganizationUserSubscriptionTx(tx *gorm.DB, organizationId 
 		return nil, nil, err
 	}
 
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("organization_id = ? AND user_id = ? AND status = ? AND end_time <= ?", organizationId, userId, "active", now).
 		Order("end_time desc, id desc").
 		First(&sub).Error; err != nil {
@@ -340,7 +341,7 @@ func CreateOrganizationUserSubscriptionFromPlan(organizationId int, userId int, 
 	cacheGroup := ""
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var user User
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", userId).First(&user).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", userId).First(&user).Error; err != nil {
 			return err
 		}
 		if user.OrganizationId != organizationId {
@@ -453,7 +454,7 @@ func CancelActiveOrganizationUserSubscriptionForUser(organizationId int, userId 
 	cacheGroup := ""
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var subs []OrganizationUserSubscription
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("organization_id = ? AND user_id = ? AND status = ?", organizationId, userId, "active").
 			Order("end_time desc, id desc").
 			Find(&subs).Error; err != nil {
@@ -641,7 +642,7 @@ func PostConsumeOrganizationUserSubscriptionDelta(organizationUserSubscriptionId
 
 func postConsumeOrganizationUserSubscriptionDeltaTx(tx *gorm.DB, organizationUserSubscriptionId int, delta int64) error {
 	var sub OrganizationUserSubscription
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", organizationUserSubscriptionId).First(&sub).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", organizationUserSubscriptionId).First(&sub).Error; err != nil {
 		return err
 	}
 	newUsed := sub.AmountUsed + delta
@@ -661,7 +662,7 @@ func RefundOrganizationSubscriptionPreConsume(requestId string) error {
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
 		var record OrganizationSubscriptionPreConsumeRecord
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("request_id = ?", requestId).First(&record).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("request_id = ?", requestId).First(&record).Error; err != nil {
 			return err
 		}
 		if record.Status == "refunded" {

@@ -16,7 +16,8 @@ import (
 // ---- Shared types ----
 
 type SubscriptionPlanDTO struct {
-	Plan model.SubscriptionPlan `json:"plan"`
+	Plan         model.SubscriptionPlan            `json:"plan"`
+	TossCheckout *TossSubscriptionCheckoutSnapshot `json:"toss_checkout,omitempty"`
 }
 
 type BillingPreferenceRequest struct {
@@ -43,7 +44,8 @@ func GetSubscriptionPlans(c *gin.Context) {
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
 	for _, p := range plans {
 		result = append(result, SubscriptionPlanDTO{
-			Plan: p,
+			Plan:         p,
+			TossCheckout: newTossSubscriptionCheckoutSnapshot(&p, tossSubscriptionChargeKRW(&p), "KRW"),
 		})
 	}
 	common.ApiSuccess(c, result)
@@ -190,7 +192,13 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgSubscriptionResetCycleGtZero)
 		return
 	}
-	err := model.DB.Create(&req.Plan).Error
+	if err := model.ValidateSubscriptionPlanTiming(&req.Plan); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	err := model.RunSubscriptionPlanMutationWithTossBarrier(func(tx *gorm.DB) error {
+		return tx.Create(&req.Plan).Error
+	})
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -257,8 +265,12 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgSubscriptionResetCycleGtZero)
 		return
 	}
+	if err := model.ValidateSubscriptionPlanTiming(&req.Plan); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 
-	err := model.DB.Transaction(func(tx *gorm.DB) error {
+	err := model.RunSubscriptionPlanMutationWithTossBarrier(func(tx *gorm.DB) error {
 		// update plan (allow zero values updates with map)
 		updateMap := map[string]interface{}{
 			"title":                      req.Plan.Title,
@@ -312,7 +324,9 @@ func AdminUpdateSubscriptionPlanStatus(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if err := model.DB.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Update("enabled", *req.Enabled).Error; err != nil {
+	if err := model.RunSubscriptionPlanMutationWithTossBarrier(func(tx *gorm.DB) error {
+		return tx.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Update("enabled", *req.Enabled).Error
+	}); err != nil {
 		common.ApiError(c, err)
 		return
 	}

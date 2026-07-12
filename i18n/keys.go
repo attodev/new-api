@@ -256,29 +256,29 @@ const (
 
 // Deployment related messages (io.net)
 const (
-	MsgDeploymentNotEnabled      = "deployment.not_enabled"
-	MsgDeploymentIdRequired      = "deployment.id_required"
-	MsgDeploymentContainerIdReq  = "deployment.container_id_required"
-	MsgDeploymentNameEmpty       = "deployment.name_empty"
-	MsgDeploymentNameTaken       = "deployment.name_taken"
-	MsgDeploymentHardwareIdReq   = "deployment.hardware_id_required"
-	MsgDeploymentHardwareInvId   = "deployment.hardware_invalid_id"
-	MsgDeploymentApiKeyRequired  = "deployment.api_key_required"
-	MsgDeploymentInvalidPayload  = "deployment.invalid_payload"
-	MsgDeploymentNotFound        = "deployment.not_found"
+	MsgDeploymentNotEnabled       = "deployment.not_enabled"
+	MsgDeploymentIdRequired       = "deployment.id_required"
+	MsgDeploymentContainerIdReq   = "deployment.container_id_required"
+	MsgDeploymentNameEmpty        = "deployment.name_empty"
+	MsgDeploymentNameTaken        = "deployment.name_taken"
+	MsgDeploymentHardwareIdReq    = "deployment.hardware_id_required"
+	MsgDeploymentHardwareInvId    = "deployment.hardware_invalid_id"
+	MsgDeploymentApiKeyRequired   = "deployment.api_key_required"
+	MsgDeploymentInvalidPayload   = "deployment.invalid_payload"
+	MsgDeploymentNotFound         = "deployment.not_found"
 	MsgDeploymentTerminateSuccess = "deployment.terminate_success"
-	MsgDeploymentCreateSuccess   = "deployment.create_success"
-	MsgDeploymentApiKeyInvalid   = "deployment.api_key_invalid"
+	MsgDeploymentCreateSuccess    = "deployment.create_success"
+	MsgDeploymentApiKeyInvalid    = "deployment.api_key_invalid"
 )
 
 // Performance related messages
 const (
-	MsgPerfDiskCacheCleared  = "performance.disk_cache_cleared"
-	MsgPerfStatsReset        = "performance.stats_reset"
-	MsgPerfGcExecuted        = "performance.gc_executed"
-	MsgPerfInvalidMode       = "performance.invalid_mode"
-	MsgPerfInvalidValue      = "performance.invalid_value"
-	MsgPerfLogDirNotConfig   = "performance.log_dir_not_configured"
+	MsgPerfDiskCacheCleared = "performance.disk_cache_cleared"
+	MsgPerfStatsReset       = "performance.stats_reset"
+	MsgPerfGcExecuted       = "performance.gc_executed"
+	MsgPerfInvalidMode      = "performance.invalid_mode"
+	MsgPerfInvalidValue     = "performance.invalid_value"
+	MsgPerfLogDirNotConfig  = "performance.log_dir_not_configured"
 )
 
 // Ability related messages
@@ -434,15 +434,15 @@ const (
 
 // Passkey extended messages
 const (
-	MsgPasskeyUserInfoFailed     = "passkey.user_info_failed"
-	MsgPasskeyHandleMismatch     = "passkey.handle_mismatch"
-	MsgPasskeySaveStateFailed    = "passkey.save_state_failed"
-	MsgPasskeyInvalidSession     = "passkey.invalid_session"
-	MsgPasskeyNeedVerification   = "passkey.need_verification"
-	MsgPasskeyNeedSpecificVerify = "passkey.need_specific_verification"
-	MsgPasskeyInvalidState       = "passkey.invalid_state"
-	MsgPasskeySettingsNotFound   = "passkey.settings_not_found"
-	MsgPasskeySessionExpired     = "passkey.session_expired"
+	MsgPasskeyUserInfoFailed       = "passkey.user_info_failed"
+	MsgPasskeyHandleMismatch       = "passkey.handle_mismatch"
+	MsgPasskeySaveStateFailed      = "passkey.save_state_failed"
+	MsgPasskeyInvalidSession       = "passkey.invalid_session"
+	MsgPasskeyNeedVerification     = "passkey.need_verification"
+	MsgPasskeyNeedSpecificVerify   = "passkey.need_specific_verification"
+	MsgPasskeyInvalidState         = "passkey.invalid_state"
+	MsgPasskeySettingsNotFound     = "passkey.settings_not_found"
+	MsgPasskeySessionExpired       = "passkey.session_expired"
 	MsgPasskeySessionFormatInvalid = "passkey.session_format_invalid"
 )
 
@@ -488,7 +488,8 @@ const (
 
 // Subscription payment messages
 const (
-	MsgSubPaymentInvalidParams = "subscription_payment.invalid_params"
+	MsgSubPaymentInvalidParams         = "subscription_payment.invalid_params"
+	MsgPaymentPersonalBillingOrgActive = "payment.personal_billing_org_active"
 )
 
 // Playground messages
@@ -575,16 +576,16 @@ const (
 
 // Setup messages
 const (
-	MsgSetupAlreadyInitialized  = "setup.already_initialized"
-	MsgSetupUsernameMaxLength   = "setup.username_max_length"
-	MsgSetupPasswordMismatch    = "setup.password_mismatch"
-	MsgSetupPasswordMinLength   = "setup.password_min_length"
-	MsgSetupSuccess             = "setup.success"
-	MsgSetupSystemError         = "setup.system_error"
-	MsgSetupAdminCreateFailed   = "setup.admin_create_failed"
-	MsgSetupSelfUseSaveFailed   = "setup.self_use_save_failed"
-	MsgSetupDemoModeSaveFailed  = "setup.demo_mode_save_failed"
-	MsgSetupInitFailedError     = "setup.init_failed_error"
+	MsgSetupAlreadyInitialized = "setup.already_initialized"
+	MsgSetupUsernameMaxLength  = "setup.username_max_length"
+	MsgSetupPasswordMismatch   = "setup.password_mismatch"
+	MsgSetupPasswordMinLength  = "setup.password_min_length"
+	MsgSetupSuccess            = "setup.success"
+	MsgSetupSystemError        = "setup.system_error"
+	MsgSetupAdminCreateFailed  = "setup.admin_create_failed"
+	MsgSetupSelfUseSaveFailed  = "setup.self_use_save_failed"
+	MsgSetupDemoModeSaveFailed = "setup.demo_mode_save_failed"
+	MsgSetupInitFailedError    = "setup.init_failed_error"
 )
 
 // 2FA controller messages
@@ -652,52 +653,52 @@ const (
 
 // Misc messages
 const (
-	MsgServerRunning          = "misc.server_running"
-	MsgMigrated               = "common.migrated"
-	MsgContactNotConfigured   = "contact.not_configured"
-	MsgEmailRecipientRequired = "email.recipient_required"
-	MsgLogTimestampRequired   = "log.timestamp_required"
-	MsgDbConnectionFailed     = "common.db_connection_failed"
-	MsgInvalidEmail           = "common.invalid_email"
-	MsgEmailDomainRestricted  = "common.email_domain_restricted"
-	MsgEmailAliasRestricted   = "common.email_alias_restricted"
-	MsgEmailTaken             = "common.email_taken"
-	MsgResetLinkInvalid       = "common.reset_link_invalid"
-	MsgUserGroupFailed        = "common.user_group_failed"
-	MsgOrgNotFound            = "common.org_not_found"
-	MsgModelRequired          = "common.model_required"
+	MsgServerRunning                  = "misc.server_running"
+	MsgMigrated                       = "common.migrated"
+	MsgContactNotConfigured           = "contact.not_configured"
+	MsgEmailRecipientRequired         = "email.recipient_required"
+	MsgLogTimestampRequired           = "log.timestamp_required"
+	MsgDbConnectionFailed             = "common.db_connection_failed"
+	MsgInvalidEmail                   = "common.invalid_email"
+	MsgEmailDomainRestricted          = "common.email_domain_restricted"
+	MsgEmailAliasRestricted           = "common.email_alias_restricted"
+	MsgEmailTaken                     = "common.email_taken"
+	MsgResetLinkInvalid               = "common.reset_link_invalid"
+	MsgUserGroupFailed                = "common.user_group_failed"
+	MsgOrgNotFound                    = "common.org_not_found"
+	MsgModelRequired                  = "common.model_required"
 	MsgPaymentComplianceDashboardOnly = "payment.compliance_dashboard_only"
 )
 
 // Passkey controller messages
 const (
-	MsgPasskeyNotEnabled   = "passkey.not_enabled"
-	MsgPasskeyRegistered   = "passkey.registered"
-	MsgPasskeyUnbound      = "passkey.unbound"
-	MsgPasskeyNotBound     = "passkey.not_bound"
-	MsgPasskeyReset        = "passkey.reset"
-	MsgPasskeyVerified     = "passkey.verified"
-	MsgPasskeyNotLoggedIn  = "passkey.not_logged_in"
+	MsgPasskeyNotEnabled  = "passkey.not_enabled"
+	MsgPasskeyRegistered  = "passkey.registered"
+	MsgPasskeyUnbound     = "passkey.unbound"
+	MsgPasskeyNotBound    = "passkey.not_bound"
+	MsgPasskeyReset       = "passkey.reset"
+	MsgPasskeyVerified    = "passkey.verified"
+	MsgPasskeyNotLoggedIn = "passkey.not_logged_in"
 )
 
 // Organization controller messages
 const (
-	MsgOrgRootRequired        = "org.root_required"
-	MsgOrgOwnerRequired       = "org.owner_required"
-	MsgOrgAdminRequired       = "org.admin_required"
-	MsgOrgNoFieldsToUpdate    = "org.no_fields_to_update"
-	MsgOrgNoUserFieldsToUpdate = "org.no_user_fields_to_update"
-	MsgOrgInvalidStartTs      = "org.invalid_start_timestamp"
-	MsgOrgInvalidEndTs        = "org.invalid_end_timestamp"
-	MsgOrgInvalidPreset       = "org.invalid_preset"
-	MsgOrgTimestampOrder      = "org.timestamp_order"
-	MsgOrgIdRequired          = "org.id_required"
-	MsgOrgSubNoFieldsToUpdate = "org.subscription_no_fields_to_update"
-	MsgOrgTargetPermDenied    = "org.target_permission_denied"
+	MsgOrgRootRequired            = "org.root_required"
+	MsgOrgOwnerRequired           = "org.owner_required"
+	MsgOrgAdminRequired           = "org.admin_required"
+	MsgOrgNoFieldsToUpdate        = "org.no_fields_to_update"
+	MsgOrgNoUserFieldsToUpdate    = "org.no_user_fields_to_update"
+	MsgOrgInvalidStartTs          = "org.invalid_start_timestamp"
+	MsgOrgInvalidEndTs            = "org.invalid_end_timestamp"
+	MsgOrgInvalidPreset           = "org.invalid_preset"
+	MsgOrgTimestampOrder          = "org.timestamp_order"
+	MsgOrgIdRequired              = "org.id_required"
+	MsgOrgSubNoFieldsToUpdate     = "org.subscription_no_fields_to_update"
+	MsgOrgTargetPermDenied        = "org.target_permission_denied"
 	MsgOrgGlobalAdminUnmanageable = "org.global_admin_unmanageable"
-	MsgOrgCannotReassignSelf  = "org.cannot_reassign_self"
-	MsgOrgInvalidRole         = "org.invalid_role"
+	MsgOrgCannotReassignSelf      = "org.cannot_reassign_self"
+	MsgOrgInvalidRole             = "org.invalid_role"
 	MsgOrgOnlyOwnerCanAssignOwner = "org.only_owner_can_assign_owner"
-	MsgOrgUserNotInOrg        = "org.user_not_in_org"
-	MsgOrgOwnerCannotBeRemoved = "org.owner_cannot_be_removed"
+	MsgOrgUserNotInOrg            = "org.user_not_in_org"
+	MsgOrgOwnerCannotBeRemoved    = "org.owner_cannot_be_removed"
 )
