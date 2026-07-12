@@ -51,10 +51,12 @@ import {
 import { useTossBilling } from '../../hooks/use-toss-billing'
 import {
   TOSS_CARD_MINIMUM_AMOUNT_KRW,
+  createTossSubscriptionPaymentConfirmation,
   formatDuration,
   formatResetPeriod,
   formatTossChargeKRW,
   getTossChargeKRW,
+  type TossSubscriptionPaymentConfirmation,
 } from '../../lib'
 import type { PlanRecord } from '../../types'
 
@@ -85,6 +87,8 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const { currency } = useSystemConfig()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
+  const [tossPaymentConfirmation, setTossPaymentConfirmation] =
+    useState<Readonly<TossSubscriptionPaymentConfirmation> | null>(null)
   const { processing: tossBillingProcessing, subscribeWithToss } =
     useTossBilling()
 
@@ -96,7 +100,20 @@ export function SubscriptionPurchaseDialog(props: Props) {
     }
   }, [props.open, props.epayMethods])
 
-  const plan = props.plan?.plan
+  useEffect(() => {
+    if (!props.open) {
+      setTossPaymentConfirmation(null)
+      return
+    }
+    // Preserve the exact plan object and server-provided KRW quote rendered for
+    // this open dialog even if a background plan refresh replaces its props.
+    setTossPaymentConfirmation(
+      (current) =>
+        current ?? createTossSubscriptionPaymentConfirmation(props.plan)
+    )
+  }, [props.open, props.plan])
+
+  const plan = tossPaymentConfirmation?.plan ?? props.plan?.plan
   if (!plan) return null
 
   const hasStripe = props.enableStripe && !!plan.stripe_price_id
@@ -116,10 +133,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const totalAmount = Number(plan.total_amount || 0)
   const price = Number(plan.price_amount || 0).toFixed(2)
   const tossChargeKRW = hasToss
-    ? formatTossChargeKRW(
-        Number(plan.price_amount || 0),
-        props.tossUnitPrice || 0
-      )
+    ? tossPaymentConfirmation
+      ? new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: tossPaymentConfirmation.checkout.provider_currency,
+          maximumFractionDigits: 0,
+        }).format(tossPaymentConfirmation.checkout.provider_amount)
+      : formatTossChargeKRW(
+          Number(plan.price_amount || 0),
+          props.tossUnitPrice || 0
+        )
     : ''
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
@@ -135,10 +158,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
     (props.purchaseLimit || 0) > 0 &&
     (props.purchaseCount || 0) >= (props.purchaseLimit || 0)
   const tossChargeAmountKRW = hasToss
-    ? getTossChargeKRW(Number(plan.price_amount || 0), props.tossUnitPrice || 0)
+    ? (tossPaymentConfirmation?.checkout.provider_amount ??
+      getTossChargeKRW(
+        Number(plan.price_amount || 0),
+        props.tossUnitPrice || 0
+      ))
     : 0
   const tossChargeUnavailable =
-    hasToss && tossChargeAmountKRW < TOSS_CARD_MINIMUM_AMOUNT_KRW
+    hasToss &&
+    (!tossPaymentConfirmation ||
+      tossChargeAmountKRW < TOSS_CARD_MINIMUM_AMOUNT_KRW)
 
   const handlePayStripe = async () => {
     setPaying(true)
@@ -278,13 +307,29 @@ export function SubscriptionPurchaseDialog(props: Props) {
   }
 
   const handlePayToss = async () => {
-    await subscribeWithToss(plan.id)
-    // SDK redirects to successUrl on auth completion — dialog stays open
-    // until redirect. If user cancels, we simply reset (hook handles toast).
+    if (!tossPaymentConfirmation) {
+      toast.error(t('Payment request failed'))
+      return
+    }
+    const result = await subscribeWithToss(tossPaymentConfirmation)
+    if (result === 'started' || result === 'confirmation_changed') {
+      props.onOpenChange(false)
+    }
+    // A redirect normally makes the close unobservable. It still prevents a
+    // second reservation if a popup-capable SDK path resolves in this page.
   }
 
   return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+    <Dialog
+      open={props.open}
+      onOpenChange={(open) => {
+        // Do not let a close gesture detach the dialog while a durable Toss
+        // reservation is being created. The hook must either open the SDK or
+        // cancel that reservation before the buyer can leave this flow.
+        if (!open && (paying || tossBillingProcessing)) return
+        props.onOpenChange(open)
+      }}
+    >
       <DialogContent className='max-sm:w-[calc(100vw-1.5rem)] sm:max-w-md'>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>

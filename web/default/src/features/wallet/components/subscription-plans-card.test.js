@@ -16,17 +16,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-// ============================================================================
-// Wallet Hooks Exports
-// ============================================================================
+import { describe, expect, test } from 'bun:test'
+import { getEpayMethods } from './subscription-plans-card'
 
-export * from './use-topup-info'
-export * from './use-payment'
-export * from './use-affiliate'
-export * from './use-redemption'
-export * from './use-creem-payment'
-export * from './use-waffo-payment'
-export * from './use-waffo-pancake-payment'
-export * from './use-toss-payment'
-export * from './use-toss-payment-lifecycle'
-export * from './use-wallet-auto-recharge'
+describe('subscription payment method routing', () => {
+  test('never routes dedicated Toss billing auth through legacy Epay', () => {
+    expect(
+      getEpayMethods([
+        { type: 'toss', name: 'Toss' },
+        { type: 'alipay', name: 'Alipay' },
+        { type: 'stripe', name: 'Stripe' },
+        { type: 'creem', name: 'Creem' },
+      ])
+    ).toEqual([{ type: 'alipay', name: 'Alipay' }])
+  })
+})

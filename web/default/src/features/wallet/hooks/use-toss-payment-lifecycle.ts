@@ -16,17 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-// ============================================================================
-// Wallet Hooks Exports
-// ============================================================================
+import { useEffect, useRef } from 'react'
+import { TossPaymentLifecycle } from '../lib/toss-payment-lifecycle'
 
-export * from './use-topup-info'
-export * from './use-payment'
-export * from './use-affiliate'
-export * from './use-redemption'
-export * from './use-creem-payment'
-export * from './use-waffo-payment'
-export * from './use-waffo-pancake-payment'
-export * from './use-toss-payment'
-export * from './use-toss-payment-lifecycle'
-export * from './use-wallet-auto-recharge'
+export function useTossPaymentLifecycle(): TossPaymentLifecycle {
+  const lifecycleRef = useRef<TossPaymentLifecycle | null>(null)
+  if (!lifecycleRef.current) {
+    lifecycleRef.current = new TossPaymentLifecycle()
+  }
+
+  useEffect(() => {
+    const lifecycle = lifecycleRef.current!
+    lifecycle.activate()
+    return () => lifecycle.deactivate()
+  }, [])
+
+  return lifecycleRef.current
+}

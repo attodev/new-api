@@ -31,9 +31,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  formatScheduledPeriodSummary,
   groupThresholdPresetOptions,
   groupUserScheduledPresetOptions,
 } from '../lib/auto-recharge-options'
+import {
+  getWalletAutoRechargePresetTerms,
+  hasValidWalletAutoRechargePresetFingerprint,
+} from '../lib/wallet-auto-recharge-session'
 import type {
   WalletAutoRechargePolicy,
   WalletAutoRechargePreset,
@@ -116,9 +121,13 @@ export function getInitialAutoRechargeFormState(
 }
 
 export function buildPresetCreatePayload(
-  presetId: number
+  preset: WalletAutoRechargePreset
 ): WalletAutoRechargeRequest {
-  return { preset_id: presetId }
+  return {
+    preset_id: preset.id,
+    preset_fingerprint: preset.terms_fingerprint ?? '',
+    expected_policy: getWalletAutoRechargePresetTerms(preset),
+  }
 }
 
 export function getVisibleAutoRechargeModes(
@@ -187,7 +196,12 @@ export function AutoRechargeCard({
   const availablePresets = useMemo(
     () =>
       presets
-        .filter((preset) => preset.enabled && preset.type === mode)
+        .filter(
+          (preset) =>
+            preset.enabled &&
+            preset.type === mode &&
+            hasValidWalletAutoRechargePresetFingerprint(preset)
+        )
         .sort((left, right) => {
           const sortOrder = (left.sort_order ?? 0) - (right.sort_order ?? 0)
           if (sortOrder !== 0) return sortOrder
@@ -217,8 +231,23 @@ export function AutoRechargeCard({
       ? scheduledGroups.length > 0
       : thresholdGroups.length > 0
 
-  const handleSelectPreset = async (presetId: number) => {
-    const payload = buildPresetCreatePayload(presetId)
+  const selectedPreset = useMemo(
+    () =>
+      selectedPresetId === null
+        ? undefined
+        : availablePresets.find((preset) => preset.id === selectedPresetId),
+    [availablePresets, selectedPresetId]
+  )
+  const consentPreset =
+    selectedPreset ??
+    (availablePresets.length === 1 ? availablePresets[0] : undefined)
+  const selectedPresetChargesImmediately =
+    consentPreset?.type === 'scheduled' &&
+    consentPreset.interval_unit !== 'month' &&
+    consentPreset.charge_immediately === true
+
+  const handleSelectPreset = async (preset: WalletAutoRechargePreset) => {
+    const payload = buildPresetCreatePayload(preset)
     if (mode === 'scheduled') {
       await onCreateScheduled(payload)
       return
@@ -232,8 +261,8 @@ export function AutoRechargeCard({
   }
 
   const handleSubmitSelectedPreset = async () => {
-    if (selectedPresetId === null) return
-    await handleSelectPreset(selectedPresetId)
+    if (!selectedPreset) return
+    await handleSelectPreset(selectedPreset)
   }
 
   return (
@@ -252,10 +281,16 @@ export function AutoRechargeCard({
                     {t('Recharge amount')}: {activePolicy.amount}
                   </div>
                   {mode === 'scheduled' ? (
-                    activePolicy.interval_unit === 'month' ||
-                    activePolicy.interval_unit === 'custom' ? (
+                    activePolicy.interval_unit === 'month' ? (
                       <div className='text-muted-foreground text-sm'>
                         {t('Charges on the 1st of every month')}
+                      </div>
+                    ) : activePolicy.interval_unit === 'custom' ? (
+                      <div className='text-muted-foreground text-sm'>
+                        {t('Test charge interval')}:{' '}
+                        {t('{{seconds}}s', {
+                          seconds: activePolicy.custom_seconds ?? 0,
+                        })}
                       </div>
                     ) : (
                       <div className='text-muted-foreground text-sm'>
@@ -325,9 +360,16 @@ export function AutoRechargeCard({
                 {selectedScheduledGroup ? (
                   <div className='space-y-2'>
                     <div className='text-sm font-medium'>
-                      {t(
-                        'Monthly recharge charges the selected amount on the 1st of every month.'
-                      )}
+                      {selectedScheduledGroup.period.kind === 'monthly'
+                        ? t(
+                            'Monthly recharge charges the selected amount on the 1st of every month.'
+                          )
+                        : t('Test mode charge interval: {{interval}}', {
+                            interval: formatScheduledPeriodSummary(
+                              selectedScheduledGroup.period,
+                              t
+                            ),
+                          })}
                     </div>
                     <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
                       {selectedScheduledGroup.amounts.map((option) => (
@@ -423,13 +465,25 @@ export function AutoRechargeCard({
                 ) : null}
               </>
             )}
+            {selectedPresetChargesImmediately ? (
+              <div className='text-destructive text-sm font-medium'>
+                {t(
+                  '{{amount}} KRW will be charged immediately after card registration. Future charges follow the interval above.',
+                  { amount: consentPreset?.amount }
+                )}
+              </div>
+            ) : null}
             <Button
               type='button'
               className='w-full'
-              disabled={creationButtonDisabled || selectedPresetId === null}
+              disabled={creationButtonDisabled || !selectedPreset}
               onClick={() => void handleSubmitSelectedPreset()}
             >
-              {t('Register card and set auto recharge')}
+              {selectedPresetChargesImmediately
+                ? t('Pay {{amount}} KRW now and enable auto recharge', {
+                    amount: consentPreset?.amount,
+                  })
+                : t('Register card and set auto recharge')}
             </Button>
           </div>
         ) : null}

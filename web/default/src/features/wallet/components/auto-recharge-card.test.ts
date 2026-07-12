@@ -41,6 +41,7 @@ const enMessages = (
     )
   ) as { translation: Record<string, string> }
 ).translation
+const presetFingerprint = 'a'.repeat(64)
 
 before(async () => {
   if (!i18next.isInitialized) {
@@ -163,7 +164,7 @@ describe('auto recharge card helpers', () => {
     assert.doesNotMatch(html, /Threshold balance/)
   })
 
-  test('renders active scheduled test-period policy with monthly copy', () => {
+  test('renders the actual cadence for an active test-period policy', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
         mode: 'scheduled',
@@ -190,9 +191,9 @@ describe('auto recharge card helpers', () => {
       })
     )
 
-    assert.match(html, /Charges on the 1st of every month/)
-    assert.doesNotMatch(html, /Charge interval/)
-    assert.doesNotMatch(html, /custom/)
+    assert.match(html, /Test charge interval/)
+    assert.match(html, /60s/)
+    assert.doesNotMatch(html, /Charges on the 1st of every month/)
   })
 })
 
@@ -288,8 +289,37 @@ describe('auto recharge preset UI helpers', () => {
     )
   })
 
-  test('builds create payload with preset id only', () => {
-    assert.deepEqual(buildPresetCreatePayload(12), { preset_id: 12 })
+  test('freezes the displayed preset contract in the create payload', () => {
+    assert.deepEqual(
+      buildPresetCreatePayload({
+        id: 12,
+        type: 'scheduled',
+        target_scope: 'user',
+        name: 'Monthly 10000',
+        amount: 10000,
+        interval_unit: 'month',
+        interval_value: 1,
+        enabled: true,
+        terms_fingerprint: presetFingerprint,
+      }),
+      {
+        preset_id: 12,
+        preset_fingerprint: presetFingerprint,
+        expected_policy: {
+          preset_id: 12,
+          type: 'scheduled',
+          target_scope: 'user',
+          amount: 10000,
+          threshold_amount: 0,
+          threshold_quota: 0,
+          interval_unit: 'month',
+          interval_value: 1,
+          custom_seconds: 0,
+          charge_immediately: false,
+          enabled: true,
+        },
+      }
+    )
   })
 
   test('renders scheduled presets as monthly amount choices only', () => {
@@ -307,6 +337,7 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'day',
             interval_value: 1,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
           {
             id: 2,
@@ -317,6 +348,7 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'month',
             interval_value: 1,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
@@ -338,7 +370,7 @@ describe('auto recharge preset UI helpers', () => {
     assert.match(html, /30000원/)
   })
 
-  test('renders scheduled test-period presets with monthly copy', () => {
+  test('renders scheduled test-period presets with their actual cadence', () => {
     const html = renderWithI18n(
       React.createElement(AutoRechargeCard, {
         mode: 'scheduled',
@@ -353,7 +385,9 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'custom',
             interval_value: 1,
             custom_seconds: 60,
+            charge_immediately: true,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
@@ -366,13 +400,15 @@ describe('auto recharge preset UI helpers', () => {
     )
 
     assert.doesNotMatch(html, /Choose recharge period/)
-    assert.doesNotMatch(html, /Test period/)
-    assert.match(
+    assert.match(html, /Test mode charge interval/)
+    assert.match(html, /60s/)
+    assert.doesNotMatch(
       html,
       /Monthly recharge charges the selected amount on the 1st of every month\./
     )
     assert.match(html, /5000원/)
-    assert.match(html, /Register card and set auto recharge/)
+    assert.match(html, /5000 KRW will be charged immediately/)
+    assert.match(html, /Pay 5000 KRW now and enable auto recharge/)
   })
 
   test('hides scheduled period selector when only one period exists', () => {
@@ -390,6 +426,7 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'month',
             interval_value: 1,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
           {
             id: 2,
@@ -400,6 +437,7 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'month',
             interval_value: 1,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
@@ -436,6 +474,7 @@ describe('auto recharge preset UI helpers', () => {
             threshold_amount: 0,
             threshold_quota: 500000,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
           {
             id: 4,
@@ -446,6 +485,7 @@ describe('auto recharge preset UI helpers', () => {
             threshold_amount: 0,
             threshold_quota: 500000,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
@@ -480,6 +520,7 @@ describe('auto recharge preset UI helpers', () => {
             threshold_amount: 0,
             threshold_quota: 500000,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
@@ -510,6 +551,7 @@ describe('auto recharge preset UI helpers', () => {
             interval_unit: 'month',
             interval_value: 1,
             enabled: true,
+            terms_fingerprint: presetFingerprint,
           },
         ],
         loading: false,
