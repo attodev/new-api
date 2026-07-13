@@ -19,12 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
-  { code: 'zh', label: '简体中文' },
-  { code: 'fr', label: 'Français' },
-  { code: 'ja', label: '日本語' },
   { code: 'kr', label: '한국어' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'vi', label: 'Tiếng Việt' },
 ] as const
 
 export type InterfaceLanguageCode =
@@ -41,10 +36,6 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
     normalized === 'ko-kp'
   ) {
     return 'kr'
-  }
-
-  if (normalized.startsWith('zh')) {
-    return 'zh'
   }
 
   const primaryLanguage = normalized.split('-')[0]
