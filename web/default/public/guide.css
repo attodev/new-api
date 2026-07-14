@@ -201,6 +201,7 @@
 /* Row of multiple captioned screen-captures for a single step (e.g. create + copy) */
 .guide-step-shot-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .guide-step-shot-fig { flex: 1 1 0; min-width: 0; max-width: 100%; margin: 10px 0 0; }
+.guide-step-shot-fig--login { max-width: 80%; margin: 10px auto 0; }
 .guide-step-shot-row .guide-step-shot-fig { margin-top: 0; }
 .guide-step-shot-fig .guide-step-shot { width: 100%; margin-top: 0; }
 .guide-step-shot-fig figcaption {
