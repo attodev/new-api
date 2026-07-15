@@ -85,7 +85,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/landing.css?v=20260715-video-controls" />
   </head>
   <body>
     <!-- ── SECTION 1: GNB ── -->
@@ -145,7 +145,15 @@
                 <img id="animPosterStd" class="anim-poster-img active" src="/videos/main/alrouter_poster.png" alt="" decoding="async" fetchpriority="high" />
                 <img id="animPosterLite" class="anim-poster-img" src="/videos/main/alrouter_lite_poster.png" alt="" decoding="async" fetchpriority="high" />
               </div>
-              <div class="anim-hover-overlay" id="animHoverOverlay">
+              <button
+                type="button"
+                class="anim-hover-overlay"
+                id="animHoverOverlay"
+                data-label-pause="Pause video"
+                data-label-resume="Resume video"
+                aria-label="Pause video"
+                hidden
+              >
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
                     <div class="anim-pause-icon">
@@ -170,8 +178,8 @@
                   </div>
                   <span class="anim-play-label">Continue</span>
                 </div>
-              </div>
-              <div class="anim-play-overlay" id="animPlayOverlay">
+              </button>
+              <button type="button" class="anim-play-overlay" id="animPlayOverlay" aria-label="Play video">
                 <div class="anim-play-btn">
                   <svg
                     viewBox="0 0 24 24"
@@ -182,13 +190,14 @@
                   </svg>
                 </div>
                 <span class="anim-play-label">Tap to Start</span>
-              </div>
+              </button>
               <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
                 <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
                   <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
                   <div class="anim-cta-btn-text">Get Started →</div>
                 </a>
                 <button
+                  type="button"
                   class="anim-end-btn anim-end-replay"
                   id="animReplayBtn"
                   style="display: none"
@@ -1474,7 +1483,7 @@
       </div>
     </div>
       <script src="./popup.js" defer></script>
-      <script src="./landing.js" defer></script>
+      <script src="/landing.js?v=20260715-video-controls" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

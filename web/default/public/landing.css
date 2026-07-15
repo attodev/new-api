@@ -709,11 +709,11 @@ cursor:pointer; transition:opacity 0.2s, transform 0.15s;
         .anim-wrap.swipe-right { animation: swipeRight 0.28s ease both; }
         @keyframes swipeLeft  { 0%{transform:translateX(18px);opacity:.4} 100%{transform:translateX(0);opacity:1} }
         @keyframes swipeRight { 0%{transform:translateX(-18px);opacity:.4} 100%{transform:translateX(0);opacity:1} }
-        .anim-play-overlay {
+.anim-play-overlay {
 position: absolute; inset: 0; z-index: 30; border-radius: 24px;
 display: flex; flex-direction: column; align-items: center; justify-content: center;
 background: rgba(0,0,0,0.45); cursor: pointer; gap: 12px;
-transition: background 0.2s;
+transition: background 0.2s; border: 0; padding: 0; color: inherit; font: inherit;
         }
         .anim-play-overlay:hover { background: rgba(0,0,0,0.55); }
         .anim-play-btn {
@@ -724,16 +724,21 @@ box-shadow: 0 0 0 8px rgba(14,165,233,0.2); transition: transform 0.15s, box-sha
         .anim-play-overlay:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
         .anim-play-btn svg { width: 32px; height: 32px; margin-left: 5px; }
         .anim-play-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); letter-spacing: 0.05em; }
-        .anim-hover-overlay {
+.anim-hover-overlay {
 position: absolute; inset: 0; z-index: 20; border-radius: 24px;
-display: none; flex-direction: column; align-items: center; justify-content: center;
-background: rgba(0,0,0,0.42); gap: 12px;
-transition: background 0.2s;
-pointer-events: none;
+display: flex; flex-direction: column; align-items: center; justify-content: center;
+background: transparent; gap: 12px; opacity: 0;
+transition: background 0.2s, opacity 0.15s;
+border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer;
         }
+.anim-hover-overlay[hidden] { display: none; }
+.anim-hover-overlay:hover,
+.anim-hover-overlay:focus-visible,
+.anim-hover-overlay.is-paused { background: rgba(0,0,0,0.42); opacity: 1; }
+.anim-hover-overlay:focus-visible { outline: 3px solid #38bdf8; outline-offset: -4px; }
         .anim-hover-state {
 display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer;
-pointer-events: auto;
+pointer-events: none;
         }
         .anim-hover-state:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
         .anim-pause-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -741,7 +746,7 @@ pointer-events: auto;
         .anim-cta-wrap {
 position: absolute; top: 27%; left: 52%; right: 5%;
 display: flex; flex-direction: column; align-items: stretch; gap: 16px;
-z-index: 10;
+z-index: 40;
         }
         .anim-cta-overlay {
 display: flex; flex-direction: column; align-items: center; gap: 5px;

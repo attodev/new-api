@@ -27,7 +27,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/landing.css?v=20260715-video-controls" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
@@ -51,22 +51,22 @@
       <div class="guide-group active" id="guide-group-manual">
         <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
-            <video id="guideVideo" controls preload="metadata" poster="/videos/guide/guide-manual-anthropic-en-poster.png">
+            <video id="guideVideo" controls playsinline preload="metadata" poster="/videos/guide/guide-manual-anthropic-en-poster.png">
               <source src="/videos/guide/guide-manual-anthropic-en.mp4" type="video/mp4" />
             </video>
-            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay">
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay" data-label-start="Play video" data-label-resume="Resume video" aria-label="Play video">
               <div class="anim-play-btn">
                 <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
                   <polygon points="6,3 20,12 6,21" />
                 </svg>
               </div>
-            </div>
+            </button>
             <div class="guide-cta-wrap" id="guideCtaWrap" style="display: none">
               <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtn">
                 <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
                 <div class="anim-cta-btn-text">Get Started →</div>
               </a>
-              <button class="anim-end-btn anim-end-replay" id="guideReplayBtn" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtn" style="display: none">
                 <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 .49-4" />
@@ -249,22 +249,22 @@ responses_websockets_v2 = false</pre>
       <div class="guide-group" id="guide-group-ccswitch">
         <section class="guide-panel active" id="guide-panel-ccswitch">
           <div class="guide-video-frame">
-            <video id="guideVideoCc" controls preload="metadata" poster="/videos/guide/guide-cc-anthropic-en-poster.png">
+            <video id="guideVideoCc" controls playsinline preload="metadata" poster="/videos/guide/guide-cc-anthropic-en-poster.png">
               <source src="/videos/guide/guide-cc-anthropic-en.mp4" type="video/mp4" />
             </video>
-            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc">
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc" data-label-start="Play video" data-label-resume="Resume video" aria-label="Play video">
               <div class="anim-play-btn">
                 <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
                   <polygon points="6,3 20,12 6,21" />
                 </svg>
               </div>
-            </div>
+            </button>
             <div class="guide-cta-wrap" id="guideCtaWrapCc" style="display: none">
               <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtnCc">
                 <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
                 <div class="anim-cta-btn-text">Get Started →</div>
               </a>
-              <button class="anim-end-btn anim-end-replay" id="guideReplayBtnCc" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtnCc" style="display: none">
                 <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 .49-4" />
@@ -439,7 +439,7 @@ $ brew install --cask cc-switch</pre>
     </div>
 
     <script src="/popup.js" defer></script>
-    <script src="/guide.js" defer></script>
+    <script src="/guide.js?v=20260715-video-controls" defer></script>
     <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

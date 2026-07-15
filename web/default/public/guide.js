@@ -32,6 +32,12 @@
           guidePlayOverlay.classList.remove('visible');
         } else if (guideVideo.paused) {
           guidePlayOverlay.classList.add('visible');
+          guidePlayOverlay.setAttribute(
+            'aria-label',
+            guideVideo.currentTime > 0
+              ? guidePlayOverlay.dataset.labelResume
+              : guidePlayOverlay.dataset.labelStart
+          );
         } else {
           guidePlayOverlay.classList.remove('visible');
         }
@@ -91,6 +97,13 @@
 
   wireGuideVideo('');
   wireGuideVideo('Cc', 7);
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) return;
+    document.querySelectorAll('.guide-video-frame video').forEach(function (video) {
+      if (!video.paused) video.pause();
+    });
+  });
 
   // 스페이스바로 재생/일시정지: 영상에 포커스가 없어도, 현재 보이는 그룹의 영상을 토글
   // (버튼/링크/입력 요소에 포커스가 있을 때는 그 요소의 기본 동작을 방해하지 않도록 무시)

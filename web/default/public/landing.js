@@ -165,6 +165,22 @@ const STRINGS = {
   const CTA_MAP = STRINGS.ctaMap;
   let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
   let switchRequestId = 0;
+  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
+
+  function syncPlaybackToggle() {
+    const unavailable = playOverlay.style.display !== 'none' || video.ended;
+    hoverOverlay.hidden = unavailable;
+    if (unavailable) return;
+
+    const isPaused = video.paused;
+    pauseState.style.display = isPaused ? 'none' : 'flex';
+    resumeState.style.display = isPaused ? 'flex' : 'none';
+    hoverOverlay.classList.toggle('is-paused', isPaused);
+    hoverOverlay.setAttribute(
+      'aria-label',
+      isPaused ? hoverOverlay.dataset.labelResume : hoverOverlay.dataset.labelPause,
+    );
+  }
 
   function loadAndDecodePoster(img) {
     const loaded = img.complete
@@ -193,6 +209,7 @@ const STRINGS = {
   Object.values(posterReady).forEach((ready) => ready.catch(() => {}));
 
   playOverlay.addEventListener('click', () => {
+    if (_isSwiping) return;
     // Playing the current video cancels a poster switch that is still loading.
     switchRequestId += 1;
     sessionStorage.setItem('videoVersion', window._videoVer);
@@ -202,6 +219,18 @@ const STRINGS = {
     video.play();
   });
 
+  hoverOverlay.addEventListener('click', () => {
+    if (_isSwiping || video.ended) return;
+    if (video.paused) {
+      video.play();
+    } else {
+      video.pause();
+    }
+  });
+
+  video.addEventListener('play', syncPlaybackToggle);
+  video.addEventListener('pause', syncPlaybackToggle);
+
   video.addEventListener('timeupdate', () => {
     if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
       ctaWrap.style.display = 'flex';
@@ -210,7 +239,7 @@ const STRINGS = {
   });
 
   video.addEventListener('ended', () => {
-    hoverOverlay.style.display = 'none';
+    syncPlaybackToggle();
     replayBtn.style.display = 'flex';
   });
 
@@ -222,43 +251,7 @@ const STRINGS = {
     video.play();
   });
 
-  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
-  animWrap.addEventListener('mouseenter', () => {
-    if (isTouch()) return;
-    if (playOverlay.style.display !== 'none') return;
-    if (video.ended) return;
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-  });
-  animWrap.addEventListener('mouseleave', () => {
-    if (isTouch()) return;
-    hoverOverlay.style.display = 'none';
-  });
-
-  // Mobile: tap to show controls, auto-hide after 2.5s
-  let _hideControlsTimer = null;
-  animWrap.addEventListener('click', () => {
-    if (!isTouch()) return;
-    if (_isSwiping) return;
-    if (playOverlay.style.display !== 'none') return; // play overlay handles this tap
-    if (video.ended) return;
-    clearTimeout(_hideControlsTimer);
-    if (hoverOverlay.style.display === 'flex') {
-      hoverOverlay.style.display = 'none';
-      return;
-    }
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-    _hideControlsTimer = setTimeout(() => {
-      hoverOverlay.style.display = 'none';
-    }, 2500);
-  });
-
   // Mobile swipe to switch video (std ↔ lite)
-  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
   animWrap.addEventListener('touchstart', (e) => {
     _touchStartX = e.touches[0].clientX;
     _touchStartY = e.touches[0].clientY;
@@ -289,7 +282,8 @@ const STRINGS = {
     ctaBtn.classList.remove('active');
     ctaWrap.style.display = 'none';
     replayBtn.style.display = 'none';
-    hoverOverlay.style.display = 'none';
+    hoverOverlay.hidden = true;
+    hoverOverlay.classList.remove('is-paused');
     playOverlay.style.display = '';
     Object.entries(posterImages).forEach(([ver, img]) => {
       img.classList.toggle('active', ver === newVer);
@@ -344,16 +338,11 @@ const STRINGS = {
     window.switchVideo(window._initialVideoVer);
   }
 
-  pauseState.addEventListener('click', () => {
-    video.pause();
-    pauseState.style.display  = 'none';
-    resumeState.style.display = 'flex';
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !video.paused) video.pause();
   });
 
-  resumeState.addEventListener('click', () => {
-    video.play();
-    hoverOverlay.style.display = 'none';
-  });
+  syncPlaybackToggle();
 })();
 
 // ── Calculator pricing ──
