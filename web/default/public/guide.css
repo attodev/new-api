@@ -120,26 +120,28 @@
   display: flex; align-items: flex-start; justify-content: center; padding-top: 18px;
 }
 .guide-step-num { font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 13.5px; font-weight: 700; }
-.guide-step-body { padding: 16px 20px; }
+.guide-step-body { padding: 16px 20px; min-width: 0; }
 .guide-step-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .guide-step-body h4 { margin: 0; font-size: 14.5px; color: #f9fafb; }
 .guide-step-time {
   font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   font-size: 10.5px; color: #6b7688; white-space: nowrap;
 }
-.guide-step-body p { margin: 0 0 10px; color: #9ca3af; font-size: 13px; }
+.guide-step-body p { margin: 0 0 10px; color: #c9d6ea; font-size: 13px; }
 .guide-step-body p:last-child { margin-bottom: 0; }
 
 .guide-pitfall {
-  display: flex; gap: 8px; background: rgba(248,113,113,0.08);
-  border: 1px solid rgba(248,113,113,0.25); border-radius: 8px;
+  display: flex; gap: 8px; background: rgba(248,113,113,0.06);
+  border: 1px solid rgba(248,113,113,0.2); border-radius: 8px;
   padding: 8px 11px; margin-bottom: 10px; font-size: 12px; color: #fca5a5;
+  min-width: 0;
 }
 .guide-pitfall b {
   font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
   color: #f87171; flex-shrink: 0; padding-top: 1px;
 }
+.guide-pitfall p { margin: 0; font-size: 12px; color: #fca5a5; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 .guide-substep {
   border: 1px solid #232e42; border-radius: 10px; background: rgba(255,255,255,0.015);
@@ -159,7 +161,13 @@
 }
 .guide-substep-body { padding: 13px; }
 .guide-substep-body > *:last-child { margin-bottom: 0; }
-.guide-substep-desc { margin: 0 0 8px; font-size: 12.5px; color: #9ca3af; }
+.guide-substep-desc { margin: 0 0 8px; font-size: 12.5px; color: #c9d6ea; }
+
+/* 경고/필수 사항은 아니지만 본문과 구분은 되었으면 하는 부가 설명 — 배경 없이 왼쪽 라인만, 본문보다 살짝 작게 */
+.guide-step-body p.guide-aside {
+  border-left: 2px solid #4b5568; padding-left: 12px;
+  margin: 5px 0; font-size: 11.5px; line-height: 1.6; color: #8a94a6;
+}
 
 /* 언어(번역)에 따라 위치가 흔들리지 않도록, 문장에서 링크를 분리해 고정된 버튼으로 노출 */
 .guide-gh-link {
@@ -193,6 +201,7 @@
 /* Row of multiple captioned screen-captures for a single step (e.g. create + copy) */
 .guide-step-shot-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .guide-step-shot-fig { flex: 1 1 0; min-width: 0; max-width: 100%; margin: 10px 0 0; }
+.guide-step-shot-fig--login { max-width: 80%; margin: 10px auto 0; }
 .guide-step-shot-row .guide-step-shot-fig { margin-top: 0; }
 .guide-step-shot-fig .guide-step-shot { width: 100%; margin-top: 0; }
 .guide-step-shot-fig figcaption {
@@ -220,13 +229,14 @@
   display: flex; gap: 8px; background: rgba(245,158,11,0.08);
   border: 1px solid rgba(245,158,11,0.25); border-radius: 8px;
   padding: 8px 11px; margin-top: 10px; margin-bottom: 10px; font-size: 12px;
+  min-width: 0;
 }
 .guide-note .mark {
   font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
   font-weight: 700; color: #f59e0b; flex-shrink: 0; padding-top: 1px;
 }
-.guide-note p { margin: 0; font-size: 12px; color: #d8b479; }
+.guide-note p { margin: 0; font-size: 12px; color: #d8b479; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 /* Coming soon (CC Switch) */
 .guide-coming-soon {

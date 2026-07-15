@@ -385,6 +385,7 @@ export function ChannelsTable() {
       applyHeaderSize
       toolbarProps={{
         searchPlaceholder: t('Filter by name, ID, or key...'),
+        searchDebounceMs: 400,
         additionalSearch: (
           <Input
             placeholder={t('Filter by model...')}

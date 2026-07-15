@@ -72,7 +72,23 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
-    <script src="/lucide.min.js"></script>
+    <script>
+      (function loadLucide(retriesLeft) {
+        var s = document.createElement('script');
+        s.src = '/lucide.min.js';
+        s.onload = function () {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        };
+        s.onerror = function () {
+          if (retriesLeft > 0) {
+            setTimeout(function () { loadLucide(retriesLeft - 1); }, 600);
+          }
+        };
+        document.head.appendChild(s);
+      })(3);
+    </script>
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
@@ -127,9 +143,12 @@
                 id="animVideo"
                 src="/videos/main/alrouter_ko.mp4"
                 playsinline
-                preload="auto"
+                preload="metadata"
               ></video>
-              <img id="animPosterImg" class="anim-poster-img" src="/videos/main/alrouter_ko_poster.png" alt="AlRouter AI API 게이트웨이 서비스 소개 영상 썸네일" />
+              <div id="animPosterLayer" class="anim-poster-layer" aria-hidden="true">
+                <img id="animPosterStd" class="anim-poster-img active" src="/videos/main/alrouter_ko_poster.png" alt="" decoding="async" fetchpriority="high" />
+                <img id="animPosterLite" class="anim-poster-img" src="/videos/main/alrouter_ko_lite_poster.png" alt="" decoding="async" fetchpriority="high" />
+              </div>
               <div class="anim-hover-overlay" id="animHoverOverlay">
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
@@ -197,13 +216,13 @@
           </div>
           <div class="video-indicator">
             <button
-              class="video-dot"
+              class="video-dot active"
               id="dotStd"
               aria-label="일반 영상 보기"
               onclick="switchVideo('std')"
             ></button>
             <button
-              class="video-dot active"
+              class="video-dot"
               id="dotLite"
               aria-label="라이트 영상 보기"
               onclick="switchVideo('lite')"
@@ -1460,15 +1479,9 @@
         </form>
       </div>
     </div>
-
-<<<<<<< HEAD
       <script src="./popup.js" defer></script>
       <script src="./landing.js" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
-=======
-      <script src="/popup.js" defer></script>
-      <script src="/landing.js" defer></script>
->>>>>>> team
   </body>
 </html>
 {{end}}

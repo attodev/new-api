@@ -1,6 +1,7 @@
 {{define "header_ko"}}
     <nav class="gnb">
       <div class="logo">
+        <a href="/" style="display: contents; color: inherit; text-decoration: none;">
         <svg
           class="logo-icon"
           viewBox="0 0 1100 1100"
@@ -24,14 +25,15 @@
             fill="#EC4899"
           />
         </svg>
-        {{if eq .Active "guide"}}<a href="/" style="color: inherit; text-decoration: none;">AlRouter</a>{{else}}AlRouter{{end}}
+        AlRouter
+        </a>
       </div>
       <ul class="gnb-menu">
         {{if eq .Active "guide"}}
-        <li><a href="/#about">서비스 소개</a></li>
-        <li><a href="/#pricing">모델 &amp; 가격</a></li>
+        <li><a href="/">서비스 소개</a></li>
         {{else}}
         <li><a href="#about">서비스 소개</a></li>
+        {{end}}
         <li>
           <a
             href="#"
@@ -39,10 +41,7 @@
             >모델 & 가격</a
           >
         </li>
-        {{end}}
-        {{/* Temporarily hidden from nav — page still reachable directly via /guide
         <li><a href="/guide"{{if eq .Active "guide"}} class="active"{{end}}>사용 가이드</a></li>
-        */}}
       </ul>
       <button class="gnb-hamburger" aria-label="메뉴 열기" aria-expanded="false">
         <span></span>

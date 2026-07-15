@@ -5,7 +5,7 @@ import {
 } from './languages'
 
 describe('interface languages', () => {
-  test('exposes Korean and English in the UI language list', () => {
+  test('exposes only English and Korean in the UI language list', () => {
     expect(INTERFACE_LANGUAGE_OPTIONS.map((language) => language.code)).toEqual(
       ['en', 'kr']
     )

@@ -205,6 +205,7 @@ export function UsersTable() {
       skeletonKeyPrefix='users-skeleton'
       toolbarProps={{
         searchPlaceholder: t('Filter by username, name or email...'),
+        searchDebounceMs: 400,
         filters: [
           {
             columnId: 'status',

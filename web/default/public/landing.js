@@ -16,8 +16,6 @@ const STRINGS = {
   // video filenames
   videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
   videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
-  posterStd:      isKo ? '/videos/main/alrouter_ko_poster.png'                          : '/videos/main/alrouter_en_poster.png',
-  posterLite:     isKo ? '/videos/main/alrouter_ko_lite_poster.png'                     : '/videos/main/alrouter_en_lite_poster.png',
   ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
                        : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
@@ -107,8 +105,6 @@ const STRINGS = {
 
 // ── Video version check ──
 (function () {
-  const video = document.getElementById("animVideo");
-  const posterImg = document.getElementById("animPosterImg");
   const prev = sessionStorage.getItem("videoVersion");
   const ver =
     prev === "std"
@@ -119,10 +115,10 @@ const STRINGS = {
           ? "std"
           : "lite";
   sessionStorage.setItem("videoVersion", ver);
-  window._videoVer = ver;
-  video.src = ver === "lite" ? STRINGS.videoLite : STRINGS.videoStd;
-  if (posterImg) posterImg.src = ver === "lite" ? STRINGS.posterLite : STRINGS.posterStd;
-  video.load();
+  // The template always starts on std. The requested initial variant is
+  // committed below only after its poster has loaded and decoded.
+  window._videoVer = "std";
+  window._initialVideoVer = ver;
 
   function _updateDots(v) {
     const s = document.getElementById("dotStd");
@@ -130,7 +126,7 @@ const STRINGS = {
     if (s) s.classList.toggle("active", v === "std");
     if (l) l.classList.toggle("active", v === "lite");
   }
-  _updateDots(ver);
+  _updateDots("std");
   window._updateDots = _updateDots;
 
   // 언어 전환 링크에 스크롤 위치 저장
@@ -153,7 +149,11 @@ const STRINGS = {
 // ── Video play/pause controls ──
 (function() {
   const video       = document.getElementById('animVideo');
-  const posterImg   = document.getElementById('animPosterImg');
+  const posterLayer = document.getElementById('animPosterLayer');
+  const posterImages = {
+    std: document.getElementById('animPosterStd'),
+    lite: document.getElementById('animPosterLite'),
+  };
   const playOverlay = document.getElementById('animPlayOverlay');
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
@@ -164,10 +164,40 @@ const STRINGS = {
   const animWrap    = document.getElementById('anim');
   const CTA_MAP = STRINGS.ctaMap;
   let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
+  let switchRequestId = 0;
+
+  function loadAndDecodePoster(img) {
+    const loaded = img.complete
+      ? (img.naturalWidth > 0
+          ? Promise.resolve()
+          : Promise.reject(new Error('Poster failed to load')))
+      : new Promise((resolve, reject) => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', () => reject(new Error('Poster failed to load')), { once: true });
+        });
+
+    return loaded.then(async () => {
+      if (typeof img.decode === 'function') await img.decode();
+      if (img.naturalWidth === 0) throw new Error('Poster failed to decode');
+      return img;
+    });
+  }
+
+  // Both poster elements are present from the initial HTML so the browser can
+  // fetch them in parallel. Cache the decode promises for atomic switching.
+  const posterReady = {
+    std: loadAndDecodePoster(posterImages.std),
+    lite: loadAndDecodePoster(posterImages.lite),
+  };
+  // Prevent a rejected background preload from becoming an unhandled promise.
+  Object.values(posterReady).forEach((ready) => ready.catch(() => {}));
 
   playOverlay.addEventListener('click', () => {
+    // Playing the current video cancels a poster switch that is still loading.
+    switchRequestId += 1;
+    sessionStorage.setItem('videoVersion', window._videoVer);
     playOverlay.style.display = 'none';
-    if (posterImg) posterImg.style.display = 'none';
+    posterLayer.classList.add('is-hidden');
     video.currentTime = 0;
     video.play();
   });
@@ -261,7 +291,10 @@ const STRINGS = {
     replayBtn.style.display = 'none';
     hoverOverlay.style.display = 'none';
     playOverlay.style.display = '';
-    if (posterImg) { posterImg.src = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd; posterImg.style.display = ''; }
+    Object.entries(posterImages).forEach(([ver, img]) => {
+      img.classList.toggle('active', ver === newVer);
+    });
+    posterLayer.classList.remove('is-hidden');
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
     video.load();
@@ -269,8 +302,21 @@ const STRINGS = {
     if (window._updateDots) window._updateDots(newVer);
   }
 
-  window.switchVideo = function(newVer, swipeDir) {
+  window.switchVideo = async function(newVer, swipeDir) {
+    if (!posterReady[newVer]) return;
+
+    // Increment before the same-version check so selecting the current dot can
+    // cancel an older pending switch to the other version.
+    const requestId = ++switchRequestId;
     if (window._videoVer === newVer) return;
+
+    try {
+      await posterReady[newVer];
+    } catch (error) {
+      console.warn('Video poster could not be prepared; keeping the current poster.', error);
+      return;
+    }
+    if (requestId !== switchRequestId) return;
 
     if (swipeDir) {
       // 스와이프: 기존 슬라이드 애니메이션
@@ -293,6 +339,10 @@ const STRINGS = {
       }, { once: true });
     }
   };
+
+  if (window._initialVideoVer !== window._videoVer) {
+    window.switchVideo(window._initialVideoVer);
+  }
 
   pauseState.addEventListener('click', () => {
     video.pause();

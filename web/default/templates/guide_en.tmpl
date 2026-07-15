@@ -4,13 +4,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Usage Guide — AlRouter</title>
+    <title>AlRouter — Unified AI API Gateway</title>
     <link rel="canonical" href="https://alrouter.ai/en/guide" />
     <link rel="alternate" hreflang="en" href="https://alrouter.ai/en/guide" />
     <link rel="alternate" hreflang="ko" href="https://alrouter.ai/guide" />
     <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/guide" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <script src="/lucide.min.js"></script>
+    <script>
+      (function loadLucide(retriesLeft) {
+        var s = document.createElement('script');
+        s.src = '/lucide.min.js';
+        s.onload = function () {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        };
+        s.onerror = function () {
+          if (retriesLeft > 0) {
+            setTimeout(function () { loadLucide(retriesLeft - 1); }, 600);
+          }
+        };
+        document.head.appendChild(s);
+      })(3);
+    </script>
     <link rel="stylesheet" href="/landing.css" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
@@ -68,31 +84,44 @@
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
                 <div class="guide-step-body">
-                  <div class="guide-step-top"><h4>Create an API key</h4></div>
-                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
-                  <div class="guide-step-shot-row">
-                    <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-create-en.png" alt="API key creation screen" />
-                      <figcaption>1-1. Create the API key</figcaption>
-                    </figure>
-                    <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-copy-en.png" alt="Copying the generated API key" />
-                      <figcaption>1-2. Copy the generated key</figcaption>
-                    </figure>
-                  </div>
+                  <div class="guide-step-top"><h4>Sign in to AlRouter</h4></div>
+                  <p>Sign in to your AlRouter account before creating an API key.</p>
+                  <figure class="guide-step-shot-fig guide-step-shot-fig--login">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-1-login-en.png" alt="AlRouter sign-in screen" />
+                    <figcaption>1-1. Sign in to AlRouter</figcaption>
+                  </figure>
                 </div>
               </div>
 
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
                 <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Create an API key</h4></div>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-create-en.png" alt="API key creation screen" />
+                      <figcaption>2-1. Create the API key</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-copy-en.png" alt="Copying the generated API key" />
+                      <figcaption>2-2. Copy the generated key</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Set environment variables</h4></div>
                   <p>Add the environment variables for your CLI to your shell config file, then apply the changes.</p>
+                  <p class="guide-aside">A shell config file runs automatically every time you open a terminal (<span class="mono">~/.zshrc</span> for zsh, <span class="mono">~/.bash_profile</span> or <span class="mono">~/.bashrc</span> for bash). <br>Adding the environment variables there means every new terminal picks them up automatically, so you don't have to re-enter them each time.</p>
 
                   <div class="guide-substep">
                     <div class="guide-substep-head"><span class="guide-substep-num">1</span>Add the environment variables to your shell config</div>
                     <div class="guide-substep-body">
-                      <div class="guide-pitfall"><b>Note</b>Replace the example key below with your actual issued key.</div>
+                      <div class="guide-pitfall"><b>Note</b><p>Replace the example key below with your actual issued key.</p></div>
 
                       <div class="guide-provider-table">
                         <div class="guide-provider-row">
@@ -104,14 +133,6 @@
                           </div>
                         </div>
                         <div class="guide-provider-row">
-                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
-                          <div class="guide-term">
-                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
-<pre><span class="c1">export</span> OPENAI_BASE_URL=<span class="c2">"https://alrouter.ai/v1"</span>
-<span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
-                          </div>
-                        </div>
-                        <div class="guide-provider-row">
                           <span class="guide-provider-name" style="color:#4285f4">Google</span>
                           <div class="guide-term">
                             <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
@@ -119,17 +140,32 @@
 <span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
                           </div>
                         </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px">
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-your-key"</span></pre>
+                            </div>
+                            <p style="margin:0; font-size:13px; color:#c9d6ea"><b style="color:#10a37f">Codex</b> — Codex CLI manages the Base URL in a separate config file, not an environment variable.<br>Keep the API key as is, and add the value below to <span class="mono">~/.codex/config.toml</span>.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>openai_base_url = <span class="c2">"https://alrouter.ai/v1"</span></pre>
+                            </div>
+                            <p class="guide-aside">After adding the setting above, using Codex may show a "Falling back from WebSockets to HTTPS" warning.<br>This doesn't affect functionality, but if you'd rather not see the warning, add the following to the same file.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>[features]
+responses_websockets_v2 = false</pre>
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <figure class="guide-step-shot-fig">
-                        <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-edit.png" alt="Editing the shell config file to add environment variables" />
-                        <figcaption>2-1. Add environment variables to the shell config</figcaption>
+                        <img class="guide-step-shot" src="/images/guide/manual/step-3-env-edit-en.png" alt="Editing the shell config file to add environment variables" />
+                        <figcaption>3-1. Add environment variables to the shell config</figcaption>
                       </figure>
-
-                      <div class="guide-note">
-                        <span class="mark">TIP</span>
-                        <p>OpenAI-format CLIs only differ by <span class="mono">/v1</span> at the end of the base URL, and Google by <span class="mono">/v1beta</span> — otherwise the setup is identical.</p>
-                      </div>
                     </div>
                   </div>
 
@@ -142,8 +178,8 @@
 <pre>$ source ~/.zshrc</pre>
                       </div>
                       <figure class="guide-step-shot-fig">
-                        <img class="guide-step-shot" src="/images/guide/guide-step-2-envsetup-apply.png" alt="Terminal after applying the settings" />
-                        <figcaption>2-2. Apply the changes</figcaption>
+                        <img class="guide-step-shot" src="/images/guide/manual/step-3-env-apply.png" alt="Terminal after applying the settings" />
+                        <figcaption>3-2. Apply the changes</figcaption>
                       </figure>
                     </div>
                   </div>
@@ -151,11 +187,11 @@
               </div>
 
               <div class="guide-step">
-                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
                   <p>Run claude in a new terminal, then use <span class="mono mono-cmd">/status</span> to verify the AlRouter connection.<br>If the base URL shows alrouter.ai, you're all set.</p>
-                  <div class="guide-pitfall"><b>Note</b>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</div>
+                  <div class="guide-pitfall"><b>Note</b><p>Environment variables apply only to newly opened terminals. If a terminal was open before you set them, open a new one.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude
@@ -163,26 +199,8 @@
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
                   <figure class="guide-step-shot-fig">
-                    <img class="guide-step-shot" src="/images/guide/guide-step-3-claude-status.png" alt="/status connection check screen" />
-                    <figcaption>3-1. /status connection check</figcaption>
-                  </figure>
-                </div>
-              </div>
-
-              <div class="guide-step">
-                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
-                <div class="guide-step-body">
-                  <div class="guide-step-top"><h4>Test</h4></div>
-                  <p>Enter a simple prompt to confirm the connection works.</p>
-                  <div class="guide-term">
-                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
-<pre>$ claude
-<span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
-<span class="cm">Claude Code connected</span></pre>
-                  </div>
-                  <figure class="guide-step-shot-fig">
-                    <img class="guide-step-shot" src="/images/guide/guide-step-4-claude-test.png" alt="Test prompt response screen" />
-                    <figcaption>4-1. Test prompt response</figcaption>
+                    <img class="guide-step-shot" src="/images/guide/manual/step-4-status.png" alt="/status connection check screen" />
+                    <figcaption>4-1. /status connection check</figcaption>
                   </figure>
                 </div>
               </div>
@@ -190,16 +208,34 @@
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
                 <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Test</h4></div>
+                  <p>Enter a simple prompt to confirm the connection works.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; This is an integration test. Please reply only with "Claude Code connection successful."</span>
+<span class="cm">Claude Code connection successful.</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-5-test-en.png" alt="Test prompt response screen" />
+                    <figcaption>5-1. Test prompt response</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">6</span></div>
+                <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Check usage</h4></div>
                   <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' and 'Dashboard' pages also show your usage trends as charts at a glance.</p>
                   <div class="guide-step-shot-row">
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-5-log-en.png" alt="Usage logs screen" />
-                      <figcaption>5-1. Usage Logs</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-usage-log-en.png" alt="Usage logs screen" />
+                      <figcaption>6-1. Usage Logs</figcaption>
                     </figure>
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-5-dashboard-en.png" alt="Dashboard chart screen" />
-                      <figcaption>5-2. Dashboard chart</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-dashboard-en.png" alt="Dashboard chart screen" />
+                      <figcaption>6-2. Dashboard chart</figcaption>
                     </figure>
                   </div>
                 </div>
@@ -274,38 +310,50 @@ $ brew install --cask cc-switch</pre>
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
                 <div class="guide-step-body">
-                  <div class="guide-step-top"><h4>Create an API key</h4></div>
-                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
-                  <div class="guide-step-shot-row">
-                    <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-create-en.png" alt="API key creation screen" />
-                      <figcaption>1-1. Create the API key</figcaption>
-                    </figure>
-                    <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-1-apikey-copy-en.png" alt="Copying the generated API key" />
-                      <figcaption>1-2. Copy the generated key</figcaption>
-                    </figure>
-                  </div>
+                  <div class="guide-step-top"><h4>Sign in to AlRouter</h4></div>
+                  <p>Sign in to your AlRouter account before creating an API key.</p>
+                  <figure class="guide-step-shot-fig guide-step-shot-fig--login">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-1-login-en.png" alt="AlRouter sign-in screen" />
+                    <figcaption>1-1. Sign in to AlRouter</figcaption>
+                  </figure>
                 </div>
               </div>
 
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
                 <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Create an API key</h4></div>
+                  <p>Go to the 'API Keys' menu, create a new API key, and copy it.<br>You'll use this single key for all the setup below.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-create-en.png" alt="API key creation screen" />
+                      <figcaption>2-1. Create the API key</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-copy-en.png" alt="Copying the generated API key" />
+                      <figcaption>2-2. Copy the generated key</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Register automatically with CC Switch</h4></div>
                   <p>From the API key's More menu, select "CC Switch," then enter the provider and default model — CC Switch opens.<br>Review the details and click "Import" to complete the registration.</p>
                   <div class="guide-step-shot-row">
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-input-form-en.png" alt="CC Switch input form" />
-                      <figcaption>2-1. Select the provider and default model</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-input-en.png" alt="CC Switch input form" />
+                      <figcaption>3-1. Select the provider and default model</figcaption>
                     </figure>
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-import-view.png" alt="CC Switch import confirmation screen" />
-                      <figcaption>2-2. Review the details and click "Import"</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-import-review.png" alt="CC Switch import confirmation screen" />
+                      <figcaption>3-2. Review the details and click "Import"</figcaption>
                     </figure>
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide-cc/cc-step2-import-success.png" alt="CC Switch import complete screen" />
-                      <figcaption>2-3. Import complete</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-import-success.png" alt="CC Switch import complete screen" />
+                      <figcaption>3-3. Import complete</figcaption>
                     </figure>
                   </div>
                   <div class="guide-note">
@@ -316,11 +364,11 @@ $ brew install --cask cc-switch</pre>
               </div>
 
               <div class="guide-step">
-                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
                 <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Verify the connection</h4></div>
                   <p>Restart Claude Code, then check the AlRouter connection with <span class="mono mono-cmd">/status</span>.<br>If the Anthropic base URL shows alrouter.ai, it's working correctly.</p>
-                  <div class="guide-pitfall"><b>Note</b>Settings take effect after restarting. If a session was open before registering, quit it completely and start a new one.</div>
+                  <div class="guide-pitfall"><b>Note</b><p>Settings take effect after restarting. If a session was open before registering, quit it completely and start a new one.</p></div>
                   <div class="guide-term">
                     <div class="guide-term-bar"><i></i><i></i><i></i></div>
 <pre>$ claude
@@ -328,26 +376,8 @@ $ brew install --cask cc-switch</pre>
 <span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
                   </div>
                   <figure class="guide-step-shot-fig">
-                    <img class="guide-step-shot" src="/images/guide-cc/cc-step3-status.png" alt="/status connection check screen" />
-                    <figcaption>3-1. /status connection check</figcaption>
-                  </figure>
-                </div>
-              </div>
-
-              <div class="guide-step">
-                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
-                <div class="guide-step-body">
-                  <div class="guide-step-top"><h4>Test</h4></div>
-                  <p>Enter a simple prompt to confirm the connection works.</p>
-                  <div class="guide-term">
-                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
-<pre>$ claude
-<span class="c3">&gt; Connection test. Please reply only with "Claude Code connected".</span>
-<span class="cm">Claude Code connected</span></pre>
-                  </div>
-                  <figure class="guide-step-shot-fig">
-                    <img class="guide-step-shot" src="/images/guide-cc/cc-step4-test.png" alt="Test prompt response screen" />
-                    <figcaption>4-1. Test prompt response</figcaption>
+                    <img class="guide-step-shot" src="/images/guide/cc-switch/step-4-status.png" alt="/status connection check screen" />
+                    <figcaption>4-1. /status connection check</figcaption>
                   </figure>
                 </div>
               </div>
@@ -355,16 +385,34 @@ $ brew install --cask cc-switch</pre>
               <div class="guide-step">
                 <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
                 <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>Test</h4></div>
+                  <p>Enter a simple prompt to confirm the connection works.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; This is an integration test. Please reply only with "Claude Code connection successful."</span>
+<span class="cm">Claude Code connection successful.</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-5-test-en.png" alt="Test prompt response screen" />
+                    <figcaption>5-1. Test prompt response</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">6</span></div>
+                <div class="guide-step-body">
                   <div class="guide-step-top"><h4>Check usage</h4></div>
                   <p>Every request is tracked per key — including tokens and cost — under the 'Usage Logs' menu.<br>The 'Overview' and 'Dashboard' pages also show your usage trends as charts at a glance.</p>
                   <div class="guide-step-shot-row">
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-5-log-en.png" alt="Usage logs screen" />
-                      <figcaption>5-1. Usage Logs</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-usage-log-en.png" alt="Usage logs screen" />
+                      <figcaption>6-1. Usage Logs</figcaption>
                     </figure>
                     <figure class="guide-step-shot-fig">
-                      <img class="guide-step-shot" src="/images/guide/guide-step-5-dashboard-en.png" alt="Dashboard chart screen" />
-                      <figcaption>5-2. Dashboard chart</figcaption>
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-dashboard-en.png" alt="Dashboard chart screen" />
+                      <figcaption>6-2. Dashboard chart</figcaption>
                     </figure>
                   </div>
                 </div>
@@ -392,6 +440,7 @@ $ brew install --cask cc-switch</pre>
 
     <script src="/popup.js" defer></script>
     <script src="/guide.js" defer></script>
+    <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>
 {{end}}

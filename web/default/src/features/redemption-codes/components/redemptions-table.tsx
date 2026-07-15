@@ -168,6 +168,7 @@ export function RedemptionsTable() {
       skeletonKeyPrefix='redemptions-skeleton'
       toolbarProps={{
         searchPlaceholder: t('Filter by name or ID...'),
+        searchDebounceMs: 400,
         filters: [
           {
             columnId: 'status',
