@@ -41,7 +41,7 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
   const primaryLanguage = normalized.split('-')[0]
 
   return INTERFACE_LANGUAGE_OPTIONS.some(
-    (lang) => lang.code === primaryLanguage,
+    (lang) => lang.code === primaryLanguage
   )
     ? primaryLanguage
     : 'en'

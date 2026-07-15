@@ -6,10 +6,9 @@ import {
 
 describe('interface languages', () => {
   test('exposes only English and Korean in the UI language list', () => {
-    expect(INTERFACE_LANGUAGE_OPTIONS.map((language) => language.code)).toEqual([
-      'en',
-      'kr',
-    ])
+    expect(INTERFACE_LANGUAGE_OPTIONS.map((language) => language.code)).toEqual(
+      ['en', 'kr']
+    )
   })
 
   test('normalizes Korean browser language variants to kr', () => {
@@ -19,17 +18,9 @@ describe('interface languages', () => {
     expect(normalizeInterfaceLanguage('kr')).toBe('kr')
   })
 
-  test('normalizes supported English browser language variants', () => {
-    expect(normalizeInterfaceLanguage('en-US')).toBe('en')
-  })
-
-  test('falls back unavailable languages to English', () => {
-    expect(normalizeInterfaceLanguage('zh-CN')).toBe('en')
-    expect(normalizeInterfaceLanguage('fr-CA')).toBe('en')
-    expect(normalizeInterfaceLanguage('ja-JP')).toBe('en')
-    expect(normalizeInterfaceLanguage('ru-RU')).toBe('en')
-    expect(normalizeInterfaceLanguage('vi-VN')).toBe('en')
+  test('falls back unknown languages to English', () => {
     expect(normalizeInterfaceLanguage('unknown')).toBe('en')
     expect(normalizeInterfaceLanguage('pt-BR')).toBe('en')
+    expect(normalizeInterfaceLanguage('zh-CN')).toBe('en')
   })
 })

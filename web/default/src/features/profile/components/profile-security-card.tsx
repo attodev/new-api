@@ -26,6 +26,8 @@ import type { UserProfile } from '../types'
 import { AccessTokenDialog } from './dialogs/access-token-dialog'
 import { ChangePasswordDialog } from './dialogs/change-password-dialog'
 import { DeleteAccountDialog } from './dialogs/delete-account-dialog'
+import { PasskeyCard } from './passkey-card'
+import { TwoFACard } from './two-fa-card'
 
 // ============================================================================
 // Profile Security Card Component
@@ -95,33 +97,40 @@ export function ProfileSecurityCard({
         icon={<Shield className='h-4 w-4' />}
       >
         <div className='grid grid-cols-1 gap-2.5 sm:gap-3 md:grid-cols-3'>
-          {securityActions.map((item) => (
-            <button
-              key={item.title}
-              type='button'
-              onClick={item.action}
-              className={`hover:bg-muted/50 flex items-center gap-3 rounded-lg border p-3 text-left transition-colors md:flex-col md:gap-2 md:p-4 md:text-center ${
-                item.variant === 'destructive'
-                  ? 'border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5'
-                  : ''
-              }`}
-            >
-              <div
-                className={`rounded-md p-2 ${
+          {securityActions.map((item, index) => (
+            <div key={item.title} className='contents'>
+              <button
+                type='button'
+                onClick={item.action}
+                className={`hover:bg-muted/50 flex items-center gap-3 rounded-lg border p-3 text-left transition-colors md:flex-col md:gap-2 md:p-4 md:text-center ${
                   item.variant === 'destructive'
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'bg-muted'
+                    ? 'border-destructive/30 hover:border-destructive/50 hover:bg-destructive/5'
+                    : ''
                 }`}
               >
-                <item.icon className='h-5 w-5' />
-              </div>
-              <div className='min-w-0 md:contents'>
-                <p className='text-sm font-medium'>{item.title}</p>
-                <p className='text-muted-foreground line-clamp-1 text-xs md:line-clamp-none'>
-                  {item.description}
-                </p>
-              </div>
-            </button>
+                <div
+                  className={`rounded-md p-2 ${
+                    item.variant === 'destructive'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-muted'
+                  }`}
+                >
+                  <item.icon className='h-5 w-5' />
+                </div>
+                <div className='min-w-0 md:contents'>
+                  <p className='text-sm font-medium'>{item.title}</p>
+                  <p className='text-muted-foreground line-clamp-1 text-xs md:line-clamp-none'>
+                    {item.description}
+                  </p>
+                </div>
+              </button>
+              {index === 0 && (
+                <>
+                  <PasskeyCard loading={loading} />
+                  <TwoFACard loading={loading} />
+                </>
+              )}
+            </div>
           ))}
         </div>
       </TitledCard>
