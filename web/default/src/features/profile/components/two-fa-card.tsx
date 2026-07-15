@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Shield } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDialogs } from '@/hooks/use-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTwoFA } from '../hooks'
 import { TwoFADisableDialog } from './dialogs/two-fa-disable-dialog'
@@ -54,9 +55,21 @@ export function TwoFACard({ loading: pageLoading }: TwoFACardProps) {
           <Shield className='h-5 w-5' />
         </div>
         <div className='min-w-0 md:contents'>
-          <p className='text-sm font-medium'>
-            {t('Two-Factor Authentication')}
-          </p>
+          <div className='flex items-center gap-2'>
+            <p className='text-sm font-medium'>
+              {t('Two-Factor Authentication')}
+            </p>
+            <Badge
+              variant={status.enabled ? 'secondary' : 'outline'}
+              className={
+                status.enabled
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'text-muted-foreground'
+              }
+            >
+              {t(status.enabled ? 'Enabled' : 'Disabled')}
+            </Badge>
+          </div>
           <p className='text-muted-foreground line-clamp-1 text-xs md:line-clamp-none'>
             {t('Add an extra layer of security to your account')}
           </p>

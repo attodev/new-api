@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePasskeyManagement } from '@/features/auth/passkey'
 import {
@@ -188,7 +189,19 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
           <KeyRound className='h-5 w-5' />
         </div>
         <div className='min-w-0 md:contents'>
-          <p className='text-sm font-medium'>{t('Passkey Login')}</p>
+          <div className='flex items-center gap-2'>
+            <p className='text-sm font-medium'>{t('Passkey Login')}</p>
+            <Badge
+              variant={enabled ? 'secondary' : 'outline'}
+              className={
+                enabled
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'text-muted-foreground'
+              }
+            >
+              {t(enabled ? 'Enabled' : 'Disabled')}
+            </Badge>
+          </div>
           <p className='text-muted-foreground line-clamp-1 text-xs md:line-clamp-none'>
             {t('Use Passkey to sign in without entering your password.')}
           </p>
