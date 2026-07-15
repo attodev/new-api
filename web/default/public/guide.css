@@ -72,23 +72,17 @@
 .guide-play-overlay { display: none; border-radius: 16px; }
 .guide-play-overlay.visible { display: flex; }
 
-/* End-of-video CTA — reuses landing page's .anim-cta-* button styling (same design),
-   repositioned for this frame's 16:9 landscape shape instead of the hero's 9:16 portrait. */
-.guide-cta-wrap {
-  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 10;
-  display: flex; width: 150px; pointer-events: none;
+/* End-of-video replay control, positioned slightly above the video center. */
+.guide-end-controls {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -65%); z-index: 10;
+  display: flex; width: 150px;
 }
-.guide-cta-wrap .anim-cta-overlay { pointer-events: auto; width: 100%; }
-.guide-cta-wrap .anim-cta-btn-text { font-size: 12px; }
-/* Replay button sits in reserved space below the CTA, positioned absolutely so its
-   appearance never shifts the CTA button (which stays centered on its own size). */
-.guide-cta-wrap .anim-end-btn {
-  position: absolute; top: calc(100% + 16px); left: 0; right: 0;
-  pointer-events: auto; width: 100%; min-width: unset; height: 38px; padding: 0 12px; font-size: 12px; border-radius: 8px;
+.guide-end-controls .anim-end-btn {
+  width: 100%; min-width: unset; height: 38px; padding: 0 12px; font-size: 12px; border-radius: 8px;
 }
-.guide-cta-wrap .anim-end-replay svg { width: 15px; height: 15px; }
+.guide-end-controls .anim-end-replay svg { width: 15px; height: 15px; }
 @media (max-width: 560px) {
-  .guide-cta-wrap { width: 110px; }
+  .guide-end-controls { width: 110px; }
 }
 .guide-video-placeholder {
   position: absolute; inset: 0; display: flex; flex-direction: column;
