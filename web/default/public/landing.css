@@ -732,7 +732,6 @@ transition: background 0.2s, opacity 0.15s;
 border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer;
         }
 .anim-hover-overlay[hidden] { display: none; }
-.anim-hover-overlay:hover,
 .anim-hover-overlay:focus-visible,
 .anim-hover-overlay.is-paused { background: rgba(0,0,0,0.42); opacity: 1; }
 .anim-hover-overlay:focus-visible { outline: 3px solid #38bdf8; outline-offset: -4px; }
