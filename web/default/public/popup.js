@@ -10,8 +10,8 @@ const POPUP_STRINGS = {
   popupTermsUrl:   popupIsKo ? './legal/terms.html'          : './legal/terms_en.html',
   popupPrivacyUrl: popupIsKo ? './legal/privacy.html'        : './legal/privacy_en.html',
   pricingTitleFn: popupIsKo
-    ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">단가는 현재 시점 기준이며 추후 변동될 수 있음</span>)`
-    : (d) => `Full Model & Pricing (as of ${d}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`,
+    ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">가격은 프로모션 적용 금액이며, 시기 및 모델에 따라 달라질 수 있습니다.</span>)`
+    : (d) => `Full Model & Pricing (as of ${d}, <span style="color:#fbbf24;">Prices reflect promotional rates and may vary over time and by model.</span>)`,
   pricingLoading: popupIsKo ? '불러오는 중…'                 : 'Loading…',
   pricingError:   popupIsKo ? '가격 정보를 불러오지 못했습니다.' : 'Failed to load pricing data.',
   tableModel:     popupIsKo ? '모델명'                        : 'Model',
