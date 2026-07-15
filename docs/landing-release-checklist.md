@@ -37,6 +37,7 @@
 - 테스트: `go test ./middleware ./router`
 - 로컬 응답: 고정 이름 CSS·poster `no-cache, must-revalidate` 및 ETag, 재검증 요청 `304`
 - 로컬 응답: 해시된 SPA 자산 `public, max-age=31536000, immutable`
+- 안전 보완: `/static/` 아래에서 파일명에 콘텐츠 해시가 있는 빌드 자산만 immutable 허용
 - 커밋/PR: 이 체크리스트 갱신을 포함한 캐시 정책 커밋
 
 ### P0. 정적·영상 요청을 글로벌 rate-limit에서 제외 — 0.5~1일

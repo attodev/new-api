@@ -22,8 +22,10 @@ func TestCache(t *testing.T) {
 		{name: "stable CSS filename", path: "/landing.css", expected: revalidateCacheControl},
 		{name: "stable poster filename", path: "/videos/main/alrouter_ko_poster.png", expected: revalidateCacheControl},
 		{name: "non-fingerprinted build asset", path: "/assets/index-main.js", expected: revalidateCacheControl},
-		{name: "hyphenated fingerprint", path: "/assets/index-a1b2c3d4.js", expected: immutableCacheControl},
-		{name: "dotted fingerprint", path: "/assets/index.0123456789abcdef.css", expected: immutableCacheControl},
+		{name: "hyphenated build fingerprint", path: "/static/js/index-a1b2c3d4.js", expected: immutableCacheControl},
+		{name: "dotted build fingerprint", path: "/static/css/index.0123456789abcdef.css", expected: immutableCacheControl},
+		{name: "fingerprint outside build path", path: "/videos/main/alrouter-deadbeef.mp4", expected: revalidateCacheControl},
+		{name: "fingerprint in build directory name only", path: "/static/deadbeef/index.js", expected: revalidateCacheControl},
 	}
 
 	for _, tt := range tests {

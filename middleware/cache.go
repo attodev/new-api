@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"path"
 	"regexp"
 	"strings"
 
@@ -19,9 +20,13 @@ const (
 // must be revalidated after every deployment instead.
 var fingerprintedAsset = regexp.MustCompile(`(?i)(?:^|[.-])[a-f0-9]{8,}(?:[.-]|$)`)
 
+func isFingerprintedBuildAsset(urlPath string) bool {
+	return strings.HasPrefix(urlPath, "/static/") && fingerprintedAsset.MatchString(path.Base(urlPath))
+}
+
 func Cache(assetETags map[string]string) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		if fingerprintedAsset.MatchString(c.Request.URL.Path) {
+		if isFingerprintedBuildAsset(c.Request.URL.Path) {
 			c.Header("Cache-Control", immutableCacheControl)
 		} else {
 			c.Header("Cache-Control", revalidateCacheControl)
