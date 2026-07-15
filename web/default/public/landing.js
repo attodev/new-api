@@ -167,12 +167,11 @@ const STRINGS = {
   let switchRequestId = 0;
   let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
 
-  function syncPlaybackToggle() {
+  function renderPlaybackToggle(isPaused) {
     const unavailable = playOverlay.style.display !== 'none' || video.ended;
     hoverOverlay.hidden = unavailable;
     if (unavailable) return;
 
-    const isPaused = video.paused;
     pauseState.style.display = isPaused ? 'none' : 'flex';
     resumeState.style.display = isPaused ? 'flex' : 'none';
     hoverOverlay.classList.toggle('is-paused', isPaused);
@@ -180,6 +179,20 @@ const STRINGS = {
       'aria-label',
       isPaused ? hoverOverlay.dataset.labelResume : hoverOverlay.dataset.labelPause,
     );
+  }
+
+  function syncPlaybackToggle() {
+    renderPlaybackToggle(video.paused);
+  }
+
+  function playVideo() {
+    // play 이벤트를 기다리는 동안 이전 일시정지 UI가 깜빡이지 않도록
+    // 클릭 즉시 재생 중 상태를 먼저 표시한다.
+    renderPlaybackToggle(false);
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(syncPlaybackToggle);
+    }
   }
 
   function loadAndDecodePoster(img) {
@@ -216,13 +229,13 @@ const STRINGS = {
     playOverlay.style.display = 'none';
     posterLayer.classList.add('is-hidden');
     video.currentTime = 0;
-    video.play();
+    playVideo();
   });
 
   hoverOverlay.addEventListener('click', () => {
     if (_isSwiping || video.ended) return;
     if (video.paused) {
-      video.play();
+      playVideo();
     } else {
       video.pause();
     }
@@ -248,7 +261,7 @@ const STRINGS = {
     ctaWrap.style.display = 'none';
     replayBtn.style.display = 'none';
     video.currentTime = 0;
-    video.play();
+    playVideo();
   });
 
   // Mobile swipe to switch video (std ↔ lite)
