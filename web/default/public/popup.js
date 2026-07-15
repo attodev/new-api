@@ -10,8 +10,11 @@ const POPUP_STRINGS = {
   popupTermsUrl:   popupIsKo ? './legal/terms.html'          : './legal/terms_en.html',
   popupPrivacyUrl: popupIsKo ? './legal/privacy.html'        : './legal/privacy_en.html',
   pricingTitleFn: popupIsKo
-    ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">가격은 프로모션 적용 금액이며, 시기 및 모델에 따라 달라질 수 있습니다.</span>)`
-    : (d) => `Full Model & Pricing (as of ${d}, <span style="color:#fbbf24;">Prices reflect promotional rates and may vary over time and by model.</span>)`,
+    ? (d) => `전체 모델 및 가격표 <span class="popup-date">(${d} 기준)</span>`
+    : (d) => `Full Model & Pricing <span class="popup-date">(as of ${d})</span>`,
+  pricingNote: popupIsKo
+    ? '가격은 프로모션 적용 금액이며, 시기 및 모델에 따라 달라질 수 있습니다.'
+    : 'Prices reflect promotional rates and may vary over time and by model.',
   pricingLoading: popupIsKo ? '불러오는 중…'                 : 'Loading…',
   pricingError:   popupIsKo ? '가격 정보를 불러오지 못했습니다.' : 'Failed to load pricing data.',
   tableModel:     popupIsKo ? '모델명'                        : 'Model',
@@ -30,8 +33,13 @@ function openPopup(title, key) {
   const modal   = overlay.querySelector('.popup-modal');
   const body    = document.getElementById('popupBody');
   const item    = POPUP_CONTENTS[key] || {};
+  const popupTitle = document.getElementById('popupTitle');
+  const popupNote = document.getElementById('popupNote');
 
-  document.getElementById('popupTitle').textContent = item.title || title;
+  modal.classList.toggle('pricing', key === 'pricing');
+  popupTitle.textContent = item.title || title;
+  popupNote.textContent = '';
+  popupNote.style.display = 'none';
 
   if (item.iframe) {
     modal.classList.add('wide');
@@ -55,6 +63,9 @@ async function renderPricingTable(body) {
   const today = new Date();
   const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
   document.getElementById('popupTitle').innerHTML = POPUP_STRINGS.pricingTitleFn(dateStr);
+  const popupNote = document.getElementById('popupNote');
+  popupNote.textContent = POPUP_STRINGS.pricingNote;
+  popupNote.style.display = '';
 
   body.innerHTML = `<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">${POPUP_STRINGS.pricingLoading}</p>`;
 
