@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -479,7 +479,7 @@ export function OverviewDashboard() {
   const [manualSetupGuideExpanded, setManualSetupGuideExpanded] = useState<
     boolean | null
   >(() => getSavedSetupGuideExpanded())
-  const userToggledThisSession = useRef(false)
+  const [userToggledThisSession, setUserToggledThisSession] = useState(false)
 
   const requestCount = Number(user?.request_count ?? 0)
   const remainQuota = Number(user?.quota ?? 0)
@@ -616,7 +616,9 @@ export function OverviewDashboard() {
   // If setup is complete and the user hasn't toggled this session, ignore a stale
   // 'expanded' saved from a previous session so the guide defaults to collapsed.
   const effectiveManualExpanded =
-    setupComplete && !userToggledThisSession.current && manualSetupGuideExpanded === true
+    setupComplete &&
+    !userToggledThisSession &&
+    manualSetupGuideExpanded === true
       ? null
       : manualSetupGuideExpanded
   const setupGuideExpanded = effectiveManualExpanded ?? !setupComplete
@@ -626,7 +628,7 @@ export function OverviewDashboard() {
 
   const handleSetupGuideToggle = () => {
     const nextExpanded = !setupGuideExpanded
-    userToggledThisSession.current = true
+    setUserToggledThisSession(true)
     setManualSetupGuideExpanded(nextExpanded)
     saveSetupGuideExpanded(nextExpanded)
   }

@@ -99,14 +99,14 @@ export function ProfileDropdown() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
-            <User className='size-4' />
-            {t('Profile')}
-          </DropdownMenuItem>
-
           <DropdownMenuItem onClick={() => navigate({ to: '/wallet' })}>
             <Wallet className='size-4' />
             {t('Wallet')}
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+            <User className='size-4' />
+            {t('Profile')}
           </DropdownMenuItem>
 
           {isSuperAdmin && (
