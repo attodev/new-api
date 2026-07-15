@@ -16,8 +16,6 @@ const STRINGS = {
   // video filenames
   videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
   videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
-  ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
-                       : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
 
 // ── Contact form ──
@@ -158,12 +156,9 @@ const STRINGS = {
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
   const resumeState = document.getElementById('animResumeState');
-  const ctaWrap     = document.getElementById('animCtaWrap');
-  const ctaBtn      = document.getElementById('animCtaBtn');
+  const endControls = document.getElementById('animEndControls');
   const replayBtn   = document.getElementById('animReplayBtn');
   const animWrap    = document.getElementById('anim');
-  const CTA_MAP = STRINGS.ctaMap;
-  let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
   let switchRequestId = 0;
   let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
 
@@ -244,21 +239,14 @@ const STRINGS = {
   video.addEventListener('play', syncPlaybackToggle);
   video.addEventListener('pause', syncPlaybackToggle);
 
-  video.addEventListener('timeupdate', () => {
-    if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
-      ctaWrap.style.display = 'flex';
-      setTimeout(() => ctaBtn.classList.add('active'), 50);
-    }
-  });
-
   video.addEventListener('ended', () => {
     syncPlaybackToggle();
+    endControls.style.display = 'flex';
     replayBtn.style.display = 'flex';
   });
 
   replayBtn.addEventListener('click', () => {
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
     video.currentTime = 0;
     playVideo();
@@ -292,8 +280,7 @@ const STRINGS = {
   function _doSwitch(newVer) {
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
     hoverOverlay.hidden = true;
     hoverOverlay.classList.remove('is-paused');
@@ -305,7 +292,6 @@ const STRINGS = {
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
     video.load();
-    CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
   }
 

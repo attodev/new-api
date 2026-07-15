@@ -41,7 +41,6 @@ body {
 }
 .gnb-menu li a:hover { color: #f9fafb; }
 .gnb-right { display: flex; align-items: center; gap: 16px; }
-.gnb-divider { width: 1px; height: 16px; background: #374151; }
 .lang-switch {
   position: relative;
   display: inline-flex;
@@ -568,6 +567,7 @@ i[data-lucide] { display: inline-flex; }
   padding: 80px 48px;
 }
 .cta-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.cta-inner-single { grid-template-columns: minmax(0, 600px); justify-content: center; }
 .cta-box { padding: 48px; text-align: center; }
 .cta-box.left { border-right: 1px solid #1f2937; }
 .cta-box h3 { font-size: 22px; font-weight: 800; margin-bottom: 10px; color: #f9fafb; }
@@ -744,27 +744,10 @@ pointer-events: none;
         .anim-hover-state:hover .anim-play-btn { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(14,165,233,0.25); }
         .anim-pause-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .anim-pause-icon span { display: block; width: 8px; height: 28px; background: #fff; border-radius: 3px; }
-        .anim-cta-wrap {
-position: absolute; top: 27%; left: 52%; right: 5%;
-display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+        .anim-end-controls {
+position: absolute; top: 50%; left: 52%; right: 5%; transform: translateY(-70%);
+display: flex; flex-direction: column; align-items: stretch;
 z-index: 40;
-        }
-        .anim-cta-overlay {
-display: flex; flex-direction: column; align-items: center; gap: 5px;
-background: linear-gradient(135deg, #0ea5e9 0%, #7c3aed 60%, #ec4899 100%);
-border-radius: 14px; padding: 10px 10px 12px;
-cursor: pointer; text-decoration: none;
-transition: transform 0.2s ease;
-        }
-        .anim-cta-logo { width: 55%; height: auto; object-fit: contain; filter: brightness(0) invert(1); }
-        .anim-cta-btn-text { color: #fff; font-size: clamp(7px,2vw,10px); font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; }
-        @keyframes anim-pulse-glow {
-0%,100% { box-shadow: 0 0 12px rgba(14,165,233,0.9), 0 0 30px rgba(14,165,233,0.6), 0 0 60px rgba(124,58,237,0.45), 0 0 100px rgba(236,72,153,0.2); }
-50%     { box-shadow: 0 0 20px rgba(14,165,233,1),   0 0 55px rgba(14,165,233,0.8), 0 0 100px rgba(124,58,237,0.65), 0 0 160px rgba(236,72,153,0.4); }
-        }
-        @keyframes anim-cta-scale-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-        .anim-cta-overlay.active {
-animation: anim-pulse-glow 1.8s 0.3s ease-in-out infinite, anim-cta-scale-pulse 2s 0.3s ease-in-out infinite;
         }
         .anim-end-btn {
 display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -867,14 +850,19 @@ backdrop-filter: blur(6px); white-space: nowrap;
   }
   .gnb-hamburger {
     display: flex;
-    margin-left: auto;
-    margin-right: 8px;
+    order: 2;
+    margin-left: 16px;
+    margin-right: 0;
   }
-  .gnb-divider {
-    display: none;
+  .gnb-right {
+    order: 1;
+    margin-left: auto;
+    gap: 12px;
   }
   .btn-login {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
   }
 
   /* Hero */

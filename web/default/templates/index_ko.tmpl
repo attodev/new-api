@@ -108,9 +108,9 @@
         AlRouter 하나로 전부 통합하고,<br>
         공식 가격보다 <strong style="color:#EC4899">최대 10% 절약</strong>하세요.</p>
           <div class="hero-cta">
-            <a href="/sign-in" class="btn-hero-primary">체험해보기 →</a>
+            <a href="/sign-in" class="btn-hero-primary" hidden>체험해보기 →</a>
             <button
-              class="btn-hero-secondary"
+              class="btn-hero-primary"
               onclick="
                 document.getElementById('contactOverlay').classList.add('open')
               "
@@ -195,11 +195,7 @@
                 </div>
                 <span class="anim-play-label">눌러서 시작</span>
               </button>
-              <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
-                <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
-                  <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                  <div class="anim-cta-btn-text">체험 신청하기 →</div>
-                </a>
+              <div class="anim-end-controls" id="animEndControls" style="display: none">
                 <button
                   type="button"
                   class="anim-end-btn anim-end-replay"
@@ -1215,8 +1211,8 @@
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">
-      <div class="cta-inner">
-        <div class="cta-box left">
+        <div class="cta-inner cta-inner-single">
+        <div class="cta-box left" hidden>
           <div class="cta-icon" style="color: #0ea5e9; margin-bottom: 16px">
             <i data-lucide="rocket"></i>
           </div>

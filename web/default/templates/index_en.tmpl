@@ -104,9 +104,9 @@
         Consolidate everything with AlRouter and<br>
         save <strong style="color:#EC4899">up to 10%</strong> off official prices.</p>
           <div class="hero-cta">
-            <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
+            <a href="/sign-in" class="btn-hero-primary" hidden>Get Started →</a>
             <button
-              class="btn-hero-secondary"
+              class="btn-hero-primary"
               onclick="
                 document.getElementById('contactOverlay').classList.add('open')
               "
@@ -191,11 +191,7 @@
                 </div>
                 <span class="anim-play-label">Tap to Start</span>
               </button>
-              <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
-                <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
-                  <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                  <div class="anim-cta-btn-text">Get Started →</div>
-                </a>
+              <div class="anim-end-controls" id="animEndControls" style="display: none">
                 <button
                   type="button"
                   class="anim-end-btn anim-end-replay"
@@ -1210,8 +1206,8 @@
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">
-      <div class="cta-inner">
-        <div class="cta-box left">
+        <div class="cta-inner cta-inner-single">
+        <div class="cta-box left" hidden>
           <div class="cta-icon" style="color: #0ea5e9; margin-bottom: 16px">
             <i data-lucide="rocket"></i>
           </div>
