@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import i18next from 'i18next'
 import { toast } from 'sonner'
 import {
@@ -38,7 +38,7 @@ import {
   submitPaymentForm,
 } from '../lib'
 import { parseTossQuoteData } from '../lib/topup-amount-mode'
-import type { TopupAmountMode, TossTopupQuote } from '../types'
+import type { ApiResponse, TopupAmountMode, TossTopupQuote } from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -51,6 +51,7 @@ export function usePayment() {
   )
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const calculationRequestIdRef = useRef(0)
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
@@ -59,6 +60,7 @@ export function usePayment() {
       paymentType: string,
       amountMode?: TopupAmountMode
     ) => {
+      const requestId = ++calculationRequestIdRef.current
       try {
         setCalculating(true)
 
@@ -66,7 +68,7 @@ export function usePayment() {
         const isPayPal = isPayPalPayment(paymentType)
         const isPancake = isWaffoPancakePayment(paymentType)
         const isToss = isTossPayment(paymentType)
-        let response: Awaited<ReturnType<typeof calculateAmount>>
+        let response: ApiResponse<string | number | TossTopupQuote>
         if (isStripe) {
           response = await calculateStripeAmount({ amount: topupAmount })
         } else if (isPayPal) {
@@ -82,25 +84,40 @@ export function usePayment() {
           response = await calculateAmount({ amount: topupAmount })
         }
 
+        if (requestId !== calculationRequestIdRef.current) {
+          return { amount: 0, tossQuote: null, isCurrent: false }
+        }
+
         if (isApiSuccess(response) && response.data) {
           const quote = isToss ? parseTossQuoteData(response.data) : null
           setTossQuote(isToss ? quote : null)
           const calculatedAmount =
             quote?.charge_amount ?? parseFloat(String(response.data))
           setAmount(calculatedAmount)
-          return calculatedAmount
+          return {
+            amount: calculatedAmount,
+            tossQuote: isToss ? quote : null,
+            isCurrent: true,
+          }
         }
 
         // Don't show error for calculation, just set to 0
         setTossQuote(null)
         setAmount(0)
-        return 0
+        return { amount: 0, tossQuote: null, isCurrent: true }
       } catch (_error) {
-        setTossQuote(null)
-        setAmount(0)
-        return 0
+        const isCurrent = requestId === calculationRequestIdRef.current
+        if (isCurrent) {
+          setTossQuote(null)
+          setAmount(0)
+        }
+        return { amount: 0, tossQuote: null, isCurrent }
       } finally {
-        setCalculating(false)
+        // An older response must not clear the loading state owned by a newer
+        // quote request or make its confirmation button appear ready early.
+        if (requestId === calculationRequestIdRef.current) {
+          setCalculating(false)
+        }
       }
     },
     []

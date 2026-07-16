@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { toast } from 'sonner'
@@ -29,12 +29,20 @@ import {
   requestWalletScheduledRecharge,
   requestWalletThresholdRecharge,
 } from '../api'
+import {
+  cancelRecoverableWalletAutoRechargeBillingSession,
+  getTossPaymentWindowTargetOptions,
+  isTossUserCancellation,
+  isWalletAutoRechargeBillingSessionMatchingRequest,
+} from '../lib'
+import type { TossPaymentLifecycleLease } from '../lib'
 import type {
   WalletAutoRechargePolicy,
   WalletAutoRechargePreset,
   WalletAutoRechargeRequest,
   WalletAutoRechargeTossResponse,
 } from '../types'
+import { useTossPaymentLifecycle } from './use-toss-payment-lifecycle'
 
 export function useWalletAutoRecharge(
   scope: 'user' | 'organization',
@@ -47,6 +55,8 @@ export function useWalletAutoRecharge(
   const [presetsLoading, setPresetsLoading] = useState(false)
   const [presetsLoaded, setPresetsLoaded] = useState(false)
   const [policiesLoaded, setPoliciesLoaded] = useState(false)
+  const processingRef = useRef(false)
+  const paymentLifecycle = useTossPaymentLifecycle()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -82,31 +92,55 @@ export function useWalletAutoRecharge(
   }, [refresh, refreshPresets])
 
   const startBillingAuth = useCallback(
-    async (response: WalletAutoRechargeTossResponse) => {
-      if (!isApiSuccess(response) || !response.data) {
+    async (
+      response: WalletAutoRechargeTossResponse,
+      request: WalletAutoRechargeRequest,
+      lifecycleLease: TossPaymentLifecycleLease
+    ) => {
+      // A backend response can contain a durable pending trade before another
+      // field fails client validation. Capture only a strictly valid order ID
+      // first so every malformed/stale session can still be cancelled.
+      if (
+        !isApiSuccess(response) ||
+        !isWalletAutoRechargeBillingSessionMatchingRequest(
+          response.data,
+          request
+        )
+      ) {
+        await cancelRecoverableWalletAutoRechargeBillingSession(
+          response?.data,
+          scope,
+          cancelPendingWalletAutoRecharge
+        ).catch(() => false)
+        await Promise.allSettled([refresh(), refreshPresets()])
         toast.error(response.message || i18next.t('Payment request failed'))
         return false
       }
 
       const { client_key, customer_key, success_url, fail_url, trade_no } =
         response.data
-      if (!client_key || !customer_key || !success_url || !fail_url) {
-        toast.error(i18next.t('Payment request failed'))
-        return false
-      }
-
       try {
         const tossPayments = await loadTossPayments(client_key)
         const payment = tossPayments.payment({ customerKey: customer_key })
+        if (!(await paymentLifecycle.adopt(payment, lifecycleLease))) {
+          if (trade_no) {
+            await cancelPendingWalletAutoRecharge(trade_no, scope).catch(
+              () => {}
+            )
+          }
+          return false
+        }
         await payment.requestBillingAuth({
           method: 'CARD',
           successUrl: success_url,
           failUrl: fail_url,
+          ...getTossPaymentWindowTargetOptions(success_url, fail_url),
         })
         return true
       } catch (err) {
-        const error = err as { code?: string }
-        if (error.code && error.code !== 'USER_CANCEL') {
+        if (isTossUserCancellation(err)) {
+          toast.info(i18next.t('Cancelled'))
+        } else {
           toast.error(i18next.t('Payment request failed'))
         }
         if (trade_no) {
@@ -116,43 +150,86 @@ export function useWalletAutoRecharge(
         return false
       }
     },
-    [refresh, scope]
+    [paymentLifecycle, refresh, refreshPresets, scope]
   )
 
   const createScheduled = useCallback(
     async (payload: WalletAutoRechargeRequest) => {
-      if (!canManage) return false
+      if (!canManage || processingRef.current) return false
+      const lifecycleLease = paymentLifecycle.beginRequest()
+      if (lifecycleLease === null) return false
 
+      processingRef.current = true
       setProcessing(true)
       try {
         const response = await requestWalletScheduledRecharge(payload, scope)
-        return await startBillingAuth(response)
+        const started = await startBillingAuth(
+          response,
+          payload,
+          lifecycleLease
+        )
+        if (started) await refresh()
+        return started
+      } catch {
+        await Promise.allSettled([refresh(), refreshPresets()])
+        return false
       } finally {
+        paymentLifecycle.finishRequest(lifecycleLease)
+        processingRef.current = false
         setProcessing(false)
       }
     },
-    [canManage, scope, startBillingAuth]
+    [
+      canManage,
+      paymentLifecycle,
+      refresh,
+      refreshPresets,
+      scope,
+      startBillingAuth,
+    ]
   )
 
   const createThreshold = useCallback(
     async (payload: WalletAutoRechargeRequest) => {
-      if (!canManage) return false
+      if (!canManage || processingRef.current) return false
+      const lifecycleLease = paymentLifecycle.beginRequest()
+      if (lifecycleLease === null) return false
 
+      processingRef.current = true
       setProcessing(true)
       try {
         const response = await requestWalletThresholdRecharge(payload, scope)
-        return await startBillingAuth(response)
+        const started = await startBillingAuth(
+          response,
+          payload,
+          lifecycleLease
+        )
+        if (started) await refresh()
+        return started
+      } catch {
+        await Promise.allSettled([refresh(), refreshPresets()])
+        return false
       } finally {
+        paymentLifecycle.finishRequest(lifecycleLease)
+        processingRef.current = false
         setProcessing(false)
       }
     },
-    [canManage, scope, startBillingAuth]
+    [
+      canManage,
+      paymentLifecycle,
+      refresh,
+      refreshPresets,
+      scope,
+      startBillingAuth,
+    ]
   )
 
   const cancel = useCallback(
     async (id: number) => {
-      if (!canManage) return false
+      if (!canManage || processingRef.current) return false
 
+      processingRef.current = true
       setProcessing(true)
       try {
         const response = await cancelWalletAutoRecharge(id, scope)
@@ -166,6 +243,7 @@ export function useWalletAutoRecharge(
         toast.error(i18next.t('Request failed'))
         return false
       } finally {
+        processingRef.current = false
         setProcessing(false)
       }
     },

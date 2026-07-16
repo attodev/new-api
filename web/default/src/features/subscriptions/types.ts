@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
+import type { TossBillingAuthSession } from '@/features/wallet/types'
 
 // ============================================================================
 // Subscription Plan Schema & Types
@@ -45,8 +46,23 @@ export const subscriptionPlanSchema = z.object({
 
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 
+export interface TossSubscriptionCheckoutSnapshot {
+  plan_id: number
+  plan_title: string
+  price_amount: number
+  price_currency: string
+  provider_amount: number
+  provider_currency: string
+  snapshot_fingerprint: string
+}
+
+export interface TossSubscriptionBillingAuthSession extends TossBillingAuthSession {
+  toss_checkout: TossSubscriptionCheckoutSnapshot
+}
+
 export interface PlanRecord {
   plan: SubscriptionPlan
+  toss_checkout?: TossSubscriptionCheckoutSnapshot
 }
 
 // ============================================================================

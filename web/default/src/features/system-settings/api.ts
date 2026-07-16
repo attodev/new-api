@@ -22,6 +22,7 @@ import type {
   DeleteLogsResponse,
   FetchUpstreamRatiosRequest,
   SystemOptionsResponse,
+  TossOptionsUpdateRequest,
   UpdateOptionRequest,
   UpdateOptionResponse,
   UpstreamChannelsResponse,
@@ -35,6 +36,14 @@ export async function getSystemOptions() {
 
 export async function updateSystemOption(request: UpdateOptionRequest) {
   const res = await api.put<UpdateOptionResponse>('/api/option/', request)
+  return res.data
+}
+
+export async function updateTossSystemOptions(
+  request: UpdateOptionRequest[] | TossOptionsUpdateRequest
+) {
+  const payload = Array.isArray(request) ? { updates: request } : request
+  const res = await api.put<UpdateOptionResponse>('/api/option/toss', payload)
   return res.data
 }
 

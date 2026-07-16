@@ -169,7 +169,7 @@ export function normalizePresetForm(
       interval_unit: intervalUnit,
       interval_value: intervalValue,
       custom_seconds: customSeconds,
-      charge_immediately: form.charge_immediately,
+      charge_immediately: intervalUnit !== 'month' && form.charge_immediately,
       sort_order: sortOrder,
       enabled: form.enabled,
     }
@@ -511,6 +511,9 @@ export function WalletAutoRechargePresetsSection() {
   }
 
   const canAddPeriod = canAddScheduledPeriod(optionState.scheduled.periods)
+  const hasTestPeriod = optionState.scheduled.periods.some(
+    (item) => item.period.kind === 'custom'
+  )
 
   return (
     <SettingsSection title={t('Auto Recharge Presets')}>
@@ -571,30 +574,38 @@ export function WalletAutoRechargePresetsSection() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className='flex items-center justify-between gap-4 rounded-lg border p-4'>
-                  <div className='flex flex-col gap-1'>
-                    <div className='text-sm font-medium'>
-                      {t('Charge immediately')}
+                {hasTestPeriod ? (
+                  <div className='flex items-center justify-between gap-4 rounded-lg border p-4'>
+                    <div className='flex flex-col gap-1'>
+                      <div className='text-sm font-medium'>
+                        {t('Charge immediately after card registration')}
+                      </div>
+                      <div className='text-muted-foreground text-sm'>
+                        {t(
+                          'For test periods only, charge the selected amount as soon as card registration succeeds.'
+                        )}
+                      </div>
                     </div>
-                    <div className='text-muted-foreground text-sm'>
-                      {t(
-                        'Start the first scheduled charge as soon as the preset is selected.'
-                      )}
-                    </div>
+                    <Switch
+                      checked={optionState.scheduled.chargeImmediately}
+                      onCheckedChange={(checked) =>
+                        setOptionState((current) => ({
+                          ...current,
+                          scheduled: {
+                            ...current.scheduled,
+                            chargeImmediately: checked,
+                          },
+                        }))
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={optionState.scheduled.chargeImmediately}
-                    onCheckedChange={(checked) =>
-                      setOptionState((current) => ({
-                        ...current,
-                        scheduled: {
-                          ...current.scheduled,
-                          chargeImmediately: checked,
-                        },
-                      }))
-                    }
-                  />
-                </div>
+                ) : (
+                  <div className='text-muted-foreground flex items-center rounded-lg border p-4 text-sm'>
+                    {t(
+                      'Monthly presets make their first charge on the next 1st of the month.'
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className='flex flex-wrap gap-2'>

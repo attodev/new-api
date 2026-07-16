@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -15,15 +16,19 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 )
 
-var commonGroupCol string
-var commonKeyCol string
-var commonTrueVal string
-var commonFalseVal string
+// Default to the SQLite/MySQL dialect so model helpers remain valid in tests
+// and embedded callers that inject a GORM database without going through
+// chooseDB. Production initialization overwrites these for PostgreSQL.
+var commonGroupCol = "`group`"
+var commonKeyCol = "`key`"
+var commonTrueVal = "1"
+var commonFalseVal = "0"
 
-var logKeyCol string
-var logGroupCol string
+var logKeyCol = "`key`"
+var logGroupCol = "`group`"
 
 func initCol() {
 	// init common column names
@@ -115,6 +120,22 @@ func CheckSetup() {
 	}
 }
 
+func paymentSafeGORMConfig() *gorm.Config {
+	// GORM's default error/slow-query logger interpolates bind values into SQL.
+	// Payment lookups contain customerKey/paymentKey and encrypted provider
+	// credentials, so keep the default thresholds while logging placeholders.
+	return &gorm.Config{
+		PrepareStmt: true,
+		Logger: gormLogger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), gormLogger.Config{
+			SlowThreshold:             200 * time.Millisecond,
+			LogLevel:                  gormLogger.Warn,
+			IgnoreRecordNotFoundError: false,
+			Colorful:                  true,
+			ParameterizedQueries:      true,
+		}),
+	}
+}
+
 func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 	defer func() {
 		initCol()
@@ -132,9 +153,7 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 			return gorm.Open(postgres.New(postgres.Config{
 				DSN:                  dsn,
 				PreferSimpleProtocol: true, // disables implicit prepared statement usage
-			}), &gorm.Config{
-				PrepareStmt: true, // precompile SQL
-			})
+			}), paymentSafeGORMConfig())
 		}
 		if strings.HasPrefix(dsn, "local") {
 			common.SysLog("SQL_DSN not set, using SQLite as database")
@@ -143,9 +162,7 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 			} else {
 				common.LogSqlType = common.DatabaseTypeSQLite
 			}
-			return gorm.Open(sqlite.Open(common.SQLitePath), &gorm.Config{
-				PrepareStmt: true, // precompile SQL
-			})
+			return gorm.Open(sqlite.Open(common.SQLitePath), paymentSafeGORMConfig())
 		}
 		// Use MySQL
 		common.SysLog("using MySQL as database")
@@ -162,16 +179,12 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 		} else {
 			common.LogSqlType = common.DatabaseTypeMySQL
 		}
-		return gorm.Open(mysql.Open(dsn), &gorm.Config{
-			PrepareStmt: true, // precompile SQL
-		})
+		return gorm.Open(mysql.Open(dsn), paymentSafeGORMConfig())
 	}
 	// Use SQLite
 	common.SysLog("SQL_DSN not set, using SQLite as database")
 	common.UsingSQLite = true
-	return gorm.Open(sqlite.Open(common.SQLitePath), &gorm.Config{
-		PrepareStmt: true, // precompile SQL
-	})
+	return gorm.Open(sqlite.Open(common.SQLitePath), paymentSafeGORMConfig())
 }
 
 func InitDB() (err error) {
@@ -248,6 +261,9 @@ func InitLogDB() (err error) {
 }
 
 func migrateDB() error {
+	if err := requireTossRecurringProtocolMigrationSafe(); err != nil {
+		return err
+	}
 	// Migrate price_amount column from float/double to decimal for existing tables
 	migrateSubscriptionPlanPriceAmount()
 	// Migrate model_limits column from varchar to text for existing tables
@@ -258,6 +274,7 @@ func migrateDB() error {
 		return err
 	}
 
+	tossRecurringOrderIDProtocolTableExisted := DB.Migrator().HasTable(&TossRecurringOrderIDProtocolState{})
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
@@ -282,6 +299,10 @@ func migrateDB() error {
 		&SubscriptionOrder{},
 		&UserSubscription{},
 		&UserBillingKey{},
+		&TossPaymentEvent{},
+		&TossTransactionReconciliationCursor{},
+		&TossTransactionReconciliationPageCursor{},
+		&TossRecurringOrderIDProtocolState{},
 		&WalletAutoRecharge{},
 		&WalletAutoRechargePreset{},
 		&SubscriptionPreConsumeRecord{},
@@ -295,8 +316,18 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
-	if err := backfillTossBillingKeyHashes(1000); err != nil {
+	if err := initializeTossRecurringOrderIDProtocolState(!tossRecurringOrderIDProtocolTableExisted); err != nil {
 		return err
+	}
+	if err := activateTossRecurringOrderIDProtocolV2IfRequested(); err != nil {
+		return err
+	}
+	if err := backfillTossBillingKeyHashes(1000); err != nil {
+		if errors.Is(err, ErrTossBillingKeyIdentityUnresolved) {
+			common.SysLog("legacy Toss billing-key hash backfill left unresolved rows isolated; startup will continue fail-closed for those identities")
+		} else {
+			return err
+		}
 	}
 	if common.UsingSQLite {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
@@ -356,7 +387,11 @@ func migrateUserBillingKeyStatusLength() error {
 }
 
 func migrateDBFast() error {
+	if err := requireTossRecurringProtocolMigrationSafe(); err != nil {
+		return err
+	}
 
+	tossRecurringOrderIDProtocolTableExisted := DB.Migrator().HasTable(&TossRecurringOrderIDProtocolState{})
 	var wg sync.WaitGroup
 
 	migrations := []struct {
@@ -386,6 +421,10 @@ func migrateDBFast() error {
 		{&SubscriptionOrder{}, "SubscriptionOrder"},
 		{&UserSubscription{}, "UserSubscription"},
 		{&UserBillingKey{}, "UserBillingKey"},
+		{&TossPaymentEvent{}, "TossPaymentEvent"},
+		{&TossTransactionReconciliationCursor{}, "TossTransactionReconciliationCursor"},
+		{&TossTransactionReconciliationPageCursor{}, "TossTransactionReconciliationPageCursor"},
+		{&TossRecurringOrderIDProtocolState{}, "TossRecurringOrderIDProtocolState"},
 		{&WalletAutoRecharge{}, "WalletAutoRecharge"},
 		{&WalletAutoRechargePreset{}, "WalletAutoRechargePreset"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
@@ -418,6 +457,12 @@ func migrateDBFast() error {
 		if err != nil {
 			return err
 		}
+	}
+	if err := initializeTossRecurringOrderIDProtocolState(!tossRecurringOrderIDProtocolTableExisted); err != nil {
+		return err
+	}
+	if err := activateTossRecurringOrderIDProtocolV2IfRequested(); err != nil {
+		return err
 	}
 	if common.UsingSQLite {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {

@@ -171,7 +171,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 					updates["status"] = stringToStatus(st)
 				}
 				updates["remark"] = getCell(row, "remark")
-				if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
+				if err := model.UpdateUserFieldsWithBillingLifecycle(existingUser.Id, updates); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
 					continue
 				}
@@ -198,13 +198,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): belongs to another organization", lineNum, username))
 				continue
 			}
-			if err := model.DB.Model(&model.User{}).
-				Select("organization_id", "organization_role").
-				Where("id = ?", existingUser.Id).
-				Updates(model.User{
-					OrganizationId:   organizationId,
-					OrganizationRole: orgRole,
-				}).Error; err != nil {
+			if err := model.AssignUserToOrganizationWithBillingLifecycle(existingUser.Id, organizationId, orgRole); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
 				continue
 			}
@@ -257,13 +251,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 			continue
 		}
 
-		if err := model.DB.Model(&model.User{}).
-			Select("organization_id", "organization_role").
-			Where("id = ?", newUser.Id).
-			Updates(model.User{
-				OrganizationId:   organizationId,
-				OrganizationRole: orgRole,
-			}).Error; err != nil {
+		if err := model.AssignUserToOrganizationWithBillingLifecycle(newUser.Id, organizationId, orgRole); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set org membership: %v", lineNum, username, err))
 			continue
 		}

@@ -1,11 +1,16 @@
 package model
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -31,6 +36,64 @@ type WalletAutoRechargePreset struct {
 	Enabled           bool    `json:"enabled" gorm:"index"`
 	CreateTime        int64   `json:"create_time" gorm:"autoCreateTime"`
 	UpdateTime        int64   `json:"update_time" gorm:"autoUpdateTime"`
+	TermsFingerprint  string  `json:"terms_fingerprint" gorm:"-"`
+}
+
+// WalletAutoRechargePresetTerms is the immutable financial contract the user
+// sees before opening Toss billing authorization. Names and sort order are
+// deliberately excluded because changing display-only metadata must not
+// invalidate an otherwise identical authorization session.
+type WalletAutoRechargePresetTerms struct {
+	PresetId          int     `json:"preset_id"`
+	Type              string  `json:"type"`
+	TargetScope       string  `json:"target_scope"`
+	Amount            float64 `json:"amount"`
+	ThresholdAmount   float64 `json:"threshold_amount"`
+	ThresholdQuota    int     `json:"threshold_quota"`
+	IntervalUnit      string  `json:"interval_unit"`
+	IntervalValue     int     `json:"interval_value"`
+	CustomSeconds     int64   `json:"custom_seconds"`
+	ChargeImmediately bool    `json:"charge_immediately"`
+	Enabled           bool    `json:"enabled"`
+}
+
+var ErrWalletAutoRechargePresetChanged = errors.New("wallet auto recharge preset terms changed; refresh and try again")
+
+func (preset WalletAutoRechargePreset) Terms() WalletAutoRechargePresetTerms {
+	return WalletAutoRechargePresetTerms{
+		PresetId:          preset.Id,
+		Type:              preset.Type,
+		TargetScope:       preset.TargetScope,
+		Amount:            preset.Amount,
+		ThresholdAmount:   preset.ThresholdAmount,
+		ThresholdQuota:    preset.ThresholdQuota,
+		IntervalUnit:      preset.IntervalUnit,
+		IntervalValue:     preset.IntervalValue,
+		CustomSeconds:     preset.CustomSeconds,
+		ChargeImmediately: preset.ChargeImmediately,
+		Enabled:           preset.Enabled,
+	}
+}
+
+func walletAutoRechargePresetTermsFingerprint(preset WalletAutoRechargePreset) (string, error) {
+	payload, err := common.Marshal(preset.Terms())
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func populateWalletAutoRechargePresetTermsFingerprint(preset *WalletAutoRechargePreset) error {
+	if preset == nil {
+		return errors.New("wallet auto recharge preset is required")
+	}
+	fingerprint, err := walletAutoRechargePresetTermsFingerprint(*preset)
+	if err != nil {
+		return err
+	}
+	preset.TermsFingerprint = fingerprint
+	return nil
 }
 
 type WalletAutoRechargePresetRequest struct {
@@ -68,28 +131,30 @@ func (req WalletAutoRechargePresetRequest) normalizeAndValidate() (WalletAutoRec
 	if req.Amount <= 0 {
 		return req, errors.New("wallet auto recharge preset amount must be positive")
 	}
-	if walletAutoRechargeKRW(req.Amount) < int64(setting.TossMinTopUp) {
+	chargeKRW := walletAutoRechargeKRW(req.Amount)
+	if chargeKRW <= 0 || chargeKRW > setting.TossMaximumChargeAmountKRW {
+		return req, errors.New("wallet auto recharge preset amount is outside Toss limits")
+	}
+	if chargeKRW < walletAutoRechargeMinimumKRW() {
 		return req, errors.New("wallet auto recharge preset amount is below Toss minimum")
+	}
+	if walletAutoRechargeQuota(req.Amount) <= 0 || walletAutoRechargeMoney(req.Amount) <= 0 {
+		return req, errors.New("wallet auto recharge preset quota conversion is invalid")
 	}
 
 	switch req.Type {
 	case WalletAutoRechargeTypeScheduled:
-		switch req.IntervalUnit {
-		case WalletAutoRechargeIntervalMonth, WalletAutoRechargeIntervalDay:
-			if req.IntervalValue <= 0 {
-				return req, errors.New("wallet auto recharge preset interval value is invalid")
-			}
-		case WalletAutoRechargeIntervalCustom:
-			if req.CustomSeconds <= 0 {
-				return req, errors.New("wallet auto recharge preset custom seconds is invalid")
-			}
-			if req.IntervalValue <= 0 {
-				req.IntervalValue = 1
-			}
-		default:
-			return req, errors.New("wallet auto recharge preset interval is required")
+		if req.IntervalUnit == WalletAutoRechargeIntervalMonth {
+			req.ChargeImmediately = false
+		}
+		if req.IntervalUnit == WalletAutoRechargeIntervalCustom && req.IntervalValue <= 0 {
+			req.IntervalValue = 1
+		}
+		if err := validateWalletAutoRechargeIntervalForCurrentMode(req.IntervalUnit, req.IntervalValue, req.CustomSeconds); err != nil {
+			return req, err
 		}
 	case WalletAutoRechargeTypeThreshold:
+		req.ChargeImmediately = false
 		if req.ThresholdQuota < 0 {
 			return req, errors.New("wallet auto recharge preset threshold quota cannot be negative")
 		}
@@ -123,6 +188,9 @@ func CreateWalletAutoRechargePreset(req WalletAutoRechargePresetRequest) (*Walle
 		UpdateTime:        now,
 	}
 	if err := DB.Create(preset).Error; err != nil {
+		return nil, err
+	}
+	if err := populateWalletAutoRechargePresetTermsFingerprint(preset); err != nil {
 		return nil, err
 	}
 	return preset, nil
@@ -161,6 +229,9 @@ func UpdateWalletAutoRechargePreset(id int, req WalletAutoRechargePresetRequest)
 	if err := DB.First(&preset, id).Error; err != nil {
 		return nil, err
 	}
+	if err := populateWalletAutoRechargePresetTermsFingerprint(&preset); err != nil {
+		return nil, err
+	}
 	return &preset, nil
 }
 
@@ -184,8 +255,15 @@ func ListWalletAutoRechargePresets(includeDisabled bool) ([]WalletAutoRechargePr
 	if !includeDisabled {
 		query = query.Where("enabled = ?", true)
 	}
-	err := query.Order("sort_order asc, id asc").Find(&rows).Error
-	return rows, err
+	if err := query.Order("sort_order asc, id asc").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for index := range rows {
+		if err := populateWalletAutoRechargePresetTermsFingerprint(&rows[index]); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
 }
 
 func walletAutoRechargePresetMatchesTarget(scope string, targetType string) bool {
@@ -199,32 +277,124 @@ func walletAutoRechargePresetHasValidThresholdQuota(preset WalletAutoRechargePre
 	return preset.Type != WalletAutoRechargeTypeThreshold || preset.ThresholdQuota > 0
 }
 
+func validateWalletAutoRechargePresetForTarget(preset WalletAutoRechargePreset, rechargeType string, targetType string) error {
+	return validateWalletAutoRechargePresetForTargetMode(preset, rechargeType, targetType, setting.GetTossConfigSnapshot().TestMode)
+}
+
+func validateWalletAutoRechargePresetForTargetMode(preset WalletAutoRechargePreset, rechargeType string, targetType string, testMode bool) error {
+	if !preset.Enabled {
+		return errors.New("wallet auto recharge preset is disabled")
+	}
+	if preset.Type != rechargeType {
+		return errors.New("wallet auto recharge preset type mismatch")
+	}
+	if !walletAutoRechargePresetMatchesTarget(preset.TargetScope, targetType) {
+		return errors.New("wallet auto recharge preset is not available for target")
+	}
+	if !walletAutoRechargePresetHasValidThresholdQuota(preset) {
+		return errors.New("wallet auto recharge preset threshold quota is invalid")
+	}
+	if preset.Type == WalletAutoRechargeTypeScheduled {
+		if err := validateWalletAutoRechargeIntervalForMode(preset.IntervalUnit, preset.IntervalValue, preset.CustomSeconds, testMode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func GetWalletAutoRechargePresetForTarget(id int, rechargeType string, targetType string) (*WalletAutoRechargePreset, error) {
+	return GetWalletAutoRechargePresetForTargetMode(id, rechargeType, targetType, setting.GetTossConfigSnapshot().TestMode)
+}
+
+func GetWalletAutoRechargePresetForTargetMode(id int, rechargeType string, targetType string, testMode bool) (*WalletAutoRechargePreset, error) {
 	var preset WalletAutoRechargePreset
 	if err := DB.First(&preset, id).Error; err != nil {
 		return nil, err
 	}
-	if !preset.Enabled {
-		return nil, errors.New("wallet auto recharge preset is disabled")
+	if err := validateWalletAutoRechargePresetForTargetMode(preset, rechargeType, targetType, testMode); err != nil {
+		return nil, err
 	}
-	if preset.Type != rechargeType {
-		return nil, errors.New("wallet auto recharge preset type mismatch")
-	}
-	if !walletAutoRechargePresetMatchesTarget(preset.TargetScope, targetType) {
-		return nil, errors.New("wallet auto recharge preset is not available for target")
-	}
-	if !walletAutoRechargePresetHasValidThresholdQuota(preset) {
-		return nil, errors.New("wallet auto recharge preset threshold quota is invalid")
+	if err := populateWalletAutoRechargePresetTermsFingerprint(&preset); err != nil {
+		return nil, err
 	}
 	return &preset, nil
 }
 
 func ListWalletAutoRechargePresetsForTarget(targetType string) ([]WalletAutoRechargePreset, error) {
 	var rows []WalletAutoRechargePreset
-	err := DB.Where("enabled = ?", true).
+	query := DB.Where("enabled = ?", true).
 		Where("target_scope = ? OR target_scope = ?", targetType, WalletAutoRechargePresetTargetAll).
-		Where("type <> ? OR threshold_quota > ?", WalletAutoRechargeTypeThreshold, 0).
-		Order("sort_order asc, id asc").
-		Find(&rows).Error
-	return rows, err
+		Where("type <> ? OR threshold_quota > ?", WalletAutoRechargeTypeThreshold, 0)
+	if !setting.GetTossConfigSnapshot().TestMode {
+		query = query.Where("type <> ? OR interval_unit <> ?", WalletAutoRechargeTypeScheduled, WalletAutoRechargeIntervalCustom)
+	}
+	if err := query.Order("sort_order asc, id asc").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for index := range rows {
+		if err := populateWalletAutoRechargePresetTermsFingerprint(&rows[index]); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
+}
+
+// CreatePendingWalletAutoRechargeFromPreset locks and validates the exact
+// financial terms the browser previously displayed, then creates the immutable
+// policy snapshot in the same transaction. An admin update cannot race between
+// the comparison and policy creation.
+func CreatePendingWalletAutoRechargeFromPreset(req CreateWalletAutoRechargeRequest, expectedFingerprint string, testMode bool) (*WalletAutoRecharge, *WalletAutoRechargePreset, error) {
+	expectedFingerprint = strings.TrimSpace(expectedFingerprint)
+	if req.PresetId <= 0 || expectedFingerprint == "" {
+		return nil, nil, ErrWalletAutoRechargePresetChanged
+	}
+
+	var policy *WalletAutoRecharge
+	var preset WalletAutoRechargePreset
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		candidate := &WalletAutoRecharge{
+			Type:        req.Type,
+			TargetType:  req.TargetType,
+			TargetId:    req.TargetId,
+			OwnerUserId: req.OwnerUserId,
+			Status:      WalletAutoRechargeStatusPending,
+		}
+		if err := lockAndValidateWalletAutoRechargeOwnerTx(tx, candidate); err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&preset, req.PresetId).Error; err != nil {
+			return err
+		}
+		if err := validateWalletAutoRechargePresetForTargetMode(preset, req.Type, req.TargetType, testMode); err != nil {
+			return err
+		}
+		if err := populateWalletAutoRechargePresetTermsFingerprint(&preset); err != nil {
+			return err
+		}
+		if preset.TermsFingerprint != expectedFingerprint {
+			return ErrWalletAutoRechargePresetChanged
+		}
+
+		req.Amount = preset.Amount
+		req.ThresholdAmount = preset.ThresholdAmount
+		req.ThresholdQuota = preset.ThresholdQuota
+		req.IntervalUnit = preset.IntervalUnit
+		req.IntervalValue = preset.IntervalValue
+		req.CustomSeconds = preset.CustomSeconds
+		req.ChargeImmediately = preset.ChargeImmediately
+
+		built, err := buildPendingWalletAutoRechargeForMode(req, testMode)
+		if err != nil {
+			return err
+		}
+		if err := createPendingWalletAutoRechargeTx(tx, built); err != nil {
+			return err
+		}
+		policy = built
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return policy, &preset, nil
 }

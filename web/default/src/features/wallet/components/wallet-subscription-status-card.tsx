@@ -46,6 +46,7 @@ import type {
   SubscriptionPlan,
   UserSubscriptionRecord,
 } from '@/features/subscriptions/types'
+import { CancelAllTossAutoRenew } from './cancel-all-toss-auto-renew'
 
 interface WalletSubscriptionStatusCardProps {
   activeSubscriptions: UserSubscriptionRecord[]
@@ -55,7 +56,7 @@ interface WalletSubscriptionStatusCardProps {
   cancellingAutoRenew: boolean
   onRefresh: () => void | Promise<void>
   onBillingPreferenceChange: (preference: string) => void | Promise<void>
-  onCancelTossAutoRenew: () => void | Promise<void>
+  onCancelTossAutoRenew: () => boolean | Promise<boolean>
 }
 
 type UserSubscriptionWithPlan = UserSubscriptionRecord & {
@@ -106,7 +107,11 @@ export function WalletSubscriptionStatusCard({
 }: WalletSubscriptionStatusCardProps) {
   const { t } = useTranslation()
 
-  if (activeSubscriptions.length === 0) {
+  const autoRenewCount = allSubscriptions.filter(
+    (record) => record.subscription?.auto_renew
+  ).length
+
+  if (activeSubscriptions.length === 0 && autoRenewCount === 0) {
     return null
   }
 
@@ -114,7 +119,6 @@ export function WalletSubscriptionStatusCard({
     0,
     allSubscriptions.length - activeSubscriptions.length
   )
-
   return (
     <TitledCard
       title={t('Subscription')}
@@ -287,24 +291,22 @@ export function WalletSubscriptionStatusCard({
                   <Progress value={usagePercent} className='mt-2 h-1.5' />
                 )}
                 {subscription?.auto_renew && (
-                  <div className='mt-2 flex items-center justify-between'>
+                  <div className='mt-2'>
                     <span className='text-muted-foreground text-xs'>
                       {t('Auto-renew active')}
                     </span>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => void onCancelTossAutoRenew()}
-                      disabled={cancellingAutoRenew}
-                    >
-                      {t('Cancel Auto-renew')}
-                    </Button>
                   </div>
                 )}
               </div>
             )
           })}
+        </div>
+        <div className='mt-3'>
+          <CancelAllTossAutoRenew
+            count={autoRenewCount}
+            loading={cancellingAutoRenew}
+            onConfirm={onCancelTossAutoRenew}
+          />
         </div>
       </div>
     </TitledCard>

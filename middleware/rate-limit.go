@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -13,6 +14,7 @@ import (
 var timeFormat = "2006-01-02T15:04:05.000Z"
 
 var inMemoryRateLimiter common.InMemoryRateLimiter
+var invalidRateLimitConfigWarningOnce sync.Once
 
 var defNext = func(c *gin.Context) {
 	c.Next()
@@ -73,7 +75,33 @@ func memoryRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark s
 	}
 }
 
+func normalizeRateLimitParameters(maxRequestNum int, duration int64) (int, int64) {
+	maxDuration := int64(common.RateLimitKeyExpirationDuration / time.Second)
+	if maxDuration <= 0 {
+		maxDuration = 1
+	}
+	if maxRequestNum > 0 && duration > 0 && duration <= maxDuration {
+		return maxRequestNum, duration
+	}
+	invalidRateLimitConfigWarningOnce.Do(func() {
+		// Keep this warning fixed and value-free: rate-limit constructors are
+		// used by many routes, and one malformed environment value must not flood
+		// logs or accidentally echo deployment configuration.
+		common.SysError("invalid rate limit configuration normalized to safe bounds")
+	})
+	if maxRequestNum <= 0 {
+		maxRequestNum = 1
+	}
+	if duration <= 0 {
+		duration = 1
+	} else if duration > maxDuration {
+		duration = maxDuration
+	}
+	return maxRequestNum, duration
+}
+
 func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration)
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			redisRateLimiter(c, maxRequestNum, duration, mark)
@@ -101,6 +129,24 @@ func GlobalAPIRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+// GlobalAPIRateLimitExcept applies the ordinary global API limiter unless the
+// caller explicitly marks this exact request as trusted infrastructure traffic.
+// The exemption predicate runs before the IP bucket is consumed, which is
+// important for provider webhooks whose documented source addresses are shared
+// by many merchants. Callers must keep predicates narrow and authenticate the
+// direct peer (or an explicitly trusted proxy) rather than trusting arbitrary
+// forwarding headers.
+func GlobalAPIRateLimitExcept(exempt func(c *gin.Context) bool) func(c *gin.Context) {
+	limiter := GlobalAPIRateLimit()
+	return func(c *gin.Context) {
+		if exempt != nil && exempt(c) {
+			c.Next()
+			return
+		}
+		limiter(c)
+	}
+}
+
 func CriticalRateLimit() func(c *gin.Context) {
 	if common.CriticalRateLimitEnable {
 		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT")
@@ -120,6 +166,7 @@ func UploadRateLimit() func(c *gin.Context) {
 // instead of client IP, making it resistant to proxy rotation attacks.
 // Must be used AFTER authentication middleware (UserAuth).
 func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration)
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			userId := c.GetInt("id")

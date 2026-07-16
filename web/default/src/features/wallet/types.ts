@@ -55,7 +55,23 @@ export interface TossTopupQuote {
   credit_quota?: number
   unit_price?: number
 }
-export type TossPaymentResponse = ApiResponse<{
+
+/**
+ * Exact server quote the buyer reviewed before starting a Toss checkout.
+ * Every field is required so the later `/toss/pay` response can be matched
+ * field-for-field before the SDK receives a charge request.
+ */
+export interface TossPaymentConfirmation extends TossTopupQuote {
+  amount_mode: TopupAmountMode
+  input_amount: number
+  charge_amount: number
+  credit_amount: number
+  credit_quota: number
+  unit_price: number
+}
+export type TossAmountResponse = ApiResponse<TossTopupQuote | string | number>
+
+export interface TossPaymentSession {
   client_key: string
   customer_key: string
   order_id: string
@@ -68,7 +84,17 @@ export type TossPaymentResponse = ApiResponse<{
   credit_quota?: number
   unit_price?: number
   amount_mode?: TopupAmountMode
-}>
+}
+
+export type TossPaymentResponse = ApiResponse<TossPaymentSession>
+
+export interface TossBillingAuthSession {
+  client_key: string
+  customer_key: string
+  trade_no: string
+  success_url: string
+  fail_url: string
+}
 
 export type WaffoPancakePaymentResponse = ApiResponse<
   | {
@@ -197,6 +223,8 @@ export interface TopupInfo {
   toss_unit_price?: number
   /** Whether Toss billing (recurring subscription) is enabled */
   enable_toss_billing?: boolean
+  /** Whether separately approved Toss wallet auto recharge is enabled */
+  enable_toss_wallet_auto_recharge?: boolean
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
@@ -348,6 +376,7 @@ export type WalletAutoRechargeIntervalUnit = 'month' | 'day' | 'custom'
 export type WalletAutoRechargeStatus =
   | 'pending'
   | 'active'
+  | 'cancel_pending'
   | 'cancelled'
   | 'failed'
 
@@ -389,6 +418,21 @@ export interface WalletAutoRechargePreset {
   charge_immediately?: boolean
   sort_order?: number
   enabled: boolean
+  terms_fingerprint?: string
+}
+
+export interface WalletAutoRechargePresetTerms {
+  preset_id: number
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  amount: number
+  threshold_amount: number
+  threshold_quota: number
+  interval_unit: WalletAutoRechargeIntervalUnit | ''
+  interval_value: number
+  custom_seconds: number
+  charge_immediately: boolean
+  enabled: boolean
 }
 
 export interface WalletAutoRechargePresetRequest {
@@ -409,18 +453,20 @@ export interface WalletAutoRechargePresetRequest {
 
 export interface WalletAutoRechargeRequest {
   preset_id: number
+  preset_fingerprint: string
+  expected_policy: WalletAutoRechargePresetTerms
 }
 
-export type WalletAutoRechargeResponse =
-  ApiResponse<WalletAutoRechargePolicy[]>
+export type WalletAutoRechargeResponse = ApiResponse<WalletAutoRechargePolicy[]>
 
-export type WalletAutoRechargePresetResponse =
-  ApiResponse<WalletAutoRechargePreset[]>
+export type WalletAutoRechargePresetResponse = ApiResponse<
+  WalletAutoRechargePreset[]
+>
 
-export type WalletAutoRechargeTossResponse = ApiResponse<{
-  client_key: string
-  customer_key: string
-  trade_no: string
-  success_url: string
-  fail_url: string
-}>
+export interface WalletAutoRechargeBillingAuthSession extends TossBillingAuthSession {
+  preset_fingerprint: string
+  policy: WalletAutoRechargePresetTerms
+}
+
+export type WalletAutoRechargeTossResponse =
+  ApiResponse<WalletAutoRechargeBillingAuthSession>

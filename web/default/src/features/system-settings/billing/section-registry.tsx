@@ -158,6 +158,8 @@ const BILLING_SECTIONS = [
           PayPalMinTopUp: settings.PayPalMinTopUp ?? 1,
           TossEnabled: settings.TossEnabled ?? false,
           TossBillingEnabled: settings.TossBillingEnabled ?? false,
+          TossWalletAutoRechargeEnabled:
+            settings.TossWalletAutoRechargeEnabled ?? false,
           TossTestMode: settings.TossTestMode ?? false,
           TossClientKey: settings.TossClientKey ?? '',
           TossSecretKey: settings.TossSecretKey ?? '',
@@ -168,7 +170,7 @@ const BILLING_SECTIONS = [
           TossBillingTestClientKey: settings.TossBillingTestClientKey ?? '',
           TossBillingTestSecretKey: settings.TossBillingTestSecretKey ?? '',
           TossUnitPrice: settings.TossUnitPrice ?? 1300,
-          TossMinTopUp: settings.TossMinTopUp ?? 1,
+          TossMinTopUp: settings.TossMinTopUp ?? 100,
           CreemApiKey: settings.CreemApiKey,
           CreemWebhookSecret: settings.CreemWebhookSecret,
           CreemTestMode: settings.CreemTestMode,
@@ -205,6 +207,11 @@ const BILLING_SECTIONS = [
           confirmedAt: settings['payment_setting.compliance_confirmed_at'] ?? 0,
           confirmedBy: settings['payment_setting.compliance_confirmed_by'] ?? 0,
         }}
+        tossConfigRepairRequired={settings.TossConfigRepairRequired ?? false}
+        tossConfigMaintenanceRequired={
+          settings.TossConfigMaintenanceRequired ?? false
+        }
+        tossConfigRepairToken={settings.TossConfigRepairToken ?? ''}
       />
     ),
   },
