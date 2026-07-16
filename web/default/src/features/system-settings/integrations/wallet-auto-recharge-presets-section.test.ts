@@ -55,7 +55,7 @@ describe('wallet auto recharge preset admin helpers', () => {
       interval_unit: 'month',
       interval_value: 1,
       custom_seconds: 0,
-      charge_immediately: true,
+      charge_immediately: false,
       sort_order: 10,
       enabled: true,
     })

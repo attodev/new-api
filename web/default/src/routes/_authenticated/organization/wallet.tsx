@@ -16,9 +16,36 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useEffect } from 'react'
+import { z } from 'zod'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { OrganizationWallet } from '@/features/organizations/components/organization-wallet'
 
-export const Route = createFileRoute('/_authenticated/organization/wallet')({
-  component: OrganizationWallet,
+const organizationWalletSearchSchema = z.object({
+  wallet_auto_recharge: z.enum(['success', 'failed']).optional(),
 })
+
+export const Route = createFileRoute('/_authenticated/organization/wallet')({
+  component: OrganizationWalletRoute,
+  validateSearch: organizationWalletSearchSchema,
+})
+
+function OrganizationWalletRoute() {
+  const { wallet_auto_recharge } = Route.useSearch()
+  const { t } = useTranslation()
+
+  useEffect(() => {
+    if (wallet_auto_recharge === 'success') {
+      toast.success(t('Setting updated successfully'))
+    } else if (wallet_auto_recharge === 'failed') {
+      toast.error(t('Payment request failed'))
+    } else {
+      return
+    }
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [t, wallet_auto_recharge])
+
+  return <OrganizationWallet />
+}

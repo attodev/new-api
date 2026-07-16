@@ -42,6 +42,7 @@ import {
   getMinTopupAmount,
   calculatePresetPricing,
   isTossPayment,
+  shouldBlockPaymentMethodBeforeQuote,
 } from '../lib'
 import {
   TOSS_KRW_PRESETS,
@@ -286,7 +287,7 @@ export function RechargeFormCard({
           {hasConfigurableTopup && (
             <>
               {usesTossAmountMode && onAmountModeChange ? (
-                <div className='grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-1'>
+                <div className='bg-muted/30 grid grid-cols-2 gap-1 rounded-lg border p-1'>
                   <Button
                     type='button'
                     variant={activeAmountMode === 'krw' ? 'default' : 'ghost'}
@@ -297,9 +298,7 @@ export function RechargeFormCard({
                   </Button>
                   <Button
                     type='button'
-                    variant={
-                      activeAmountMode === 'quota' ? 'default' : 'ghost'
-                    }
+                    variant={activeAmountMode === 'quota' ? 'default' : 'ghost'}
                     onClick={() => onAmountModeChange('quota')}
                     aria-pressed={activeAmountMode === 'quota'}
                   >
@@ -459,7 +458,11 @@ export function RechargeFormCard({
                               tossUnitPrice
                             ).chargeAmount
                           : topupAmount
-                      const disabled = minTopup > amountForMinimum
+                      const disabled = shouldBlockPaymentMethodBeforeQuote(
+                        method.type,
+                        amountForMinimum,
+                        minTopup
+                      )
 
                       const button = (
                         <Button

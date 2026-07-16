@@ -40,6 +40,7 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  TossAmountResponse,
   TossPaymentResponse,
   WalletAutoRechargeRequest,
   WalletAutoRechargeResponse,
@@ -194,7 +195,7 @@ export async function calculateWaffoPancakeAmount(
  */
 export async function calculateTossAmount(
   request: AmountRequest
-): Promise<AmountResponse> {
+): Promise<TossAmountResponse> {
   const res = await api.post('/api/user/toss/amount', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
@@ -345,9 +346,10 @@ export async function requestWalletScheduledRecharge(
   request: WalletAutoRechargeRequest,
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargeTossResponse> {
+  const { preset_id, preset_fingerprint } = request
   const res = await api.post(
     `${walletAutoRechargeBase(scope)}/scheduled`,
-    request,
+    { preset_id, preset_fingerprint },
     {
       skipBusinessError: true,
     } as Record<string, unknown>
@@ -359,9 +361,10 @@ export async function requestWalletThresholdRecharge(
   request: WalletAutoRechargeRequest,
   scope: 'user' | 'organization' = 'user'
 ): Promise<WalletAutoRechargeTossResponse> {
+  const { preset_id, preset_fingerprint } = request
   const res = await api.post(
     `${walletAutoRechargeBase(scope)}/threshold`,
-    request,
+    { preset_id, preset_fingerprint },
     {
       skipBusinessError: true,
     } as Record<string, unknown>

@@ -410,6 +410,7 @@ topup.fetch_products_failed: "상품 목록을 가져오지 못했습니다"
 
 # 구독 결제 메시지
 subscription_payment.invalid_params: "잘못된 매개변수입니다"
+payment.personal_billing_org_active: "조직에 소속된 동안에는 개인 결제를 사용할 수 없습니다. 조직 지갑을 이용해 주세요."
 
 # 플레이그라운드 메시지
 playground.no_access_token: "플레이그라운드에서는 액세스 토큰을 지원하지 않습니다"

@@ -43,19 +43,18 @@
         </li>
         <li><a href="/guide"{{if eq .Active "guide"}} class="active"{{end}}>사용 가이드</a></li>
       </ul>
+      <div class="gnb-right">
+        <button type="button" class="lang-switch" aria-label="언어 선택, 현재 한국어" aria-haspopup="true" aria-expanded="false" aria-controls="languageMenu">
+          <i data-lucide="languages"></i>
+          <div class="lang-dropdown" id="languageMenu"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}" lang="en">English</a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}" lang="ko" aria-current="page">한국어<span class="check">✓</span></a></div>
+        </button>
+        <a href="/sign-in" class="btn-login">로그인</a>
+        <a href="/sign-in" class="btn-primary" hidden>체험해보기</a>
+      </div>
       <button class="gnb-hamburger" aria-label="메뉴 열기" aria-expanded="false">
         <span></span>
         <span></span>
         <span></span>
       </button>
-      <div class="gnb-right">
-        <button class="lang-switch" onclick="this.classList.toggle('open')">
-          <i data-lucide="languages"></i>
-          <div class="lang-dropdown"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}">English</a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}">한국어<span class="check">✓</span></a></div>
-        </button>
-        <div class="gnb-divider"></div>
-        <a href="/sign-in" class="btn-login">로그인</a>
-        <a href="/sign-in" class="btn-primary">체험해보기</a>
-      </div>
     </nav>
 {{end}}

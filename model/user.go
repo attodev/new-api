@@ -15,6 +15,7 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const UserNameMaxLength = 20
@@ -339,8 +340,8 @@ func HardDeleteUserById(id int) error {
 	if id == 0 {
 		return errors.New("id is empty")
 	}
-	err := DB.Unscoped().Delete(&User{}, "id = ?", id).Error
-	return err
+	user := User{Id: id}
+	return user.HardDelete()
 }
 
 func inviteUser(inviterId int) (err error) {
@@ -368,7 +369,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	defer tx.Rollback() // ensure transaction is rolled back on function exit
 
 	// lock-query user to ensure data consistency
-	err := tx.Set("gorm:query_option", "FOR UPDATE").First(&user, user.Id).Error
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, user.Id).Error
 	if err != nil {
 		return err
 	}
@@ -515,13 +516,47 @@ func (user *User) Update(updatePassword bool) error {
 		}
 	}
 	newUser := *user
-	DB.First(&user, user.Id)
-	if err = DB.Model(user).Updates(newUser).Error; err != nil {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if newUser.Status == common.UserStatusDisabled {
+			if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+				return err
+			}
+		}
+		return tx.Model(&current).Updates(newUser).Error
+	})
+	if err != nil {
+		return err
+	}
+	if err := DB.First(user, user.Id).Error; err != nil {
 		return err
 	}
 
 	// Update cache
 	return updateUserCache(*user)
+}
+
+// UpdateUserFieldsWithBillingLifecycle applies controller-owned field updates
+// while ensuring a transition to disabled atomically stops recurring billing.
+func UpdateUserFieldsWithBillingLifecycle(id int, updates map[string]interface{}) error {
+	if id <= 0 {
+		return errors.New("id is empty")
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, id).Error; err != nil {
+			return err
+		}
+		if status, ok := updates["status"].(int); ok && status == common.UserStatusDisabled {
+			if err := DeactivateTossBillingForUser(tx, id); err != nil {
+				return err
+			}
+		}
+		return tx.Model(&current).Updates(updates).Error
+	})
 }
 
 func (user *User) Edit(updatePassword bool) error {
@@ -588,7 +623,19 @@ func (user *User) Delete() error {
 	if user.Id == 0 {
 		return errors.New("id is empty")
 	}
-	if err := DB.Delete(user).Error; err != nil {
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if err := prepareUserTossPaymentsForDeletionTx(tx, user.Id); err != nil {
+			return err
+		}
+		if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+			return err
+		}
+		return tx.Delete(&current).Error
+	}); err != nil {
 		return err
 	}
 
@@ -600,8 +647,22 @@ func (user *User) HardDelete() error {
 	if user.Id == 0 {
 		return errors.New("id is empty")
 	}
-	err := DB.Unscoped().Delete(user).Error
-	return err
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if err := prepareUserTossPaymentsForDeletionTx(tx, user.Id); err != nil {
+			return err
+		}
+		if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+			return err
+		}
+		return tx.Unscoped().Delete(&current).Error
+	}); err != nil {
+		return err
+	}
+	return invalidateUserCache(user.Id)
 }
 
 // ValidateAndFill check password & user status

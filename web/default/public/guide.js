@@ -16,15 +16,15 @@
     });
   }
 
-  // 가이드 영상 하나(재생 오버레이 + 종료 시 CTA/다시보기)에 필요한 동작을 전부 연결.
+  // 가이드 영상 하나(재생 오버레이 + 종료 시 다시보기)에 필요한 동작을 전부 연결.
   // 매뉴얼 설정 패널과 CC Switch 패널 둘 다 동일한 구조라 id 접미사만 바꿔 재사용한다.
-  function wireGuideVideo(suffix, ctaLeadSeconds) {
+  function wireGuideVideo(suffix) {
     var guideVideo = document.getElementById('guideVideo' + suffix);
     if (!guideVideo) return;
 
     // 일시정지 상태에서 큰 재생 버튼을 표시
     // — 재생 중에는 오버레이를 완전히 숨겨 네이티브 컨트롤(탐색바 등) 클릭을 가리지 않도록 함
-    // — 영상이 끝난 상태(ended)에서는 이 오버레이 대신 CTA 옆의 "다시 보기" 버튼을 노출하므로 표시하지 않음
+    // — 영상이 끝난 상태(ended)에서는 이 오버레이 대신 "다시 보기" 버튼을 노출하므로 표시하지 않음
     var guidePlayOverlay = document.getElementById('guidePlayOverlay' + suffix);
     if (guidePlayOverlay) {
       var renderGuidePlayOverlay = function () {
@@ -32,6 +32,12 @@
           guidePlayOverlay.classList.remove('visible');
         } else if (guideVideo.paused) {
           guidePlayOverlay.classList.add('visible');
+          guidePlayOverlay.setAttribute(
+            'aria-label',
+            guideVideo.currentTime > 0
+              ? guidePlayOverlay.dataset.labelResume
+              : guidePlayOverlay.dataset.labelStart
+          );
         } else {
           guidePlayOverlay.classList.remove('visible');
         }
@@ -46,51 +52,34 @@
       renderGuidePlayOverlay();
     }
 
-    // 영상 마지막에 체험하기 CTA 노출 (랜딩 페이지 히어로 영상과 동일한 동작)
-    var guideCtaWrap = document.getElementById('guideCtaWrap' + suffix);
-    var guideCtaBtn = document.getElementById('guideCtaBtn' + suffix);
+    var guideEndControls = document.getElementById('guideEndControls' + suffix);
     var guideReplayBtn = document.getElementById('guideReplayBtn' + suffix);
-    if (guideCtaWrap && guideCtaBtn) {
-      var CTA_LEAD_SECONDS = ctaLeadSeconds || 5;
-      guideVideo.addEventListener('timeupdate', function () {
-        var showFrom = guideVideo.duration - CTA_LEAD_SECONDS;
-        if (guideVideo.currentTime >= showFrom && guideCtaWrap.style.display === 'none') {
-          guideCtaWrap.style.display = 'flex';
-          setTimeout(function () { guideCtaBtn.classList.add('active'); }, 50);
-        } else if (guideVideo.currentTime < showFrom && guideCtaWrap.style.display !== 'none') {
-          guideCtaBtn.classList.remove('active');
-          guideCtaWrap.style.display = 'none';
-        }
+    if (guideEndControls && guideReplayBtn) {
+      // 다시보기 버튼은 실제로 영상이 끝난(ended) 상태일 때만 노출.
+      // 끝난 뒤 재생바를 앞/뒤로 당기면 ended가 풀리므로 그때마다 다시 감춘다.
+      var syncReplayBtn = function () {
+        guideEndControls.style.display = guideVideo.ended ? 'flex' : 'none';
+      };
+      guideVideo.addEventListener('ended', syncReplayBtn);
+      guideVideo.addEventListener('seeking', syncReplayBtn);
+      guideVideo.addEventListener('play', syncReplayBtn);
+      guideReplayBtn.addEventListener('click', function () {
+        guideEndControls.style.display = 'none';
+        guideVideo.currentTime = 0;
+        guideVideo.play();
       });
-      guideVideo.addEventListener('play', function () {
-        if (guideVideo.currentTime < guideVideo.duration - CTA_LEAD_SECONDS) {
-          guideCtaBtn.classList.remove('active');
-          guideCtaWrap.style.display = 'none';
-        }
-      });
-
-      if (guideReplayBtn) {
-        // 다시보기 버튼은 실제로 영상이 끝난(ended) 상태일 때만 노출.
-        // 끝난 뒤 재생바를 앞/뒤로 당기면 ended가 풀리므로 그때마다 다시 감춘다.
-        var syncReplayBtn = function () {
-          guideReplayBtn.style.display = guideVideo.ended ? 'flex' : 'none';
-        };
-        guideVideo.addEventListener('ended', syncReplayBtn);
-        guideVideo.addEventListener('seeking', syncReplayBtn);
-        guideVideo.addEventListener('play', syncReplayBtn);
-        guideReplayBtn.addEventListener('click', function () {
-          guideReplayBtn.style.display = 'none';
-          guideCtaBtn.classList.remove('active');
-          guideCtaWrap.style.display = 'none';
-          guideVideo.currentTime = 0;
-          guideVideo.play();
-        });
-      }
     }
   }
 
   wireGuideVideo('');
-  wireGuideVideo('Cc', 7);
+  wireGuideVideo('Cc');
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) return;
+    document.querySelectorAll('.guide-video-frame video').forEach(function (video) {
+      if (!video.paused) video.pause();
+    });
+  });
 
   // 스페이스바로 재생/일시정지: 영상에 포커스가 없어도, 현재 보이는 그룹의 영상을 토글
   // (버튼/링크/입력 요소에 포커스가 있을 때는 그 요소의 기본 동작을 방해하지 않도록 무시)

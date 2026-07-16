@@ -155,7 +155,7 @@ func UpdateOrganization(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.Organization{}).Where("id = ?", organizationId).Updates(updates).Error; err != nil {
+	if err := model.UpdateOrganizationFieldsWithBillingLifecycle(organizationId, updates); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -666,7 +666,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(updates).Error; err != nil {
+	if err := model.UpdateUserFieldsWithBillingLifecycle(target.Id, updates); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -720,10 +720,7 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
-		"organization_id":   actor.OrganizationId,
-		"organization_role": req.OrganizationRole,
-	}).Error; err != nil {
+	if err := model.AssignUserToOrganizationWithBillingLifecycle(target.Id, actor.OrganizationId, req.OrganizationRole); err != nil {
 		common.ApiError(c, err)
 		return
 	}

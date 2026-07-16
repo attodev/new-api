@@ -43,19 +43,18 @@
         </li>
         <li><a href="/en/guide"{{if eq .Active "guide"}} class="active"{{end}}>Guide</a></li>
       </ul>
+      <div class="gnb-right">
+        <button type="button" class="lang-switch" aria-label="Select language, current language English" aria-haspopup="true" aria-expanded="false" aria-controls="languageMenu">
+          <i data-lucide="languages"></i>
+          <div class="lang-dropdown" id="languageMenu"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}" lang="en" aria-current="page">English<span class="check">✓</span></a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}" lang="ko">한국어</a></div>
+        </button>
+        <a href="/sign-in" class="btn-login">Log in</a>
+        <a href="/sign-in" class="btn-primary" hidden>Get Started</a>
+      </div>
       <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">
         <span></span>
         <span></span>
         <span></span>
       </button>
-      <div class="gnb-right">
-        <button class="lang-switch" onclick="this.classList.toggle('open')">
-          <i data-lucide="languages"></i>
-          <div class="lang-dropdown"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}">English<span class="check">✓</span></a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}">한국어</a></div>
-        </button>
-        <div class="gnb-divider"></div>
-        <a href="/sign-in" class="btn-login">Log in</a>
-        <a href="/sign-in" class="btn-primary">Get Started</a>
-      </div>
     </nav>
 {{end}}

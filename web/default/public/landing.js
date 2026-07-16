@@ -16,8 +16,6 @@ const STRINGS = {
   // video filenames
   videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
   videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
-  ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
-                       : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
 };
 
 // ── Contact form ──
@@ -27,24 +25,19 @@ const STRINGS = {
   const result = document.getElementById("contactResult");
   if (!overlay || !form || !result) return;
 
+  const contactDialog = window.createAccessibleModal({
+    overlay,
+    initialFocus: () => form.querySelector('[name="org"]'),
+  });
+
+  window.openContact = (opener) => contactDialog.open(opener);
+
   function closeContact() {
-    overlay.classList.remove("open");
+    contactDialog.close();
   }
   document
     .getElementById("contactClose")
     .addEventListener("click", closeContact);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeContact();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeContact();
-  });
-  new MutationObserver(() => {
-    document.body.style.overflow = overlay.classList.contains("open")
-      ? "hidden"
-      : "";
-  }).observe(overlay, { attributes: true, attributeFilter: ["class"] });
-
   // 도입 규모 탭 전환
   document
     .querySelectorAll('input[name="scale_type"]')
@@ -158,13 +151,40 @@ const STRINGS = {
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
   const resumeState = document.getElementById('animResumeState');
-  const ctaWrap     = document.getElementById('animCtaWrap');
-  const ctaBtn      = document.getElementById('animCtaBtn');
+  const endControls = document.getElementById('animEndControls');
   const replayBtn   = document.getElementById('animReplayBtn');
   const animWrap    = document.getElementById('anim');
-  const CTA_MAP = STRINGS.ctaMap;
-  let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
   let switchRequestId = 0;
+  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
+
+  function renderPlaybackToggle(isPaused) {
+    const unavailable = playOverlay.style.display !== 'none' || video.ended;
+    hoverOverlay.hidden = unavailable;
+    if (unavailable) return;
+
+    pauseState.style.display = isPaused ? 'none' : 'flex';
+    resumeState.style.display = isPaused ? 'flex' : 'none';
+    hoverOverlay.classList.toggle('is-paused', isPaused);
+    hoverOverlay.setAttribute(
+      'aria-label',
+      isPaused ? hoverOverlay.dataset.labelResume : hoverOverlay.dataset.labelPause,
+    );
+  }
+
+  function syncPlaybackToggle() {
+    renderPlaybackToggle(video.paused);
+  }
+
+  function playVideo() {
+    // play 이벤트를 기다리는 동안 이전 일시정지 UI가 깜빡이지 않도록
+    // 클릭 즉시 재생 중 상태를 먼저 표시한다.
+    renderPlaybackToggle(false);
+    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) video.load();
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(syncPlaybackToggle);
+    }
+  }
 
   function loadAndDecodePoster(img) {
     const loaded = img.complete
@@ -183,83 +203,69 @@ const STRINGS = {
     });
   }
 
-  // Both poster elements are present from the initial HTML so the browser can
-  // fetch them in parallel. Cache the decode promises for atomic switching.
+  // Only the visible standard poster is requested at navigation time. The
+  // alternate poster is attached on user intent or during browser idle time,
+  // while the cached decode promise keeps switching atomic.
   const posterReady = {
     std: loadAndDecodePoster(posterImages.std),
-    lite: loadAndDecodePoster(posterImages.lite),
   };
-  // Prevent a rejected background preload from becoming an unhandled promise.
-  Object.values(posterReady).forEach((ready) => ready.catch(() => {}));
+  posterReady.std.catch(() => {});
+
+  function ensurePosterReady(ver) {
+    if (posterReady[ver]) return posterReady[ver];
+
+    const img = posterImages[ver];
+    if (!img) return Promise.reject(new Error('Unknown poster version'));
+    if (!img.getAttribute('src')) {
+      if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+      if (img.dataset.sizes) img.sizes = img.dataset.sizes;
+      img.src = img.dataset.src;
+    }
+    posterReady[ver] = loadAndDecodePoster(img);
+    posterReady[ver].catch(() => {});
+    return posterReady[ver];
+  }
 
   playOverlay.addEventListener('click', () => {
+    if (_isSwiping) return;
     // Playing the current video cancels a poster switch that is still loading.
     switchRequestId += 1;
     sessionStorage.setItem('videoVersion', window._videoVer);
     playOverlay.style.display = 'none';
     posterLayer.classList.add('is-hidden');
     video.currentTime = 0;
-    video.play();
+    playVideo();
   });
 
-  video.addEventListener('timeupdate', () => {
-    if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
-      ctaWrap.style.display = 'flex';
-      setTimeout(() => ctaBtn.classList.add('active'), 50);
+  hoverOverlay.addEventListener('click', () => {
+    if (_isSwiping || video.ended) return;
+    if (video.paused) {
+      playVideo();
+    } else {
+      video.pause();
     }
   });
 
+  video.addEventListener('play', syncPlaybackToggle);
+  video.addEventListener('pause', syncPlaybackToggle);
+
   video.addEventListener('ended', () => {
-    hoverOverlay.style.display = 'none';
+    syncPlaybackToggle();
+    endControls.style.display = 'flex';
     replayBtn.style.display = 'flex';
   });
 
   replayBtn.addEventListener('click', () => {
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
     video.currentTime = 0;
-    video.play();
-  });
-
-  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
-  animWrap.addEventListener('mouseenter', () => {
-    if (isTouch()) return;
-    if (playOverlay.style.display !== 'none') return;
-    if (video.ended) return;
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-  });
-  animWrap.addEventListener('mouseleave', () => {
-    if (isTouch()) return;
-    hoverOverlay.style.display = 'none';
-  });
-
-  // Mobile: tap to show controls, auto-hide after 2.5s
-  let _hideControlsTimer = null;
-  animWrap.addEventListener('click', () => {
-    if (!isTouch()) return;
-    if (_isSwiping) return;
-    if (playOverlay.style.display !== 'none') return; // play overlay handles this tap
-    if (video.ended) return;
-    clearTimeout(_hideControlsTimer);
-    if (hoverOverlay.style.display === 'flex') {
-      hoverOverlay.style.display = 'none';
-      return;
-    }
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-    _hideControlsTimer = setTimeout(() => {
-      hoverOverlay.style.display = 'none';
-    }, 2500);
+    playVideo();
   });
 
   // Mobile swipe to switch video (std ↔ lite)
-  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
   animWrap.addEventListener('touchstart', (e) => {
+    const nextVer = window._videoVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(nextVer).catch(() => {});
     _touchStartX = e.touches[0].clientX;
     _touchStartY = e.touches[0].clientY;
     _isSwiping = false;
@@ -286,10 +292,10 @@ const STRINGS = {
   function _doSwitch(newVer) {
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
-    hoverOverlay.style.display = 'none';
+    hoverOverlay.hidden = true;
+    hoverOverlay.classList.remove('is-paused');
     playOverlay.style.display = '';
     Object.entries(posterImages).forEach(([ver, img]) => {
       img.classList.toggle('active', ver === newVer);
@@ -297,13 +303,11 @@ const STRINGS = {
     posterLayer.classList.remove('is-hidden');
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
-    video.load();
-    CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
   }
 
   window.switchVideo = async function(newVer, swipeDir) {
-    if (!posterReady[newVer]) return;
+    if (!posterImages[newVer]) return;
 
     // Increment before the same-version check so selecting the current dot can
     // cancel an older pending switch to the other version.
@@ -311,7 +315,7 @@ const STRINGS = {
     if (window._videoVer === newVer) return;
 
     try {
-      await posterReady[newVer];
+      await ensurePosterReady(newVer);
     } catch (error) {
       console.warn('Video poster could not be prepared; keeping the current poster.', error);
       return;
@@ -340,25 +344,39 @@ const STRINGS = {
     }
   };
 
-  if (window._initialVideoVer !== window._videoVer) {
-    window.switchVideo(window._initialVideoVer);
+  Object.entries({ std: document.getElementById('dotStd'), lite: document.getElementById('dotLite') })
+    .forEach(([ver, dot]) => {
+      if (!dot) return;
+      ['pointerenter', 'focus', 'touchstart'].forEach((eventName) => {
+        dot.addEventListener(eventName, () => ensurePosterReady(ver).catch(() => {}), { passive: true });
+      });
+    });
+
+  const warmAlternatePoster = () => {
+    const initialVer = window._initialVideoVer;
+    if (initialVer !== window._videoVer) {
+      window.switchVideo(initialVer);
+      return;
+    }
+    const alternateVer = initialVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(alternateVer).catch(() => {});
+  };
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(warmAlternatePoster, { timeout: 2000 });
+  } else {
+    window.setTimeout(warmAlternatePoster, 1200);
   }
 
-  pauseState.addEventListener('click', () => {
-    video.pause();
-    pauseState.style.display  = 'none';
-    resumeState.style.display = 'flex';
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !video.paused) video.pause();
   });
 
-  resumeState.addEventListener('click', () => {
-    video.play();
-    hoverOverlay.style.display = 'none';
-  });
+  syncPlaybackToggle();
 })();
 
 // ── Calculator pricing ──
 // TODO: 모델 목록 및 가격은 추후 API에서 가져올 예정
-let _calcPricing = {}; // model_name → { input, output }
+let _calcPricing = Object.create(null); // model_name → { input, output }
 let _calcGroupRatio = 1;
 
 async function loadCalcModels() {
@@ -367,18 +385,29 @@ async function loadCalcModels() {
     const res = await fetch("/api/pricing");
     const json = await res.json();
     _calcGroupRatio = 2;
-    json.data.forEach((m) => {
+    const models = json.data.map((model) => ({
+      ...model,
+      model_name: String(model.model_name ?? ""),
+    }));
+    models.forEach((m) => {
       const d = (m.discount_percent || 0) / 100;
       _calcPricing[m.model_name] = {
         input: m.model_ratio * _calcGroupRatio * (1 - d),
         output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
       };
     });
-    sel.innerHTML = json.data
-      .map((m) => `<option value="${m.model_name}">${m.model_name}</option>`)
-      .join("");
+    const options = models.map((m) => {
+      const option = document.createElement("option");
+      option.value = m.model_name;
+      option.textContent = m.model_name;
+      return option;
+    });
+    sel.replaceChildren(...options);
   } catch (e) {
-    sel.innerHTML = `<option value="">${STRINGS.calcLoadError}</option>`;
+    const errorOption = document.createElement("option");
+    errorOption.value = "";
+    errorOption.textContent = STRINGS.calcLoadError;
+    sel.replaceChildren(errorOption);
   }
 }
 loadCalcModels();
@@ -412,15 +441,10 @@ function runCalc() {
     `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>${STRINGS.calcOutputRate}</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
 }
 
-// ── Lucide icon init + lang-switch click handler ──
+// ── Lucide icon init ──
 if (window.lucide && typeof window.lucide.createIcons === 'function') {
   window.lucide.createIcons();
 }
-document.addEventListener("click", function (e) {
-  document.querySelectorAll(".lang-switch.open").forEach(function (el) {
-    if (!el.contains(e.target)) el.classList.remove("open");
-  });
-});
 
 // ── Scroll reveal ──
 (function () {

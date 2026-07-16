@@ -2,8 +2,12 @@ package router
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"html/template"
+	"io"
+	"io/fs"
 	"net/http"
 	"strings"
 
@@ -51,16 +55,59 @@ func devWebTemplates() *template.Template {
 	return template.Must(template.ParseGlob("web/default/templates/*.tmpl"))
 }
 
+// buildAssetETags creates content-based validators for public files that use
+// stable URLs. The same content produces the same ETag across instances, while
+// a deployment that changes the file immediately invalidates browser caches.
+func buildAssetETags(fileSystem fs.FS, root string) (map[string]string, error) {
+	etags := make(map[string]string)
+	err := fs.WalkDir(fileSystem, root, func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		file, err := fileSystem.Open(filePath)
+		if err != nil {
+			return err
+		}
+		hash := sha256.New()
+		_, copyErr := io.Copy(hash, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+
+		urlPath := "/" + strings.TrimPrefix(strings.TrimPrefix(filePath, root), "/")
+		etags[urlPath] = `"` + hex.EncodeToString(hash.Sum(nil)) + `"`
+		return nil
+	})
+	return etags, err
+}
+
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
 	classicFS := common.EmbedFolder(assets.ClassicBuildFS, "web/classic/dist")
 	themeFS := common.NewThemeAwareFS(defaultFS, classicFS)
 
 	devMode := common.DebugEnabled
+	var publicAssetETags map[string]string
+	if !devMode {
+		var err error
+		publicAssetETags, err = buildAssetETags(assets.PublicFS, "web/default/public")
+		if err != nil {
+			common.SysLog("failed to build public asset ETags: " + err.Error())
+			publicAssetETags = nil
+		}
+	}
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
-	router.Use(middleware.Cache())
+	router.Use(middleware.Cache(publicAssetETags))
 
 	if devMode {
 		// Dev mode: re-render templates and re-read public/ from disk on every

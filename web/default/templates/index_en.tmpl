@@ -86,7 +86,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
   </head>
   <body>
     <!-- ── SECTION 1: GNB ── -->
@@ -105,11 +105,11 @@
         Consolidate everything with AlRouter and<br>
         save <strong style="color:#EC4899">up to 10%</strong> off official prices.</p>
           <div class="hero-cta">
-            <a href="/sign-in" class="btn-hero-primary">Get Started →</a>
+            <a href="/sign-in" class="btn-hero-primary" hidden>Get Started →</a>
             <button
-              class="btn-hero-secondary"
+              class="btn-hero-primary"
               onclick="
-                document.getElementById('contactOverlay').classList.add('open')
+                openContact(this)
               "
             >
               Contact Sales
@@ -139,14 +139,23 @@
               <video
                 id="animVideo"
                 src="/videos/main/alrouter_en.mp4"
+                aria-label="AlRouter service overview video"
                 playsinline
-                preload="metadata"
+                preload="none"
               ></video>
               <div id="animPosterLayer" class="anim-poster-layer" aria-hidden="true">
-                <img id="animPosterStd" class="anim-poster-img active" src="/videos/main/alrouter_en_poster.png" alt="" decoding="async" fetchpriority="high" />
-                <img id="animPosterLite" class="anim-poster-img" src="/videos/main/alrouter_en_lite_poster.png" alt="" decoding="async" fetchpriority="high" />
+                <img id="animPosterStd" class="anim-poster-img active" src="/videos/main/alrouter_poster-360.webp" srcset="/videos/main/alrouter_poster-360.webp 360w, /videos/main/alrouter_poster-720.webp 720w" sizes="360px" width="360" height="640" alt="" decoding="async" fetchpriority="high" />
+                <img id="animPosterLite" class="anim-poster-img" data-src="/videos/main/alrouter_lite_poster-360.webp" data-srcset="/videos/main/alrouter_lite_poster-360.webp 360w, /videos/main/alrouter_lite_poster-720.webp 720w" data-sizes="360px" width="360" height="640" alt="" decoding="async" fetchpriority="low" />
               </div>
-              <div class="anim-hover-overlay" id="animHoverOverlay">
+              <button
+                type="button"
+                class="anim-hover-overlay"
+                id="animHoverOverlay"
+                data-label-pause="Pause video"
+                data-label-resume="Resume video"
+                aria-label="Pause video"
+                hidden
+              >
                 <div class="anim-hover-state" id="animPauseState">
                   <div class="anim-play-btn">
                     <div class="anim-pause-icon">
@@ -171,8 +180,8 @@
                   </div>
                   <span class="anim-play-label">Continue</span>
                 </div>
-              </div>
-              <div class="anim-play-overlay" id="animPlayOverlay">
+              </button>
+              <button type="button" class="anim-play-overlay" id="animPlayOverlay" aria-label="Play video">
                 <div class="anim-play-btn">
                   <svg
                     viewBox="0 0 24 24"
@@ -183,13 +192,10 @@
                   </svg>
                 </div>
                 <span class="anim-play-label">Tap to Start</span>
-              </div>
-              <div class="anim-cta-wrap" id="animCtaWrap" style="display: none">
-                <a href="/sign-in" class="anim-cta-overlay" id="animCtaBtn">
-                  <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                  <div class="anim-cta-btn-text">Get Started →</div>
-                </a>
+              </button>
+              <div class="anim-end-controls" id="animEndControls" style="display: none">
                 <button
+                  type="button"
                   class="anim-end-btn anim-end-replay"
                   id="animReplayBtn"
                   style="display: none"
@@ -918,7 +924,7 @@
                 </select>
               </div>
               <div class="calc-group">
-                <label>Input Tokens</label>
+                <label for="calcInputTokens">Input Tokens</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -931,7 +937,7 @@
                 </div>
               </div>
               <div class="calc-group">
-                <label>Output Tokens</label>
+                <label for="calcOutputTokens">Output Tokens</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -943,11 +949,11 @@
                   <span class="calc-input-suffix">M tokens</span>
                 </div>
               </div>
-              <button class="calc-btn" onclick="runCalc()">
+              <button type="button" class="calc-btn" onclick="runCalc()">
                 Calculate
               </button>
             </div>
-            <div class="calc-result" id="calcResult">
+            <div class="calc-result" id="calcResult" role="status" aria-live="polite">
               <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
               <div
                 class="calc-result-label"
@@ -974,7 +980,7 @@
           >
             Prices shown are estimates based on public rates.<br>
         Actual costs may vary depending on usage patterns.
-        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+        <a href="#" onclick="openContact(this);return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
           </p>
         </div>
       </div>
@@ -1202,8 +1208,8 @@
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">
-      <div class="cta-inner">
-        <div class="cta-box left">
+        <div class="cta-inner cta-inner-single">
+        <div class="cta-box left" hidden>
           <div class="cta-icon" style="color: #0ea5e9; margin-bottom: 16px">
             <i data-lucide="rocket"></i>
           </div>
@@ -1220,7 +1226,7 @@
           <button
             class="btn-cta-secondary"
             onclick="
-              document.getElementById('contactOverlay').classList.add('open')
+              openContact(this)
             "
           >
             Contact Sales →
@@ -1231,17 +1237,18 @@
 
     {{template "footer_en" .}}
     <!-- Enterprise Inquiry 모달 -->
-    <div class="popup-overlay" id="contactOverlay">
-      <div class="popup-modal">
+    <div class="popup-overlay" id="contactOverlay" aria-hidden="true">
+      <div class="popup-modal" role="dialog" aria-modal="true" aria-labelledby="contactTitle" tabindex="-1">
         <div class="popup-header">
-          <h3 class="popup-title">Enterprise Inquiry</h3>
-          <button class="popup-close" id="contactClose">✕</button>
+          <h3 class="popup-title" id="contactTitle" tabindex="-1">Enterprise Inquiry</h3>
+          <button type="button" class="popup-close" id="contactClose" aria-label="Close inquiry dialog">✕</button>
         </div>
         <form id="contactForm" class="contact-form">
           <div class="popup-body">
             <div class="cf-group">
-              <label>Organization<span class="cf-required">*</span></label>
+              <label for="contactOrg">Organization<span class="cf-required">*</span></label>
               <input
+                id="contactOrg"
                 type="text"
                 name="org"
                 placeholder="Company or organization name"
@@ -1249,10 +1256,11 @@
               />
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactEmail"
                 >Email<span class="cf-required">*</span></label
               >
               <input
+                id="contactEmail"
                 type="email"
                 name="email"
                 placeholder="example@company.com"
@@ -1260,21 +1268,20 @@
               />
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactPhone"
                 >Phone<span class="cf-optional"
                   >(optional)</span
                 ></label
               >
               <input
+                id="contactPhone"
                 type="tel"
                 name="phone"
                 placeholder="+1 000-000-0000"
               />
             </div>
-            <div class="cf-group">
-              <label
-                >Team Size<span class="cf-required">*</span></label
-              >
+            <div class="cf-group" role="group" aria-labelledby="contactScaleLabel">
+              <div class="cf-group-label" id="contactScaleLabel">Team Size<span class="cf-required">*</span></div>
               <div class="cf-scale-tabs">
                 <div class="cf-scale-tab">
                   <input
@@ -1298,7 +1305,9 @@
               </div>
               <div id="scaleHeadField" style="display: none">
                 <div class="cf-num-wrap">
+                  <label class="sr-only" for="contactHeadcount">Estimated headcount</label>
                   <input
+                    id="contactHeadcount"
                     type="number"
                     name="headcount"
                     placeholder="0"
@@ -1310,7 +1319,9 @@
               <div id="scaleTokenField">
                 <div class="cf-token-row">
                   <div class="cf-num-wrap">
+                    <label class="sr-only" for="contactInputTokens">Estimated monthly input tokens</label>
                     <input
+                      id="contactInputTokens"
                       type="number"
                       name="input_tokens"
                       placeholder="0"
@@ -1320,7 +1331,9 @@
                     <span class="cf-num-suffix">M input</span>
                   </div>
                   <div class="cf-num-wrap">
+                    <label class="sr-only" for="contactOutputTokens">Estimated monthly output tokens</label>
                     <input
+                      id="contactOutputTokens"
                       type="number"
                       name="output_tokens"
                       placeholder="0"
@@ -1333,12 +1346,8 @@
                 <p class="cf-scale-hint">Enter your estimated monthly token usage from the calculator.</p>
               </div>
             </div>
-            <div class="cf-group">
-              <label
-                >Features Needed<span class="cf-optional"
-                  >(optional)</span
-                ></label
-              >
+            <div class="cf-group" role="group" aria-labelledby="contactFeaturesLabel">
+              <div class="cf-group-label" id="contactFeaturesLabel">Features Needed<span class="cf-optional">(optional)</span></div>
               <div class="cf-checks">
                 <label class="cf-check"
                   ><input
@@ -1451,12 +1460,13 @@
               </div>
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactNotes"
                 >Additional Comments<span class="cf-optional"
                   >(optional)</span
                 ></label
               >
               <textarea
+                id="contactNotes"
                 name="notes"
                 placeholder="Anything else you'd like to share with us."
               ></textarea>
@@ -1474,8 +1484,8 @@
         </form>
       </div>
     </div>
-      <script src="./popup.js" defer></script>
-      <script src="./landing.js" defer></script>
+      <script src="/popup.js?v=20260716-interaction-a11y" defer></script>
+      <script src="/landing.js?v=20260716-interaction-a11y" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

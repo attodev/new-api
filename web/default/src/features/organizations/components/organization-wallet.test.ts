@@ -3,6 +3,7 @@ import { describe, test } from 'node:test'
 import {
   buildOrganizationWalletPaymentSettingTabs,
   getOrganizationAmountModeRequest,
+  shouldBlockOrganizationPaymentMethodBeforeQuote,
 } from './organization-wallet'
 
 describe('organization wallet topup amount mode request', () => {
@@ -14,6 +15,30 @@ describe('organization wallet topup amount mode request', () => {
     assert.deepEqual(getOrganizationAmountModeRequest(10, 'stripe', 'quota'), {
       amount: 10,
     })
+  })
+})
+
+describe('organization wallet pre-quote minimum gate', () => {
+  test('always lets Toss request the authoritative organization quote', () => {
+    assert.equal(
+      shouldBlockOrganizationPaymentMethodBeforeQuote(
+        { type: 'toss', min_topup: 5000 },
+        100,
+        5000
+      ),
+      false
+    )
+  })
+
+  test('keeps the client minimum gate for non-Toss methods', () => {
+    assert.equal(
+      shouldBlockOrganizationPaymentMethodBeforeQuote(
+        { type: 'stripe', min_topup: 5000 },
+        100,
+        5000
+      ),
+      true
+    )
   })
 })
 

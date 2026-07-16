@@ -46,6 +46,35 @@ func TestCreateWalletAutoRechargePresetValidatesScheduledPreset(t *testing.T) {
 	require.NotZero(t, preset.Id)
 	require.Equal(t, "월 1회 10000원", preset.Name)
 	require.True(t, preset.Enabled)
+	require.False(t, preset.ChargeImmediately)
+}
+
+func TestWalletAutoRechargeCustomPresetIsTestModeOnly(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+
+	request := WalletAutoRechargePresetRequest{
+		Type: WalletAutoRechargeTypeScheduled, TargetScope: WalletAutoRechargePresetTargetUser,
+		Name: "test cadence", Amount: 10000, IntervalUnit: WalletAutoRechargeIntervalCustom,
+		IntervalValue: 1, CustomSeconds: 60, Enabled: true,
+	}
+	_, err := CreateWalletAutoRechargePreset(request)
+	require.ErrorContains(t, err, "only in Toss test mode")
+
+	require.NoError(t, setting.ApplyTossOptionValues(map[string]string{"TossTestMode": "true"}))
+	preset, err := CreateWalletAutoRechargePreset(request)
+	require.NoError(t, err)
+	require.NotEmpty(t, preset.TermsFingerprint)
+
+	rows, err := ListWalletAutoRechargePresetsForTarget(TopUpTargetTypeUser)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	require.NoError(t, setting.ApplyTossOptionValues(map[string]string{"TossTestMode": "false"}))
+	rows, err = ListWalletAutoRechargePresetsForTarget(TopUpTargetTypeUser)
+	require.NoError(t, err)
+	require.Empty(t, rows)
+	_, err = GetWalletAutoRechargePresetForTarget(preset.Id, WalletAutoRechargeTypeScheduled, TopUpTargetTypeUser)
+	require.ErrorContains(t, err, "only in Toss test mode")
 }
 
 func TestWalletAutoRechargePresetTargetFiltering(t *testing.T) {
@@ -208,7 +237,7 @@ func TestUpdateWalletAutoRechargePresetPersistsChanges(t *testing.T) {
 	require.Equal(t, "수정된 프리셋", updated.Name)
 	require.Equal(t, WalletAutoRechargePresetTargetOrganization, updated.TargetScope)
 	require.False(t, updated.Enabled)
-	require.True(t, updated.ChargeImmediately)
+	require.False(t, updated.ChargeImmediately)
 
 	var stored WalletAutoRechargePreset
 	require.NoError(t, DB.First(&stored, preset.Id).Error)
@@ -217,7 +246,7 @@ func TestUpdateWalletAutoRechargePresetPersistsChanges(t *testing.T) {
 	require.Equal(t, float64(7000), stored.ThresholdAmount)
 	require.Equal(t, 9, stored.SortOrder)
 	require.False(t, stored.Enabled)
-	require.True(t, stored.ChargeImmediately)
+	require.False(t, stored.ChargeImmediately)
 }
 
 func TestListWalletAutoRechargePresetsFiltersDisabledAndSortsBySortOrder(t *testing.T) {

@@ -28,7 +28,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
@@ -52,22 +52,18 @@
       <div class="guide-group active" id="guide-group-manual">
         <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
-            <video id="guideVideo" controls preload="metadata" poster="/videos/guide/guide-manual-anthropic-poster.png">
+            <video id="guideVideo" controls playsinline preload="metadata" aria-label="환경변수 직접 설정 가이드 영상" poster="/videos/guide/guide-manual-anthropic-poster.png">
               <source src="/videos/guide/guide-manual-anthropic.mp4" type="video/mp4" />
             </video>
-            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay">
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay" data-label-start="영상 재생" data-label-resume="영상 계속 재생" aria-label="영상 재생">
               <div class="anim-play-btn">
                 <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
                   <polygon points="6,3 20,12 6,21" />
                 </svg>
               </div>
-            </div>
-            <div class="guide-cta-wrap" id="guideCtaWrap" style="display: none">
-              <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtn">
-                <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                <div class="anim-cta-btn-text">체험 신청하기 →</div>
-              </a>
-              <button class="anim-end-btn anim-end-replay" id="guideReplayBtn" style="display: none">
+            </button>
+            <div class="guide-end-controls" id="guideEndControls" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 .49-4" />
@@ -250,22 +246,18 @@ responses_websockets_v2 = false</pre>
       <div class="guide-group" id="guide-group-ccswitch">
         <section class="guide-panel active" id="guide-panel-ccswitch">
           <div class="guide-video-frame">
-            <video id="guideVideoCc" controls preload="metadata" poster="/videos/guide/guide-cc-anthropic-poster.png">
+            <video id="guideVideoCc" controls playsinline preload="metadata" aria-label="CC Switch 설정 가이드 영상" poster="/videos/guide/guide-cc-anthropic-poster.png">
               <source src="/videos/guide/guide-cc-anthropic.mp4" type="video/mp4" />
             </video>
-            <div class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc">
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc" data-label-start="영상 재생" data-label-resume="영상 계속 재생" aria-label="영상 재생">
               <div class="anim-play-btn">
                 <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
                   <polygon points="6,3 20,12 6,21" />
                 </svg>
               </div>
-            </div>
-            <div class="guide-cta-wrap" id="guideCtaWrapCc" style="display: none">
-              <a href="/sign-in" class="anim-cta-overlay" id="guideCtaBtnCc">
-                <img src="/logo.svg" alt="AlRouter" class="anim-cta-logo" />
-                <div class="anim-cta-btn-text">체험 신청하기 →</div>
-              </a>
-              <button class="anim-end-btn anim-end-replay" id="guideReplayBtnCc" style="display: none">
+            </button>
+            <div class="guide-end-controls" id="guideEndControlsCc" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtnCc">
                 <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
                   <polyline points="1 4 1 10 7 10" />
                   <path d="M3.51 15a9 9 0 1 0 .49-4" />
@@ -438,8 +430,8 @@ $ brew install --cask cc-switch</pre>
       <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="다음 이미지">›</button>
     </div>
 
-    <script src="/popup.js" defer></script>
-    <script src="/guide.js" defer></script>
+    <script src="/popup.js?v=20260716-interaction-a11y" defer></script>
+    <script src="/guide.js?v=20260715-video-controls" defer></script>
     <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

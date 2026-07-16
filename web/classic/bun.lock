@@ -7,6 +7,7 @@
         "@douyinfe/semi-icons": "^2.63.1",
         "@douyinfe/semi-ui": "^2.69.1",
         "@lobehub/icons": "^2.0.0",
+        "@tosspayments/tosspayments-sdk": "^2.7.1",
         "@visactor/react-vchart": "~1.8.8",
         "@visactor/vchart": "~1.8.8",
         "@visactor/vchart-semi-theme": "~1.8.8",
@@ -683,6 +684,8 @@
     "@use-gesture/core": ["@use-gesture/core@10.3.1", "", {}, "sha512-WcINiDt8WjqBdUXye25anHiNxPc0VOrlT8F6LLkU6cycrOGUDyY/yyFmsg3k8i5OLvv25llc0QC45GhR/C8llw=="],
 
     "@use-gesture/react": ["@use-gesture/react@10.3.1", "", { "dependencies": { "@use-gesture/core": "10.3.1" }, "peerDependencies": { "react": ">= 16.8.0" } }, "sha512-Yy19y6O2GJq8f7CHf7L0nxL8bf4PZCPaVOCgJrusOeFHY1LvHgYXnmnXg6N5iwAnbgbZCDjo60SiM6IPJi9C5g=="],
+
+    "@tosspayments/tosspayments-sdk": ["@tosspayments/tosspayments-sdk@2.7.1", "", {}, "sha512-nHInxgFvFGm1VtaCS+IPLdtmE+B2a+MCYE9Meq0aR/0L0hAgoGllLS4ciQGb1RtLvp3mHcj3lL80XMi4BqQ7uw=="],
 
     "@visactor/react-vchart": ["@visactor/react-vchart@1.8.11", "", { "dependencies": { "@visactor/vchart": "1.8.11", "@visactor/vgrammar-core": "0.10.11", "@visactor/vrender-core": "0.17.17", "@visactor/vrender-kits": "0.17.17", "@visactor/vutils": "~0.17.3", "react-is": "^18.2.0" }, "peerDependencies": { "react": ">=16.0.0", "react-dom": ">=16.0.0" } }, "sha512-wHnCex9gOpnttTtSu04ozKJhTveUk8Ln2KX/7PZyCJxqlXq+eWvW4zvM6Ja8T8kGXfXtFYVVNh9zBMQ7y2T/Sw=="],
 
