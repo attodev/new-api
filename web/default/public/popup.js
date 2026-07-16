@@ -7,8 +7,8 @@ const POPUP_STRINGS = {
   popupTerms:      popupIsKo ? '이용약관'                    : 'Terms of Service',
   popupPrivacy:    popupIsKo ? '개인정보처리방침'              : 'Privacy Policy',
   popupPricing:    popupIsKo ? '전체 모델 및 가격표'           : 'Full Model & Pricing Table',
-  popupTermsUrl:   popupIsKo ? './legal/terms.html'          : './legal/terms_en.html',
-  popupPrivacyUrl: popupIsKo ? './legal/privacy.html'        : './legal/privacy_en.html',
+  popupTermsUrl:   popupIsKo ? '/legal/terms.html'           : '/legal/terms_en.html',
+  popupPrivacyUrl: popupIsKo ? '/legal/privacy.html'         : '/legal/privacy_en.html',
   pricingTitleFn: popupIsKo
     ? (d) => `전체 모델 및 가격표 <span class="popup-date">(${d} 기준)</span>`
     : (d) => `Full Model & Pricing <span class="popup-date">(as of ${d})</span>`,

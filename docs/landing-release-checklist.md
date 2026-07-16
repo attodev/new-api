@@ -145,19 +145,27 @@
 
 ### P1. Sitemap 및 명백한 콘텐츠 오류 수정 — 0.25~0.5일
 
-- [ ] Sitemap의 영문 URL을 canonical `/en`으로 변경한다.
-- [ ] `/guide`, `/en/guide`를 Sitemap에 추가한다.
-- [ ] 개인정보처리방침과 이용약관 URL을 실제 `/legal/...` 경로와 일치시킨다.
-- [ ] Sitemap의 모든 URL이 정상 응답하고 canonical과 일치하는지 확인한다.
-- [ ] 한국어 `총 달당량` 문구를 의도에 맞는 용어로 교체한다.
-- [ ] `Total Budget`이 실제 지표 의미와 일치하는지 확인하고 한국어와 함께 정리한다.
+- [x] Sitemap의 영문 URL을 canonical `/en`으로 변경한다.
+- [x] `/guide`, `/en/guide`를 Sitemap에 추가한다.
+- [x] 개인정보처리방침과 이용약관 URL을 실제 `/legal/...` 경로와 일치시킨다.
+- [x] Sitemap의 모든 URL이 정상 응답하고 canonical과 일치하는지 확인한다.
+- [x] 한국어 `총 달당량` 문구를 의도에 맞는 용어로 교체한다.
+- [x] `Total Budget`이 실제 지표 의미와 일치하는지 확인하고 한국어와 함께 정리한다.
 
 완료 조건:
 
 - Sitemap에 오래된 URL이나 SPA fallback URL이 없다.
 - 한국어와 영문의 지표 의미가 동일하다.
 
-관련 기록: `커밋/PR: `
+관련 기록:
+
+- Sitemap: `/`, `/en`, `/guide`, `/en/guide`와 한국어·영문 법적 문서 4개를 실제 canonical URL로 등록
+- 법적 문서: 팝업 URL을 루트 기준 `/legal/...`로 통일하고 문서별 self-canonical 추가
+- 지표 문구: 한국어 오탈자 `총 달당량`을 `총 할당량`으로 교정하고 영문 `Total Budget`과 의미를 일치시킴
+- 로컬 응답: Sitemap의 8개 URL 모두 `200`, 각 URL의 self-canonical 일치
+- 정적 검사: `xmllint --noout web/default/public/sitemap.xml`, `git diff --check`
+- 빌드: `bun run build`
+- 커밋/PR: 이 체크리스트 갱신을 포함한 Sitemap 및 콘텐츠 오류 수정 커밋
 
 ### 1단계 통합 검증 — 1일
 
