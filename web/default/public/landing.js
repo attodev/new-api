@@ -184,6 +184,7 @@ const STRINGS = {
     // play 이벤트를 기다리는 동안 이전 일시정지 UI가 깜빡이지 않도록
     // 클릭 즉시 재생 중 상태를 먼저 표시한다.
     renderPlaybackToggle(false);
+    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) video.load();
     const playPromise = video.play();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch(syncPlaybackToggle);
@@ -207,14 +208,28 @@ const STRINGS = {
     });
   }
 
-  // Both poster elements are present from the initial HTML so the browser can
-  // fetch them in parallel. Cache the decode promises for atomic switching.
+  // Only the visible standard poster is requested at navigation time. The
+  // alternate poster is attached on user intent or during browser idle time,
+  // while the cached decode promise keeps switching atomic.
   const posterReady = {
     std: loadAndDecodePoster(posterImages.std),
-    lite: loadAndDecodePoster(posterImages.lite),
   };
-  // Prevent a rejected background preload from becoming an unhandled promise.
-  Object.values(posterReady).forEach((ready) => ready.catch(() => {}));
+  posterReady.std.catch(() => {});
+
+  function ensurePosterReady(ver) {
+    if (posterReady[ver]) return posterReady[ver];
+
+    const img = posterImages[ver];
+    if (!img) return Promise.reject(new Error('Unknown poster version'));
+    if (!img.getAttribute('src')) {
+      if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+      if (img.dataset.sizes) img.sizes = img.dataset.sizes;
+      img.src = img.dataset.src;
+    }
+    posterReady[ver] = loadAndDecodePoster(img);
+    posterReady[ver].catch(() => {});
+    return posterReady[ver];
+  }
 
   playOverlay.addEventListener('click', () => {
     if (_isSwiping) return;
@@ -254,6 +269,8 @@ const STRINGS = {
 
   // Mobile swipe to switch video (std ↔ lite)
   animWrap.addEventListener('touchstart', (e) => {
+    const nextVer = window._videoVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(nextVer).catch(() => {});
     _touchStartX = e.touches[0].clientX;
     _touchStartY = e.touches[0].clientY;
     _isSwiping = false;
@@ -291,12 +308,11 @@ const STRINGS = {
     posterLayer.classList.remove('is-hidden');
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
-    video.load();
     if (window._updateDots) window._updateDots(newVer);
   }
 
   window.switchVideo = async function(newVer, swipeDir) {
-    if (!posterReady[newVer]) return;
+    if (!posterImages[newVer]) return;
 
     // Increment before the same-version check so selecting the current dot can
     // cancel an older pending switch to the other version.
@@ -304,7 +320,7 @@ const STRINGS = {
     if (window._videoVer === newVer) return;
 
     try {
-      await posterReady[newVer];
+      await ensurePosterReady(newVer);
     } catch (error) {
       console.warn('Video poster could not be prepared; keeping the current poster.', error);
       return;
@@ -333,8 +349,27 @@ const STRINGS = {
     }
   };
 
-  if (window._initialVideoVer !== window._videoVer) {
-    window.switchVideo(window._initialVideoVer);
+  Object.entries({ std: document.getElementById('dotStd'), lite: document.getElementById('dotLite') })
+    .forEach(([ver, dot]) => {
+      if (!dot) return;
+      ['pointerenter', 'focus', 'touchstart'].forEach((eventName) => {
+        dot.addEventListener(eventName, () => ensurePosterReady(ver).catch(() => {}), { passive: true });
+      });
+    });
+
+  const warmAlternatePoster = () => {
+    const initialVer = window._initialVideoVer;
+    if (initialVer !== window._videoVer) {
+      window.switchVideo(initialVer);
+      return;
+    }
+    const alternateVer = initialVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(alternateVer).catch(() => {});
+  };
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(warmAlternatePoster, { timeout: 2000 });
+  } else {
+    window.setTimeout(warmAlternatePoster, 1200);
   }
 
   document.addEventListener('visibilitychange', () => {
