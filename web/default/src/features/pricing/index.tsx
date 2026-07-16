@@ -193,7 +193,7 @@ export function Pricing() {
               )}
             </p>
             <Alert variant='notice' className='mx-auto mt-3 max-w-2xl'>
-              <Info aria-hidden='true' />
+              <Info aria-hidden='true' strokeWidth={2.5} />
               <AlertDescription>
                 {t(
                   'Prices reflect promotional rates and may vary over time and by model.'

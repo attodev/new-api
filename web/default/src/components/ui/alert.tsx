@@ -27,7 +27,7 @@ const alertVariants = cva(
       variant: {
         default: 'bg-card text-card-foreground',
         notice:
-          'flex w-fit items-center gap-1 rounded-none border-transparent bg-transparent px-0 py-0 text-center *:data-[slot=alert-description]:translate-y-px *:data-[slot=alert-description]:text-muted-foreground/75 *:[svg]:shrink-0 *:[svg]:translate-y-0 *:[svg]:text-muted-foreground/70',
+          'flex w-fit items-center gap-0.5 rounded-none border-transparent bg-transparent px-0 py-0 text-center *:data-[slot=alert-description]:translate-y-px *:data-[slot=alert-description]:font-bold *:data-[slot=alert-description]:text-warning *:[svg]:shrink-0 *:[svg]:translate-y-0 *:[svg]:text-warning',
         destructive:
           'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
       },
