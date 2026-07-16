@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,20 @@ var timeFormat = "2006-01-02T15:04:05.000Z"
 
 var inMemoryRateLimiter common.InMemoryRateLimiter
 var invalidRateLimitConfigWarningOnce sync.Once
+
+var globalWebRateLimitExemptExtensions = map[string]struct{}{
+	// Stylesheets and scripts.
+	".css": {}, ".js": {}, ".mjs": {}, ".map": {}, ".wasm": {},
+	// Images and browser icons.
+	".avif": {}, ".gif": {}, ".ico": {}, ".jpeg": {}, ".jpg": {},
+	".png": {}, ".svg": {}, ".webp": {},
+	// Audio and video. Range requests for these files must not consume the
+	// small HTML/navigation bucket one chunk at a time.
+	".m4a": {}, ".m4v": {}, ".mov": {}, ".mp3": {}, ".mp4": {},
+	".oga": {}, ".ogg": {}, ".ogv": {}, ".wav": {}, ".webm": {},
+	// Fonts.
+	".eot": {}, ".otf": {}, ".ttf": {}, ".woff": {}, ".woff2": {},
+}
 
 var defNext = func(c *gin.Context) {
 	c.Next()
@@ -117,9 +133,29 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gi
 
 func GlobalWebRateLimit() func(c *gin.Context) {
 	if common.GlobalWebRateLimitEnable {
-		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		limiter := rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		return func(c *gin.Context) {
+			if isGlobalWebRateLimitExempt(c.Request) {
+				c.Next()
+				return
+			}
+			limiter(c)
+		}
 	}
 	return defNext
+}
+
+// isGlobalWebRateLimitExempt keeps immutable/revalidating browser assets out of
+// the navigation limiter. Only safe read methods with known static extensions
+// are exempt: HTML, extensionless routes, API-style JSON paths, and all writes
+// remain protected. A Range header alone never grants an exemption.
+func isGlobalWebRateLimitExempt(request *http.Request) bool {
+	if request == nil || (request.Method != http.MethodGet && request.Method != http.MethodHead) {
+		return false
+	}
+	extension := strings.ToLower(path.Ext(request.URL.Path))
+	_, exempt := globalWebRateLimitExemptExtensions[extension]
+	return exempt
 }
 
 func GlobalAPIRateLimit() func(c *gin.Context) {

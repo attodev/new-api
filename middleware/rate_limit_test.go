@@ -114,6 +114,83 @@ func TestGlobalAndCriticalPaymentLimitersNormalizeInvalidConfiguration(t *testin
 	}
 }
 
+func TestGlobalWebRateLimitExemptsOnlyStaticReadRequests(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		path        string
+		rangeHeader string
+		want        bool
+	}{
+		{name: "stylesheet", method: http.MethodGet, path: "/landing.css?v=release", want: true},
+		{name: "script", method: http.MethodGet, path: "/assets/app.A1B2C3.js", want: true},
+		{name: "image", method: http.MethodHead, path: "/images/hero.AVIF", want: true},
+		{name: "font", method: http.MethodGet, path: "/fonts/site.woff2", want: true},
+		{name: "video range", method: http.MethodGet, path: "/videos/main/demo.mp4", rangeHeader: "bytes=0-1023", want: true},
+		{name: "HTML", method: http.MethodGet, path: "/en/guide", want: false},
+		{name: "HTML file", method: http.MethodGet, path: "/index.html", want: false},
+		{name: "dynamic JSON", method: http.MethodGet, path: "/api/pricing.json", want: false},
+		{name: "range without static extension", method: http.MethodGet, path: "/download", rangeHeader: "bytes=0-1023", want: false},
+		{name: "static-looking write", method: http.MethodPost, path: "/upload/image.png", want: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			request := httptest.NewRequest(testCase.method, testCase.path, nil)
+			if testCase.rangeHeader != "" {
+				request.Header.Set("Range", testCase.rangeHeader)
+			}
+			require.Equal(t, testCase.want, isGlobalWebRateLimitExempt(request))
+		})
+	}
+}
+
+func TestGlobalWebRateLimitDoesNotChargeStaticAssets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	oldEnabled := common.GlobalWebRateLimitEnable
+	oldLimit := common.GlobalWebRateLimitNum
+	oldDuration := common.GlobalWebRateLimitDuration
+	oldRedisEnabled := common.RedisEnabled
+	common.GlobalWebRateLimitEnable = true
+	common.GlobalWebRateLimitNum = 1
+	common.GlobalWebRateLimitDuration = 60
+	common.RedisEnabled = false
+	t.Cleanup(func() {
+		common.GlobalWebRateLimitEnable = oldEnabled
+		common.GlobalWebRateLimitNum = oldLimit
+		common.GlobalWebRateLimitDuration = oldDuration
+		common.RedisEnabled = oldRedisEnabled
+	})
+
+	engine := gin.New()
+	engine.Use(GlobalWebRateLimit())
+	engine.NoRoute(func(c *gin.Context) { c.Status(http.StatusOK) })
+	seed := uint64(time.Now().UnixNano())
+	remoteAddr := fmt.Sprintf("198.18.%d.%d:443", byte(seed>>8), byte(seed))
+	request := func(target string, rangeHeader string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.RemoteAddr = remoteAddr
+		if rangeHeader != "" {
+			req.Header.Set("Range", rangeHeader)
+		}
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, req)
+		return response.Code
+	}
+
+	for rangeIndex := 0; rangeIndex < 10; rangeIndex++ {
+		require.Equal(t, http.StatusOK, request("/videos/main/demo.mp4", fmt.Sprintf("bytes=%d-%d", rangeIndex*1024, (rangeIndex+1)*1024-1)))
+		require.Equal(t, http.StatusOK, request("/images/poster.png", ""))
+		require.Equal(t, http.StatusOK, request("/landing.css", ""))
+	}
+
+	// Static traffic did not consume the bucket, while HTML navigation still
+	// receives the configured protection.
+	require.Equal(t, http.StatusOK, request("/en/guide", ""))
+	require.Equal(t, http.StatusTooManyRequests, request("/en/guide", ""))
+}
+
 func TestUserRateLimitFactoryNormalizesInvalidSearchConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	originalRedisEnabled := common.RedisEnabled
