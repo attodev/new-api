@@ -64,15 +64,23 @@
 
 ### P0. 가격 모델명 DOM 주입 방지 — 0.25일
 
-- [ ] 가격 계산기에서 API 모델명을 `innerHTML`로 삽입하지 않는다.
-- [ ] 문의 팝업에서도 동일하게 안전한 DOM API 또는 `textContent`를 사용한다.
-- [ ] HTML 특수문자가 포함된 모델명이 텍스트로만 표시되는지 테스트한다.
+- [x] 가격 계산기에서 API 모델명을 `innerHTML`로 삽입하지 않는다.
+- [x] 문의 팝업에서도 동일하게 안전한 DOM API 또는 `textContent`를 사용한다.
+- [x] HTML 특수문자가 포함된 모델명이 텍스트로만 표시되는지 테스트한다.
 
 완료 조건:
 
 - 모델명 데이터가 마크업이나 스크립트로 해석되지 않는다.
 
-관련 기록: `커밋/PR: `
+관련 기록:
+
+- 상태: 구현 및 로컬 브라우저 검증 완료
+- 구현: 계산기 option과 가격 팝업 table cell을 `createElement`, `textContent`, `replaceChildren`로 생성
+- 안전 보완: 계산기 가격 맵을 prototype이 없는 객체로 생성하고 API 모델명을 문자열로 정규화
+- 검증 데이터: `<img id="xss-probe" src=x onerror="window.__xssProbe=1">`
+- 검증 결과: 계산기와 팝업 모두 원문 텍스트로 표시, DOM 요소 생성 및 이벤트 실행 0건
+- 정적 검사: `node --check`, `bun x prettier --check public/landing.js public/popup.js`
+- 커밋/PR: 이 체크리스트 갱신을 포함한 가격 모델명 DOM 주입 방지 커밋
 
 ### P1. 포스터 최적화 및 LCP 개선 — 1~2일
 

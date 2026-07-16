@@ -346,7 +346,7 @@ const STRINGS = {
 
 // ── Calculator pricing ──
 // TODO: 모델 목록 및 가격은 추후 API에서 가져올 예정
-let _calcPricing = {}; // model_name → { input, output }
+let _calcPricing = Object.create(null); // model_name → { input, output }
 let _calcGroupRatio = 1;
 
 async function loadCalcModels() {
@@ -355,18 +355,29 @@ async function loadCalcModels() {
     const res = await fetch("/api/pricing");
     const json = await res.json();
     _calcGroupRatio = 2;
-    json.data.forEach((m) => {
+    const models = json.data.map((model) => ({
+      ...model,
+      model_name: String(model.model_name ?? ""),
+    }));
+    models.forEach((m) => {
       const d = (m.discount_percent || 0) / 100;
       _calcPricing[m.model_name] = {
         input: m.model_ratio * _calcGroupRatio * (1 - d),
         output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
       };
     });
-    sel.innerHTML = json.data
-      .map((m) => `<option value="${m.model_name}">${m.model_name}</option>`)
-      .join("");
+    const options = models.map((m) => {
+      const option = document.createElement("option");
+      option.value = m.model_name;
+      option.textContent = m.model_name;
+      return option;
+    });
+    sel.replaceChildren(...options);
   } catch (e) {
-    sel.innerHTML = `<option value="">${STRINGS.calcLoadError}</option>`;
+    const errorOption = document.createElement("option");
+    errorOption.value = "";
+    errorOption.textContent = STRINGS.calcLoadError;
+    sel.replaceChildren(errorOption);
   }
 }
 loadCalcModels();
