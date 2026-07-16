@@ -29,6 +29,7 @@ import type {
   PaymentRequest,
   PaymentResponse,
   StripePaymentResponse,
+  TossAmountResponse,
   TossPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
@@ -207,7 +208,7 @@ export async function calculateOrganizationWaffoPancakeAmount(
 
 export async function calculateOrganizationTossAmount(
   request: AmountRequest
-): Promise<AmountResponse> {
+): Promise<TossAmountResponse> {
   const res = await api.post('/api/organization/toss/amount', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)

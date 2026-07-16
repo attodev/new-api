@@ -42,6 +42,7 @@ import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
+import { SubscriptionPlansCard } from './components/subscription-plans-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
 import { WalletSubscriptionStatusCard } from './components/wallet-subscription-status-card'
 import { DEFAULT_DISCOUNT_RATE } from './constants'
@@ -61,6 +62,7 @@ import {
   getMinTopupAmount,
   isWaffoPancakePayment,
   isTossPayment,
+  shouldBlockPaymentMethodBeforeQuote,
   shouldOpenPaymentConfirmDialog,
 } from './lib'
 import {
@@ -70,13 +72,17 @@ import {
   WALLET_PAYMENT_SETTING_LOCK_MESSAGE,
   type WalletPaymentSettingKind,
 } from './lib/payment-settings'
-import { getTossPreview } from './lib/topup-amount-mode'
+import {
+  createTossPaymentConfirmation,
+  getTossPreview,
+} from './lib/topup-amount-mode'
 import type {
   UserWalletData,
   PaymentMethod,
   PresetAmount,
   CreemProduct,
   TopupAmountMode,
+  TossPaymentConfirmation,
 } from './types'
 
 interface WalletProps {
@@ -97,6 +103,8 @@ export function Wallet(props: WalletProps) {
     useState<PaymentMethod>()
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [tossPaymentConfirmation, setTossPaymentConfirmation] =
+    useState<Readonly<TossPaymentConfirmation> | null>(null)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [billingDialogOpen, setBillingDialogOpen] = useState(false)
   const [redemptionCode, setRedemptionCode] = useState('')
@@ -244,6 +252,7 @@ export function Wallet(props: WalletProps) {
   }, [selectedPaymentMethod, topupInfo])
 
   const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTossPaymentConfirmation(null)
     setTopupAmountMode(mode)
     setSelectedPreset(null)
     const paymentType = getCurrentPaymentType()
@@ -256,6 +265,7 @@ export function Wallet(props: WalletProps) {
 
   // Handle preset selection
   const handleSelectPreset = (preset: PresetAmount) => {
+    setTossPaymentConfirmation(null)
     setTopupAmount(preset.value)
     setSelectedPreset(preset.value)
     const paymentType = getCurrentPaymentType()
@@ -268,6 +278,7 @@ export function Wallet(props: WalletProps) {
 
   // Handle topup amount change
   const handleTopupAmountChange = (amount: number) => {
+    setTossPaymentConfirmation(null)
     setTopupAmount(amount)
     setSelectedPreset(null)
     const paymentType = getCurrentPaymentType()
@@ -291,17 +302,39 @@ export function Wallet(props: WalletProps) {
         method.type,
         topupAmountMode
       )
-      if (amountForMinimum < minTopup) {
+      if (
+        shouldBlockPaymentMethodBeforeQuote(
+          method.type,
+          amountForMinimum,
+          minTopup
+        )
+      ) {
         return
       }
 
       // Calculate payment amount and show confirmation dialog
-      const paymentAmount = await calculatePaymentAmount(
+      const amountMode = getAmountModeForPaymentType(method.type)
+      const calculation = await calculatePaymentAmount(
         topupAmount,
         method.type,
-        getAmountModeForPaymentType(method.type)
+        amountMode
       )
-      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+      if (!calculation.isCurrent) return
+      if (shouldOpenPaymentConfirmDialog(method.type, calculation.amount)) {
+        if (isTossPayment(method.type)) {
+          const confirmation = createTossPaymentConfirmation(
+            topupAmount,
+            amountMode ?? topupAmountMode,
+            calculation.tossQuote
+          )
+          if (!confirmation) {
+            toast.error(t('Payment request failed'))
+            return
+          }
+          setTossPaymentConfirmation(confirmation)
+        } else {
+          setTossPaymentConfirmation(null)
+        }
         setConfirmDialogOpen(true)
       }
     } finally {
@@ -318,7 +351,25 @@ export function Wallet(props: WalletProps) {
     if (isWaffoPancakePayment(type)) {
       success = await processWaffoPancakePayment(topupAmount)
     } else if (isTossPayment(type)) {
-      success = await processTossPayment(topupAmount, topupAmountMode)
+      if (
+        !tossPaymentConfirmation ||
+        topupAmount !== tossPaymentConfirmation.input_amount ||
+        topupAmountMode !== tossPaymentConfirmation.amount_mode
+      ) {
+        toast.info(
+          t('Payment details changed. Please review and confirm again.')
+        )
+        setConfirmDialogOpen(false)
+        setTossPaymentConfirmation(null)
+        return
+      }
+      const result = await processTossPayment(tossPaymentConfirmation)
+      if (result === 'confirmation_changed') {
+        setConfirmDialogOpen(false)
+        setTossPaymentConfirmation(null)
+        return
+      }
+      success = result === 'started'
     } else {
       success = await processPayment(topupAmount, type)
     }
@@ -326,6 +377,13 @@ export function Wallet(props: WalletProps) {
     if (success) {
       setConfirmDialogOpen(false)
       await fetchUser()
+    }
+  }
+
+  const handleConfirmDialogOpenChange = (open: boolean) => {
+    setConfirmDialogOpen(open)
+    if (!open) {
+      setTossPaymentConfirmation(null)
     }
   }
 
@@ -420,11 +478,14 @@ export function Wallet(props: WalletProps) {
       if (res.success) {
         toast.success(t('Auto-renew cancelled'))
         await fetchSelfSubscription()
+        return true
       } else {
         toast.error(res.message || t('Request failed'))
+        return false
       }
     } catch {
       toast.error(t('Request failed'))
+      return false
     } finally {
       setCancellingAutoRenew(false)
     }
@@ -447,6 +508,8 @@ export function Wallet(props: WalletProps) {
       walletAutoRecharge.presetsLoaded,
     ]
   )
+  const walletAutoRechargeGatewayEnabled =
+    topupInfo?.enable_toss_wallet_auto_recharge === true
 
   const paymentSettingTabs = useMemo(
     () =>
@@ -485,6 +548,15 @@ export function Wallet(props: WalletProps) {
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={user} loading={userLoading} />
+
+            <SubscriptionPlansCard
+              topupInfo={topupInfo}
+              userQuota={user?.quota}
+              showStatus={false}
+              onPurchaseSuccess={async () => {
+                await Promise.all([fetchUser(), fetchSelfSubscription()])
+              }}
+            />
 
             <div
               className={
@@ -591,12 +663,16 @@ export function Wallet(props: WalletProps) {
                         processing={walletAutoRecharge.processing}
                         canManage
                         creationDisabled={
-                          paymentSettingTabs.find(
+                          !walletAutoRechargeGatewayEnabled ||
+                          (paymentSettingTabs.find(
                             (tab) => tab.kind === 'threshold'
-                          )?.disabled ?? false
+                          )?.disabled ??
+                            false)
                         }
                         creationDisabledMessageKey={
-                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                          walletAutoRechargeGatewayEnabled
+                            ? WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                            : 'Not available'
                         }
                         onCreateScheduled={walletAutoRecharge.createScheduled}
                         onCreateThreshold={walletAutoRecharge.createThreshold}
@@ -613,12 +689,16 @@ export function Wallet(props: WalletProps) {
                         processing={walletAutoRecharge.processing}
                         canManage
                         creationDisabled={
-                          paymentSettingTabs.find(
+                          !walletAutoRechargeGatewayEnabled ||
+                          (paymentSettingTabs.find(
                             (tab) => tab.kind === 'scheduled'
-                          )?.disabled ?? false
+                          )?.disabled ??
+                            false)
                         }
                         creationDisabledMessageKey={
-                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                          walletAutoRechargeGatewayEnabled
+                            ? WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                            : 'Not available'
                         }
                         onCreateScheduled={walletAutoRecharge.createScheduled}
                         onCreateThreshold={walletAutoRecharge.createThreshold}
@@ -645,15 +725,17 @@ export function Wallet(props: WalletProps) {
 
       <PaymentConfirmDialog
         open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
+        onOpenChange={handleConfirmDialogOpenChange}
         onConfirm={handlePaymentConfirm}
-        topupAmount={topupAmount}
-        paymentAmount={paymentAmount}
+        topupAmount={tossPaymentConfirmation?.input_amount ?? topupAmount}
+        paymentAmount={tossPaymentConfirmation?.charge_amount ?? paymentAmount}
         paymentMethod={selectedPaymentMethod}
-        amountMode={topupAmountMode}
-        tossUnitPrice={topupInfo?.toss_unit_price}
-        tossQuote={tossQuote}
-        calculating={calculating}
+        amountMode={tossPaymentConfirmation?.amount_mode ?? topupAmountMode}
+        tossUnitPrice={
+          tossPaymentConfirmation?.unit_price ?? topupInfo?.toss_unit_price
+        }
+        tossQuote={tossPaymentConfirmation ?? tossQuote}
+        calculating={tossPaymentConfirmation ? false : calculating}
         processing={processing || pancakeProcessing || tossProcessing}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}

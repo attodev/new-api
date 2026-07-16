@@ -316,7 +316,7 @@ function scheduledRequest(
     interval_unit: period.interval_unit,
     interval_value: period.interval_value,
     custom_seconds: period.custom_seconds,
-    charge_immediately: state.chargeImmediately,
+    charge_immediately: period.kind === 'custom' && state.chargeImmediately,
     sort_order: sortOrder,
     enabled: true,
   }

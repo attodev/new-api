@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk';
 import {
   API,
   showError,
@@ -39,6 +40,13 @@ import InvitationCard from './InvitationCard';
 import TransferModal from './modals/TransferModal';
 import PaymentConfirmModal from './modals/PaymentConfirmModal';
 import TopupHistoryModal from './modals/TopupHistoryModal';
+import {
+  getTossPaymentWindowTargetOptions,
+  isTossCallbackPair,
+  isTossUserCancellation,
+} from './tossSubscriptionCheckout';
+import { getClassicTossTarget } from './tossTargetRouting';
+import { useTossPaymentLifecycle } from './tossPaymentLifecycle';
 
 // Reject non-navigable schemes (e.g. javascript:, data:) and relative URLs.
 // Only http / https are allowed for backend-provided redirect targets.
@@ -57,11 +65,94 @@ function isSafeHttpCheckoutUrl(value) {
   }
 }
 
+const TOSS_GENERAL_MINIMUM_KRW = 200;
+const TOSS_MAXIMUM_CHARGE_KRW = 2147483647;
+const TOSS_ORDER_ID_PATTERN = /^[A-Za-z0-9_-]{6,64}$/;
+// The server Billing API accepts a wider key, but payment({ customerKey }) in
+// the JavaScript SDK v2 is explicitly limited to 50 characters.
+const TOSS_CUSTOMER_KEY_MAX_LENGTH = 50;
+const TOSS_CUSTOMER_KEY_PATTERN = /^[A-Za-z0-9_.=@-]{2,50}$/;
+
+function isNonBlankBoundedString(value, maxLength) {
+  return (
+    typeof value === 'string' &&
+    value === value.trim() &&
+    value.length > 0 &&
+    value.length <= maxLength
+  );
+}
+
+function isValidTossCustomerKey(value) {
+  return (
+    isNonBlankBoundedString(value, TOSS_CUSTOMER_KEY_MAX_LENGTH) &&
+    TOSS_CUSTOMER_KEY_PATTERN.test(value) &&
+    /[-_=.@]/.test(value)
+  );
+}
+
+function parseTossQuotaQuote(value, inputAmount) {
+  if (!value || typeof value !== 'object') return null;
+  const quote = value;
+  if (
+    quote.amount_mode !== 'quota' ||
+    quote.input_amount !== inputAmount ||
+    !Number.isSafeInteger(quote.charge_amount) ||
+    quote.charge_amount < TOSS_GENERAL_MINIMUM_KRW ||
+    quote.charge_amount > TOSS_MAXIMUM_CHARGE_KRW ||
+    typeof quote.credit_amount !== 'number' ||
+    !Number.isFinite(quote.credit_amount) ||
+    quote.credit_amount <= 0 ||
+    !Number.isSafeInteger(quote.credit_quota) ||
+    quote.credit_quota <= 0 ||
+    typeof quote.unit_price !== 'number' ||
+    !Number.isFinite(quote.unit_price) ||
+    quote.unit_price <= 0
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    amount_mode: quote.amount_mode,
+    input_amount: quote.input_amount,
+    charge_amount: quote.charge_amount,
+    credit_amount: quote.credit_amount,
+    credit_quota: quote.credit_quota,
+    unit_price: quote.unit_price,
+  });
+}
+
+function isValidTossPaymentSession(value) {
+  if (!value || typeof value !== 'object') return false;
+  return (
+    isNonBlankBoundedString(value.client_key, 2048) &&
+    isValidTossCustomerKey(value.customer_key) &&
+    typeof value.order_id === 'string' &&
+    TOSS_ORDER_ID_PATTERN.test(value.order_id) &&
+    isNonBlankBoundedString(value.order_name, 100) &&
+    Array.from(value.order_name).length <= 100 &&
+    Number.isSafeInteger(value.amount) &&
+    value.amount >= TOSS_GENERAL_MINIMUM_KRW &&
+    value.amount <= TOSS_MAXIMUM_CHARGE_KRW &&
+    isTossCallbackPair(value.success_url, value.fail_url, 'payment')
+  );
+}
+
+function tossPaymentSessionMatchesQuote(session, quote) {
+  return (
+    session.amount === quote.charge_amount &&
+    session.charge_amount === quote.charge_amount &&
+    session.credit_amount === quote.credit_amount &&
+    session.credit_quota === quote.credit_quota &&
+    session.unit_price === quote.unit_price &&
+    session.amount_mode === quote.amount_mode
+  );
+}
+
 const TopUp = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState] = useContext(StatusContext);
+  const tossTarget = getClassicTossTarget(userState?.user);
 
   const [redemptionCode, setRedemptionCode] = useState('');
   const [amount, setAmount] = useState(0.0);
@@ -90,6 +181,14 @@ const TopUp = () => {
   const [enablePayPalTopUp, setEnablePayPalTopUp] = useState(false);
   const [paypalMinTopUp, setPaypalMinTopUp] = useState(1);
 
+  // Toss uses the SDK v2 CARD flow. Classic keeps its historical input as a
+  // quota-unit amount and snapshots the exact server quote before checkout.
+  const [enableTossTopUp, setEnableTossTopUp] = useState(false);
+  const [enableTossBilling, setEnableTossBilling] = useState(false);
+  const [enableTossWalletAutoRecharge, setEnableTossWalletAutoRecharge] =
+    useState(false);
+  const [tossQuote, setTossQuote] = useState(null);
+
   // Waffo 相关状态
   const [enableWaffoTopUp, setEnableWaffoTopUp] = useState(false);
   const [waffoPayMethods, setWaffoPayMethods] = useState([]);
@@ -106,6 +205,8 @@ const TopUp = () => {
   const [payMethods, setPayMethods] = useState([]);
 
   const affFetchedRef = useRef(false);
+  const tossCheckoutInFlightRef = useRef(false);
+  const tossPaymentLifecycle = useTossPaymentLifecycle();
 
   // 邀请相关状态
   const [affLink, setAffLink] = useState('');
@@ -161,6 +262,9 @@ const TopUp = () => {
     }
     if (payment === 'paypal') {
       return getPayPalAmount(value);
+    }
+    if (payment === 'toss') {
+      return getTossAmount(value);
     }
     if (payment === 'waffo_pancake') {
       return getWaffoPancakeAmount(value);
@@ -226,6 +330,11 @@ const TopUp = () => {
         showError(t('管理员未开启 PayPal 充值！'));
         return;
       }
+    } else if (payment === 'toss') {
+      if (!enableTossTopUp || !tossTarget.canManage) {
+        showError(t('支付失败'));
+        return;
+      }
     } else if (payment === 'waffo_pancake') {
       if (!enableWaffoPancakeTopUp) {
         showError(t('管理员未开启 Waffo Pancake 充值！'));
@@ -244,12 +353,15 @@ const TopUp = () => {
     }
 
     setPayWay(payment);
+    if (payment !== 'toss') {
+      setTossQuote(null);
+    }
     setPaymentLoading(true);
     try {
       const selectedMinTopUp = getPaymentMinTopUp(payment);
       await requestAmountByPayment(payment);
 
-      if (topUpCount < selectedMinTopUp) {
+      if (payment !== 'toss' && topUpCount < selectedMinTopUp) {
         showError(t('充值数量不能小于') + selectedMinTopUp);
         return;
       }
@@ -261,7 +373,89 @@ const TopUp = () => {
     }
   };
 
+  const startTossTopUp = async (lifecycleLease) => {
+    const inputAmount = Number(topUpCount);
+    if (
+      !tossTarget.canManage ||
+      !Number.isSafeInteger(inputAmount) ||
+      inputAmount <= 0 ||
+      !tossQuote ||
+      tossQuote.input_amount !== inputAmount ||
+      tossQuote.amount_mode !== 'quota'
+    ) {
+      setTossQuote(null);
+      showError(t('支付失败'));
+      return;
+    }
+
+    const response = await API.post(`${tossTarget.topUpApiBase}/toss/pay`, {
+      amount: inputAmount,
+      amount_mode: 'quota',
+      payment_method: 'toss',
+    });
+    const payload = response?.data;
+    if (payload?.message !== 'success') {
+      showError(payload?.message || t('支付失败'));
+      return;
+    }
+
+    const session = payload.data;
+    if (
+      !isValidTossPaymentSession(session) ||
+      !tossPaymentSessionMatchesQuote(session, tossQuote)
+    ) {
+      // Pricing/group/configuration changed after the buyer reviewed the
+      // quote. Never open a checkout for the unreviewed replacement amount.
+      setTossQuote(null);
+      showError(t('支付失败'));
+      return;
+    }
+
+    const tossPayments = await loadTossPayments(session.client_key);
+    const payment = tossPayments.payment({ customerKey: session.customer_key });
+    if (!(await tossPaymentLifecycle.adopt(payment, lifecycleLease))) return;
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: { currency: 'KRW', value: session.amount },
+      taxFreeAmount: 0,
+      card: { useEscrow: false, taxExemptionAmount: 0 },
+      orderId: session.order_id,
+      orderName: session.order_name,
+      successUrl: session.success_url,
+      failUrl: session.fail_url,
+      ...getTossPaymentWindowTargetOptions(
+        session.success_url,
+        session.fail_url,
+      ),
+    });
+  };
+
   const onlineTopUp = async () => {
+    if (payWay === 'toss') {
+      // `confirmLoading` is committed asynchronously. Guard synchronously too,
+      // otherwise a rapid double click can create two independent Toss orders.
+      if (tossCheckoutInFlightRef.current) return;
+      const lifecycleLease = tossPaymentLifecycle.beginRequest();
+      if (lifecycleLease === null) return;
+      tossCheckoutInFlightRef.current = true;
+      setConfirmLoading(true);
+      try {
+        await startTossTopUp(lifecycleLease);
+      } catch (error) {
+        if (isTossUserCancellation(error)) {
+          showInfo(t('取消'));
+        } else {
+          showError(t('支付请求失败'));
+        }
+      } finally {
+        tossPaymentLifecycle.finishRequest(lifecycleLease);
+        tossCheckoutInFlightRef.current = false;
+        setOpen(false);
+        setConfirmLoading(false);
+      }
+      return;
+    }
+
     if (payWay === 'waffo_pancake') {
       setConfirmLoading(true);
       try {
@@ -690,6 +884,10 @@ const TopUp = () => {
           const enableOnlineTopUp = data.enable_online_topup || false;
           const enableCreemTopUp = data.enable_creem_topup || false;
           const enablePayPalTopUpVal = data.enable_paypal_topup || false;
+          const enableTossTopUpVal = data.enable_toss_topup || false;
+          const enableTossBillingVal = data.enable_toss_billing || false;
+          const enableTossWalletAutoRechargeVal =
+            data.enable_toss_wallet_auto_recharge || false;
           const enableWaffoTopUp = data.enable_waffo_topup || false;
           const enableWaffoPancakeTopUp =
             data.enable_waffo_pancake_topup || false;
@@ -709,6 +907,9 @@ const TopUp = () => {
           setEnableCreemTopUp(enableCreemTopUp);
           setEnablePayPalTopUp(enablePayPalTopUpVal);
           setPaypalMinTopUp(data.paypal_min_topup || 1);
+          setEnableTossTopUp(enableTossTopUpVal);
+          setEnableTossBilling(enableTossBillingVal);
+          setEnableTossWalletAutoRecharge(enableTossWalletAutoRechargeVal);
           setEnableWaffoTopUp(enableWaffoTopUp);
           setWaffoPayMethods(data.waffo_pay_methods || []);
           setWaffoMinTopUp(data.waffo_min_topup || 1);
@@ -798,11 +999,51 @@ const TopUp = () => {
     showSuccess(t('邀请链接已复制到剪切板'));
   };
 
-  // URL 参数自动打开账单弹窗（支付回跳时触发）
+  // URL 参数处理（支付回跳时触发）
   useEffect(() => {
+    let changed = false;
     if (searchParams.get('show_history') === 'true') {
       setOpenHistory(true);
       searchParams.delete('show_history');
+      changed = true;
+    }
+
+    const tossErrorCode = (searchParams.get('toss_error_code') || '').trim();
+    const tossErrorMessage = (
+      searchParams.get('toss_error_message') || ''
+    ).trim();
+    const tossErrorDetail = tossErrorMessage || tossErrorCode;
+    if (tossErrorDetail) {
+      if (
+        tossErrorCode === 'PAY_PROCESS_CANCELED' ||
+        tossErrorCode === 'USER_CANCEL'
+      ) {
+        showInfo(t('取消'));
+      } else {
+        showError(`${t('支付失败')}: ${tossErrorDetail}`);
+      }
+    }
+    const walletAutoRechargeResult = searchParams.get('wallet_auto_recharge');
+    if (walletAutoRechargeResult === 'success') {
+      showSuccess(t('更新成功'));
+    } else if (walletAutoRechargeResult === 'failed' && !tossErrorDetail) {
+      showError(t('支付失败'));
+    }
+    if (searchParams.has('wallet_auto_recharge')) {
+      searchParams.delete('wallet_auto_recharge');
+      changed = true;
+    }
+    for (const key of [
+      'toss_error_code',
+      'toss_error_message',
+      'toss_order_id',
+    ]) {
+      if (searchParams.has(key)) {
+        searchParams.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
       setSearchParams(searchParams, { replace: true });
     }
   }, []);
@@ -838,6 +1079,9 @@ const TopUp = () => {
   }, [statusState?.status]);
 
   const renderAmount = () => {
+    if (payWay === 'toss') {
+      return `${amount} KRW`;
+    }
     return amount + ' ' + t('元');
   };
 
@@ -865,6 +1109,39 @@ const TopUp = () => {
       // amount fetch failed silently
     }
     setAmountLoading(false);
+  };
+
+  const getTossAmount = async (value) => {
+    const inputAmount = Number(value === undefined ? topUpCount : value);
+    if (!Number.isSafeInteger(inputAmount) || inputAmount <= 0) {
+      setAmount(0);
+      setTossQuote(null);
+      throw new Error('invalid Toss top-up amount');
+    }
+
+    setAmountLoading(true);
+    try {
+      const response = await API.post(
+        `${tossTarget.topUpApiBase}/toss/amount`,
+        {
+          amount: inputAmount,
+          amount_mode: 'quota',
+          payment_method: 'toss',
+        },
+      );
+      const payload = response?.data;
+      const quote = parseTossQuotaQuote(payload?.data, inputAmount);
+      if (payload?.message !== 'success' || !quote) {
+        setAmount(0);
+        setTossQuote(null);
+        throw new Error('invalid Toss top-up quote');
+      }
+      setAmount(quote.charge_amount);
+      setTossQuote(quote);
+      return quote;
+    } finally {
+      setAmountLoading(false);
+    }
   };
 
   const getStripeAmount = async (value) => {
@@ -995,7 +1272,9 @@ const TopUp = () => {
         payWay={payWay}
         payMethods={confirmPayMethods}
         amountNumber={amount}
-        discountRate={topupInfo?.discount?.[topUpCount] || 1.0}
+        discountRate={
+          payWay === 'toss' ? 1.0 : topupInfo?.discount?.[topUpCount] || 1.0
+        }
       />
 
       {/* 充值账单模态框 */}
@@ -1043,6 +1322,15 @@ const TopUp = () => {
           creemProducts={creemProducts}
           creemPreTopUp={creemPreTopUp}
           enablePayPalTopUp={enablePayPalTopUp}
+          enableTossTopUp={enableTossTopUp && tossTarget.canManage}
+          enableTossBilling={
+            enableTossBilling && tossTarget.allowPersonalBilling
+          }
+          enableTossWalletAutoRecharge={
+            enableTossWalletAutoRecharge && tossTarget.canManage
+          }
+          tossWalletScope={tossTarget.scope}
+          tossWalletCanManage={tossTarget.canManage}
           enableWaffoTopUp={enableWaffoTopUp}
           enableWaffoPancakeTopUp={enableWaffoPancakeTopUp}
           presetAmounts={presetAmounts}

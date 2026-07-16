@@ -2,8 +2,10 @@
 <!doctype html>
 <html lang="en">
   <head>
+    {{template "google_tag_manager_head" .}}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{template "google_analytics" .}}
     <title>AlRouter — Unified AI API Gateway</title>
     <link rel="canonical" href="https://alrouter.ai/en/guide" />
     <link rel="alternate" hreflang="en" href="https://alrouter.ai/en/guide" />
@@ -31,6 +33,7 @@
     <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
+    {{template "google_tag_manager_body" .}}
     {{template "header_en" .}}
     <!-- ── Content ── -->
     <div class="guide-wrap">

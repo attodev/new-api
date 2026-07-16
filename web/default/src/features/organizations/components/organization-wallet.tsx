@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
@@ -39,17 +39,26 @@ import { PaymentConfirmDialog } from '@/features/wallet/components/dialogs/payme
 import { RechargeFormCard } from '@/features/wallet/components/recharge-form-card'
 import { WalletStatsCard } from '@/features/wallet/components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE } from '@/features/wallet/constants'
-import { useTopupInfo, useWalletAutoRecharge } from '@/features/wallet/hooks'
 import {
+  useTopupInfo,
+  useTossPaymentLifecycle,
+  useWalletAutoRecharge,
+} from '@/features/wallet/hooks'
+import {
+  getTossPaymentWindowTargetOptions,
   getDefaultPaymentType,
   getMinTopupAmount,
   isPayPalPayment,
   isStripePayment,
   isTossPayment,
+  isTossUserCancellation,
+  isValidTossPaymentSession,
   isWaffoPancakePayment,
+  shouldBlockPaymentMethodBeforeQuote,
   shouldOpenPaymentConfirmDialog,
   submitPaymentForm,
 } from '@/features/wallet/lib'
+import type { TossPaymentLifecycleLease } from '@/features/wallet/lib'
 import {
   buildWalletPaymentSettingTabs,
   getInitialWalletPaymentSetting,
@@ -58,14 +67,17 @@ import {
   type WalletPaymentSettingKind,
 } from '@/features/wallet/lib/payment-settings'
 import {
+  createTossPaymentConfirmation,
   getTossPreview,
   parseTossQuoteData,
+  tossPaymentSessionMatchesConfirmation,
 } from '@/features/wallet/lib/topup-amount-mode'
 import type {
   CreemProduct,
   PaymentMethod,
   PresetAmount,
   TopupAmountMode,
+  TossPaymentConfirmation,
   TossTopupQuote,
   UserWalletData,
   WalletAutoRechargePolicy,
@@ -142,6 +154,18 @@ export function getOrganizationAmountModeRequest(
     : { amount }
 }
 
+export function shouldBlockOrganizationPaymentMethodBeforeQuote(
+  method: Pick<PaymentMethod, 'type' | 'min_topup'>,
+  amountForMinimum: number,
+  fallbackMinimum: number
+): boolean {
+  return shouldBlockPaymentMethodBeforeQuote(
+    method.type,
+    amountForMinimum,
+    method.min_topup || fallbackMinimum
+  )
+}
+
 export function buildOrganizationWalletPaymentSettingTabs({
   visibleAutoRechargeModes,
   policies,
@@ -156,7 +180,13 @@ export function buildOrganizationWalletPaymentSettingTabs({
   })
 }
 
-export function OrganizationWallet() {
+interface OrganizationWalletProps {
+  initialShowHistory?: boolean
+}
+
+export function OrganizationWallet({
+  initialShowHistory = false,
+}: OrganizationWalletProps = {}) {
   const { t } = useTranslation()
   const [paymentSettingTab, setPaymentSettingTab] =
     useState<WalletPaymentSettingKind | null>(null)
@@ -171,6 +201,8 @@ export function OrganizationWallet() {
   const [tossQuote, setTossQuote] = useState<Partial<TossTopupQuote> | null>(
     null
   )
+  const [tossPaymentConfirmation, setTossPaymentConfirmation] =
+    useState<Readonly<TossPaymentConfirmation> | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null)
@@ -179,6 +211,9 @@ export function OrganizationWallet() {
   const [creemDialogOpen, setCreemDialogOpen] = useState(false)
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
+  const calculationRequestIdRef = useRef(0)
+  const tossPaymentProcessingRef = useRef(false)
+  const tossPaymentLifecycle = useTossPaymentLifecycle()
 
   const currentUser = useAuthStore((state) => state.auth.user)
   const { status } = useStatus()
@@ -192,6 +227,14 @@ export function OrganizationWallet() {
     'organization',
     canManageAutoRecharge
   )
+
+  useEffect(() => {
+    if (!initialShowHistory) return
+    setBillingDialogOpen(true)
+    // Remove callback-only query data without adding a history entry that can
+    // replay the Toss result when the user navigates back.
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [initialShowHistory])
 
   const effectiveUsdExchangeRate = useMemo(() => {
     return currency?.quotaDisplayType === 'USD'
@@ -253,6 +296,7 @@ export function OrganizationWallet() {
       paymentType: string,
       amountMode: TopupAmountMode = topupAmountMode
     ) => {
+      const requestId = ++calculationRequestIdRef.current
       try {
         setCalculating(true)
         const request = getOrganizationAmountModeRequest(
@@ -270,6 +314,10 @@ export function OrganizationWallet() {
                 ? await calculateOrganizationTossAmount(request)
                 : await calculateOrganizationAmount(request)
 
+        if (requestId !== calculationRequestIdRef.current) {
+          return { amount: 0, tossQuote: null, isCurrent: false }
+        }
+
         if (isApiSuccess(response) && response.data) {
           const quote = isTossPayment(paymentType)
             ? parseTossQuoteData(response.data)
@@ -278,17 +326,26 @@ export function OrganizationWallet() {
           const value =
             quote?.charge_amount ?? parseFloat(String(response.data))
           setPaymentAmount(value)
-          return value
+          return {
+            amount: value,
+            tossQuote: isTossPayment(paymentType) ? quote : null,
+            isCurrent: true,
+          }
         }
         setTossQuote(null)
         setPaymentAmount(0)
-        return 0
+        return { amount: 0, tossQuote: null, isCurrent: true }
       } catch {
-        setTossQuote(null)
-        setPaymentAmount(0)
-        return 0
+        const isCurrent = requestId === calculationRequestIdRef.current
+        if (isCurrent) {
+          setTossQuote(null)
+          setPaymentAmount(0)
+        }
+        return { amount: 0, tossQuote: null, isCurrent }
       } finally {
-        setCalculating(false)
+        if (requestId === calculationRequestIdRef.current) {
+          setCalculating(false)
+        }
       }
     },
     [topupAmountMode]
@@ -307,18 +364,21 @@ export function OrganizationWallet() {
   }, [selectedPaymentMethod, topupInfo])
 
   const handleTopupAmountModeChange = (mode: TopupAmountMode) => {
+    setTossPaymentConfirmation(null)
     setTopupAmountMode(mode)
     setSelectedPreset(null)
     void calculatePaymentAmount(topupAmount, getCurrentPaymentType(), mode)
   }
 
   const handleSelectPreset = (preset: PresetAmount) => {
+    setTossPaymentConfirmation(null)
     setTopupAmount(preset.value)
     setSelectedPreset(preset.value)
     void calculatePaymentAmount(preset.value, getCurrentPaymentType())
   }
 
   const handleTopupAmountChange = (amount: number) => {
+    setTossPaymentConfirmation(null)
     setTopupAmount(amount)
     setSelectedPreset(null)
     void calculatePaymentAmount(amount, getCurrentPaymentType())
@@ -333,12 +393,32 @@ export function OrganizationWallet() {
         method.type,
         topupAmountMode
       )
-      if (amountForMinimum < getMinTopupAmount(topupInfo)) return
-      const paymentAmount = await calculatePaymentAmount(
-        topupAmount,
-        method.type
-      )
-      if (shouldOpenPaymentConfirmDialog(method.type, paymentAmount)) {
+      if (
+        shouldBlockOrganizationPaymentMethodBeforeQuote(
+          method,
+          amountForMinimum,
+          getMinTopupAmount(topupInfo)
+        )
+      ) {
+        return
+      }
+      const calculation = await calculatePaymentAmount(topupAmount, method.type)
+      if (!calculation.isCurrent) return
+      if (shouldOpenPaymentConfirmDialog(method.type, calculation.amount)) {
+        if (isTossPayment(method.type)) {
+          const confirmation = createTossPaymentConfirmation(
+            topupAmount,
+            topupAmountMode,
+            calculation.tossQuote
+          )
+          if (!confirmation) {
+            toast.error(t('Payment request failed'))
+            return
+          }
+          setTossPaymentConfirmation(confirmation)
+        } else {
+          setTossPaymentConfirmation(null)
+        }
         setConfirmDialogOpen(true)
       }
     } finally {
@@ -348,10 +428,33 @@ export function OrganizationWallet() {
 
   const handlePaymentConfirm = async () => {
     if (!selectedPaymentMethod) return
+    const paymentType = selectedPaymentMethod.type
+    let tossPaymentLease: TossPaymentLifecycleLease | null = null
+    if (
+      isTossPayment(paymentType) &&
+      (!tossPaymentConfirmation ||
+        topupAmount !== tossPaymentConfirmation.input_amount ||
+        topupAmountMode !== tossPaymentConfirmation.amount_mode)
+    ) {
+      toast.info(t('Payment details changed. Please review and confirm again.'))
+      setConfirmDialogOpen(false)
+      setTossPaymentConfirmation(null)
+      return
+    }
+    if (isTossPayment(paymentType)) {
+      if (tossPaymentProcessingRef.current) return
+      const lifecycleLease = tossPaymentLifecycle.beginRequest()
+      if (lifecycleLease === null) return
+      tossPaymentProcessingRef.current = true
+      tossPaymentLease = lifecycleLease
+    }
     setProcessing(true)
     try {
-      const amount = Math.floor(topupAmount)
-      const paymentType = selectedPaymentMethod.type
+      const amount = Math.floor(
+        isTossPayment(paymentType)
+          ? (tossPaymentConfirmation?.input_amount ?? 0)
+          : topupAmount
+      )
       const response = isStripePayment(paymentType)
         ? await requestOrganizationStripePayment({
             amount,
@@ -367,7 +470,7 @@ export function OrganizationWallet() {
             : isTossPayment(paymentType)
               ? await requestOrganizationTossPayment({
                   amount,
-                  amount_mode: topupAmountMode,
+                  amount_mode: tossPaymentConfirmation?.amount_mode,
                   payment_method: 'toss',
                 })
               : await requestOrganizationPayment({
@@ -381,19 +484,20 @@ export function OrganizationWallet() {
       }
 
       if (isTossPayment(paymentType)) {
-        const data = response.data as
-          | {
-              client_key: string
-              customer_key: string
-              order_id: string
-              order_name: string
-              amount: number
-              success_url: string
-              fail_url: string
-            }
-          | undefined
-        if (!data) {
+        const data = response.data
+        if (!isValidTossPaymentSession(data)) {
           toast.error(response.message || i18next.t('Payment request failed'))
+          return
+        }
+        if (
+          !tossPaymentConfirmation ||
+          !tossPaymentSessionMatchesConfirmation(data, tossPaymentConfirmation)
+        ) {
+          toast.info(
+            t('Payment details changed. Please review and confirm again.')
+          )
+          setConfirmDialogOpen(false)
+          setTossPaymentConfirmation(null)
           return
         }
         const {
@@ -409,18 +513,31 @@ export function OrganizationWallet() {
         try {
           const tossPayments = await loadTossPayments(client_key)
           const payment = tossPayments.payment({ customerKey: customer_key })
+          if (!(await tossPaymentLifecycle.adopt(payment, tossPaymentLease))) {
+            toast.error(t('Payment request failed'))
+            return
+          }
 
           await payment.requestPayment({
             method: 'CARD',
             amount: { currency: 'KRW', value: chargeAmount },
+            taxFreeAmount: 0,
+            card: { useEscrow: false, taxExemptionAmount: 0 },
             orderId: order_id,
             orderName: order_name,
             successUrl: success_url,
             failUrl: fail_url,
+            ...getTossPaymentWindowTargetOptions(success_url, fail_url),
           })
+          // Navigation is the normal SDK outcome. If a popup-capable browser
+          // resolves the promise without replacing this page, close the
+          // confirmation so the same reviewed quote cannot mint another order.
+          setConfirmDialogOpen(false)
+          setTossPaymentConfirmation(null)
         } catch (error) {
-          const tossError = error as { code?: string }
-          if (tossError.code && tossError.code !== 'PAY_PROCESS_CANCELED') {
+          if (isTossUserCancellation(error)) {
+            toast.info(t('Cancelled'))
+          } else {
             toast.error(t('Payment request failed'))
           }
         }
@@ -468,7 +585,18 @@ export function OrganizationWallet() {
     } catch {
       toast.error(t('Payment request failed'))
     } finally {
+      if (isTossPayment(paymentType)) {
+        tossPaymentLifecycle.finishRequest(tossPaymentLease)
+        tossPaymentProcessingRef.current = false
+      }
       setProcessing(false)
+    }
+  }
+
+  const handleConfirmDialogOpenChange = (open: boolean) => {
+    setConfirmDialogOpen(open)
+    if (!open) {
+      setTossPaymentConfirmation(null)
     }
   }
 
@@ -545,6 +673,8 @@ export function OrganizationWallet() {
       walletAutoRecharge.presetsLoaded,
     ]
   )
+  const walletAutoRechargeGatewayEnabled =
+    topupInfo?.enable_toss_wallet_auto_recharge === true
 
   const paymentSettingTabs = useMemo(
     () =>
@@ -673,12 +803,16 @@ export function OrganizationWallet() {
                         canManage={canManageAutoRecharge}
                         permissionMessageKey='Only the organization owner can change auto payments'
                         creationDisabled={
-                          paymentSettingTabs.find(
+                          !walletAutoRechargeGatewayEnabled ||
+                          (paymentSettingTabs.find(
                             (tab) => tab.kind === 'threshold'
-                          )?.disabled ?? false
+                          )?.disabled ??
+                            false)
                         }
                         creationDisabledMessageKey={
-                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                          walletAutoRechargeGatewayEnabled
+                            ? WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                            : 'Not available'
                         }
                         onCreateScheduled={walletAutoRecharge.createScheduled}
                         onCreateThreshold={walletAutoRecharge.createThreshold}
@@ -696,12 +830,16 @@ export function OrganizationWallet() {
                         canManage={canManageAutoRecharge}
                         permissionMessageKey='Only the organization owner can change auto payments'
                         creationDisabled={
-                          paymentSettingTabs.find(
+                          !walletAutoRechargeGatewayEnabled ||
+                          (paymentSettingTabs.find(
                             (tab) => tab.kind === 'scheduled'
-                          )?.disabled ?? false
+                          )?.disabled ??
+                            false)
                         }
                         creationDisabledMessageKey={
-                          WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                          walletAutoRechargeGatewayEnabled
+                            ? WALLET_PAYMENT_SETTING_LOCK_MESSAGE
+                            : 'Not available'
                         }
                         onCreateScheduled={walletAutoRecharge.createScheduled}
                         onCreateThreshold={walletAutoRecharge.createThreshold}
@@ -718,15 +856,17 @@ export function OrganizationWallet() {
 
       <PaymentConfirmDialog
         open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
+        onOpenChange={handleConfirmDialogOpenChange}
         onConfirm={handlePaymentConfirm}
-        topupAmount={topupAmount}
-        paymentAmount={paymentAmount}
+        topupAmount={tossPaymentConfirmation?.input_amount ?? topupAmount}
+        paymentAmount={tossPaymentConfirmation?.charge_amount ?? paymentAmount}
         paymentMethod={selectedPaymentMethod}
-        amountMode={topupAmountMode}
-        tossUnitPrice={topupInfo?.toss_unit_price}
-        tossQuote={tossQuote}
-        calculating={calculating}
+        amountMode={tossPaymentConfirmation?.amount_mode ?? topupAmountMode}
+        tossUnitPrice={
+          tossPaymentConfirmation?.unit_price ?? topupInfo?.toss_unit_price
+        }
+        tossQuote={tossPaymentConfirmation ?? tossQuote}
+        calculating={tossPaymentConfirmation ? false : calculating}
         processing={processing}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}

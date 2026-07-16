@@ -18,7 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { lazy, Suspense, useContext, useMemo } from 'react';
-import { Route, Routes, useLocation, useParams } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
 import { AuthRedirect, PrivateRoute, AdminRoute } from './helpers';
@@ -265,6 +271,12 @@ function App() {
                 <PersonalSetting />
               </Suspense>
             </PrivateRoute>
+          }
+        />
+        <Route
+          path='/wallet'
+          element={
+            <Navigate to={`/console/topup${location.search}`} replace={true} />
           }
         />
         <Route

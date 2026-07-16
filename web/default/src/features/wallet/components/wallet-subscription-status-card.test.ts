@@ -68,21 +68,42 @@ describe('WalletSubscriptionStatusCard', () => {
             },
             plan: { id: 3, title: 'Pro Plan' },
           },
+          {
+            subscription: {
+              id: 12,
+              plan_id: 4,
+              status: 'active',
+              amount_total: 2000,
+              amount_used: 100,
+              end_time: Math.floor(Date.now() / 1000) + 172800,
+              auto_renew: true,
+            },
+            plan: { id: 4, title: 'Team Plan' },
+          },
         ] as never,
-        allSubscriptions: [],
+        allSubscriptions: [
+          {
+            subscription: { id: 11, auto_renew: true },
+          },
+          {
+            subscription: { id: 12, auto_renew: true },
+          },
+        ] as never,
         billingPreference: 'subscription_first',
         refreshing: false,
         cancellingAutoRenew: false,
         onRefresh: async () => undefined,
         onBillingPreferenceChange: async () => undefined,
-        onCancelTossAutoRenew: async () => undefined,
+        onCancelTossAutoRenew: async () => true,
       })
     )
 
     assert.match(html, /My Subscriptions/)
     assert.match(html, /Pro Plan/)
     assert.match(html, /aria-label="Refresh subscription status"/)
-    assert.match(html, /Auto-renew active/)
+    assert.equal(html.match(/Auto-renew active/g)?.length ?? 0, 2)
+    assert.equal(html.match(/Cancel all auto-renewals/g)?.length ?? 0, 1)
+    assert.doesNotMatch(html, /Cancel Auto-renew/)
     assert.doesNotMatch(html, /Subscribe Now/)
     assert.doesNotMatch(html, /No plans available/)
   })
@@ -97,10 +118,36 @@ describe('WalletSubscriptionStatusCard', () => {
         cancellingAutoRenew: false,
         onRefresh: async () => undefined,
         onBillingPreferenceChange: async () => undefined,
-        onCancelTossAutoRenew: async () => undefined,
+        onCancelTossAutoRenew: async () => true,
       })
     )
 
     assert.equal(html, '')
+  })
+
+  test('keeps the global cancellation control for an overdue auto-renewal', () => {
+    const html = renderWithI18n(
+      React.createElement(WalletSubscriptionStatusCard, {
+        activeSubscriptions: [],
+        allSubscriptions: [
+          {
+            subscription: {
+              id: 21,
+              status: 'active',
+              auto_renew: true,
+              end_time: Math.floor(Date.now() / 1000) - 30,
+            },
+          },
+        ] as never,
+        billingPreference: 'wallet_first',
+        refreshing: false,
+        cancellingAutoRenew: false,
+        onRefresh: async () => undefined,
+        onBillingPreferenceChange: async () => undefined,
+        onCancelTossAutoRenew: async () => true,
+      })
+    )
+
+    assert.equal(html.match(/Cancel all auto-renewals/g)?.length ?? 0, 1)
   })
 })

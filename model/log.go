@@ -106,6 +106,24 @@ func RecordLog(userId int, logType int, content string) {
 	}
 }
 
+func RecordLogWithContext(ctx context.Context, userId int, logType int, content string) {
+	if logType == LogTypeConsume && !common.LogConsumeEnabled {
+		return
+	}
+	username, _ := getUsernameByIdWithContext(ctx, userId)
+	log := &Log{
+		UserId:    userId,
+		Username:  username,
+		CreatedAt: common.GetTimestamp(),
+		Type:      logType,
+		Content:   content,
+	}
+	err := createLogWithContext(ctx, log)
+	if err != nil {
+		common.SysLog("failed to record log: " + err.Error())
+	}
+}
+
 // RecordLogWithAdminInfo Other.admin_info
 func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo map[string]interface{}) {
 	if logType == LogTypeConsume && !common.LogConsumeEnabled {
@@ -156,6 +174,59 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	if err != nil {
 		common.SysLog("failed to record topup log: " + err.Error())
 	}
+}
+
+func RecordTopupLogWithContext(ctx context.Context, userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
+	username, _ := getUsernameByIdWithContext(ctx, userId)
+	adminInfo := map[string]interface{}{
+		"server_ip":               common.GetIp(),
+		"node_name":               common.NodeName,
+		"caller_ip":               callerIp,
+		"payment_method":          paymentMethod,
+		"callback_payment_method": callbackPaymentMethod,
+		"version":                 common.Version,
+	}
+	other := map[string]interface{}{
+		"admin_info": adminInfo,
+	}
+	log := &Log{
+		UserId:    userId,
+		Username:  username,
+		CreatedAt: common.GetTimestamp(),
+		Type:      LogTypeTopup,
+		Content:   content,
+		Ip:        callerIp,
+		Other:     common.MapToJsonStr(other),
+	}
+	err := createLogWithContext(ctx, log)
+	if err != nil {
+		common.SysLog("failed to record topup log: " + err.Error())
+	}
+}
+
+func getUsernameByIdWithContext(ctx context.Context, id int) (string, error) {
+	var username string
+	err := dbWithContext(ctx).Model(&User{}).Where("id = ?", id).Select("username").Find(&username).Error
+	return username, err
+}
+
+func createLogWithContext(ctx context.Context, log *Log) error {
+	if LOG_DB == DB {
+		return dbWithContext(ctx).Create(log).Error
+	}
+	if common.LogSqlType != common.DatabaseTypeSQLite {
+		return LOG_DB.WithContext(ctx).Create(log).Error
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return LOG_DB.WithContext(ctx).Create(log).Error
+	}
+	bound, release, err := bindSQLiteDeadlineConnection(ctx, LOG_DB, deadline)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return bound.Create(log).Error
 }
 
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,

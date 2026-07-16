@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 
@@ -11,12 +13,46 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func isTrustedTossWebhookForGlobalRateLimit(c *gin.Context) bool {
+	return c != nil && c.Request != nil &&
+		c.Request.Method == http.MethodPost &&
+		c.Request.URL != nil && c.Request.URL.Path == "/api/toss/webhook" &&
+		controller.IsTrustedTossWebhookSource(c.Request)
+}
+
+func requireTrustedTossWebhookSource(c *gin.Context) {
+	if c == nil || c.Request == nil || !controller.IsTrustedTossWebhookSource(c.Request) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	c.Next()
+}
+
+func apiGzipExceptTossWebhook() gin.HandlerFunc {
+	compressed := gzip.Gzip(gzip.DefaultCompression)
+	return func(c *gin.Context) {
+		if c.Request != nil && c.Request.Method == http.MethodPost && c.Request.URL != nil && c.Request.URL.Path == "/api/toss/webhook" {
+			c.Next()
+			return
+		}
+		compressed(c)
+	}
+}
+
 func SetApiRouter(router *gin.Engine) {
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.RouteTag("api"))
-	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
+	// Establish the connection read deadline while Gin still exposes the base
+	// writer, then keep the exact webhook route out of gzip's non-Unwrap wrapper.
+	apiRouter.Use(controller.TossWebhookReadDeadlineMiddleware())
+	apiRouter.Use(apiGzipExceptTossWebhook())
 	apiRouter.Use(middleware.BodyStorageCleanup())
-	apiRouter.Use(middleware.GlobalAPIRateLimit())
+	// Toss webhook source IPs are shared provider infrastructure. Counting all
+	// of them in the end-user IP bucket can permanently suppress BILLING_DELETED
+	// during sustained payment traffic (there is no billing-key lookup API to
+	// recover that event). Exempt only the exact POST route and only after the
+	// direct peer/trusted proxy chain is authenticated against Toss's allowlist.
+	apiRouter.Use(middleware.GlobalAPIRateLimitExcept(isTrustedTossWebhookForGlobalRateLimit))
 	{
 		apiRouter.GET("/setup", controller.GetSetup)
 		apiRouter.POST("/setup", controller.PostSetup)
@@ -62,7 +98,11 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/paypal/webhook", controller.PayPalWebhook)
 		apiRouter.GET("/toss/confirm", controller.TossConfirm)
 		apiRouter.GET("/toss/fail", controller.TossFail)
-		apiRouter.POST("/toss/webhook", controller.TossWebhook)
+		// Toss does not sign general payment webhooks. Restrict the entire route
+		// to its published inbound addresses before reading the body or issuing an
+		// authoritative Payment GET; otherwise a spoofable X-Forwarded-For value
+		// could turn arbitrary traffic into merchant API quota consumption.
+		apiRouter.POST("/toss/webhook", requireTrustedTossWebhookSource, controller.TossWebhook)
 		apiRouter.GET("/subscription/toss/confirm/:trade_no", controller.SubscriptionTossBillingConfirm)
 		apiRouter.GET("/subscription/toss/fail/:trade_no", controller.SubscriptionTossBillingFail)
 		apiRouter.GET("/subscription/toss/confirm", controller.SubscriptionTossBillingConfirm)
@@ -176,6 +216,9 @@ func SetApiRouter(router *gin.Engine) {
 		adminRoute := apiRouter.Group("/admin")
 		adminRoute.Use(middleware.AdminAuth())
 		{
+			adminRoute.GET("/toss/reconciliation-events", controller.ListTossPaymentReconciliationEvents)
+			adminRoute.GET("/toss/reconciliation-events/:id", controller.GetTossPaymentReconciliationEvent)
+			adminRoute.POST("/toss/reconciliation-events/:id/resolve", controller.ResolveTossPaymentReconciliationEvent)
 			adminRoute.GET("/wallet/auto-recharge/presets", controller.ListWalletAutoRechargePresets)
 			adminRoute.POST("/wallet/auto-recharge/presets", controller.CreateWalletAutoRechargePreset)
 			adminRoute.PUT("/wallet/auto-recharge/presets/:id", controller.UpdateWalletAutoRechargePreset)
@@ -251,6 +294,7 @@ func SetApiRouter(router *gin.Engine) {
 			subscriptionRoute.POST("/creem/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestCreemPay)
 			subscriptionRoute.POST("/waffo-pancake/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestWaffoPancakePay)
 			subscriptionRoute.POST("/toss/pay", middleware.CriticalRateLimit(), controller.SubscriptionRequestTossBilling)
+			subscriptionRoute.DELETE("/toss/pending/:trade_no", controller.CancelPendingTossSubscriptionOrder)
 			subscriptionRoute.POST("/toss/cancel", controller.CancelTossAutoRenew)
 		}
 		subscriptionAdminRoute := apiRouter.Group("/subscription/admin")
@@ -279,6 +323,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			optionRoute.GET("/", controller.GetOptions)
 			optionRoute.PUT("/", controller.UpdateOption)
+			optionRoute.PUT("/toss", controller.UpdateTossOptions)
 			optionRoute.POST("/payment_compliance", controller.ConfirmPaymentCompliance)
 			optionRoute.GET("/channel_affinity_cache", controller.GetChannelAffinityCacheStats)
 			optionRoute.DELETE("/channel_affinity_cache", controller.ClearChannelAffinityCache)
