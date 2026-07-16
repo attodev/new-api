@@ -5,7 +5,6 @@ import (
 	"embed"
 	"html/template"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -29,9 +28,7 @@ type ThemeAssets struct {
 // webPageData is the data passed to the shared header/footer partials so
 // they can highlight the active nav item and point links at the right page.
 type webPageData struct {
-	Active             string // "about" (index pages) or "guide" (guide pages)
-	GoogleAnalyticsID  string
-	GoogleTagManagerID string
+	Active string // "about" (index pages) or "guide" (guide pages)
 }
 
 // renderWebTemplate executes a named template from tmpl with the given
@@ -39,9 +36,7 @@ type webPageData struct {
 func renderWebTemplate(tmpl *template.Template, name string, active string) []byte {
 	var buf bytes.Buffer
 	data := webPageData{
-		Active:             active,
-		GoogleAnalyticsID:  os.Getenv("GOOGLE_ANALYTICS_ID"),
-		GoogleTagManagerID: os.Getenv("GOOGLE_TAG_MANAGER_ID"),
+		Active: active,
 	}
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		common.SysLog("failed to render web template " + name + ": " + err.Error())

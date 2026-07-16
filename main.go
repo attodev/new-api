@@ -201,7 +201,6 @@ func main() {
 
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
-	InjectGoogleTagManager()
 
 	router.SetRouter(server, router.ThemeAssets{
 		DefaultBuildFS:   buildFS,
@@ -247,46 +246,24 @@ func InjectUmamiAnalytics() {
 }
 
 func InjectGoogleAnalytics() {
+	const gaID = "G-Z73Y7213LF"
 	analyticsInjectBuilder := &strings.Builder{}
-	if os.Getenv("GOOGLE_ANALYTICS_ID") != "" {
-		gaID := os.Getenv("GOOGLE_ANALYTICS_ID")
-		// Google Analytics 4 (gtag.js)
-		analyticsInjectBuilder.WriteString("<script async src=\"https://www.googletagmanager.com/gtag/js?id=")
-		analyticsInjectBuilder.WriteString(gaID)
-		analyticsInjectBuilder.WriteString("\"></script>")
-		analyticsInjectBuilder.WriteString("<script>")
-		analyticsInjectBuilder.WriteString("window.dataLayer = window.dataLayer || [];")
-		analyticsInjectBuilder.WriteString("function gtag(){dataLayer.push(arguments);}")
-		analyticsInjectBuilder.WriteString("gtag('js', new Date());")
-		analyticsInjectBuilder.WriteString("gtag('config', '")
-		analyticsInjectBuilder.WriteString(gaID)
-		analyticsInjectBuilder.WriteString("');")
-		analyticsInjectBuilder.WriteString("</script>")
-	}
+	analyticsInjectBuilder.WriteString("<script async src=\"https://www.googletagmanager.com/gtag/js?id=")
+	analyticsInjectBuilder.WriteString(gaID)
+	analyticsInjectBuilder.WriteString("\"></script>")
+	analyticsInjectBuilder.WriteString("<script>")
+	analyticsInjectBuilder.WriteString("window.dataLayer = window.dataLayer || [];")
+	analyticsInjectBuilder.WriteString("function gtag(){dataLayer.push(arguments);}")
+	analyticsInjectBuilder.WriteString("gtag('js', new Date());")
+	analyticsInjectBuilder.WriteString("gtag('config', '")
+	analyticsInjectBuilder.WriteString(gaID)
+	analyticsInjectBuilder.WriteString("');")
+	analyticsInjectBuilder.WriteString("</script>")
 	analyticsInjectBuilder.WriteString("<!--Google Analytics QuantumNous-->\n")
 	analyticsInject := []byte(analyticsInjectBuilder.String())
 	placeholder := []byte("<!--Google Analytics-->\n")
 	indexPage = bytes.ReplaceAll(indexPage, placeholder, analyticsInject)
 	classicIndexPage = bytes.ReplaceAll(classicIndexPage, placeholder, analyticsInject)
-}
-
-func InjectGoogleTagManager() {
-	gtmID := os.Getenv("GOOGLE_TAG_MANAGER_ID")
-	headInject := "<!--Google Tag Manager QuantumNous-->\n"
-	bodyInject := "<!--Google Tag Manager (noscript) QuantumNous-->\n"
-	if gtmID != "" {
-		headInject = "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':" +
-			"new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0]," +
-			"j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=" +
-			"'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);" +
-			"})(window,document,'script','dataLayer','" + gtmID + "');</script>" + headInject
-		bodyInject = "<noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=" + gtmID +
-			"\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>" + bodyInject
-	}
-	for _, page := range []*[]byte{&indexPage, &classicIndexPage} {
-		*page = bytes.ReplaceAll(*page, []byte("<!--Google Tag Manager-->\n"), []byte(headInject))
-		*page = bytes.ReplaceAll(*page, []byte("<!--Google Tag Manager (noscript)-->\n"), []byte(bodyInject))
-	}
 }
 
 func InitResources() error {
