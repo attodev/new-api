@@ -2,8 +2,10 @@
 <!doctype html>
 <html lang="ko">
   <head>
+    {{template "google_tag_manager_head" .}}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{template "google_analytics" .}}
 
     <!-- Naver Search Console -->
     <meta name="naver-site-verification" content="71114668a24c6c89523f4d6e028a223250c70321" />
@@ -92,6 +94,7 @@
     <link rel="stylesheet" href="/landing.css?v=20260715-icon-controls" />
   </head>
   <body>
+    {{template "google_tag_manager_body" .}}
     <!-- ── SECTION 1: GNB ── -->
     {{template "header_ko" .}}
 

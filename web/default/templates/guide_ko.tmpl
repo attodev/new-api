@@ -2,8 +2,10 @@
 <!doctype html>
 <html lang="ko">
   <head>
+    {{template "google_tag_manager_head" .}}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{template "google_analytics" .}}
     <title>AlRouter(알라우터) — AI API 통합 게이트웨이</title>
     <link rel="canonical" href="https://alrouter.ai/guide" />
     <link rel="alternate" hreflang="ko" href="https://alrouter.ai/guide" />
@@ -31,6 +33,7 @@
     <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
+    {{template "google_tag_manager_body" .}}
     {{template "header_ko" .}}
     <!-- ── 본문 ── -->
     <div class="guide-wrap">
