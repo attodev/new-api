@@ -111,7 +111,7 @@
             <button
               class="btn-hero-primary"
               onclick="
-                document.getElementById('contactOverlay').classList.add('open')
+                openContact(this)
               "
             >
               Contact Sales
@@ -981,7 +981,7 @@
           >
             Prices shown are estimates based on public rates.<br>
         Actual costs may vary depending on usage patterns.
-        <a href="#" onclick="document.getElementById('contactOverlay').classList.add('open');return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+        <a href="#" onclick="openContact(this);return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
           </p>
         </div>
       </div>
@@ -1227,7 +1227,7 @@
           <button
             class="btn-cta-secondary"
             onclick="
-              document.getElementById('contactOverlay').classList.add('open')
+              openContact(this)
             "
           >
             Contact Sales →
@@ -1238,11 +1238,11 @@
 
     {{template "footer_en" .}}
     <!-- Enterprise Inquiry 모달 -->
-    <div class="popup-overlay" id="contactOverlay">
-      <div class="popup-modal">
+    <div class="popup-overlay" id="contactOverlay" aria-hidden="true">
+      <div class="popup-modal" role="dialog" aria-modal="true" aria-labelledby="contactTitle" tabindex="-1">
         <div class="popup-header">
-          <h3 class="popup-title">Enterprise Inquiry</h3>
-          <button class="popup-close" id="contactClose">✕</button>
+          <h3 class="popup-title" id="contactTitle" tabindex="-1">Enterprise Inquiry</h3>
+          <button type="button" class="popup-close" id="contactClose" aria-label="Close inquiry dialog">✕</button>
         </div>
         <form id="contactForm" class="contact-form">
           <div class="popup-body">
@@ -1481,8 +1481,8 @@
         </form>
       </div>
     </div>
-      <script src="./popup.js" defer></script>
-      <script src="/landing.js?v=20260715-resume-controls" defer></script>
+      <script src="/popup.js?v=20260716-modal-a11y" defer></script>
+      <script src="/landing.js?v=20260716-modal-a11y" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

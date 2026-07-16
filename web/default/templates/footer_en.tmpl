@@ -79,14 +79,14 @@
     </footer>
 
     <!-- Popup -->
-    <div class="popup-overlay" id="popupOverlay">
-      <div class="popup-modal">
+    <div class="popup-overlay" id="popupOverlay" aria-hidden="true">
+      <div class="popup-modal" role="dialog" aria-modal="true" aria-labelledby="popupTitle" tabindex="-1">
         <div class="popup-header">
           <div class="popup-header-left">
-            <h3 class="popup-title" id="popupTitle"></h3>
+            <h3 class="popup-title" id="popupTitle" tabindex="-1"></h3>
             <p class="popup-note" id="popupNote" style="display: none"></p>
           </div>
-          <button class="popup-close" id="popupClose">✕</button>
+          <button type="button" class="popup-close" id="popupClose" aria-label="Close popup">✕</button>
         </div>
         <div class="popup-body" id="popupBody"></div>
       </div>

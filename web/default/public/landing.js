@@ -25,24 +25,19 @@ const STRINGS = {
   const result = document.getElementById("contactResult");
   if (!overlay || !form || !result) return;
 
+  const contactDialog = window.createAccessibleModal({
+    overlay,
+    initialFocus: () => form.querySelector('[name="org"]'),
+  });
+
+  window.openContact = (opener) => contactDialog.open(opener);
+
   function closeContact() {
-    overlay.classList.remove("open");
+    contactDialog.close();
   }
   document
     .getElementById("contactClose")
     .addEventListener("click", closeContact);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeContact();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeContact();
-  });
-  new MutationObserver(() => {
-    document.body.style.overflow = overlay.classList.contains("open")
-      ? "hidden"
-      : "";
-  }).observe(overlay, { attributes: true, attributeFilter: ["class"] });
-
   // 도입 규모 탭 전환
   document
     .querySelectorAll('input[name="scale_type"]')

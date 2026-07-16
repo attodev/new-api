@@ -28,8 +28,137 @@ const POPUP_CONTENTS = {
   pricing: { title: POPUP_STRINGS.popupPricing, wide: true, dynamic: true },
 };
 
+const MODAL_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'area[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'iframe',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function createAccessibleModal({ overlay, initialFocus, onClose }) {
+  if (!overlay) return null;
+
+  const modal = overlay.querySelector('.popup-modal');
+  const backgroundState = new Map();
+  let trigger = null;
+
+  // The shared popup is rendered inside the footer template. Moving overlays to
+  // the body allows every other top-level region to become inert while open.
+  if (overlay.parentElement !== document.body) {
+    document.body.appendChild(overlay);
+  }
+
+  function getFocusableElements() {
+    return Array.from(modal.querySelectorAll(MODAL_FOCUSABLE_SELECTOR)).filter(
+      (element) => element.getClientRects().length > 0,
+    );
+  }
+
+  function setBackgroundInert(isInert) {
+    if (isInert) {
+      backgroundState.clear();
+      Array.from(document.body.children).forEach((element) => {
+        if (element === overlay) return;
+        backgroundState.set(element, element.inert);
+        element.inert = true;
+      });
+      return;
+    }
+
+    backgroundState.forEach((wasInert, element) => {
+      if (element.isConnected) element.inert = wasInert;
+    });
+    backgroundState.clear();
+  }
+
+  function focusInitialElement() {
+    const target = initialFocus?.() || getFocusableElements()[0] || modal;
+    target.focus({ preventScroll: true });
+  }
+
+  function open(opener = document.activeElement) {
+    if (overlay.classList.contains('open')) return;
+    trigger = opener instanceof HTMLElement ? opener : null;
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setBackgroundInert(true);
+    requestAnimationFrame(focusInitialElement);
+  }
+
+  function close() {
+    if (!overlay.classList.contains('open')) return;
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    setBackgroundInert(false);
+
+    const returnTarget = trigger;
+    trigger = null;
+    if (returnTarget?.isConnected) {
+      requestAnimationFrame(() => returnTarget.focus({ preventScroll: true }));
+    }
+    onClose?.();
+  }
+
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+  });
+
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const focusable = getFocusableElements();
+    if (focusable.length === 0) {
+      event.preventDefault();
+      modal.focus({ preventScroll: true });
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!focusable.includes(document.activeElement)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  return { open, close };
+}
+
+window.createAccessibleModal = createAccessibleModal;
+
+const popupOverlay = document.getElementById('popupOverlay');
+function resetPopupContent() {
+  popupOverlay.querySelector('.popup-modal').classList.remove('wide', 'pricing');
+  document.getElementById('popupBody').replaceChildren();
+}
+
+const popupDialog = createAccessibleModal({
+  overlay: popupOverlay,
+  initialFocus: () => document.getElementById('popupTitle'),
+  onClose: resetPopupContent,
+});
+
 function openPopup(title, key) {
-  const overlay = document.getElementById('popupOverlay');
+  const overlay = popupOverlay;
   const modal   = overlay.querySelector('.popup-modal');
   const body    = document.getElementById('popupBody');
   const item    = POPUP_CONTENTS[key] || {};
@@ -43,7 +172,16 @@ function openPopup(title, key) {
 
   if (item.iframe) {
     modal.classList.add('wide');
-    body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
+    const iframe = document.createElement('iframe');
+    iframe.className = 'popup-iframe';
+    iframe.src = item.iframe;
+    iframe.title = item.title || title;
+    iframe.addEventListener('load', () => {
+      iframe.contentDocument?.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closePopup();
+      });
+    });
+    body.replaceChildren(iframe);
   } else if (item.dynamic && key === 'pricing') {
     modal.classList.add('wide');
     renderPricingTable(body);
@@ -55,8 +193,7 @@ function openPopup(title, key) {
     body.innerHTML = item.body || '';
   }
 
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  popupDialog.open();
 }
 
 async function renderPricingTable(body) {
@@ -155,17 +292,7 @@ async function renderPricingTable(body) {
 }
 
 function closePopup() {
-  const overlay = document.getElementById('popupOverlay');
-  overlay.classList.remove('open');
-  overlay.querySelector('.popup-modal').classList.remove('wide');
-  document.getElementById('popupBody').innerHTML = '';
-  document.body.style.overflow = '';
+  popupDialog.close();
 }
 
 document.getElementById('popupClose').addEventListener('click', closePopup);
-document.getElementById('popupOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closePopup();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closePopup();
-});
