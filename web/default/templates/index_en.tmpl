@@ -2,8 +2,10 @@
 <!doctype html>
 <html lang="en">
   <head>
+    {{template "google_tag_manager_head" .}}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{template "google_analytics" .}}
 
     <!-- Primary Meta Tags -->
     <title>AlRouter — Unified AI API Gateway</title>
@@ -88,6 +90,7 @@
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
+    {{template "google_tag_manager_body" .}}
     <!-- ── SECTION 1: GNB ── -->
     {{template "header_en" .}}
 
