@@ -91,7 +91,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css?v=20260715-icon-controls" />
+    <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
   </head>
   <body>
     {{template "google_tag_manager_body" .}}
@@ -145,6 +145,7 @@
               <video
                 id="animVideo"
                 src="/videos/main/alrouter_ko.mp4"
+                aria-label="AlRouter 서비스 소개 영상"
                 playsinline
                 preload="none"
               ></video>
@@ -929,7 +930,7 @@
                 </select>
               </div>
               <div class="calc-group">
-                <label>입력 토큰</label>
+                <label for="calcInputTokens">입력 토큰</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -942,7 +943,7 @@
                 </div>
               </div>
               <div class="calc-group">
-                <label>출력 토큰</label>
+                <label for="calcOutputTokens">출력 토큰</label>
                 <div class="calc-input-wrap">
                   <input
                     type="number"
@@ -954,11 +955,11 @@
                   <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
-              <button class="calc-btn" onclick="runCalc()">
+              <button type="button" class="calc-btn" onclick="runCalc()">
                 계산하기
               </button>
             </div>
-            <div class="calc-result" id="calcResult">
+            <div class="calc-result" id="calcResult" role="status" aria-live="polite">
               <div class="calc-result-hint" id="calcHint">모델과 토큰 수를 입력하고<br>계산하기를 눌러주세요</div>
               <div
                 class="calc-result-label"
@@ -1253,8 +1254,9 @@
         <form id="contactForm" class="contact-form">
           <div class="popup-body">
             <div class="cf-group">
-              <label>기관명<span class="cf-required">*</span></label>
+              <label for="contactOrg">기관명<span class="cf-required">*</span></label>
               <input
+                id="contactOrg"
                 type="text"
                 name="org"
                 placeholder="회사 또는 기관 이름"
@@ -1262,10 +1264,11 @@
               />
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactEmail"
                 >이메일<span class="cf-required">*</span></label
               >
               <input
+                id="contactEmail"
                 type="email"
                 name="email"
                 placeholder="example@company.com"
@@ -1273,21 +1276,20 @@
               />
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactPhone"
                 >전화번호<span class="cf-optional"
                   >(선택)</span
                 ></label
               >
               <input
+                id="contactPhone"
                 type="tel"
                 name="phone"
                 placeholder="010-0000-0000"
               />
             </div>
-            <div class="cf-group">
-              <label
-                >도입 규모<span class="cf-required">*</span></label
-              >
+            <div class="cf-group" role="group" aria-labelledby="contactScaleLabel">
+              <div class="cf-group-label" id="contactScaleLabel">도입 규모<span class="cf-required">*</span></div>
               <div class="cf-scale-tabs">
                 <div class="cf-scale-tab">
                   <input
@@ -1311,7 +1313,9 @@
               </div>
               <div id="scaleHeadField" style="display: none">
                 <div class="cf-num-wrap">
+                  <label class="sr-only" for="contactHeadcount">예상 인원수</label>
                   <input
+                    id="contactHeadcount"
                     type="number"
                     name="headcount"
                     placeholder="0"
@@ -1323,7 +1327,9 @@
               <div id="scaleTokenField">
                 <div class="cf-token-row">
                   <div class="cf-num-wrap">
+                    <label class="sr-only" for="contactInputTokens">월 예상 입력 토큰</label>
                     <input
+                      id="contactInputTokens"
                       type="number"
                       name="input_tokens"
                       placeholder="0"
@@ -1333,7 +1339,9 @@
                     <span class="cf-num-suffix">M 입력</span>
                   </div>
                   <div class="cf-num-wrap">
+                    <label class="sr-only" for="contactOutputTokens">월 예상 출력 토큰</label>
                     <input
+                      id="contactOutputTokens"
                       type="number"
                       name="output_tokens"
                       placeholder="0"
@@ -1346,12 +1354,8 @@
                 <p class="cf-scale-hint">계산기에서 산정한 월 예상 토큰량을 입력하세요.</p>
               </div>
             </div>
-            <div class="cf-group">
-              <label
-                >필요 기능<span class="cf-optional"
-                  >(선택)</span
-                ></label
-              >
+            <div class="cf-group" role="group" aria-labelledby="contactFeaturesLabel">
+              <div class="cf-group-label" id="contactFeaturesLabel">필요 기능<span class="cf-optional">(선택)</span></div>
               <div class="cf-checks">
                 <label class="cf-check"
                   ><input
@@ -1464,12 +1468,13 @@
               </div>
             </div>
             <div class="cf-group">
-              <label
+              <label for="contactNotes"
                 >기타 의견<span class="cf-optional"
                   >(선택)</span
                 ></label
               >
               <textarea
+                id="contactNotes"
                 name="notes"
                 placeholder="추가적으로 전달하고 싶은 내용을 자유롭게 작성해 주세요."
               ></textarea>
@@ -1487,8 +1492,8 @@
         </form>
       </div>
     </div>
-      <script src="/popup.js?v=20260716-modal-a11y" defer></script>
-      <script src="/landing.js?v=20260716-modal-a11y" defer></script>
+      <script src="/popup.js?v=20260716-interaction-a11y" defer></script>
+      <script src="/landing.js?v=20260716-interaction-a11y" defer></script>
       <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>
 </html>

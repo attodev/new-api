@@ -29,7 +29,7 @@
         document.head.appendChild(s);
       })(3);
     </script>
-    <link rel="stylesheet" href="/landing.css?v=20260715-icon-controls" />
+    <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
     <link rel="stylesheet" href="/guide.css" />
   </head>
   <body>
@@ -54,7 +54,7 @@
       <div class="guide-group active" id="guide-group-manual">
         <section class="guide-panel active" id="guide-panel-manual">
           <div class="guide-video-frame">
-            <video id="guideVideo" controls playsinline preload="metadata" poster="/videos/guide/guide-manual-anthropic-en-poster.png">
+            <video id="guideVideo" controls playsinline preload="metadata" aria-label="Manual environment variable setup guide video" poster="/videos/guide/guide-manual-anthropic-en-poster.png">
               <source src="/videos/guide/guide-manual-anthropic-en.mp4" type="video/mp4" />
             </video>
             <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay" data-label-start="Play video" data-label-resume="Resume video" aria-label="Play video">
@@ -248,7 +248,7 @@ responses_websockets_v2 = false</pre>
       <div class="guide-group" id="guide-group-ccswitch">
         <section class="guide-panel active" id="guide-panel-ccswitch">
           <div class="guide-video-frame">
-            <video id="guideVideoCc" controls playsinline preload="metadata" poster="/videos/guide/guide-cc-anthropic-en-poster.png">
+            <video id="guideVideoCc" controls playsinline preload="metadata" aria-label="CC Switch setup guide video" poster="/videos/guide/guide-cc-anthropic-en-poster.png">
               <source src="/videos/guide/guide-cc-anthropic-en.mp4" type="video/mp4" />
             </video>
             <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc" data-label-start="Play video" data-label-resume="Resume video" aria-label="Play video">
@@ -433,7 +433,7 @@ $ brew install --cask cc-switch</pre>
       <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="Next image">›</button>
     </div>
 
-    <script src="/popup.js?v=20260716-modal-a11y" defer></script>
+    <script src="/popup.js?v=20260716-interaction-a11y" defer></script>
     <script src="/guide.js?v=20260715-video-controls" defer></script>
     <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
   </body>

@@ -642,9 +642,10 @@ footer { background: #0f172a; border-top: 1px solid #1f2937; padding: 40px; }
         .popup-iframe { width:100%; height:100%; flex:1; border:none; border-radius:0 0 16px 16px; min-height:0; }
 
         /* ── 문의 폼 ── */
+        .sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
         .contact-form { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
         .cf-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
-        .cf-group label { font-size:13px; font-weight:600; color:#d1d5db; }
+        .cf-group label, .cf-group-label { font-size:13px; font-weight:600; color:#d1d5db; }
         .cf-required { color:#EC4899; margin-left:2px; }
         .cf-optional { font-size:11px; font-weight:400; color:#6b7280; margin-left:4px; }
         .cf-group input, .cf-group textarea {
@@ -664,15 +665,16 @@ border-color:#0EA5E9; box-shadow:0 0 0 3px rgba(14,165,233,0.15);
         .cf-num-suffix { position:absolute; right:14px; color:#9ca3af; font-size:14px; pointer-events:none; }
         .cf-scale-tabs { display:flex; gap:0; margin-bottom:10px; border-radius:8px; overflow:hidden; border:1px solid #374151; width:fit-content; }
         .cf-scale-tab { position:relative; }
-        .cf-scale-tab input[type="radio"] { display:none; }
+        .cf-scale-tab input[type="radio"] { position:absolute; width:1px; height:1px; opacity:0; }
         .cf-scale-tab label { display:block; padding:6px 16px; font-size:12px; font-weight:600; color:#9ca3af; cursor:pointer; background:#1f2937; transition:background 0.15s, color 0.15s; white-space:nowrap; }
         .cf-scale-tab input[type="radio"]:checked + label { background:#0EA5E9; color:#fff; }
+        .cf-scale-tab input[type="radio"]:focus-visible + label { outline:2px solid #7dd3fc; outline-offset:-2px; }
         .cf-token-row { display:flex; gap:10px; }
         .cf-token-row .cf-num-wrap { flex:1; }
         .cf-scale-hint { margin-top:6px; font-size:11px; color:#6b7280; }
         .cf-checks { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 16px; }
         .cf-check { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
-        .cf-check input[type="checkbox"] { display:none; }
+        .cf-check input[type="checkbox"] { position:absolute; width:1px; height:1px; opacity:0; }
         .cf-check-box {
 width:18px; height:18px; flex-shrink:0; border-radius:4px;
 border:1.5px solid #374151; background:#111827;
@@ -680,6 +682,7 @@ display:flex; align-items:center; justify-content:center;
 transition:border-color 0.15s, background 0.15s;
         }
         .cf-check input[type="checkbox"]:checked ~ .cf-check-box { background:#0EA5E9; border-color:#0EA5E9; }
+        .cf-check input[type="checkbox"]:focus-visible ~ .cf-check-box { box-shadow:0 0 0 3px rgba(125,211,252,0.35); border-color:#7dd3fc; }
         .cf-check-box svg { display:none; }
         .cf-check input[type="checkbox"]:checked ~ .cf-check-box svg { display:block; }
         .cf-check-label { font-size:13px; color:#d1d5db; }

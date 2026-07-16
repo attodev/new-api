@@ -145,6 +145,30 @@ function createAccessibleModal({ overlay, initialFocus, onClose }) {
 
 window.createAccessibleModal = createAccessibleModal;
 
+(function wireLanguageSwitch() {
+  const switcher = document.querySelector('.lang-switch');
+  const trigger = switcher?.querySelector('.lang-switch-trigger') || switcher;
+  if (!switcher || !trigger) return;
+
+  function setOpen(isOpen) {
+    switcher.classList.toggle('open', isOpen);
+    trigger.setAttribute('aria-expanded', String(isOpen));
+  }
+
+  trigger.addEventListener('click', () => {
+    setOpen(!switcher.classList.contains('open'));
+  });
+  switcher.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !switcher.classList.contains('open')) return;
+    event.preventDefault();
+    setOpen(false);
+    trigger.focus();
+  });
+  document.addEventListener('click', (event) => {
+    if (!switcher.contains(event.target)) setOpen(false);
+  });
+})();
+
 const popupOverlay = document.getElementById('popupOverlay');
 function resetPopupContent() {
   popupOverlay.querySelector('.popup-modal').classList.remove('wide', 'pricing');

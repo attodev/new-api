@@ -441,15 +441,10 @@ function runCalc() {
     `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>${STRINGS.calcOutputRate}</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
 }
 
-// ── Lucide icon init + lang-switch click handler ──
+// ── Lucide icon init ──
 if (window.lucide && typeof window.lucide.createIcons === 'function') {
   window.lucide.createIcons();
 }
-document.addEventListener("click", function (e) {
-  document.querySelectorAll(".lang-switch.open").forEach(function (el) {
-    if (!el.contains(e.target)) el.classList.remove("open");
-  });
-});
 
 // ── Scroll reveal ──
 (function () {
