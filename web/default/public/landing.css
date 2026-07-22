@@ -94,6 +94,129 @@ body {
   transition: color 0.2s;
 }
 .btn-login:hover { color: #f9fafb; }
+/* Public Sans — self-hosted, matches the dashboard font. Scoped to the
+   profile badge/dropdown only so the rest of the landing keeps its own type. */
+@font-face {
+  font-family: 'Public Sans Local';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/public-sans-latin-wght-normal.woff2') format('woff2');
+}
+.profile-menu { position: relative; display: inline-flex; }
+.profile-menu,
+.profile-dropdown {
+  font-family: 'Public Sans Local', -apple-system, 'Pretendard', 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.btn-profile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.btn-profile:hover { opacity: 0.85; }
+.profile-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 208px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.profile-menu.open .profile-dropdown { display: block; }
+.pd-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 9px;
+}
+.pd-avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pd-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pd-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #f9fafb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pd-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-dropdown a,
+.profile-dropdown .pd-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 9px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 14px;
+  font-family: inherit;
+  color: #d1d5db;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.profile-dropdown a:hover,
+.profile-dropdown .pd-logout:hover { background: #374151; color: #f9fafb; }
+.profile-dropdown a i[data-lucide],
+.profile-dropdown a svg,
+.profile-dropdown .pd-logout i[data-lucide],
+.profile-dropdown .pd-logout svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: #9ca3af;
+}
+.pd-sep { height: 1px; background: #374151; margin: 3px -6px; }
+.profile-dropdown .pd-logout { color: #f87171; }
+.profile-dropdown .pd-logout i[data-lucide],
+.profile-dropdown .pd-logout svg { color: #f87171; }
+.profile-dropdown .pd-logout:hover { background: rgba(248,113,113,0.12); color: #fca5a5; }
+.profile-dropdown .pd-logout:hover i[data-lucide],
+.profile-dropdown .pd-logout:hover svg { color: #fca5a5; }
 .btn-primary {
   background: linear-gradient(135deg, #0EA5E9, #EC4899);
   color: white;

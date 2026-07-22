@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -15,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/gin-contrib/gzip"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +34,27 @@ type ThemeAssets struct {
 // webPageData is the data passed to the shared header/footer partials so
 // they can highlight the active nav item and point links at the right page.
 type webPageData struct {
-	Active string // "about" (index pages) or "guide" (guide pages)
+	Active       string       // "about" (index pages) or "guide" (guide pages)
+	IsLoggedIn   bool         // whether the current request carries a logged-in session
+	Username     string       // logged-in user's login name, empty when not logged in
+	DisplayName  string       // shown name (display_name, falls back to username) — matches the dashboard
+	UserInitial  string       // first rune of Username, upper-cased, for the avatar badge
+	UserRole     int          // session role (0/1/10/100); templates map it to a label
+	UserGroup    string       // session user group, e.g. "default"
+	UserAvatarBg template.CSS // hash-derived avatar background, matching the dashboard
+}
+
+// avatarBg reproduces the dashboard's getUserAvatarStyle (web/default/src/lib/avatar.ts)
+// so the landing badge gets the exact same per-user color as the app.
+func avatarBg(name string) template.CSS {
+	var hash uint32
+	for _, r := range name {
+		hash = hash*31 + uint32(r)
+	}
+	hue := hash % 360
+	sat := 54 + hash%8
+	light := 52 + ((hash >> 4) % 8)
+	return template.CSS(fmt.Sprintf("hsl(%d %d%% %d%% / 0.82)", hue, sat, light))
 }
 
 // renderWebTemplate executes a named template from tmpl with the given
@@ -115,7 +137,33 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 		// on refresh without rebuilding the binary.
 		common.SysLog("web dev mode enabled (DEBUG=true): templates/public served live from disk")
 		render := func(c *gin.Context, name string, active string) {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", renderWebTemplate(devWebTemplates(), name, active))
+			session := sessions.Default(c)
+			data := webPageData{
+				Active:     active,
+				IsLoggedIn: session.Get("id") != nil,
+			}
+			if u, ok := session.Get("username").(string); ok {
+				data.Username = u
+				data.DisplayName = u
+				if r := []rune(u); len(r) > 0 {
+					data.UserInitial = strings.ToUpper(string(r[0]))
+				}
+				data.UserAvatarBg = avatarBg(u)
+			}
+			if dn, ok := session.Get("display_name").(string); ok && dn != "" {
+				data.DisplayName = dn
+			}
+			if r, ok := session.Get("role").(int); ok {
+				data.UserRole = r
+			}
+			if g, ok := session.Get("group").(string); ok {
+				data.UserGroup = g
+			}
+			var buf bytes.Buffer
+			if err := devWebTemplates().ExecuteTemplate(&buf, name, data); err != nil {
+				common.SysLog("failed to render web template " + name + ": " + err.Error())
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
 		}
 		router.GET("/", func(c *gin.Context) {
 			acceptLang := c.GetHeader("Accept-Language")

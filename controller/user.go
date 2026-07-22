@@ -98,6 +98,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 	session := sessions.Default(c)
 	session.Set("id", user.Id)
 	session.Set("username", user.Username)
+	session.Set("display_name", user.DisplayName)
 	session.Set("role", user.Role)
 	session.Set("status", user.Status)
 	session.Set("group", user.Group)

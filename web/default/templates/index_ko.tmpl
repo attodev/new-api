@@ -92,7 +92,7 @@
     </script>
     <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
   </head>
-  <body>
+  <body data-logged-in="{{if .IsLoggedIn}}true{{else}}false{{end}}">
     <!-- ── SECTION 1: GNB ── -->
     {{template "header_ko" .}}
 
@@ -1113,7 +1113,8 @@
       </div>
     </div>
 
-    <!-- ── SECTION 9: PRICING PREVIEW ── -->
+    <!-- ── SECTION 9: PRICING PREVIEW (임시 비활성화) ── -->
+    {{if false}}
     <div class="pricing-section" id="pricing">
       <div class="pricing-inner">
         <span class="section-tag">가격</span>
@@ -1210,6 +1211,7 @@
         </div>
       </div>
     </div>
+    {{end}}
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">

@@ -48,7 +48,26 @@
           <i data-lucide="languages"></i>
           <div class="lang-dropdown" id="languageMenu"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}" lang="en">English</a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}" lang="ko" aria-current="page">한국어<span class="check">✓</span></a></div>
         </button>
+        {{if .IsLoggedIn}}
+        <div class="profile-menu">
+          <button type="button" class="btn-profile profile-menu-trigger" aria-haspopup="true" aria-expanded="false" aria-label="{{.DisplayName}} 계정 메뉴" title="{{.DisplayName}}" style="background-color:{{.UserAvatarBg}}">{{.UserInitial}}</button>
+          <div class="profile-dropdown" role="menu">
+            <div class="pd-head">
+              <span class="pd-avatar" style="background-color:{{.UserAvatarBg}}">{{.UserInitial}}</span>
+              <span class="pd-info">
+                <span class="pd-name">{{.DisplayName}}</span>
+                <span class="pd-sub">{{if eq .UserRole 100}}슈퍼 관리자{{else if eq .UserRole 10}}관리자{{else if eq .UserRole 1}}사용자{{else}}게스트{{end}}{{if .UserGroup}} · {{.UserGroup}}{{end}}</span>
+              </span>
+            </div>
+            <div class="pd-sep"></div>
+            <a href="/dashboard" role="menuitem"><i data-lucide="layout-dashboard"></i><span>대시보드</span></a>
+            <div class="pd-sep"></div>
+            <button type="button" class="pd-logout" role="menuitem"><i data-lucide="log-out"></i><span>로그아웃</span></button>
+          </div>
+        </div>
+        {{else}}
         <a href="/sign-in" class="btn-login">로그인</a>
+        {{end}}
         <a href="/sign-in" class="btn-primary" hidden>체험해보기</a>
       </div>
       <button class="gnb-hamburger" aria-label="메뉴 열기" aria-expanded="false">

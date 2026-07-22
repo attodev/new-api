@@ -99,18 +99,25 @@ export function ProfileDropdown() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/wallet' })}>
+          <DropdownMenuItem
+            className='cursor-pointer'
+            onClick={() => navigate({ to: '/wallet' })}
+          >
             <Wallet className='size-4' />
             {t('Wallet')}
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+          <DropdownMenuItem
+            className='cursor-pointer'
+            onClick={() => navigate({ to: '/profile' })}
+          >
             <User className='size-4' />
             {t('Profile')}
           </DropdownMenuItem>
 
           {isSuperAdmin && (
             <DropdownMenuItem
+              className='cursor-pointer'
               onClick={() =>
                 navigate({
                   to: '/system-settings/site/$section',
@@ -125,7 +132,11 @@ export function ProfileDropdown() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem variant='destructive' onClick={() => setOpen(true)}>
+          <DropdownMenuItem
+            className='cursor-pointer'
+            variant='destructive'
+            onClick={() => setOpen(true)}
+          >
             <LogOut className='size-4' />
             {t('Sign out')}
           </DropdownMenuItem>

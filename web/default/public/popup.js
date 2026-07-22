@@ -169,6 +169,43 @@ window.createAccessibleModal = createAccessibleModal;
   });
 })();
 
+(function wireProfileMenu() {
+  const menu = document.querySelector('.profile-menu');
+  const trigger = menu?.querySelector('.profile-menu-trigger');
+  if (!menu || !trigger) return;
+
+  function setOpen(isOpen) {
+    menu.classList.toggle('open', isOpen);
+    trigger.setAttribute('aria-expanded', String(isOpen));
+  }
+
+  trigger.addEventListener('click', () => {
+    setOpen(!menu.classList.contains('open'));
+  });
+  menu.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !menu.classList.contains('open')) return;
+    event.preventDefault();
+    setOpen(false);
+    trigger.focus();
+  });
+  document.addEventListener('click', (event) => {
+    if (!menu.contains(event.target)) setOpen(false);
+  });
+
+  const logoutBtn = menu.querySelector('.pd-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      logoutBtn.disabled = true;
+      try {
+        await fetch('/api/user/logout', { method: 'GET', credentials: 'same-origin' });
+      } catch (e) {
+        /* 로그아웃 요청 실패해도 새로고침으로 상태 재확인 */
+      }
+      window.location.reload();
+    });
+  }
+})();
+
 const popupOverlay = document.getElementById('popupOverlay');
 function resetPopupContent() {
   popupOverlay.querySelector('.popup-modal').classList.remove('wide', 'pricing');

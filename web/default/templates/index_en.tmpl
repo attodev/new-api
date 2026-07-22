@@ -88,7 +88,7 @@
     </script>
     <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
   </head>
-  <body>
+  <body data-logged-in="{{if .IsLoggedIn}}true{{else}}false{{end}}">
     <!-- ── SECTION 1: GNB ── -->
     {{template "header_en" .}}
 
@@ -1108,7 +1108,8 @@
       </div>
     </div>
 
-    <!-- ── SECTION 9: PRICING PREVIEW ── -->
+    <!-- ── SECTION 9: PRICING PREVIEW (temporarily disabled) ── -->
+    {{if false}}
     <div class="pricing-section" id="pricing">
       <div class="pricing-inner">
         <span class="section-tag">Pricing</span>
@@ -1205,6 +1206,7 @@
         </div>
       </div>
     </div>
+    {{end}}
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">
