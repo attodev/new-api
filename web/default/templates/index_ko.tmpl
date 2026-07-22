@@ -53,7 +53,7 @@
       "offers": {
         "@type": "Offer",
         "priceCurrency": "KRW",
-        "description": "사용량 기반 요금제, 공식가 대비 최대 10% 절감"
+        "description": "사용량 기반 요금제"
       },
       "provider": {
         "@type": "Organization",
@@ -106,8 +106,8 @@
           <h1>AI 도입했는데,<br>비용이 <span class="highlight">감당이 안 되시나요?</span></h1>
           <p class="hero-sub">OpenAI, Claude, Gemini — 모델마다 따로 계약하고,<br>
         예산은 초과되고, 누가 얼마나 쓰는지도 모르고.<br><br>
-        AlRouter 하나로 전부 통합하고,<br>
-        공식 가격보다 <strong style="color:#EC4899">최대 10% 절약</strong>하세요.</p>
+        AlRouter 하나로 전부 통합하고<br>
+        편하게 관리하세요.</p>
           <div class="hero-cta">
             <a href="/sign-in" class="btn-hero-primary" hidden>체험해보기 →</a>
             <button
@@ -120,10 +120,6 @@
             </button>
           </div>
           <div class="hero-stats">
-            <div class="stat-item">
-              <div class="stat-value">10%</div>
-              <div class="stat-label">최대 비용 절감</div>
-            </div>
             <div class="stat-item">
               <div class="stat-value">₩0</div>
               <div class="stat-label">월 구독료</div>
@@ -276,7 +272,7 @@
         <span class="section-tag">해결책</span>
         <h2>AlRouter가 해결합니다</h2>
         <p class="section-sub">
-          하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 관리하고, 공식 가격보다 저렴하게 쓰세요.
+          하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 편하게 관리하세요.
         </p>
 
         <!-- 가로 트리 다이어그램 -->
@@ -852,7 +848,7 @@
           "
         >
           <div class="diagram-result-item">
-            <i data-lucide="circle-dollar-sign"></i> 최대 10% 비용 절감
+            <i data-lucide="layers"></i> 주요 AI 모델 통합
           </div>
           <div class="diagram-result-item">
             <i data-lucide="sliders-horizontal"></i> 사용자별 쿼터 제어
@@ -869,47 +865,11 @@
 
     <!-- ── SECTION 6: FEATURE - COST ── -->
     <div class="section feature-section">
-      <div class="feature-grid">
-        <div class="feature-content">
-          <span class="section-tag">비용 절감</span>
-          <h2>공식 가격보다<br>최대 10% 저렴하게</h2>
-          <p>AlRouter를 통해 주요 AI 모델을 공식 API보다 할인된 가격으로 사용하세요.<br>사용한 만큼만 청구됩니다.</p>
-          <table class="price-table">
-            <thead>
-              <tr>
-                <th>모델</th>
-                <th>가격</th>
-                <th>절감</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>gpt-5-mini</td>
-                <td
-                  rowspan="3"
-                  style="text-align: center; vertical-align: middle"
-                >
-                  공식 가격
-                </td>
-                <td
-                  rowspan="3"
-                  class="discount-pct"
-                  style="text-align: center; vertical-align: middle"
-                >
-                  -10%
-                </td>
-              </tr>
-              <tr>
-                <td>claude-sonnet-4.6</td>
-              </tr>
-              <tr>
-                <td>gemini-3.1-pro</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="payg-badge">💳 Pay-as-you-go — 쓴 만큼만. 최소 약정 없음.</div>
-        </div>
-        <div class="feature-visual">
+      <div class="cost-calc-inner">
+        <span class="section-tag">비용 계산</span>
+        <h2>도입 비용을 계산해보세요</h2>
+        <p class="section-sub">약정 금액에 따라 할인율은 달라질 수 있습니다.</p>
+        <div class="feature-visual cost-calc-card">
           <div class="calc-card-header">
             <span class="calc-card-title">AI 도입 비용 계산기</span>
             <a
