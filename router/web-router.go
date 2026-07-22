@@ -57,6 +57,36 @@ func avatarBg(name string) template.CSS {
 	return template.CSS(fmt.Sprintf("hsl(%d %d%% %d%% / 0.82)", hue, sat, light))
 }
 
+// buildWebPageData reads the current request session and assembles the data
+// the shared header/footer partials need, including the logged-in badge
+// fields. Shared by the dev and production render paths so the landing
+// reflects the current login state.
+func buildWebPageData(c *gin.Context, active string) webPageData {
+	session := sessions.Default(c)
+	data := webPageData{
+		Active:     active,
+		IsLoggedIn: session.Get("id") != nil,
+	}
+	if u, ok := session.Get("username").(string); ok {
+		data.Username = u
+		data.DisplayName = u
+		if r := []rune(u); len(r) > 0 {
+			data.UserInitial = strings.ToUpper(string(r[0]))
+		}
+		data.UserAvatarBg = avatarBg(u)
+	}
+	if dn, ok := session.Get("display_name").(string); ok && dn != "" {
+		data.DisplayName = dn
+	}
+	if r, ok := session.Get("role").(int); ok {
+		data.UserRole = r
+	}
+	if g, ok := session.Get("group").(string); ok {
+		data.UserGroup = g
+	}
+	return data
+}
+
 // renderWebTemplate executes a named template from tmpl with the given
 // active-nav context and returns the resulting bytes, or nil on error.
 func renderWebTemplate(tmpl *template.Template, name string, active string) []byte {
@@ -137,30 +167,8 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 		// on refresh without rebuilding the binary.
 		common.SysLog("web dev mode enabled (DEBUG=true): templates/public served live from disk")
 		render := func(c *gin.Context, name string, active string) {
-			session := sessions.Default(c)
-			data := webPageData{
-				Active:     active,
-				IsLoggedIn: session.Get("id") != nil,
-			}
-			if u, ok := session.Get("username").(string); ok {
-				data.Username = u
-				data.DisplayName = u
-				if r := []rune(u); len(r) > 0 {
-					data.UserInitial = strings.ToUpper(string(r[0]))
-				}
-				data.UserAvatarBg = avatarBg(u)
-			}
-			if dn, ok := session.Get("display_name").(string); ok && dn != "" {
-				data.DisplayName = dn
-			}
-			if r, ok := session.Get("role").(int); ok {
-				data.UserRole = r
-			}
-			if g, ok := session.Get("group").(string); ok {
-				data.UserGroup = g
-			}
 			var buf bytes.Buffer
-			if err := devWebTemplates().ExecuteTemplate(&buf, name, data); err != nil {
+			if err := devWebTemplates().ExecuteTemplate(&buf, name, buildWebPageData(c, active)); err != nil {
 				common.SysLog("failed to render web template " + name + ": " + err.Error())
 			}
 			c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
@@ -190,29 +198,40 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 		publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
 		webTmpl := template.Must(template.ParseFS(assets.TemplatesFS, "web/default/templates/*.tmpl"))
 
+		// Anonymous versions are rendered once and served as-is on the hot path
+		// (most landing traffic is logged-out). Logged-in requests are rendered
+		// per-request so the profile badge reflects the current user.
 		landingKo := renderWebTemplate(webTmpl, "index_ko", "about")
 		landingEn := renderWebTemplate(webTmpl, "index_en", "about")
 		guideKo := renderWebTemplate(webTmpl, "guide_ko", "guide")
 		guideEn := renderWebTemplate(webTmpl, "guide_en", "guide")
 
+		serve := func(c *gin.Context, name string, active string, anon []byte) {
+			if sessions.Default(c).Get("id") == nil {
+				c.Data(http.StatusOK, "text/html; charset=utf-8", anon)
+				return
+			}
+			var buf bytes.Buffer
+			if err := webTmpl.ExecuteTemplate(&buf, name, buildWebPageData(c, active)); err != nil {
+				common.SysLog("failed to render web template " + name + ": " + err.Error())
+				c.Data(http.StatusOK, "text/html; charset=utf-8", anon)
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
+		}
+
 		// Landing page routes — served before the SPA static handler
 		router.GET("/", func(c *gin.Context) {
 			acceptLang := c.GetHeader("Accept-Language")
 			if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
-				c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
+				serve(c, "index_en", "about", landingEn)
 			} else {
-				c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
+				serve(c, "index_ko", "about", landingKo)
 			}
 		})
-		router.GET("/en", func(c *gin.Context) {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
-		})
-		router.GET("/guide", func(c *gin.Context) {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", guideKo)
-		})
-		router.GET("/en/guide", func(c *gin.Context) {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", guideEn)
-		})
+		router.GET("/en", func(c *gin.Context) { serve(c, "index_en", "about", landingEn) })
+		router.GET("/guide", func(c *gin.Context) { serve(c, "guide_ko", "guide", guideKo) })
+		router.GET("/en/guide", func(c *gin.Context) { serve(c, "guide_en", "guide", guideEn) })
 
 		// Legacy filename URLs — redirect to the clean equivalents so old
 		// bookmarks/links still work but the address bar no longer shows .html
