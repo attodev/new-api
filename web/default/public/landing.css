@@ -626,7 +626,7 @@ body {
 /* 직접입력 행: 아래 입력 토큰/출력 토큰과 동일한 폭·스타일(.calc-input-wrap)로 채움 */
 .calc-disc-custom input { text-align:left; }
 /* empty-input hint */
-.calc-hint { min-height:16px; margin-bottom:10px; font-size:11.5px; color:#fbbf24; text-align:center; }
+.calc-hint { min-height:16px; margin:10px; font-size:11.5px; color:#fbbf24; text-align:center; }
 .calc-contact-link { color:#EC4899; text-decoration:underline; transition:color 0.15s; }
 .calc-contact-link:hover { color:#f472b6; }
 .calc-disclaimer { margin-top:20px; padding-top:16px; border-top:1px solid #374151; font-size:11px; color:#6b7280; line-height:1.6; }
