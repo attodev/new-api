@@ -866,9 +866,9 @@
     <!-- ── SECTION 6: FEATURE - COST ── -->
     <div class="section feature-section">
       <div class="cost-calc-inner">
-        <span class="section-tag">비용 계산</span>
-        <h2>도입 비용을 계산해보세요</h2>
-        <p class="section-sub">약정 금액에 따라 할인율은 달라질 수 있습니다.</p>
+        <span class="section-tag">비용 절감</span>
+        <h2>공식 가격보다 저렴하게</h2>
+        <p class="section-sub">AlRouter를 통해 주요 AI 모델을 공식 API보다 저렴한 가격으로 사용하세요.<br>사용한 만큼만 청구됩니다.</p>
         <div class="feature-visual cost-calc-card">
           <div class="calc-card-header">
             <span class="calc-card-title">AI 도입 비용 계산기</span>
@@ -881,70 +881,103 @@
           </div>
           <div class="calc-body">
             <div class="calc-form">
+              <div class="calc-fields">
               <div class="calc-group">
                 <label for="calcModel">모델 선택</label>
-                <select class="calc-select" id="calcModel">
+                <select class="calc-select" id="calcModel" onchange="updateCalcUnitLabels()">
                   <option value="">모델 불러오는 중…</option>
                 </select>
               </div>
+              {{if .IsLoggedIn}}
               <div class="calc-group">
-                <label for="calcInputTokens">입력 토큰</label>
+                <label for="calcDiscount">할인율</label>
+                <div class="calc-discount-badges">
+                  <button type="button" class="calc-disc-badge active" data-disc="0" onclick="setCalcDiscount(0, this)">0%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="5" onclick="setCalcDiscount(5, this)">5%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="10" onclick="setCalcDiscount(10, this)">10%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="15" onclick="setCalcDiscount(15, this)">15%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="20" onclick="setCalcDiscount(20, this)">20%</button>
+                </div>
+                <div class="calc-input-wrap calc-disc-custom">
+                  <input
+                    type="text"
+                    id="calcDiscount"
+                    value="0"
+                    placeholder="0~100"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    oninput="onCalcDiscountInput(this)"
+                  />
+                  <span class="calc-input-suffix">%</span>
+                </div>
+                <p class="calc-commit-note">약정 금액에 따라 할인율은 달라질 수 있습니다.</p>
+              </div>
+              {{end}}
+              <div class="calc-group">
+                <div class="calc-label-row">
+                  <label for="calcInputTokens">입력 토큰</label>
+                  <span class="calc-unit" id="calcInUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcInputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
               <div class="calc-group">
-                <label for="calcOutputTokens">출력 토큰</label>
+                <div class="calc-label-row">
+                  <label for="calcOutputTokens">출력 토큰</label>
+                  <span class="calc-unit" id="calcOutUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcOutputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
-              <button type="button" class="calc-btn" onclick="runCalc()">
-                계산하기
-              </button>
-            </div>
-            <div class="calc-result" id="calcResult" role="status" aria-live="polite">
-              <div class="calc-result-hint" id="calcHint">모델과 토큰 수를 입력하고<br>계산하기를 눌러주세요</div>
-              <div
-                class="calc-result-label"
-                id="calcLabel"
-                style="display: none"
-              >
-                예상 비용
               </div>
-              <div
-                class="calc-result-price"
-                id="calcPrice"
-                style="display: none"
-              ></div>
-              <div class="calc-breakdown" id="calcBreakdown"></div>
+              <div class="calc-btn-wrap">
+                <p class="calc-hint" id="calcHint"></p>
+                <button type="button" class="calc-btn" onclick="addCalcItem()">
+                  + 목록에 추가하기
+                </button>
+              </div>
+            </div>
+            <div class="calc-cart">
+              <div class="calc-cart-total">
+                <span class="calc-cart-total-label">총 예상 비용</span>
+                <div class="calc-cart-total-price" id="calcTotal">$0.00</div>
+                {{if .IsLoggedIn}}<div class="calc-total-discount" id="calcTotalDiscount"></div>{{end}}
+              </div>
+              <div class="calc-cart-head">
+                <span class="calc-cart-head-label">견적 항목 (<span id="calcItemCount">0</span>)</span>
+                <button type="button" class="calc-cart-clear" onclick="clearCalcItems()">전체 삭제</button>
+              </div>
+              <div class="calc-cart-list" id="calcItemList" role="status" aria-live="polite">
+                <div class="calc-cart-empty">모델과 토큰을 입력하고<br>‘+ 목록에 추가하기’를 눌러주세요.</div>
+              </div>
             </div>
           </div>
-          <p
-            style="
-              margin-top: 14px;
-              font-size: 11px;
-              color: #6b7280;
-              line-height: 1.6;
-            "
-          >
-            위 금액은 공개 단가 기준 예상치입니다.<br>
-        실제 도입 비용은 사용 패턴에 따라 달라질 수 있으니
-        <a href="#" onclick="openContact(this);return false;" style="color:#EC4899; text-decoration:underline;">기업 도입 문의</a>로
+          <p class="calc-disclaimer">
+            * 위 금액은 공개 단가 기준 예상치입니다.<br>
+            * 실제 도입 비용은 사용 패턴에 따라 달라질 수 있으니
+        <a href="#" onclick="openContact(this);return false;" class="calc-contact-link">기업 도입 문의</a>로
         정확한 견적을 받아보세요.
           </p>
         </div>

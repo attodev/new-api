@@ -10,6 +10,19 @@ body {
   font-family: -apple-system, 'Pretendard', 'Noto Sans KR', sans-serif;
 }
 
+/* ── custom scrollbar (landing page + calculator) ── */
+* { scrollbar-width: thin; scrollbar-color: #374151 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #4b5563; background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
 /* ── 1. GNB ── */
 .gnb {
   display: flex;
@@ -465,7 +478,7 @@ body {
   font-size: 12px;
   color: #0EA5E9;
   font-weight: 600;
-  flex: 0 0 160px;
+  flex: 0 0 180px;
 }
 
 /* ── 6. FEATURE: COST ── */
@@ -477,10 +490,12 @@ body {
 .feature-content p { font-size: 15px; color: #9ca3af; line-height: 1.7; margin-bottom: 24px; }
 /* SECTION 6: cost calculator — single centered column, calculator widened
    in advance for the upcoming calculator refactoring. */
-.cost-calc-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
+.cost-calc-inner { max-width: 1200px; margin: 0 auto; padding: 0 48px; text-align: center; }
 .cost-calc-inner h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
 .cost-calc-inner .section-sub { max-width: 560px; margin: 0 auto 40px; text-align: center; }
-.cost-calc-card { max-width: 720px; margin: 0 auto; text-align: left; }
+.cost-calc-card { max-width: 920px; margin: 0 auto; text-align: left; }
+/* commitment note under the calculator title (logged-in only) — kept prominent */
+.calc-commit-note { margin: 6px 0 0; font-size: 11.5px; font-weight: 500; color: #7dd3fc; }
 .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .price-table th {
   background: #374151;
@@ -530,11 +545,44 @@ body {
 
 /* ── AI 비용 계산기 ── */
 .calc-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-.calc-card-title { font-size:14px; font-weight:700; color:#f9fafb; }
+.calc-card-title { font-size:15px; font-weight:700; color:#f9fafb; }
 .calc-card-link { font-size:11px; color:#6b7280; text-decoration:none; text-transform:uppercase; letter-spacing:0.06em; transition:color 0.2s; white-space:nowrap; }
 .calc-card-link:hover { color:#0EA5E9; }
-.calc-body { display:flex; gap:16px; align-items:stretch; }
-.calc-form { flex:1; display:flex; flex-direction:column; gap:12px; min-width:0; }
+.calc-body { display:grid; grid-template-columns:4fr 7fr; gap:36px; align-items:stretch; }
+.calc-form { display:flex; flex-direction:column; justify-content:space-between; min-width:0; padding: 10px 0; }
+.calc-fields { display:flex; flex-direction:column; gap:14px; }
+.calc-btn-wrap { display:flex; flex-direction:column; }
+.calc-label-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.calc-label-row label { margin:0; }
+.calc-unit { font-size:11px; font-weight:600; color:#9ca3af; text-transform:none; letter-spacing:0; white-space:nowrap; }
+/* cart (right column) */
+.calc-cart { display:flex; flex-direction:column; background:#111827; border:1px solid #1c2b4e; border-radius:14px; padding:20px; min-width:0; }
+.calc-cart-total { text-align:center; padding-bottom:16px; border-bottom:1px solid #243042; }
+.calc-cart-total-label { font-size:11px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.08em; }
+.calc-cart-total-price { font-size:34px; font-weight:800; color:#0EA5E9; line-height:1.1; margin-top:4px; }
+.calc-total-discount { margin-top:6px; min-height:19px; font-size:12px; color:#7dd3fc; }
+.calc-total-discount .ctd-gray { color:#6b7280; }
+.calc-total-discount .ctd-list { color:#6b7280; text-decoration:line-through; }
+.calc-cart-head { display:flex; align-items:center; justify-content:space-between; margin:16px 0 10px; }
+.calc-cart-head-label { font-size:12px; font-weight:600; color:#9ca3af; }
+.calc-cart-clear { background:none; border:none; font-size:11px; color:#6b7280; cursor:pointer; font-family:inherit; transition:color 0.2s; }
+.calc-cart-clear:hover { color:#f87171; }
+.calc-cart-list { display:flex; flex-direction:column; gap:10px; height:230px; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; padding-right:2px; }
+.calc-cart-empty { margin:auto; text-align:center; padding:8px; color:#6b7280; font-size:13px; line-height:1.7; }
+.calc-cart-item { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#080f21; border:1px solid #243042; border-radius:12px; padding:12px 14px; transition:opacity 0.22s ease-in, transform 0.22s ease-in; }
+.calc-cart-item.cci-new { animation: cciPopIn 0.28s ease-out; }
+.calc-cart-item.cci-removing { opacity:0; transform:translateX(40px); }
+@keyframes cciPopIn {
+  from { opacity:0; transform:translateY(-6px) scale(0.98); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+.cci-name { font-size:13.5px; font-weight:700; color:#e5e7eb; word-break:break-all; }
+.cci-sub { font-size:11.5px; color:#9ca3af; margin-top:2px; }
+.cci-sub .cci-disc { color:#7dd3fc; font-weight:600; }
+.cci-right { display:flex; align-items:center; gap:12px; flex:none; }
+.cci-cost { font-size:14px; font-weight:700; color:#0EA5E9; white-space:nowrap; }
+.cci-remove { background:none; border:none; color:#6b7280; cursor:pointer; font-size:13px; padding:2px; line-height:1; transition:color 0.2s; }
+.cci-remove:hover { color:#f87171; }
 .calc-group { display:flex; flex-direction:column; gap:5px; }
 .calc-group label { font-size:11px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.06em; }
 .calc-select {
@@ -559,11 +607,30 @@ body {
 .calc-input-wrap input:focus { border-color:#0EA5E9; }
 .calc-input-suffix { position:absolute; right:12px; font-size:11px; color:#6b7280; pointer-events:none; white-space:nowrap; }
 .calc-btn {
-  margin-top:15px; padding:9px 16px; background:#0EA5E9; color:#fff;
-  border:none; border-radius:8px; font-size:13px; font-weight:700;
+  padding:12px 16px; background:#0EA5E9; color:#fff;
+  border:none; border-radius:8px; font-size:14px; font-weight:700;
   cursor:pointer; transition:opacity 0.2s, transform 0.15s; width:100%;
 }
 .calc-btn:hover { opacity:0.88; transform:translateY(-1px); }
+/* discount badges (logged-in) */
+.calc-discount-badges { display:flex; gap:6px; margin-bottom:8px; }
+.calc-discount-badges .calc-disc-badge { flex:1; }
+.calc-disc-badge {
+  background:#111827; border:1px solid #374151; color:#9ca3af;
+  border-radius:8px; padding:6px 8px; font-size:12.5px; font-weight:600;
+  font-family:inherit; cursor:pointer; text-align:center;
+  transition:border-color 0.15s, color 0.15s, background 0.15s;
+}
+.calc-disc-badge:hover { border-color:#0EA5E9; color:#e5e7eb; }
+.calc-disc-badge.active { background:#0EA5E9; border-color:#0EA5E9; color:#fff; }
+/* 직접입력 행: 아래 입력 토큰/출력 토큰과 동일한 폭·스타일(.calc-input-wrap)로 채움 */
+.calc-disc-custom input { text-align:left; }
+/* empty-input hint */
+.calc-hint { min-height:16px; margin-bottom:10px; font-size:11.5px; color:#fbbf24; text-align:center; }
+.calc-contact-link { color:#EC4899; text-decoration:underline; transition:color 0.15s; }
+.calc-contact-link:hover { color:#f472b6; }
+.calc-disclaimer { margin-top:20px; padding-top:16px; border-top:1px solid #374151; font-size:11px; color:#6b7280; line-height:1.6; }
+.calc-input-wrap input.calc-input-invalid { border-color:#fbbf24; }
 .calc-result {
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   background:#111827; border-radius:12px; padding:20px 16px; min-width:0;
@@ -1035,7 +1102,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
     padding: 48px 20px;
   }
   .cost-calc-inner {
-    padding: 48px 20px;
+    padding: 0 20px;
   }
 
   /* Problem */
@@ -1080,7 +1147,7 @@ backdrop-filter: blur(6px); white-space: nowrap;
 
   /* 비용 계산기 — 1열 스택 */
   .calc-body {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   .calc-result {
     min-height: 120px;

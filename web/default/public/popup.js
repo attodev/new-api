@@ -3,6 +3,10 @@
 // Used by /, /en, /guide, /en/guide.
 const popupIsKo = document.documentElement.lang === 'ko';
 
+// 전체 모델 가격표에 discount_percent를 반영할지 여부.
+// true로 바꾸면 다시 할인가로 표시된다(문구도 함께 "프로모션 적용" 안내로 전환됨).
+const SHOW_MODEL_DISCOUNT = false;
+
 const POPUP_STRINGS = {
   popupTerms:      popupIsKo ? '이용약관'                    : 'Terms of Service',
   popupPrivacy:    popupIsKo ? '개인정보처리방침'              : 'Privacy Policy',
@@ -315,7 +319,9 @@ async function renderPricingTable(body) {
     const tableBody = body.querySelector('tbody');
     let lastProvider = '';
     sorted.forEach((m) => {
-      const discount = (m.discount_percent || 0) / 100;
+      // SHOW_MODEL_DISCOUNT=false면 정가로 노출(표시용, 실제 정산과 무관).
+      // 나중에 할인을 다시 보여주려면 상단의 SHOW_MODEL_DISCOUNT만 true로 바꾸면 된다.
+      const discount = SHOW_MODEL_DISCOUNT ? (m.discount_percent || 0) / 100 : 0;
       const inputPrice  = (m.model_ratio * groupRatio * (1 - discount)).toFixed(4);
       const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio * (1 - discount)).toFixed(4);
       const provider = getProvider(m.model_name);

@@ -862,9 +862,9 @@
     <!-- ── SECTION 6: FEATURE - COST ── -->
     <div class="section feature-section">
       <div class="cost-calc-inner">
-        <span class="section-tag">Cost Estimate</span>
-        <h2>Estimate Your Adoption Cost</h2>
-        <p class="section-sub">Discount rates may vary depending on your commitment volume.</p>
+        <span class="section-tag">Cost Savings</span>
+        <h2>Cheaper Than Official Prices</h2>
+        <p class="section-sub">Access major AI models through AlRouter at discounted rates vs. official APIs.<br>No subscription — pay only for what you use.</p>
         <div class="feature-visual cost-calc-card">
           <div class="calc-card-header">
             <span class="calc-card-title">AI Cost Calculator</span>
@@ -877,70 +877,103 @@
           </div>
           <div class="calc-body">
             <div class="calc-form">
+              <div class="calc-fields">
               <div class="calc-group">
                 <label for="calcModel">Select Model</label>
-                <select class="calc-select" id="calcModel">
+                <select class="calc-select" id="calcModel" onchange="updateCalcUnitLabels()">
                   <option value="">Loading models…</option>
                 </select>
               </div>
+              {{if .IsLoggedIn}}
               <div class="calc-group">
-                <label for="calcInputTokens">Input Tokens</label>
+                <label for="calcDiscount">Discount</label>
+                <div class="calc-discount-badges">
+                  <button type="button" class="calc-disc-badge active" data-disc="0" onclick="setCalcDiscount(0, this)">0%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="5" onclick="setCalcDiscount(5, this)">5%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="10" onclick="setCalcDiscount(10, this)">10%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="15" onclick="setCalcDiscount(15, this)">15%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="20" onclick="setCalcDiscount(20, this)">20%</button>
+                </div>
+                <div class="calc-input-wrap calc-disc-custom">
+                  <input
+                    type="text"
+                    id="calcDiscount"
+                    value="0"
+                    placeholder="0~100"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    oninput="onCalcDiscountInput(this)"
+                  />
+                  <span class="calc-input-suffix">%</span>
+                </div>
+                <p class="calc-commit-note">Discount rates may vary depending on your commitment volume.</p>
+              </div>
+              {{end}}
+              <div class="calc-group">
+                <div class="calc-label-row">
+                  <label for="calcInputTokens">Input Tokens</label>
+                  <span class="calc-unit" id="calcInUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcInputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">M tokens</span>
                 </div>
               </div>
               <div class="calc-group">
-                <label for="calcOutputTokens">Output Tokens</label>
+                <div class="calc-label-row">
+                  <label for="calcOutputTokens">Output Tokens</label>
+                  <span class="calc-unit" id="calcOutUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcOutputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">M tokens</span>
                 </div>
               </div>
-              <button type="button" class="calc-btn" onclick="runCalc()">
-                Calculate
-              </button>
-            </div>
-            <div class="calc-result" id="calcResult" role="status" aria-live="polite">
-              <div class="calc-result-hint" id="calcHint">Enter model and token counts,<br>then click Calculate</div>
-              <div
-                class="calc-result-label"
-                id="calcLabel"
-                style="display: none"
-              >
-                Estimated Cost
               </div>
-              <div
-                class="calc-result-price"
-                id="calcPrice"
-                style="display: none"
-              ></div>
-              <div class="calc-breakdown" id="calcBreakdown"></div>
+              <div class="calc-btn-wrap">
+                <p class="calc-hint" id="calcHint"></p>
+                <button type="button" class="calc-btn" onclick="addCalcItem()">
+                  + Add to list
+                </button>
+              </div>
+            </div>
+            <div class="calc-cart">
+              <div class="calc-cart-total">
+                <span class="calc-cart-total-label">Total Estimated Cost</span>
+                <div class="calc-cart-total-price" id="calcTotal">$0.00</div>
+                {{if .IsLoggedIn}}<div class="calc-total-discount" id="calcTotalDiscount"></div>{{end}}
+              </div>
+              <div class="calc-cart-head">
+                <span class="calc-cart-head-label">Estimate Items (<span id="calcItemCount">0</span>)</span>
+                <button type="button" class="calc-cart-clear" onclick="clearCalcItems()">Clear all</button>
+              </div>
+              <div class="calc-cart-list" id="calcItemList" role="status" aria-live="polite">
+                <div class="calc-cart-empty">Select a model and enter tokens,<br>then click ‘+ Add to list’.</div>
+              </div>
             </div>
           </div>
-          <p
-            style="
-              margin-top: 14px;
-              font-size: 11px;
-              color: #6b7280;
-              line-height: 1.6;
-            "
-          >
-            Prices shown are estimates based on public rates.<br>
-        Actual costs may vary depending on usage patterns.
-        <a href="#" onclick="openContact(this);return false;" style="color:#EC4899; text-decoration:underline;">Contact us</a> for an accurate quote.
+          <p class="calc-disclaimer">
+            * Prices shown are estimates based on public rates.<br>
+            * Actual costs may vary depending on usage patterns.
+        <a href="#" onclick="openContact(this);return false;" class="calc-contact-link">Contact us</a> for an accurate quote.
           </p>
         </div>
       </div>

@@ -1,6 +1,12 @@
 package controller
 
 import (
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
@@ -9,6 +15,33 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// devProxyPricing (DEBUG only) forwards the pricing response from an upstream
+// set via DEV_PRICING_UPSTREAM (e.g. https://alrouter.ai), so the local landing
+// calculator has real models even when the local DB has no channels configured.
+// Completely inert in production or when the env var is unset.
+func devProxyPricing(c *gin.Context) bool {
+	if !common.DebugEnabled {
+		return false
+	}
+	upstream := os.Getenv("DEV_PRICING_UPSTREAM")
+	if upstream == "" {
+		return false
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(strings.TrimRight(upstream, "/") + "/api/pricing")
+	if err != nil {
+		common.SysLog("dev pricing proxy failed: " + err.Error())
+		return false
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	c.Data(resp.StatusCode, "application/json; charset=utf-8", body)
+	return true
+}
 
 func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string]string) []model.Pricing {
 	if len(pricing) == 0 {
@@ -35,6 +68,9 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 }
 
 func GetPricing(c *gin.Context) {
+	if devProxyPricing(c) {
+		return
+	}
 	pricing := model.GetPricing()
 	userId, exists := c.Get("id")
 	usableGroup := map[string]string{}

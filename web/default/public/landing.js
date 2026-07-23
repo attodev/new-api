@@ -13,6 +13,14 @@ const STRINGS = {
   calcOutputRow:  isKo ? (m) => `출력 토큰 (${m}M)`                                    : (m) => `Output Tokens (${m}M)`,
   calcInputRate:  isKo ? '단가 입력'                                                    : 'Input rate',
   calcOutputRate: isKo ? '단가 출력'                                                    : 'Output rate',
+  calcUnit:       isKo ? (v) => `단가: $${v} / 1M`                                     : (v) => `$${v} / 1M`,
+  calcEmpty:      isKo ? '모델과 토큰을 입력하고<br>‘+ 목록에 추가하기’를 눌러주세요.'      : 'Select a model and enter tokens,<br>then click ‘+ Add to list’.',
+  calcRemove:     isKo ? '삭제'                                                         : 'Remove',
+  calcNeedTokens: isKo ? '입력·출력 토큰을 입력해 주세요.'                                : 'Enter input/output tokens first.',
+  calcItemDiscount: isKo ? (pct) => ` · ${pct}% 할인`                                   : (pct) => ` · ${pct}% off`,
+  calcTotalList:     isKo ? (list) => `정가 ${list}`                                     : (list) => `List price ${list}`,
+  calcTotalDiscount: isKo ? (list, save) => `<span class="ctd-gray">정가 <span class="ctd-list">${list}</span></span> · 할인 −${save}` : (list, save) => `<span class="ctd-gray">List <span class="ctd-list">${list}</span></span> · Save ${save}`,
+  calcTotalList:  isKo ? (list) => `<span class="ctd-gray">정가 ${list}</span>`          : (list) => `<span class="ctd-gray">List price ${list}</span>`,
   // video filenames
   videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
   videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
@@ -375,34 +383,81 @@ const STRINGS = {
 })();
 
 // ── Calculator pricing ──
-// TODO: 모델 목록 및 가격은 추후 API에서 가져올 예정
-let _calcPricing = Object.create(null); // model_name → { input, output }
+// AI cost calculator (cart-style): add model/token estimates to a list and
+// see the running total. Model prices come from /api/pricing.
+let _calcPricing = Object.create(null); // model_name → { input, output }  ($ / 1M)
 let _calcGroupRatio = 1;
+let _calcItems = [];
+let _calcSeq = 0;
+let _calcLastAddedId = null; // 렌더 1회에만 소비되는 "새로 추가됨" 표시
+
+// full amount → "$1,234.56"; very large → compact "$1.2B" so the total never overflows
+const _calcMoney = (v) =>
+  "$" +
+  (Math.abs(v) >= 1e6
+    ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)
+    : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+const _calcUnitStr = (v) =>
+  v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// "모델 & 가격" 전체 가격표(popup.js renderPricingTable)와 동일한 제공사·티어 정렬 기준.
+function _calcProvider(name) {
+  if (name.startsWith("claude")) return "Anthropic";
+  if (name.startsWith("gemini")) return "Google";
+  if (name.startsWith("gpt") || name.startsWith("o1") || name.startsWith("o3") || name.startsWith("o4")) return "OpenAI";
+  return "Other";
+}
+function _calcTier(name) {
+  if (name.includes("haiku") || name.includes("flash-lite")) return 1;
+  if (name.includes("sonnet") || (name.includes("flash") && !name.includes("lite"))) return 2;
+  if (name.includes("opus") || name.includes("pro")) return 3;
+  return 2;
+}
 
 async function loadCalcModels() {
   const sel = document.getElementById("calcModel");
+  if (!sel) return;
   try {
     const res = await fetch("/api/pricing");
     const json = await res.json();
     _calcGroupRatio = 2;
-    const models = json.data.map((model) => ({
-      ...model,
-      model_name: String(model.model_name ?? ""),
-    }));
+    const models = json.data
+      .map((model) => ({ ...model, model_name: String(model.model_name ?? "") }))
+      .sort((a, b) => {
+        const pa = _calcProvider(a.model_name), pb = _calcProvider(b.model_name);
+        if (pa !== pb) return pa.localeCompare(pb);
+        const ta = _calcTier(a.model_name), tb = _calcTier(b.model_name);
+        if (ta !== tb) return ta - tb;
+        return a.model_name.localeCompare(b.model_name);
+      });
     models.forEach((m) => {
-      const d = (m.discount_percent || 0) / 100;
+      // 전체 가격표의 discount_percent는 적용하지 않고 원래(정가) 금액으로 계산.
+      // 로그인 사용자의 할인율은 addCalcItem에서 별도로 반영한다.
       _calcPricing[m.model_name] = {
-        input: m.model_ratio * _calcGroupRatio * (1 - d),
-        output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
+        input: m.model_ratio * _calcGroupRatio,
+        output: m.model_ratio * m.completion_ratio * _calcGroupRatio,
       };
     });
-    const options = models.map((m) => {
+    let lastProvider = "";
+    const nodes = [];
+    models.forEach((m) => {
+      const provider = _calcProvider(m.model_name);
+      if (provider !== lastProvider) {
+        const group = document.createElement("optgroup");
+        group.label = provider;
+        group.dataset.provider = provider;
+        nodes.push(group);
+        lastProvider = provider;
+      }
       const option = document.createElement("option");
       option.value = m.model_name;
-      option.textContent = m.model_name;
-      return option;
+      const p = _calcPricing[m.model_name];
+      option.textContent = `${m.model_name} ($${_calcUnitStr(p.input)} / $${_calcUnitStr(p.output)})`;
+      nodes[nodes.length - 1].appendChild(option);
     });
-    sel.replaceChildren(...options);
+    sel.replaceChildren(...nodes);
+    updateCalcUnitLabels();
   } catch (e) {
     const errorOption = document.createElement("option");
     errorOption.value = "";
@@ -411,34 +466,221 @@ async function loadCalcModels() {
   }
 }
 loadCalcModels();
+// 초기(0개) 상태에서도 정가 라인을 노출해 하단이 비어 보이지 않도록 한다.
+renderCalcCart();
 
-function runCalc() {
+function updateCalcUnitLabels() {
+  const sel = document.getElementById("calcModel");
+  const p = sel && _calcPricing[sel.value];
+  const inEl = document.getElementById("calcInUnit");
+  const outEl = document.getElementById("calcOutUnit");
+  if (inEl) inEl.textContent = p ? STRINGS.calcUnit(_calcUnitStr(p.input)) : "";
+  if (outEl) outEl.textContent = p ? STRINGS.calcUnit(_calcUnitStr(p.output)) : "";
+}
+
+// 할인율 뱃지(0/5/10/15/20)를 클릭하면 직접입력 인풋에 값을 채우고 활성 상태를 표시.
+function setCalcDiscount(v, el) {
+  const input = document.getElementById("calcDiscount");
+  if (input) input.value = v;
+  document
+    .querySelectorAll(".calc-disc-badge")
+    .forEach((b) => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+
+// 직접입력 시: 정수(0~100)만 허용하고, 프리셋과 값이 일치하는 뱃지만 활성화(없으면 전부 해제).
+function onCalcDiscountInput(input) {
+  let v = input.value.replace(/[^\d]/g, ""); // 숫자만 (음수·소수점·문자 차단)
+  if (v !== "") {
+    let n = parseInt(v, 10);
+    if (n > 100) n = 100;
+    v = String(n);
+  }
+  if (v !== input.value) input.value = v;
+  const val = v === "" ? null : parseFloat(v);
+  document.querySelectorAll(".calc-disc-badge").forEach((b) => {
+    b.classList.toggle("active", val !== null && parseFloat(b.dataset.disc) === val);
+  });
+}
+
+// 입력값이 비어 있을 때 살짝 안내 + 인풋 강조.
+function calcHintNeedTokens() {
+  const hint = document.getElementById("calcHint");
+  if (hint) hint.textContent = STRINGS.calcNeedTokens;
+  ["calcInputTokens", "calcOutputTokens"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el || _calcPositive(id) > 0) return; // 0 초과인 정상 필드는 강조하지 않음
+    el.classList.add("calc-input-invalid");
+    setTimeout(() => el.classList.remove("calc-input-invalid"), 1200);
+  });
+}
+
+// 토큰 입력 최댓값(placeholder "0.1~100,000"과 동일한 단위: 백만 토큰).
+const CALC_MAX_TOKENS_M = 100000;
+
+// 토큰 입력 정제: 입력 순간부터 숫자와 소수점 하나만 허용한다.
+// -, +, e, 공백, 문자 등은 애초에 들어가지 못하게 즉시 제거(음수 불가 → 값은 항상 0 이상).
+// 최댓값을 넘으면 즉시 상한으로 클램프.
+function sanitizeCalcNum(el) {
+  let v = el.value.replace(/[^\d.]/g, ""); // 숫자·점만 남김
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    // 첫 소수점만 유지, 이후의 점은 제거
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+  }
+  const n = parseFloat(v);
+  if (Number.isFinite(n) && n > CALC_MAX_TOKENS_M) {
+    v = String(CALC_MAX_TOKENS_M);
+  }
+  if (v !== el.value) el.value = v;
+}
+
+// 안전 파싱: 유한한 양수만 인정, 그 외(음수·NaN·문자열)는 0.
+function _calcPositive(id) {
+  const v = parseFloat(document.getElementById(id).value);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+function addCalcItem() {
   const model = document.getElementById("calcModel").value;
-  const inputM =
-    parseFloat(document.getElementById("calcInputTokens").value) || 0;
-  const outputM =
-    parseFloat(document.getElementById("calcOutputTokens").value) || 0;
-  const prices = _calcPricing[model] || { input: 0, output: 0 };
-  const inputCost = inputM * prices.input;
-  const outputCost = outputM * prices.output;
-  const total = inputCost + outputCost;
-  // 아주 큰 토큰 수를 입력해도 결과 박스를 벗어나지 않도록, 일정 금액 이상이면 축약 표기($1.2B)로 전환
-  const fmtMoney = (v, decimals) =>
-    "$" +
-    (Math.abs(v) >= 1e6
-      ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)
-      : v.toFixed(decimals));
-  const fmt = (v) => fmtMoney(v, 4);
-  document.getElementById("calcHint").style.display = "none";
-  document.getElementById("calcLabel").style.display = "";
-  const priceEl = document.getElementById("calcPrice");
-  priceEl.style.display = "";
-  priceEl.textContent = fmtMoney(total, 2);
-  document.getElementById("calcBreakdown").innerHTML =
-    `<div class="calc-breakdown-row"><span>${STRINGS.calcInputRow(inputM)}</span><span>${fmt(inputCost)}</span></div>` +
-    `<div class="calc-breakdown-row"><span>${STRINGS.calcOutputRow(outputM)}</span><span>${fmt(outputCost)}</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;margin-top:4px;padding-top:4px;border-top:1px solid #374151;color:#9ca3af"><span>${STRINGS.calcInputRate}</span><span>$${prices.input.toFixed(4)}/M</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>${STRINGS.calcOutputRate}</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
+  const p = _calcPricing[model];
+  if (!p) return;
+  const inputM = _calcPositive("calcInputTokens");
+  const outputM = _calcPositive("calcOutputTokens");
+  // 입력·출력 모두 0 초과여야 유효한 견적. 한쪽이라도 0/빈값이면 차단.
+  if (inputM <= 0 || outputM <= 0) {
+    calcHintNeedTokens();
+    return;
+  }
+  const hint = document.getElementById("calcHint");
+  if (hint) hint.textContent = "";
+  // 로그인 시 노출되는 할인율(뱃지/직접입력)이 있으면 반영 (없으면 정가)
+  const discountEl = document.getElementById("calcDiscount");
+  let discountPct = discountEl ? parseFloat(discountEl.value) || 0 : 0;
+  discountPct = Math.min(100, Math.max(0, discountPct));
+  const listCost = inputM * p.input + outputM * p.output;
+  const cost = listCost * (1 - discountPct / 100);
+  // 기존 항목들이 아래로 밀리는 것도 부드럽게 보이도록, 삽입 전 위치를 기록해둔다.
+  const prevTops = {};
+  document.querySelectorAll(".calc-cart-item").forEach((el) => {
+    prevTops[el.dataset.id] = el.getBoundingClientRect().top;
+  });
+  // 새로 추가한 항목이 맨 위에 보이도록 앞에 삽입한다.
+  _calcItems.unshift({ id: ++_calcSeq, model, inputM, outputM, listCost, cost, discount: discountPct });
+  _calcLastAddedId = _calcSeq; // 방금 추가된 항목에만 등장 애니메이션 적용
+  renderCalcCart();
+  _calcFlipShift(prevTops);
+}
+
+// FLIP: 삭제로 아래 항목들이 순간이동하듯 튀지 않도록, 이전 위치에서 새 위치로 부드럽게 슬라이드.
+function _calcFlipShift(prevTops) {
+  document.querySelectorAll(".calc-cart-item").forEach((el) => {
+    const prevTop = prevTops[el.dataset.id];
+    if (prevTop == null) return;
+    const delta = prevTop - el.getBoundingClientRect().top;
+    if (Math.abs(delta) < 0.5) return;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.22s ease-out";
+        el.style.transform = "";
+        el.addEventListener("transitionend", () => { el.style.transition = ""; }, { once: true });
+      });
+    });
+  });
+}
+
+function removeCalcItem(id) {
+  // 삭제 애니메이션(fade-out) 재생 후 실제로 목록에서 제거한다.
+  const row = document.querySelector(`.calc-cart-item[data-id="${id}"]`);
+  if (row) {
+    row.classList.remove("cci-new"); // 등장 애니메이션과 겹치지 않도록 먼저 해제
+    row.classList.add("cci-removing");
+    setTimeout(() => {
+      const prevTops = {};
+      document.querySelectorAll(".calc-cart-item").forEach((el) => {
+        if (el.dataset.id !== String(id)) prevTops[el.dataset.id] = el.getBoundingClientRect().top;
+      });
+      _calcItems = _calcItems.filter((it) => it.id !== id);
+      renderCalcCart();
+      _calcFlipShift(prevTops);
+    }, 220);
+  } else {
+    _calcItems = _calcItems.filter((it) => it.id !== id);
+    renderCalcCart();
+  }
+}
+
+function clearCalcItems() {
+  const rows = [...document.querySelectorAll(".calc-cart-item")];
+  if (rows.length === 0) {
+    _calcItems = [];
+    renderCalcCart();
+    return;
+  }
+  // 한 번에 사라지지 않고 위에서부터 순서대로 하나씩 fade-out 되도록 지연을 준다.
+  const STAGGER_MS = 50;
+  const FADE_MS = 220;
+  rows.forEach((row, i) => {
+    setTimeout(() => {
+      row.classList.remove("cci-new");
+      row.classList.add("cci-removing");
+    }, i * STAGGER_MS);
+  });
+  setTimeout(() => {
+    _calcItems = [];
+    renderCalcCart();
+  }, (rows.length - 1) * STAGGER_MS + FADE_MS);
+}
+
+function renderCalcCart() {
+  const list = document.getElementById("calcItemList");
+  const totalEl = document.getElementById("calcTotal");
+  const countEl = document.getElementById("calcItemCount");
+  const discEl = document.getElementById("calcTotalDiscount");
+  if (!list) return;
+  if (countEl) countEl.textContent = _calcItems.length;
+
+  if (_calcItems.length === 0) {
+    list.innerHTML = `<div class="calc-cart-empty">${STRINGS.calcEmpty}</div>`;
+    if (totalEl) totalEl.textContent = "$0.00";
+    // 비어 있어도 정가 라인을 그대로 노출해 아래 공간이 허전하지 않도록 한다.
+    if (discEl) discEl.innerHTML = STRINGS.calcTotalList(_calcMoney(0));
+    return;
+  }
+
+  let totalCost = 0;
+  let totalList = 0;
+  list.innerHTML = "";
+  _calcItems.forEach((it) => {
+    totalCost += it.cost;
+    totalList += it.listCost != null ? it.listCost : it.cost;
+    // inputM/outputM/discount 는 정제된 숫자라 innerHTML 삽입이 안전(모델명만 textContent).
+    const subDisc =
+      it.discount > 0
+        ? `<span class="cci-disc">${STRINGS.calcItemDiscount(it.discount)}</span>`
+        : "";
+    const row = document.createElement("div");
+    row.className = "calc-cart-item" + (it.id === _calcLastAddedId ? " cci-new" : "");
+    row.dataset.id = it.id;
+    row.innerHTML =
+      `<div><div class="cci-name"></div><div class="cci-sub">In: ${it.inputM}M / Out: ${it.outputM}M${subDisc}</div></div>` +
+      `<div class="cci-right"><span class="cci-cost">${_calcMoney(it.cost)}</span>` +
+      `<button class="cci-remove" type="button" aria-label="${STRINGS.calcRemove}" onclick="removeCalcItem(${it.id})">✕</button></div>`;
+    row.querySelector(".cci-name").textContent = it.model; // set as text to avoid HTML injection
+    list.appendChild(row);
+  });
+  _calcLastAddedId = null; // 이번 렌더에서 소비 완료
+  if (totalEl) totalEl.textContent = _calcMoney(totalCost);
+  if (discEl) {
+    const saved = totalList - totalCost;
+    // 정가는 항상 노출하고, 할인이 있으면 옆에 할인액을 덧붙인다.
+    discEl.innerHTML =
+      saved > 0.005
+        ? STRINGS.calcTotalDiscount(_calcMoney(totalList), _calcMoney(saved))
+        : STRINGS.calcTotalList(_calcMoney(totalList));
+  }
 }
 
 // ── Lucide icon init ──
