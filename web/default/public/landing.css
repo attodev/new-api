@@ -434,6 +434,7 @@ body {
 .solution-inner { max-width: 1200px; margin: 0 auto; padding: 80px 48px; text-align: center; }
 .solution-inner h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; color: #f9fafb; }
 .solution-inner .section-sub { font-size: 16px; color: #9ca3af; line-height: 1.7; margin: 0 auto; text-align: center; }
+.integration-inner .section-sub { font-size: 16px; color: #9ca3af; max-width: 560px; line-height: 1.7; margin: 0 auto 48px; text-align: center; }
 .diagram-box {
   display: flex;
   align-items: center;
