@@ -72,10 +72,14 @@ var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 // balances, and the quota-input UI can multiply a typed amount by QuotaPerUnit,
 // without any intermediate result losing integer precision.
 //
-// Enforced as a request-validation bound, and for payments as an atomic upper
-// bound in CreditTopUpTarget. Deliberately NOT enforced on the generic quota
-// increment helpers: those mostly serve refunds, and a refund that cannot be
-// applied destroys quota the account already paid for.
+// Enforced by request validation on the organization quota endpoints, and for
+// payments as an atomic upper bound in CreditTopUpTarget. Deliberately NOT
+// enforced on the generic quota increment helpers: those mostly serve refunds,
+// and a refund that cannot be applied destroys quota the account already paid
+// for.
+//
+// Not yet enforced on the admin grant paths (ManageUser add_quota/override) --
+// see the note on increaseUserQuota in model/user.go.
 const MaxQuota int64 = 500_000_000_000_000 // exactly $1B at the default QuotaPerUnit
 
 // general_setting.quota_display_type

@@ -15,6 +15,7 @@ describe('formatTokens', () => {
     assert.equal(formatTokens(1e9), '1.00B')
     assert.equal(formatTokens(2e9), '2.00B')
     assert.equal(formatTokens(1e12), '1.00T')
-    assert.equal(formatTokens(9e15), '9000.00T')
+    // common.MaxQuota -- the largest value a quota field can hold
+    assert.equal(formatTokens(5e14), '500.00T')
   })
 })

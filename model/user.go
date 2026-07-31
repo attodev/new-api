@@ -977,9 +977,14 @@ func IncreaseUserQuota(id int, quota int64, db bool) (err error) {
 // are refund and compensation paths (relay settlement, task/video refunds,
 // rollback of a failed reserve), and a refund that cannot be applied silently
 // destroys quota the user already paid for -- strictly worse than the precision
-// drift a ceiling here would prevent. The ceiling is enforced where new quota
-// actually enters the system instead: CreditTopUpTarget for payments, and
-// request validation for admin grants.
+// drift a ceiling here would prevent. For payments the ceiling is enforced where
+// new quota enters instead, in CreditTopUpTarget.
+//
+// Note the remaining gap: the admin grant paths (ManageUser add_quota/override in
+// controller/user.go) validate only the sign, so a root admin can still write a
+// balance above common.MaxQuota and past Number.MAX_SAFE_INTEGER, after which the
+// frontend reads that balance imprecisely. Widening this column to bigint removed
+// the out-of-range rejection that MySQL and PostgreSQL used to supply there.
 func increaseUserQuota(id int, quota int64) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
 	if err != nil {

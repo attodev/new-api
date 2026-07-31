@@ -158,6 +158,10 @@ func increaseUserQuota(id int, quota int64) (err error) {
 - 요청 검증 (`validateInt64Range`, `controller/organization.go` 3곳 + `organization_subscription.go`)
 - 결제 유입 (`CreditTopUpTarget`의 기존 원자적 가드 — `math.MaxInt32` → `common.MaxQuota`로 변경)
 
+**강제되지 않는 곳 (알려진 공백).** 관리자 부여 경로 `ManageUser`의 `add_quota`/`override`([controller/user.go:944](../controller/user.go), [:967](../controller/user.go))는 부호만 검사하고 상한을 보지 않는다. 그래서 root 관리자는 `common.MaxQuota`를 넘는, 나아가 `Number.MAX_SAFE_INTEGER`를 넘는 잔액을 쓸 수 있고 이후 프론트가 그 값을 부정확하게 읽는다.
+
+이 컬럼을 bigint로 확장하면서 **MySQL/PostgreSQL이 제공하던 out-of-range 거부가 사라졌다** — 검증이 없던 이 경로에서는 그것이 사실상 유일한 방어였다. SQLite는 `INTEGER`가 8바이트라 원래부터 무제한이었으므로 현 배포 환경에서 달라진 것은 없고, PG/MySQL로 전환할 때 드러난다. root 권한이 필요하므로 공격 경로가 아니라 footgun이다. 9절 참조.
+
 ---
 
 ## 5. 프론트엔드 변경
@@ -283,6 +287,6 @@ organizations  quota: bigint, used_quota: bigint
 
 1. **`model` 타임존 브리지 테스트 실패** — `walletAutoRechargeAttemptIdentitiesForPolicy`의 기존 버그. 별도 추적 필요.
 2. **증가 함수의 누적 상한** — 6절 참조. 환불 경로를 깨지 않으면서 누적을 제한하려면, 환불과 신규 크레딧을 별도 함수로 분리하고 후자에만 상한을 두는 설계가 필요하다.
-3. **관리자 부여 경로의 상한 부재** — `ManageUser`의 `add_quota`(`ManageRequest.Value`), `TransferAffQuotaToQuota`, `QuotaForNewUser` 옵션에 상한 검증이 없다. 반복 부여로 누적이 상한을 넘을 수 있다.
+3. **관리자 부여 경로의 상한 부재** — 4.3절의 "알려진 공백". `ManageUser`의 `add_quota`/`override`(`ManageRequest.Value`), `TransferAffQuotaToQuota`, `QuotaForNewUser` 옵션에 상한 검증이 없다. 반복 부여로 누적이 상한을 넘을 수 있고, `override`는 단발로도 넘길 수 있다. 조치는 `validateInt64Range("value", req.Value, 0, common.MaxQuota)`를 두 분기에 추가하는 것으로 충분하다. 현재는 우선순위를 낮춰 보류했다.
 4. **`service/org_user_export.go`의 부동소수 변환** — `int(usd * common.QuotaPerUnit)`가 CSV 입력값에 대해 무제한이다. Go에서 범위를 벗어난 float→int 변환은 구현 정의 동작이다. 이 변경과 무관한 기존 문제.
 5. **커밋 4분할 미달성** — 조직/사용자 쿼터 분리를 두 차례 시도했으나 중간 커밋이 컴파일되지 않았다. 타입 확장이 하나의 원자적 리팩터링이라(대시보드 사용량 필드, `logger.FormatQuota`, `service/*`가 동시에 바뀜) 파일 단위 분리가 불가능했다. 컴파일되지 않는 커밋은 롤백 용도로 무용하므로 빌드되는 3분할을 택했다.

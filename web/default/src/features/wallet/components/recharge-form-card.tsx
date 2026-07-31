@@ -213,10 +213,19 @@ export function RechargeFormCard({
   const customInputMin =
     usesTossAmountMode && activeAmountMode === 'quota' ? 1 : minTopup
   // Per-payment Toss ceiling, shown so the buyer knows it up front. Display only
-  // -- enforcement already lives on the server. The warning is limited to KRW
-  // mode, where the typed amount *is* the charge; in quota mode the charge is
-  // derived server-side from group ratio and discount, which a browser preview
-  // cannot reproduce, so flagging it here would be guesswork.
+  // -- enforcement already lives on the server.
+  //
+  // The notice appears whenever Toss is offered at all, including alongside other
+  // providers: the ceiling is a fixed KRW figure, so stating it is always correct.
+  // The *warning* is deliberately narrower and only fires in the Toss-only amount
+  // mode with KRW selected, the one case where the typed number is unambiguously
+  // the KRW charge. In quota mode the charge is derived server-side from group
+  // ratio and discount, and when Toss shares the form with other providers the
+  // input is not necessarily KRW at all -- warning there would be guesswork
+  // against a number we do not have.
+  const tossAvailable =
+    !!topupInfo?.enable_toss_topup ||
+    (topupInfo?.pay_methods ?? []).some((method) => isTossPayment(method.type))
   const overTossMax =
     usesTossAmountMode &&
     activeAmountMode === 'krw' &&
@@ -448,7 +457,7 @@ export function RechargeFormCard({
                     )}
                   </div>
                 </div>
-                {usesTossAmountMode && (
+                {tossAvailable && (
                   <p
                     className={
                       overTossMax

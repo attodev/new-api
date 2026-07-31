@@ -3667,7 +3667,7 @@ func walletThresholdShouldCharge(tx *gorm.DB, policy *WalletAutoRecharge, now ti
 		if err := tx.Select("quota").Where("id = ?", policy.TargetId).First(&user).Error; err != nil {
 			return false, err
 		}
-		return int64(user.Quota) <= policy.ThresholdQuota, nil
+		return user.Quota <= policy.ThresholdQuota, nil
 	}
 }
 

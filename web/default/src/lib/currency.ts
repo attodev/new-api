@@ -229,8 +229,9 @@ function removeTrailingZeros(str: string): string {
 
 /**
  * Magnitude tiers used when abbreviating raw token counts, largest first.
- * Covers the full quota range (up to 9e15 raw units) so large values keep a
- * readable suffix instead of overflowing the smallest tier (e.g. `9000000000000k`).
+ * Covers the full quota range (up to common.MaxQuota, 5e14 raw units) so large
+ * values keep a readable suffix instead of overflowing the smallest tier
+ * (e.g. `500000000000k`).
  */
 const SUFFIX_TIERS = [
   { threshold: 1e12, suffix: 'T' },
