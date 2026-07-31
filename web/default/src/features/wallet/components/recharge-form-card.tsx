@@ -43,6 +43,7 @@ import {
   calculatePresetPricing,
   isTossPayment,
   shouldBlockPaymentMethodBeforeQuote,
+  TOSS_MAXIMUM_CHARGE_KRW,
 } from '../lib'
 import {
   TOSS_KRW_PRESETS,
@@ -211,6 +212,15 @@ export function RechargeFormCard({
         : formatCurrency(paymentAmount)
   const customInputMin =
     usesTossAmountMode && activeAmountMode === 'quota' ? 1 : minTopup
+  // Per-payment Toss ceiling, shown so the buyer knows it up front. Display only
+  // -- enforcement already lives on the server. The warning is limited to KRW
+  // mode, where the typed amount *is* the charge; in quota mode the charge is
+  // derived server-side from group ratio and discount, which a browser preview
+  // cannot reproduce, so flagging it here would be guesswork.
+  const overTossMax =
+    usesTossAmountMode &&
+    activeAmountMode === 'krw' &&
+    topupAmount > TOSS_MAXIMUM_CHARGE_KRW
 
   if (loading) {
     return (
@@ -438,6 +448,24 @@ export function RechargeFormCard({
                     )}
                   </div>
                 </div>
+                {usesTossAmountMode && (
+                  <p
+                    className={
+                      overTossMax
+                        ? 'text-destructive text-xs font-medium'
+                        : 'text-muted-foreground text-xs'
+                    }
+                  >
+                    {overTossMax
+                      ? t(
+                          'Exceeds the maximum for a single payment ({{amount}}). Please enter a smaller amount.',
+                          { amount: formatWonAmount(TOSS_MAXIMUM_CHARGE_KRW) }
+                        )
+                      : t('Maximum for a single payment: {{amount}}', {
+                          amount: formatWonAmount(TOSS_MAXIMUM_CHARGE_KRW),
+                        })}
+                  </p>
+                )}
               </div>
 
               <div className='space-y-2.5 sm:space-y-3'>

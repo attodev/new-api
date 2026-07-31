@@ -125,7 +125,10 @@ export function shouldBlockPaymentMethodBeforeQuote(
 // SDK v2 CARD opens the card/easy-pay unified window. Linked-account easy-pay
 // requires at least 200 KRW even though a card-only payment starts at 100 KRW.
 const TOSS_GENERAL_MINIMUM_KRW = 200
-const TOSS_MAXIMUM_CHARGE_KRW = 2_147_483_647
+// Mirrors setting.TossMaximumChargeAmountKRW. Exported so the checkout form can
+// state the per-payment ceiling to the buyer; enforcement stays where it already
+// was -- the server, plus isValidTossPaymentSession below.
+export const TOSS_MAXIMUM_CHARGE_KRW = 2_147_483_647
 const TOSS_ORDER_ID_PATTERN = /^[A-Za-z0-9_-]{6,64}$/
 // The server Billing API accepts a wider key, but payment({ customerKey }) in
 // the JavaScript SDK v2 is explicitly limited to 50 characters.
