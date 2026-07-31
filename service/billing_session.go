@@ -89,7 +89,7 @@ func (s *BillingSession) Refund(c *gin.Context) {
 
 	logger.LogInfo(c, fmt.Sprintf("user %d request failed, refunding pre-charge (token_quota=%s, funding=%s)",
 		s.relayInfo.UserId,
-		logger.FormatQuota(s.tokenConsumed),
+		logger.FormatQuota(int64(s.tokenConsumed)),
 		s.funding.Source(),
 	))
 
@@ -198,7 +198,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 		effectiveQuota = 0
 		logger.LogInfo(c, fmt.Sprintf("user %d quota sufficient, trusted, skipping pre-charge (funding=%s)", s.relayInfo.UserId, s.funding.Source()))
 	} else if effectiveQuota > 0 {
-		logger.LogInfo(c, fmt.Sprintf("user %d requires pre-charge: %s (funding=%s)", s.relayInfo.UserId, logger.FormatQuota(effectiveQuota), s.funding.Source()))
+		logger.LogInfo(c, fmt.Sprintf("user %d requires pre-charge: %s (funding=%s)", s.relayInfo.UserId, logger.FormatQuota(int64(effectiveQuota)), s.funding.Source()))
 	}
 
 	// ---- 1) ----
@@ -237,7 +237,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 func (s *BillingSession) reserveFunding(delta int) error {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		if err := model.DecreaseUserQuota(funding.userId, delta, false); err != nil {
+		if err := model.DecreaseUserQuota(funding.userId, int64(delta), false); err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
 		funding.consumed += delta
@@ -272,7 +272,7 @@ func (s *BillingSession) reserveFunding(delta int) error {
 func (s *BillingSession) rollbackFundingReserve(delta int) {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		if err := model.IncreaseUserQuota(funding.userId, delta, false); err != nil {
+		if err := model.IncreaseUserQuota(funding.userId, int64(delta), false); err != nil {
 			common.SysLog("error rolling back wallet funding reserve: " + err.Error())
 		} else {
 			funding.consumed -= delta
@@ -324,7 +324,7 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 		if _, ok := s.funding.(*OrganizationWalletFunding); ok {
 			return false
 		}
-		return s.relayInfo.UserQuota > trustQuota
+		return s.relayInfo.UserQuota > int64(trustQuota)
 	case BillingSourceSubscription:
 		// 1. PreConsumeUserSubscription amount>0
 		// 2. SubscriptionFunding.PreConsume s.amount
@@ -392,9 +392,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		if userQuota-preConsumedQuota < 0 {
+		if userQuota-int64(preConsumedQuota) < 0 {
 			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("pre-charge failed, user remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
+				fmt.Errorf("pre-charge failed, user remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(int64(preConsumedQuota))),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
@@ -412,9 +412,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 			}
-			if organizationQuota-preConsumedQuota < 0 {
+			if organizationQuota-int64(preConsumedQuota) < 0 {
 				return nil, types.NewErrorWithStatusCode(
-					fmt.Errorf("organization pre-charge failed, remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(preConsumedQuota)),
+					fmt.Errorf("organization pre-charge failed, remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(int64(preConsumedQuota))),
 					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 			}
@@ -471,9 +471,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		if organizationQuota-int(subConsume) < 0 {
+		if organizationQuota-subConsume < 0 {
 			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("organization pre-charge failed, remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(int(subConsume))),
+				fmt.Errorf("organization pre-charge failed, remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(organizationQuota), logger.FormatQuota(subConsume)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}

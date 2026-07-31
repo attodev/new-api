@@ -60,6 +60,24 @@ func ThemeAwarePath(suffix string) string {
 // var ChatLink = ""
 // var ChatLink2 = ""
 var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
+
+// MaxQuota is the ceiling for any single quota column (users.quota,
+// organizations.quota and their used_quota counterparts). The columns are
+// bigint, so the binding constraint is not the database but the frontend: quota
+// is transported as a plain JSON number, and JavaScript loses integer precision
+// above Number.MAX_SAFE_INTEGER (9_007_199_254_740_991).
+//
+// Rather than sitting just under that limit, this leaves ~18x headroom. That
+// margin is what makes client-side arithmetic safe: the dashboard can sum many
+// balances, and the quota-input UI can multiply a typed amount by QuotaPerUnit,
+// without any intermediate result losing integer precision.
+//
+// Enforced as a request-validation bound, and for payments as an atomic upper
+// bound in CreditTopUpTarget. Deliberately NOT enforced on the generic quota
+// increment helpers: those mostly serve refunds, and a refund that cannot be
+// applied destroys quota the account already paid for.
+const MaxQuota int64 = 500_000_000_000_000 // exactly $1B at the default QuotaPerUnit
+
 // general_setting.quota_display_type
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
@@ -142,13 +160,13 @@ var TurnstileSecretKey = ""
 var TelegramBotToken = ""
 var TelegramBotName = ""
 
-var QuotaForNewUser = 0
-var QuotaForInviter = 0
-var QuotaForInvitee = 0
+var QuotaForNewUser int64 = 0
+var QuotaForInviter int64 = 0
+var QuotaForInvitee int64 = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
-var QuotaRemindThreshold = 1000
+var QuotaRemindThreshold int64 = 1000
 var PreConsumedQuota = 500
 
 var RetryTimes = 0

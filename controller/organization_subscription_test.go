@@ -212,12 +212,12 @@ func TestOrganizationSubscriptionPlanRejectsInvalidInput(t *testing.T) {
 		{
 			name:    "total amount below minimum",
 			body:    `{"title":"Team","duration_unit":"month","duration_value":1,"total_amount":-1}`,
-			message: "total_amount must be between 0 and 1000000000",
+			message: fmt.Sprintf("total_amount must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "total amount too large",
 			body:    fmt.Sprintf(`{"title":"Team","duration_unit":"month","duration_value":1,"total_amount":%d}`, MaxOrganizationQuota+1),
-			message: "total_amount must be between 0 and 1000000000",
+			message: fmt.Sprintf("total_amount must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "sort order too small",

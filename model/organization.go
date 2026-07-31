@@ -26,8 +26,8 @@ type Organization struct {
 	Name        string `json:"name" gorm:"type:varchar(64);not null;uniqueIndex" validate:"max=64"`
 	Description string `json:"description,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	OwnerUserId int    `json:"owner_user_id" gorm:"column:owner_user_id;index"`
-	Quota       int    `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota   int    `json:"used_quota" gorm:"type:int;default:0;column:used_quota"`
+	Quota       int64  `json:"quota" gorm:"type:bigint;default:0"`
+	UsedQuota   int64  `json:"used_quota" gorm:"type:bigint;default:0;column:used_quota"`
 	Status      int    `json:"status" gorm:"type:int;default:1"`
 	CreatedAt   int64  `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	UpdatedAt   int64  `json:"updated_at" gorm:"autoUpdateTime;column:updated_at"`
@@ -61,12 +61,12 @@ func GetOrganizationOwnerUserId(organizationId int) (int, error) {
 	return ownerUserId, nil
 }
 
-func GetOrganizationQuota(organizationId int) (int, error) {
+func GetOrganizationQuota(organizationId int) (int64, error) {
 	if organizationId <= 0 {
 		return 0, nil
 	}
 
-	var quota int
+	var quota int64
 	err := DB.Model(&Organization{}).
 		Where("id = ?", organizationId).
 		Select("quota").
@@ -74,19 +74,24 @@ func GetOrganizationQuota(organizationId int) (int, error) {
 	return quota, err
 }
 
-func IncreaseOrganizationQuota(organizationId int, quota int) error {
+func IncreaseOrganizationQuota(organizationId int, quota int64) error {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
 	if organizationId <= 0 || quota == 0 {
 		return nil
 	}
+	// Like increaseUserQuota, this deliberately does NOT enforce common.MaxQuota:
+	// its callers are subscription and wallet refund paths, and a refund that
+	// cannot be applied destroys quota the organization already paid for. The
+	// ceiling is enforced where new quota enters instead -- CreditTopUpTarget for
+	// payments, request validation for admin writes.
 	return DB.Model(&Organization{}).
 		Where("id = ?", organizationId).
 		Update("quota", gorm.Expr("quota + ?", quota)).Error
 }
 
-func DecreaseOrganizationQuota(organizationId int, quota int) error {
+func DecreaseOrganizationQuota(organizationId int, quota int64) error {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
@@ -98,7 +103,7 @@ func DecreaseOrganizationQuota(organizationId int, quota int) error {
 		Update("quota", gorm.Expr("quota - ?", quota)).Error
 }
 
-func UpdateOrganizationUsedQuota(organizationId int, quota int) error {
+func UpdateOrganizationUsedQuota(organizationId int, quota int64) error {
 	if organizationId <= 0 || quota == 0 {
 		return nil
 	}
@@ -107,13 +112,13 @@ func UpdateOrganizationUsedQuota(organizationId int, quota int) error {
 		Update("used_quota", gorm.Expr("used_quota + ?", quota)).Error
 }
 
-func CreateOrganization(name string, description string, ownerUserId int, quota ...int) (*Organization, error) {
+func CreateOrganization(name string, description string, ownerUserId int, quota ...int64) (*Organization, error) {
 	name = strings.TrimSpace(name)
 	description = strings.TrimSpace(description)
 	if name == "" || ownerUserId <= 0 {
 		return nil, errors.New("invalid organization parameters")
 	}
-	initialQuota := 0
+	var initialQuota int64
 	if len(quota) > 0 {
 		initialQuota = quota[0]
 	}

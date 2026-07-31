@@ -105,7 +105,7 @@ func TestRechargeTossLocksOwnerOrganizationBeforeOrder(t *testing.T) {
 	requireOwnerOrganizationOrderLocks(t, *events)
 
 	require.NoError(t, DB.First(organization, organization.Id).Error)
-	require.Equal(t, 777, organization.Quota)
+	require.Equal(t, int64(777), organization.Quota)
 	require.NoError(t, DB.First(topUp, topUp.Id).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
 }
@@ -146,7 +146,7 @@ func TestTossRecoveryAndLateSettlementPreserveDisabledOrganization(t *testing.T)
 
 	require.NoError(t, DB.First(organization, organization.Id).Error)
 	require.Equal(t, OrganizationStatusDisabled, organization.Status)
-	require.Equal(t, 777, organization.Quota)
+	require.Equal(t, int64(777), organization.Quota)
 	require.NoError(t, DB.First(topUp, topUp.Id).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
 	require.Equal(t, paymentKey, topUp.ProviderOrderId)
@@ -288,7 +288,7 @@ func TestRechargeTossOrganizationLifecycleRaceSettlesExactlyOnce(t *testing.T) {
 
 	require.NoError(t, DB.First(organization, organization.Id).Error)
 	require.Equal(t, OrganizationStatusDisabled, organization.Status)
-	require.Equal(t, 777, organization.Quota)
+	require.Equal(t, int64(777), organization.Quota)
 	require.NoError(t, DB.First(topUp, topUp.Id).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
 }

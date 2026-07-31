@@ -61,7 +61,7 @@ func DoCheckin(c *gin.Context) {
 		})
 		return
 	}
-	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("Check-in successful, quota awarded: %s", logger.LogQuota(checkin.QuotaAwarded)))
+	model.RecordLog(userId, model.LogTypeSystem, fmt.Sprintf("Check-in successful, quota awarded: %s", logger.LogQuota(int64(checkin.QuotaAwarded))))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": common.TranslateMessage(c, i18n.MsgCheckinSuccess),

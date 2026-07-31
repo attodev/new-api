@@ -417,7 +417,7 @@ func TestResetClaimedTossTopUpBindingDoesNotEraseConcurrentSettlement(t *testing
 	require.Empty(t, stored.ProviderClaimToken)
 	var user User
 	require.NoError(t, DB.First(&user, 45).Error)
-	require.Equal(t, 999, user.Quota)
+	require.Equal(t, int64(999), user.Quota)
 }
 
 func TestResetClaimedTossTopUpRejectsLegacyOrEventBearingBinding(t *testing.T) {
@@ -753,13 +753,13 @@ func TestRechargeTossAllowsWebhookFirstTradeNoMarker(t *testing.T) {
 	require.Equal(t, "pay_webhook_first", stored.ProviderOrderId)
 	var user User
 	require.NoError(t, DB.First(&user, 19).Error)
-	require.Equal(t, 888, user.Quota)
+	require.Equal(t, int64(888), user.Quota)
 }
 
 func TestCreditTopUpTargetRejectsQuotaCapacityOverflowAtomically(t *testing.T) {
 	setupTossBillingModelTestDB(t)
 	require.NoError(t, DB.AutoMigrate(&User{}))
-	require.NoError(t, DB.Create(&User{Id: 20, Username: "quota-capacity-user", Quota: math.MaxInt32 - 5}).Error)
+	require.NoError(t, DB.Create(&User{Id: 20, Username: "quota-capacity-user", Quota: common.MaxQuota - 5}).Error)
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		return CreditTopUpTarget(tx, &TopUp{UserId: 20}, 10)
@@ -768,7 +768,7 @@ func TestCreditTopUpTargetRejectsQuotaCapacityOverflowAtomically(t *testing.T) {
 	require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
 	var user User
 	require.NoError(t, DB.First(&user, 20).Error)
-	require.Equal(t, math.MaxInt32-5, user.Quota)
+	require.Equal(t, common.MaxQuota-5, user.Quota)
 }
 
 func TestTossRefundRequirementAtomicallyBlocksQuotaFulfillment(t *testing.T) {
@@ -1003,7 +1003,7 @@ func TestCreditTopUpTargetCanRestoreNegativeBalance(t *testing.T) {
 	require.NoError(t, err)
 	var user User
 	require.NoError(t, DB.First(&user, 21).Error)
-	require.Equal(t, 25, user.Quota)
+	require.Equal(t, int64(25), user.Quota)
 }
 
 func TestTossTopUpQuotaMustFitPortableDatabaseInt(t *testing.T) {

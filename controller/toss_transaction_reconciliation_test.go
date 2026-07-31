@@ -586,7 +586,7 @@ func TestTossTransactionPermanentMismatchIsDeadLetteredBeforeLaterRowSettles(t *
 	require.Equal(t, validPaymentKey, validTopUp.ProviderOrderId)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota, "only the valid second transaction may credit quota")
+	require.Equal(t, int64(321), user.Quota, "only the valid second transaction may credit quota")
 
 	var checkpointCount int64
 	require.NoError(t, model.DB.Model(&model.TossTransactionReconciliationPageCursor{}).
@@ -793,7 +793,7 @@ func TestTossTransactionIncompleteCancellationPinsUntilCompletedDetailsAreVisibl
 	require.Equal(t, common.TopUpStatusSuccess, validTopUp.Status)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 }
 
 func TestTossTransactionPartialWalletCancellationDoesNotPinLaterTopUp(t *testing.T) {
@@ -901,7 +901,7 @@ func TestTossTransactionPartialWalletCancellationDoesNotPinLaterTopUp(t *testing
 	require.Equal(t, common.TopUpStatusSuccess, validTopUp.Status)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 	var checkpointCount int64
 	require.NoError(t, model.DB.Model(&model.TossTransactionReconciliationPageCursor{}).
 		Where("source_key = ? AND lane = ?", source.SourceKey, model.TossTransactionPageLaneHistorical).
@@ -1106,7 +1106,7 @@ func TestTossTransactionRestoredProjectOrderWithLostDiscriminatorIsDeadLetteredA
 	require.Equal(t, validPaymentKey, validTopUp.ProviderOrderId)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 }
 
 func TestTossTransactionLocalOrderDisappearanceAfterAuthoritativeLookupIsPermanent(t *testing.T) {
@@ -1488,7 +1488,7 @@ func TestTossTransactionPaymentKeyConflictIsDeadLetteredBeforeLaterRowSettles(t 
 	require.Equal(t, validPaymentKey, validTopUp.ProviderOrderId)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 }
 
 func TestTossTransactionSubscriptionImmutableContractErrorsArePermanent(t *testing.T) {
@@ -1823,7 +1823,7 @@ func TestTossTransactionVirtualAccountDoneRegressionIsDurableAndDoesNotPinLaterR
 		"the durable unresolved event, not an unsafe automatic debit, owns the historical credit discrepancy")
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 432, user.Quota, "the later valid payment may credit quota only once across the replay")
+	require.Equal(t, int64(432), user.Quota, "the later valid payment may credit quota only once across the replay")
 	var checkpointCount int64
 	require.NoError(t, model.DB.Model(&model.TossTransactionReconciliationPageCursor{}).
 		Where("source_key = ? AND lane = ?", source.SourceKey, model.TossTransactionPageLaneHistorical).
@@ -2131,7 +2131,7 @@ func TestTossTransactionReconciliationRecoversDONECheckoutWithoutCallbackOrWebho
 	require.Equal(t, paymentKey, topUp.ProviderOrderId)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 71).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 
 	var cursor model.TossTransactionReconciliationCursor
 	require.NoError(t, model.DB.First(&cursor, "source_key = ?", source.SourceKey).Error)
@@ -2513,7 +2513,7 @@ func TestTossTransactionReconciliationSkipsUnprovableLocalOrderAndContinuesSourc
 			require.Equal(t, common.TopUpStatusExpired, topUp.Status)
 			var user model.User
 			require.NoError(t, model.DB.First(&user, 71).Error)
-			require.Equal(t, 321, user.Quota)
+			require.Equal(t, int64(321), user.Quota)
 			topUp = model.TopUp{}
 			require.NoError(t, model.DB.Where("trade_no = ?", validOrderID).First(&topUp).Error)
 			require.Equal(t, common.TopUpStatusSuccess, topUp.Status)

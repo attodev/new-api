@@ -164,7 +164,7 @@ func TestReconcileTossRecordedTopUpRetriesExactIdempotentConfirmAfterLookup404(t
 	require.Empty(t, stored.ProviderClaimToken)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 7).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 }
 
 func TestReconcileTossRecordedTopUpLeavesPendingWhenIdempotentRetryStillProcessing(t *testing.T) {
@@ -858,7 +858,7 @@ func TestTossConfirmInactiveUserStillSettlesAlreadyDonePayment(t *testing.T) {
 	require.Equal(t, common.TopUpStatusSuccess, stored.Status)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 7).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 }
 
 func TestReconcileTossRecordedTopUpKillSwitchDoesNotRetryOrFailLookupMiss(t *testing.T) {
@@ -1031,7 +1031,7 @@ func TestTossWebhookRecoversLateDoneAfterLocalTerminalState(t *testing.T) {
 	require.Equal(t, paymentKey, stored.ProviderOrderId)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 27).Error)
-	require.Equal(t, 444, user.Quota)
+	require.Equal(t, int64(444), user.Quota)
 	var eventCount int64
 	require.NoError(t, model.DB.Model(&model.TossPaymentEvent{}).Where("order_id = ? AND event_type = ?", orderID, model.TossPaymentEventTypeFulfillment).Count(&eventCount).Error)
 	require.Zero(t, eventCount)

@@ -27,7 +27,7 @@ type WalletAutoRechargePreset struct {
 	Description       string  `json:"description" gorm:"type:varchar(255)"`
 	Amount            float64 `json:"amount"`
 	ThresholdAmount   float64 `json:"threshold_amount"`
-	ThresholdQuota    int     `json:"threshold_quota"`
+	ThresholdQuota    int64   `json:"threshold_quota"`
 	IntervalUnit      string  `json:"interval_unit" gorm:"type:varchar(16)"`
 	IntervalValue     int     `json:"interval_value"`
 	CustomSeconds     int64   `json:"custom_seconds"`
@@ -49,7 +49,7 @@ type WalletAutoRechargePresetTerms struct {
 	TargetScope       string  `json:"target_scope"`
 	Amount            float64 `json:"amount"`
 	ThresholdAmount   float64 `json:"threshold_amount"`
-	ThresholdQuota    int     `json:"threshold_quota"`
+	ThresholdQuota    int64   `json:"threshold_quota"`
 	IntervalUnit      string  `json:"interval_unit"`
 	IntervalValue     int     `json:"interval_value"`
 	CustomSeconds     int64   `json:"custom_seconds"`
@@ -103,7 +103,7 @@ type WalletAutoRechargePresetRequest struct {
 	Description       string  `json:"description"`
 	Amount            float64 `json:"amount"`
 	ThresholdAmount   float64 `json:"threshold_amount"`
-	ThresholdQuota    int     `json:"threshold_quota"`
+	ThresholdQuota    int64   `json:"threshold_quota"`
 	IntervalUnit      string  `json:"interval_unit"`
 	IntervalValue     int     `json:"interval_value"`
 	CustomSeconds     int64   `json:"custom_seconds"`

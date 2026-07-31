@@ -151,7 +151,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("Quota added via redemption code: %s, redemption ID: %d", logger.LogQuota(redemption.Quota), redemption.Id))
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("Quota added via redemption code: %s, redemption ID: %d", logger.LogQuota(int64(redemption.Quota)), redemption.Id))
 	return redemption.Quota, nil
 }
 

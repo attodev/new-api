@@ -180,9 +180,9 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 						newQuota := int(usd * common.QuotaPerUnit)
 						delta := newQuota - int(existingUser.Quota)
 						if delta > 0 {
-							_ = model.IncreaseUserQuota(existingUser.Id, delta, true)
+							_ = model.IncreaseUserQuota(existingUser.Id, int64(delta), true)
 						} else if delta < 0 {
-							_ = model.DecreaseUserQuota(existingUser.Id, -delta, true)
+							_ = model.DecreaseUserQuota(existingUser.Id, -int64(delta), true)
 						}
 					}
 				}
@@ -259,11 +259,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 		if quota != 0 {
 			delta := quota - int(common.QuotaForNewUser)
 			if delta > 0 {
-				if err := model.IncreaseUserQuota(newUser.Id, delta, true); err != nil {
+				if err := model.IncreaseUserQuota(newUser.Id, int64(delta), true); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 				}
 			} else if delta < 0 {
-				if err := model.DecreaseUserQuota(newUser.Id, -delta, true); err != nil {
+				if err := model.DecreaseUserQuota(newUser.Id, -int64(delta), true); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 				}
 			}

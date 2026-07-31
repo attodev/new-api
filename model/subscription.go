@@ -1298,7 +1298,7 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 	return "", nil
 }
 
-func calcSubscriptionBalanceQuota(priceAmount float64) (int, error) {
+func calcSubscriptionBalanceQuota(priceAmount float64) (int64, error) {
 	if priceAmount <= 0 {
 		return 0, nil
 	}
@@ -1309,7 +1309,7 @@ func calcSubscriptionBalanceQuota(priceAmount float64) (int, error) {
 		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
 		Ceil().
 		IntPart()
-	return int(quota), nil
+	return quota, nil
 }
 
 // PurchaseSubscriptionWithBalance creates a subscription by deducting the user's wallet quota.
@@ -1320,7 +1320,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 
 	var logPlanTitle string
 	var logMoney float64
-	var chargedQuota int
+	var chargedQuota int64
 	var upgradeGroup string
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		plan, err := getSubscriptionPlanByIdTx(tx, planId)

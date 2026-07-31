@@ -133,7 +133,7 @@ func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 
 	var org model.Organization
 	require.NoError(t, model.DB.First(&org, reloaded.OrganizationId).Error)
-	require.Equal(t, 500, org.Quota)
+	require.Equal(t, int64(500), org.Quota)
 }
 
 func TestOrganizationRootAcceptsCreateBoundaryInput(t *testing.T) {
@@ -141,7 +141,7 @@ func TestOrganizationRootAcceptsCreateBoundaryInput(t *testing.T) {
 		name        string
 		orgName     string
 		description string
-		quota       int
+		quota       int64
 		ownerId     int
 	}{
 		{
@@ -220,12 +220,12 @@ func TestOrganizationRootRejectsInvalidCreateInput(t *testing.T) {
 		{
 			name:    "quota below minimum",
 			body:    `{"name":"Acme","owner_user_id":1,"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"name":"Acme","owner_user_id":1,"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "unsupported field",
@@ -274,14 +274,14 @@ func TestOrganizationRootCanUpdateOrganizationQuota(t *testing.T) {
 
 	var reloaded model.Organization
 	require.NoError(t, model.DB.First(&reloaded, org.Id).Error)
-	require.Equal(t, 750, reloaded.Quota)
+	require.Equal(t, int64(750), reloaded.Quota)
 }
 
 func TestOrganizationRootAcceptsUpdateBoundaryInput(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		body        string
-		wantQuota   int
+		wantQuota   int64
 		wantStatus  int
 		wantComment string
 	}{
@@ -342,12 +342,12 @@ func TestOrganizationRootRejectsInvalidUpdateInput(t *testing.T) {
 		{
 			name:    "quota below minimum",
 			body:    `{"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "status below enum",
@@ -705,7 +705,7 @@ func TestOrganizationAdminCannotUpdateOutsideOrganization(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 10, reloaded.Quota)
+	require.Equal(t, int64(10), reloaded.Quota)
 }
 
 func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
@@ -729,7 +729,7 @@ func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 100, reloaded.Quota)
+	require.Equal(t, int64(100), reloaded.Quota)
 	require.Equal(t, "reviewed", reloaded.Remark)
 }
 
@@ -737,7 +737,7 @@ func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		body       string
-		wantQuota  int
+		wantQuota  int64
 		wantStatus int
 		wantRemark string
 	}{
@@ -793,12 +793,12 @@ func TestOrganizationAdminRejectsInvalidUserUpdateInput(t *testing.T) {
 		{
 			name:    "negative quota",
 			body:    `{"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "invalid status",
@@ -863,7 +863,7 @@ func TestOrganizationAdminCannotUpdateGlobalAdmin(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 10, reloaded.Quota)
+	require.Equal(t, int64(10), reloaded.Quota)
 }
 
 func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {

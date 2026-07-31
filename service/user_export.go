@@ -232,7 +232,7 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 			Status:      stringToStatus(getCell(row, "status")),
 			Group:       group,
 			Quota:       0, // Insert() will set QuotaForNewUser; we override below if needed
-			AffQuota:    affQuota,
+			AffQuota:    int64(affQuota),
 			InviterId:   inviterId,
 			Remark:      getCell(row, "remark"),
 		}
@@ -248,11 +248,11 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 		if quota != 0 {
 			delta := quota - int(common.QuotaForNewUser)
 			if delta > 0 {
-				if err := model.IncreaseUserQuota(user.Id, delta, true); err != nil {
+				if err := model.IncreaseUserQuota(user.Id, int64(delta), true); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 				}
 			} else if delta < 0 {
-				if err := model.DecreaseUserQuota(user.Id, -delta, true); err != nil {
+				if err := model.DecreaseUserQuota(user.Id, -int64(delta), true); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 				}
 			}

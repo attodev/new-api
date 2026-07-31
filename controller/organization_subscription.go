@@ -280,7 +280,7 @@ func buildOrganizationSubscriptionPlanUpdates(req organizationSubscriptionPlanRe
 	if err != nil {
 		return nil, err
 	}
-	if err := validateInt64Range("total_amount", req.TotalAmount, 0, int64(MaxOrganizationQuota)); err != nil {
+	if err := validateInt64Range("total_amount", req.TotalAmount, 0, MaxOrganizationQuota); err != nil {
 		return nil, err
 	}
 	durationUnit := strings.TrimSpace(req.DurationUnit)

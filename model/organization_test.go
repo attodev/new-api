@@ -166,8 +166,8 @@ func TestGetOrganizationDashboardScopesQuotaDataToOrganization(t *testing.T) {
 
 	require.Equal(t, org.Id, dashboard.Organization.Id)
 	require.Equal(t, "Dashboard Org", dashboard.Organization.Name)
-	require.Equal(t, 1000, dashboard.Organization.Quota)
-	require.Equal(t, 125, dashboard.Organization.UsedQuota)
+	require.Equal(t, int64(1000), dashboard.Organization.Quota)
+	require.Equal(t, int64(125), dashboard.Organization.UsedQuota)
 
 	require.Equal(t, 350, dashboard.Summary.PeriodQuota)
 	require.Equal(t, 6, dashboard.Summary.PeriodRequests)

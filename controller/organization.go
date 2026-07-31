@@ -22,12 +22,12 @@ type createOrganizationRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	OwnerUserId int    `json:"owner_user_id"`
-	Quota       *int   `json:"quota,omitempty"`
+	Quota       *int64 `json:"quota,omitempty"`
 }
 
 type updateOrganizationUserRequest struct {
 	Status *int    `json:"status,omitempty"`
-	Quota  *int    `json:"quota,omitempty"`
+	Quota  *int64  `json:"quota,omitempty"`
 	Remark *string `json:"remark,omitempty"`
 }
 
@@ -37,7 +37,7 @@ type assignOrganizationUserRequest struct {
 
 type updateOrganizationRequest struct {
 	Description *string `json:"description,omitempty"`
-	Quota       *int    `json:"quota,omitempty"`
+	Quota       *int64  `json:"quota,omitempty"`
 	Status      *int    `json:"status,omitempty"`
 }
 
@@ -68,9 +68,9 @@ func CreateOrganization(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	initialQuota := 0
+	var initialQuota int64
 	if req.Quota != nil {
-		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+		if err := validateInt64Range("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
 			common.ApiError(c, err)
 			return
 		}
@@ -137,7 +137,7 @@ func UpdateOrganization(c *gin.Context) {
 		updates["description"] = description
 	}
 	if req.Quota != nil {
-		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+		if err := validateInt64Range("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
 			common.ApiError(c, err)
 			return
 		}
@@ -647,7 +647,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		updates["status"] = *req.Status
 	}
 	if req.Quota != nil {
-		if err := validateIntRange("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
+		if err := validateInt64Range("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
 			common.ApiError(c, err)
 			return
 		}
