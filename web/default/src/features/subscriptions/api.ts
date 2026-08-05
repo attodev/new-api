@@ -26,6 +26,7 @@ import type {
   SubscriptionPayResponse,
   SubscriptionPayRequest,
   SelfSubscriptionData,
+  TossSubscriptionBillingAuthSession,
 } from './types'
 
 // ============================================================================
@@ -133,6 +134,31 @@ export async function paySubscriptionBalance(
   data: SubscriptionPayRequest
 ): Promise<SubscriptionPayResponse> {
   const res = await api.post('/api/subscription/balance/pay', data)
+  return res.data
+}
+
+export async function paySubscriptionToss(data: { plan_id: number }): Promise<
+  Omit<SubscriptionPayResponse, 'success' | 'data'> & {
+    // The Toss controller follows the legacy {message: "success"} envelope.
+    success?: boolean
+    data?: TossSubscriptionBillingAuthSession
+  }
+> {
+  const res = await api.post('/api/subscription/toss/pay', data)
+  return res.data
+}
+
+export async function cancelPendingTossSubscription(
+  tradeNo: string
+): Promise<ApiResponse<{ cancelled: boolean }>> {
+  const res = await api.delete(
+    `/api/subscription/toss/pending/${encodeURIComponent(tradeNo)}`
+  )
+  return res.data
+}
+
+export async function cancelTossAutoRenew(): Promise<SubscriptionPayResponse> {
+  const res = await api.post('/api/subscription/toss/cancel', {})
   return res.data
 }
 

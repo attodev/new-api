@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -23,13 +24,15 @@ import (
 )
 
 func GetTopUpInfo(c *gin.Context) {
+	tossConfig := setting.GetTossConfigSnapshot()
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
+	tossTopUpEnabled := isTossTopUpEnabled()
 
 	// Epay Epay
 	// PayMethods /
 	var payMethods []map[string]string
 	if complianceConfirmed && isEpayTopUpEnabled() {
-		payMethods = operation_setting.PayMethods
+		payMethods = paymentMethodsForTossFeatureGate(operation_setting.PayMethods, tossTopUpEnabled)
 	}
 
 	// Stripe
@@ -94,6 +97,25 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	// Toss
+	if tossTopUpEnabled {
+		hasToss := false
+		for _, method := range payMethods {
+			if method["type"] == model.PaymentMethodToss {
+				hasToss = true
+				break
+			}
+		}
+		if !hasToss {
+			payMethods = append(payMethods, map[string]string{
+				"name":      "Toss",
+				"type":      model.PaymentMethodToss,
+				"color":     "#0051BA",
+				"min_topup": strconv.Itoa(setting.TossEffectiveGeneralTopUp()),
+			})
+		}
+	}
+
 	// Waffo
 	enableWaffo := isWaffoTopUpEnabled()
 	if enableWaffo {
@@ -123,6 +145,11 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
+		"enable_toss_topup":                tossTopUpEnabled,
+		"enable_toss_billing":              isTossBillingEnabled(),
+		"enable_toss_wallet_auto_recharge": isTossWalletAutoRechargeEnabled(),
+		"toss_min_topup":                   setting.TossEffectiveGeneralTopUp(),
+		"toss_unit_price":                  tossConfig.UnitPrice,
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,
@@ -144,6 +171,21 @@ func GetTopUpInfo(c *gin.Context) {
 		"topup_link":              common.TopUpLink,
 	}
 	common.ApiSuccess(c, data)
+}
+
+// paymentMethodsForTossFeatureGate keeps the public payment-method list in
+// sync with the dedicated Toss feature gate. A legacy administrator-defined
+// `toss` entry must not make either frontend offer a checkout that the Toss
+// endpoints will reject as disabled.
+func paymentMethodsForTossFeatureGate(payMethods []map[string]string, tossEnabled bool) []map[string]string {
+	filtered := make([]map[string]string, 0, len(payMethods))
+	for _, method := range payMethods {
+		if !tossEnabled && method["type"] == model.PaymentMethodToss {
+			continue
+		}
+		filtered = append(filtered, method)
+	}
+	return filtered
 }
 
 type EpayRequest struct {
@@ -303,6 +345,8 @@ type refCountedMutex struct {
 	refCount int
 }
 
+const orderLockContextPollInterval = 5 * time.Millisecond
+
 // LockOrder
 func LockOrder(tradeNo string) {
 	createLock.Lock()
@@ -316,6 +360,66 @@ func LockOrder(tradeNo string) {
 	rcm.refCount++
 	createLock.Unlock()
 	rcm.mu.Lock()
+}
+
+// LockOrderWithContext preserves the same per-order serialization as
+// LockOrder, but lets deadline-bound callers abandon a contended lock. The
+// reference is registered before waiting so the shared lock entry cannot be
+// deleted and replaced while this caller is polling it.
+func LockOrderWithContext(ctx context.Context, tradeNo string) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	createLock.Lock()
+	var rcm *refCountedMutex
+	if v, ok := orderLocks.Load(tradeNo); ok {
+		rcm = v.(*refCountedMutex)
+	} else {
+		rcm = &refCountedMutex{}
+		orderLocks.Store(tradeNo, rcm)
+	}
+	rcm.refCount++
+	createLock.Unlock()
+
+	releaseReference := func() {
+		createLock.Lock()
+		rcm.refCount--
+		if rcm.refCount == 0 {
+			// refCount protects this exact entry from replacement, but compare the
+			// loaded value as an additional guard against future bookkeeping changes.
+			if current, ok := orderLocks.Load(tradeNo); ok && current == rcm {
+				orderLocks.Delete(tradeNo)
+			}
+		}
+		createLock.Unlock()
+	}
+
+	timer := time.NewTimer(orderLockContextPollInterval)
+	defer timer.Stop()
+	for {
+		if ctx.Err() != nil {
+			releaseReference()
+			return false
+		}
+		if rcm.mu.TryLock() {
+			// Do not start work after the deadline won a race with TryLock.
+			if ctx.Err() != nil {
+				rcm.mu.Unlock()
+				releaseReference()
+				return false
+			}
+			return true
+		}
+
+		select {
+		case <-ctx.Done():
+			releaseReference()
+			return false
+		case <-timer.C:
+			timer.Reset(orderLockContextPollInterval)
+		}
+	}
 }
 
 // UnlockOrder
@@ -426,13 +530,13 @@ func EpayNotify(c *gin.Context) {
 			dAmount := decimal.NewFromInt(int64(topUp.Amount))
 			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-			err = model.CreditTopUpTarget(model.DB, topUp, quotaToAdd)
+			err = model.CreditTopUpTarget(model.DB, topUp, int64(quotaToAdd))
 			if err != nil {
 				logger.LogError(c.Request.Context(), fmt.Sprintf("Epay update target wallet quota failed trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s quota_to_add=%d error=%q topup=%q", topUp.TradeNo, topUp.UserId, topUp.EffectiveTargetType(), topUp.EffectiveTargetId(), c.ClientIP(), quotaToAdd, err.Error(), common.GetJsonString(topUp)))
 				return
 			}
 			logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay recharge succeeded trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q", topUp.TradeNo, topUp.UserId, c.ClientIP(), quotaToAdd, topUp.Money, common.GetJsonString(topUp)))
-			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("Online topup succeeded, quota: %v, amount: %f", logger.LogQuota(quotaToAdd), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "epay")
+			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("Online topup succeeded, quota: %v, amount: %f", logger.LogQuota(int64(quotaToAdd)), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "epay")
 		}
 	} else {
 		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook event ignored trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))

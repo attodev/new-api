@@ -25,6 +25,9 @@ import type { PricingData } from './types'
 
 // Get model pricing data
 export async function getPricing(): Promise<PricingData> {
-  const res = await api.get('/api/pricing')
+  // Scoped timeout: a stalled first-load request (e.g. cold backend/Redis
+  // connection) should reject and let React Query retry, instead of hanging
+  // the loading state forever until a manual refresh.
+  const res = await api.get('/api/pricing', { timeout: 8000 })
   return res.data
 }

@@ -11,16 +11,22 @@ import (
 )
 
 const (
-	MaxOrganizationNameLength                     = 64
-	MaxOrganizationDescriptionLength              = 255
-	MaxOrganizationRemarkLength                   = 255
-	MaxOrganizationQuota                          = 1_000_000_000
-	MaxOrganizationReferenceId                    = 1_000_000_000
-	MaxOrganizationSubscriptionPlanTitleLength    = 128
-	MaxOrganizationSubscriptionPlanSubtitleLength = 255
-	MaxOrganizationSubscriptionDurationValue      = 1200
-	MaxOrganizationSubscriptionCustomSeconds      = 31_536_000
-	MaxOrganizationSubscriptionSortOrder          = 1_000_000
+	MaxOrganizationNameLength        = 64
+	MaxOrganizationDescriptionLength = 255
+	MaxOrganizationRemarkLength      = 255
+	// Quota ceilings share one definition with the model layer, which enforces the
+	// same bound atomically on the increment paths. See common.MaxQuota.
+	MaxOrganizationQuota = common.MaxQuota
+	// Top-up amounts are currency units handed to a payment gateway and are later
+	// multiplied by quotaPerUnit, so they keep the original, far lower ceiling
+	// rather than sharing MaxOrganizationQuota.
+	MaxTopUpAmount                                int64 = 1_000_000_000
+	MaxOrganizationReferenceId                          = 1_000_000_000
+	MaxOrganizationSubscriptionPlanTitleLength          = 128
+	MaxOrganizationSubscriptionPlanSubtitleLength       = 255
+	MaxOrganizationSubscriptionDurationValue            = 1200
+	MaxOrganizationSubscriptionCustomSeconds            = 31_536_000
+	MaxOrganizationSubscriptionSortOrder                = 1_000_000
 
 	OrganizationStatusAllowedError       = "status must be one of: 1, 2"
 	OrganizationDurationValueRangeError  = "duration_value must be between 0 and 1200"
@@ -90,8 +96,8 @@ func validateOrganizationDurationUnit(durationUnit string) error {
 }
 
 func rejectTopUpAmountTooLarge(amount int64) error {
-	if amount > int64(MaxOrganizationQuota) {
-		return fmt.Errorf("amount cannot be greater than %d", MaxOrganizationQuota)
+	if amount > MaxTopUpAmount {
+		return fmt.Errorf("amount cannot be greater than %d", MaxTopUpAmount)
 	}
 	return nil
 }

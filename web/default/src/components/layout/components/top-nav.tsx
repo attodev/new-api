@@ -62,7 +62,7 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent side='bottom' align='start'>
             {normalizedLinks.map(
-              ({ title, href, isActive, disabled, external }) => (
+              ({ title, href, isActive, disabled, external, forceReload }) => (
                 <DropdownMenuItem
                   key={`${title}-${href}`}
                   render={
@@ -71,6 +71,13 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
                         href={href}
                         target='_blank'
                         rel='noopener noreferrer'
+                        className={!isActive ? 'text-muted-foreground' : ''}
+                      >
+                        {title}
+                      </a>
+                    ) : forceReload ? (
+                      <a
+                        href={href}
                         className={!isActive ? 'text-muted-foreground' : ''}
                       >
                         {title}
@@ -100,27 +107,43 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
         )}
         {...props}
       >
-        {normalizedLinks.map(({ title, href, isActive, disabled, external }) =>
-          external ? (
-            <a
-              key={`${title}-${href}`}
-              href={href}
-              target='_blank'
-              rel='noopener noreferrer'
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
-            >
-              {title}
-            </a>
-          ) : (
-            <Link
-              key={`${title}-${href}`}
-              to={href}
-              disabled={disabled}
-              className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
-            >
-              {title}
-            </Link>
-          )
+        {normalizedLinks.map(
+          ({ title, href, isActive, disabled, external, forceReload }) => {
+            const navClassName = `hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`
+            if (external) {
+              return (
+                <a
+                  key={`${title}-${href}`}
+                  href={href}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className={navClassName}
+                >
+                  {title}
+                </a>
+              )
+            }
+            // forceReload: full page navigation so the Go backend serves the
+            // target (e.g. the server-rendered landing at '/'), instead of a
+            // client-side route that the SPA would redirect elsewhere.
+            if (forceReload) {
+              return (
+                <a key={`${title}-${href}`} href={href} className={navClassName}>
+                  {title}
+                </a>
+              )
+            }
+            return (
+              <Link
+                key={`${title}-${href}`}
+                to={href}
+                disabled={disabled}
+                className={navClassName}
+              >
+                {title}
+              </Link>
+            )
+          }
         )}
       </nav>
     </>

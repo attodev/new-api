@@ -45,8 +45,9 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
-import { confirmPaymentCompliance } from '../api'
+import { confirmPaymentCompliance, updateTossSystemOptions } from '../api'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -60,6 +61,11 @@ import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
+import {
+  buildCompleteTossRepairUpdates,
+  completeTossCredentialOptionPairs,
+  TOSS_ATOMIC_OPTION_KEYS,
+} from './toss-option-updates'
 import {
   formatJsonForEditor,
   getJsonError,
@@ -136,6 +142,20 @@ const paymentSchema = z.object({
   PayPalSandbox: z.boolean(),
   PayPalUnitPrice: z.coerce.number().min(0),
   PayPalMinTopUp: z.coerce.number().min(0),
+  TossEnabled: z.boolean(),
+  TossBillingEnabled: z.boolean(),
+  TossWalletAutoRechargeEnabled: z.boolean(),
+  TossTestMode: z.boolean(),
+  TossClientKey: z.string(),
+  TossSecretKey: z.string(),
+  TossTestClientKey: z.string(),
+  TossTestSecretKey: z.string(),
+  TossBillingClientKey: z.string(),
+  TossBillingSecretKey: z.string(),
+  TossBillingTestClientKey: z.string(),
+  TossBillingTestSecretKey: z.string(),
+  TossUnitPrice: z.coerce.number().positive().max(2_147_483_647),
+  TossMinTopUp: z.coerce.number().int().min(100).max(2_147_483_647),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -167,6 +187,23 @@ const paymentSchema = z.object({
   WaffoPancakeReturnURL: z.string(),
 })
 
+const tossRepairSchema = paymentSchema.pick({
+  TossEnabled: true,
+  TossBillingEnabled: true,
+  TossWalletAutoRechargeEnabled: true,
+  TossTestMode: true,
+  TossClientKey: true,
+  TossSecretKey: true,
+  TossTestClientKey: true,
+  TossTestSecretKey: true,
+  TossBillingClientKey: true,
+  TossBillingSecretKey: true,
+  TossBillingTestClientKey: true,
+  TossBillingTestSecretKey: true,
+  TossUnitPrice: true,
+  TossMinTopUp: true,
+})
+
 type PaymentFormValues = z.infer<typeof paymentSchema>
 type WaffoFormFieldValues = Omit<WaffoSettingsValues, 'WaffoPayMethods'>
 type PaymentBaseFormValues = Omit<
@@ -190,6 +227,9 @@ type PaymentSettingsSectionProps = {
   waffoPancakeProvisionedStoreID?: string
   waffoPancakeProvisionedProductID?: string
   complianceDefaults: PaymentComplianceDefaults
+  tossConfigRepairRequired: boolean
+  tossConfigMaintenanceRequired: boolean
+  tossConfigRepairToken: string
 }
 
 function parseWaffoPayMethods(value: string): PayMethod[] {
@@ -208,6 +248,9 @@ export function PaymentSettingsSection({
   waffoPancakeProvisionedStoreID,
   waffoPancakeProvisionedProductID,
   complianceDefaults,
+  tossConfigRepairRequired,
+  tossConfigMaintenanceRequired,
+  tossConfigRepairToken,
 }: PaymentSettingsSectionProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -234,6 +277,7 @@ export function PaymentSettingsSection({
   const [creemProductsVisualMode, setCreemProductsVisualMode] =
     React.useState(true)
   const [showComplianceDialog, setShowComplianceDialog] = React.useState(false)
+  const [showTossRepairDialog, setShowTossRepairDialog] = React.useState(false)
   const [waffoPayMethods, setWaffoPayMethods] = React.useState<PayMethod[]>(
     () => parseWaffoPayMethods(waffoDefaultValues.WaffoPayMethods)
   )
@@ -348,6 +392,105 @@ export function PaymentSettingsSection({
   })
 
   const { isSubmitting } = form.formState
+  const tossConfigurationLocked =
+    tossConfigMaintenanceRequired && !tossConfigRepairRequired
+
+  const tossMaintenanceMutation = useMutation({
+    mutationFn: updateTossSystemOptions,
+    onSuccess: async (data) => {
+      if (!data.success) {
+        toast.error(data.message || t('Failed to update setting'))
+        return
+      }
+      await queryClient.invalidateQueries({ queryKey: ['system-options'] })
+      toast.success(
+        data.maintenance_pending
+          ? t(
+              'Toss maintenance is still pending. Retry after checking the configuration.'
+            )
+          : t('Toss configuration is ready.')
+      )
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || t('Failed to update setting'))
+    },
+  })
+
+  const getValidatedTossRepairValues = () => {
+    const parsed = tossRepairSchema.safeParse(form.getValues())
+    if (!parsed.success) {
+      toast.error(
+        t('Review the Toss fields before repairing the configuration.')
+      )
+      return null
+    }
+    const values = parsed.data
+    if (
+      values.TossEnabled ||
+      values.TossBillingEnabled ||
+      values.TossWalletAutoRechargeEnabled
+    ) {
+      toast.error(
+        t('Disable all Toss payment modes before repairing the configuration.')
+      )
+      return null
+    }
+    if (!tossConfigRepairToken) {
+      toast.error(
+        t('Refresh the page before repairing the Toss configuration.')
+      )
+      return null
+    }
+    return values
+  }
+
+  const openTossRepairDialog = () => {
+    if (!getValidatedTossRepairValues()) {
+      return
+    }
+    setShowTossRepairDialog(true)
+  }
+
+  const repairTossConfiguration = async () => {
+    const values = getValidatedTossRepairValues()
+    if (!values) return
+    try {
+      const result = await tossMaintenanceMutation.mutateAsync({
+        updates: buildCompleteTossRepairUpdates({
+          TossEnabled: false,
+          TossBillingEnabled: false,
+          TossWalletAutoRechargeEnabled: false,
+          TossTestMode: values.TossTestMode,
+          TossClientKey: values.TossClientKey.trim(),
+          TossSecretKey: values.TossSecretKey.trim(),
+          TossTestClientKey: values.TossTestClientKey.trim(),
+          TossTestSecretKey: values.TossTestSecretKey.trim(),
+          TossBillingClientKey: values.TossBillingClientKey.trim(),
+          TossBillingSecretKey: values.TossBillingSecretKey.trim(),
+          TossBillingTestClientKey: values.TossBillingTestClientKey.trim(),
+          TossBillingTestSecretKey: values.TossBillingTestSecretKey.trim(),
+          TossUnitPrice: values.TossUnitPrice,
+          TossMinTopUp: values.TossMinTopUp,
+        }),
+        repair_complete_set: true,
+        expected_repair_token: tossConfigRepairToken,
+      })
+      if (result.success) setShowTossRepairDialog(false)
+    } catch {
+      // onError owns the user-facing error; keep the destructive dialog open.
+    }
+  }
+
+  const retryTossMaintenance = async () => {
+    try {
+      await tossMaintenanceMutation.mutateAsync({
+        updates: [],
+        retry_maintenance: true,
+      })
+    } catch {
+      // onError owns the user-facing error and the durable gate remains set.
+    }
+  }
 
   const setPaymentValue = React.useCallback(
     (
@@ -427,6 +570,20 @@ export function PaymentSettingsSection({
       PayPalSandbox: values.PayPalSandbox,
       PayPalUnitPrice: values.PayPalUnitPrice,
       PayPalMinTopUp: values.PayPalMinTopUp,
+      TossEnabled: values.TossEnabled,
+      TossBillingEnabled: values.TossBillingEnabled,
+      TossWalletAutoRechargeEnabled: values.TossWalletAutoRechargeEnabled,
+      TossTestMode: values.TossTestMode,
+      TossClientKey: values.TossClientKey.trim(),
+      TossSecretKey: values.TossSecretKey.trim(),
+      TossTestClientKey: values.TossTestClientKey.trim(),
+      TossTestSecretKey: values.TossTestSecretKey.trim(),
+      TossBillingClientKey: values.TossBillingClientKey.trim(),
+      TossBillingSecretKey: values.TossBillingSecretKey.trim(),
+      TossBillingTestClientKey: values.TossBillingTestClientKey.trim(),
+      TossBillingTestSecretKey: values.TossBillingTestSecretKey.trim(),
+      TossUnitPrice: values.TossUnitPrice,
+      TossMinTopUp: values.TossMinTopUp,
       CreemApiKey: values.CreemApiKey.trim(),
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
@@ -478,6 +635,23 @@ export function PaymentSettingsSection({
       PayPalSandbox: initialRef.current.PayPalSandbox,
       PayPalUnitPrice: initialRef.current.PayPalUnitPrice,
       PayPalMinTopUp: initialRef.current.PayPalMinTopUp,
+      TossEnabled: initialRef.current.TossEnabled,
+      TossBillingEnabled: initialRef.current.TossBillingEnabled,
+      TossWalletAutoRechargeEnabled:
+        initialRef.current.TossWalletAutoRechargeEnabled,
+      TossTestMode: initialRef.current.TossTestMode,
+      TossClientKey: initialRef.current.TossClientKey.trim(),
+      TossSecretKey: initialRef.current.TossSecretKey.trim(),
+      TossTestClientKey: initialRef.current.TossTestClientKey.trim(),
+      TossTestSecretKey: initialRef.current.TossTestSecretKey.trim(),
+      TossBillingClientKey: initialRef.current.TossBillingClientKey.trim(),
+      TossBillingSecretKey: initialRef.current.TossBillingSecretKey.trim(),
+      TossBillingTestClientKey:
+        initialRef.current.TossBillingTestClientKey.trim(),
+      TossBillingTestSecretKey:
+        initialRef.current.TossBillingTestSecretKey.trim(),
+      TossUnitPrice: initialRef.current.TossUnitPrice,
+      TossMinTopUp: initialRef.current.TossMinTopUp,
       CreemApiKey: initialRef.current.CreemApiKey.trim(),
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
@@ -634,6 +808,103 @@ export function PaymentSettingsSection({
       updates.push({ key: 'PayPalMinTopUp', value: sanitized.PayPalMinTopUp })
     }
 
+    if (sanitized.TossEnabled !== initial.TossEnabled) {
+      updates.push({ key: 'TossEnabled', value: sanitized.TossEnabled })
+    }
+
+    if (sanitized.TossBillingEnabled !== initial.TossBillingEnabled) {
+      updates.push({
+        key: 'TossBillingEnabled',
+        value: sanitized.TossBillingEnabled,
+      })
+    }
+
+    if (
+      sanitized.TossWalletAutoRechargeEnabled !==
+      initial.TossWalletAutoRechargeEnabled
+    ) {
+      updates.push({
+        key: 'TossWalletAutoRechargeEnabled',
+        value: sanitized.TossWalletAutoRechargeEnabled,
+      })
+    }
+
+    if (sanitized.TossTestMode !== initial.TossTestMode) {
+      updates.push({ key: 'TossTestMode', value: sanitized.TossTestMode })
+    }
+
+    if (sanitized.TossClientKey !== initial.TossClientKey) {
+      updates.push({ key: 'TossClientKey', value: sanitized.TossClientKey })
+    }
+
+    if (
+      sanitized.TossSecretKey &&
+      sanitized.TossSecretKey !== initial.TossSecretKey
+    ) {
+      updates.push({ key: 'TossSecretKey', value: sanitized.TossSecretKey })
+    }
+
+    if (sanitized.TossTestClientKey !== initial.TossTestClientKey) {
+      updates.push({
+        key: 'TossTestClientKey',
+        value: sanitized.TossTestClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossTestSecretKey &&
+      sanitized.TossTestSecretKey !== initial.TossTestSecretKey
+    ) {
+      updates.push({
+        key: 'TossTestSecretKey',
+        value: sanitized.TossTestSecretKey,
+      })
+    }
+
+    if (sanitized.TossBillingClientKey !== initial.TossBillingClientKey) {
+      updates.push({
+        key: 'TossBillingClientKey',
+        value: sanitized.TossBillingClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingSecretKey &&
+      sanitized.TossBillingSecretKey !== initial.TossBillingSecretKey
+    ) {
+      updates.push({
+        key: 'TossBillingSecretKey',
+        value: sanitized.TossBillingSecretKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingTestClientKey !== initial.TossBillingTestClientKey
+    ) {
+      updates.push({
+        key: 'TossBillingTestClientKey',
+        value: sanitized.TossBillingTestClientKey,
+      })
+    }
+
+    if (
+      sanitized.TossBillingTestSecretKey &&
+      sanitized.TossBillingTestSecretKey !== initial.TossBillingTestSecretKey
+    ) {
+      updates.push({
+        key: 'TossBillingTestSecretKey',
+        value: sanitized.TossBillingTestSecretKey,
+      })
+    }
+
+    if (sanitized.TossUnitPrice !== initial.TossUnitPrice) {
+      updates.push({ key: 'TossUnitPrice', value: sanitized.TossUnitPrice })
+    }
+
+    if (sanitized.TossMinTopUp !== initial.TossMinTopUp) {
+      updates.push({ key: 'TossMinTopUp', value: sanitized.TossMinTopUp })
+    }
+
     if (
       sanitized.CreemApiKey &&
       sanitized.CreemApiKey !== initial.CreemApiKey
@@ -746,7 +1017,24 @@ export function PaymentSettingsSection({
       return
     }
 
-    for (const update of updates) {
+    const tossUpdates = updates.filter((update) =>
+      TOSS_ATOMIC_OPTION_KEYS.has(update.key)
+    )
+    const otherUpdates = updates.filter(
+      (update) => !TOSS_ATOMIC_OPTION_KEYS.has(update.key)
+    )
+    if (tossUpdates.length > 0) {
+      const result = await updateTossSystemOptions(
+        completeTossCredentialOptionPairs(tossUpdates, sanitized)
+      )
+      if (!result.success) {
+        throw new Error(result.message || t('Failed to update setting'))
+      }
+      queryClient.invalidateQueries({ queryKey: ['system-options'] })
+      toast.success(t('Setting updated successfully'))
+    }
+
+    for (const update of otherUpdates) {
       await updateOption.mutateAsync(update)
     }
 
@@ -920,6 +1208,35 @@ export function PaymentSettingsSection({
         onConfirm={() => confirmComplianceMutation.mutate()}
       />
 
+      <ConfirmDialog
+        open={showTossRepairDialog}
+        onOpenChange={setShowTossRepairDialog}
+        title={t('Replace the complete Toss configuration?')}
+        desc={
+          <div className='flex flex-col gap-2'>
+            <p>
+              {t(
+                'Blank credential fields will permanently clear the stored credentials.'
+              )}
+            </p>
+            <p>
+              {t(
+                'All Toss payment modes will remain disabled until maintenance finishes.'
+              )}
+            </p>
+            <p>
+              {t(
+                'Stored secret keys are never shown; re-enter every secret you intend to keep.'
+              )}
+            </p>
+          </div>
+        }
+        confirmText={t('Repair complete Toss configuration')}
+        destructive
+        isLoading={tossMaintenanceMutation.isPending}
+        handleConfirm={() => void repairTossConfiguration()}
+      />
+
       <Form {...form}>
         <SettingsForm
           onSubmit={form.handleSubmit(onSubmit)}
@@ -931,7 +1248,11 @@ export function PaymentSettingsSection({
         >
           <SettingsPageFormActions
             onSave={form.handleSubmit(onSubmit)}
-            isSaving={updateOption.isPending || isSubmitting}
+            isSaving={
+              updateOption.isPending ||
+              tossMaintenanceMutation.isPending ||
+              isSubmitting
+            }
             saveLabel='Save all settings'
           />
           <div className='space-y-4'>
@@ -1450,7 +1771,9 @@ export function PaymentSettingsSection({
                   e.stopPropagation()
                   if (
                     window.confirm(
-                      t('Clear all Stripe credentials and disable Stripe payments?')
+                      t(
+                        'Clear all Stripe credentials and disable Stripe payments?'
+                      )
                     )
                   ) {
                     clearStripeSettings()
@@ -1645,7 +1968,9 @@ export function PaymentSettingsSection({
                   e.stopPropagation()
                   if (
                     window.confirm(
-                      t('Clear all PayPal credentials and disable PayPal payments?')
+                      t(
+                        'Clear all PayPal credentials and disable PayPal payments?'
+                      )
                     )
                   ) {
                     clearPayPalSettings()
@@ -1655,6 +1980,477 @@ export function PaymentSettingsSection({
               >
                 {t('Clear')}
               </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-4'>
+            <div>
+              <h3 className='text-lg font-medium'>{t('Toss Gateway')}</h3>
+              <p className='text-muted-foreground text-sm'>
+                {t('Configuration for Toss Payments integration')}
+              </p>
+            </div>
+
+            {tossConfigRepairRequired && (
+              <Alert variant='destructive'>
+                <ShieldAlert />
+                <AlertTitle>
+                  {t('Toss configuration repair required')}
+                </AlertTitle>
+                <AlertDescription>
+                  {t(
+                    'Payments are fail-closed because the stored Toss configuration is legacy, incomplete, or cannot be verified. Review every field, keep all payment modes disabled, and submit one complete replacement.'
+                  )}
+                </AlertDescription>
+                <AlertAction>
+                  <Button
+                    type='button'
+                    variant='destructive'
+                    size='sm'
+                    disabled={
+                      tossMaintenanceMutation.isPending ||
+                      !tossConfigRepairToken
+                    }
+                    onClick={openTossRepairDialog}
+                  >
+                    {t('Repair complete Toss configuration')}
+                  </Button>
+                </AlertAction>
+              </Alert>
+            )}
+
+            {!tossConfigRepairRequired && tossConfigMaintenanceRequired && (
+              <Alert>
+                <ShieldAlert />
+                <AlertTitle>{t('Toss maintenance pending')}</AlertTitle>
+                <AlertDescription>
+                  {t(
+                    'Toss provider requests and configuration changes remain blocked while legacy payment records are migrated. Retry is safe and never resubmits or clears credentials.'
+                  )}
+                </AlertDescription>
+                <AlertAction>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    disabled={tossMaintenanceMutation.isPending}
+                    onClick={() => void retryTossMaintenance()}
+                  >
+                    {t('Retry Toss maintenance')}
+                  </Button>
+                </AlertAction>
+              </Alert>
+            )}
+
+            <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+              <p className='mb-2 font-medium'>{t('Webhook Configuration:')}</p>
+              <ul className='list-inside list-disc space-y-1'>
+                <li>
+                  {t('Webhook URL:')}{' '}
+                  <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                    {'<ServerAddress>/api/toss/webhook'}
+                  </code>
+                </li>
+                <li>
+                  {t(
+                    'In the Toss developer console, register this URL for PAYMENT_STATUS_CHANGED and BILLING_DELETED events on every Toss MID you use, including the recurring-billing MID when it is separate'
+                  )}
+                </li>
+              </ul>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Toss')}</FormLabel>
+                      <FormDescription>
+                        {t('Enable Toss payment gateway')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        disabled={
+                          (tossConfigRepairRequired ||
+                            tossConfigMaintenanceRequired) &&
+                          !field.value
+                        }
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossTestMode'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Test Mode')}</FormLabel>
+                      <FormDescription>
+                        {t('Use Toss test environment')}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        disabled={
+                          tossConfigMaintenanceRequired &&
+                          !tossConfigRepairRequired
+                        }
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Toss Auto Pay')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Enable only when your Toss MID is approved for recurring billing'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        disabled={
+                          (tossConfigRepairRequired ||
+                            tossConfigMaintenanceRequired) &&
+                          !field.value
+                        }
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked)
+                          if (!checked) {
+                            form.setValue(
+                              'TossWalletAutoRechargeEnabled',
+                              false,
+                              { shouldDirty: true }
+                            )
+                          }
+                        }}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossWalletAutoRechargeEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem className='border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30'>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Toss Wallet Auto Recharge')}</FormLabel>
+                      <FormDescription className='text-amber-900 dark:text-amber-200'>
+                        {t(
+                          'Enable only after separately confirming with Toss that this merchant is approved for non-subscription automatic payments.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        disabled={
+                          !form.watch('TossBillingEnabled') ||
+                          ((tossConfigRepairRequired ||
+                            tossConfigMaintenanceRequired) &&
+                            !field.value)
+                        }
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss Client Key')}
+                        autoComplete='off'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Toss live client key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss Secret Key')}
+                        autoComplete='new-password'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {tossConfigRepairRequired
+                        ? t(
+                            'During repair, a blank secret field clears the stored secret.'
+                          )
+                        : t(
+                            'Toss live secret key (leave blank unless updating)'
+                          )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossTestClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Test Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss test client key')}
+                        autoComplete='off'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Toss test client key (leave blank unless updating)')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossTestSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Test Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss test secret key')}
+                        autoComplete='new-password'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {tossConfigRepairRequired
+                        ? t(
+                            'During repair, a blank secret field clears the stored secret.'
+                          )
+                        : t(
+                            'Toss test secret key (leave blank unless updating)'
+                          )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossBillingClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss billing client key')}
+                        autoComplete='off'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Live client key for a recurring-billing MID (required when Toss Auto Pay is enabled)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss billing secret key')}
+                        autoComplete='new-password'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {tossConfigRepairRequired
+                        ? t(
+                            'During repair, a blank secret field clears the stored secret.'
+                          )
+                        : t(
+                            'Live secret key for a recurring-billing MID (required when Toss Auto Pay is enabled)'
+                          )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossBillingTestClientKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Test Client Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Enter Toss billing test client key')}
+                        autoComplete='off'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Test client key for a recurring-billing MID (required when Test Mode and Toss Auto Pay are enabled)'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossBillingTestSecretKey'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Billing Test Secret Key')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='password'
+                        placeholder={t('Enter Toss billing test secret key')}
+                        autoComplete='new-password'
+                        disabled={tossConfigurationLocked}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {tossConfigRepairRequired
+                        ? t(
+                            'During repair, a blank secret field clears the stored secret.'
+                          )
+                        : t(
+                            'Test secret key for a recurring-billing MID (required when Test Mode and Toss Auto Pay are enabled)'
+                          )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2'>
+              <FormField
+                control={form.control}
+                name='TossUnitPrice'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Unit Price (KRW/unit)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='1'
+                        min={1}
+                        disabled={tossConfigurationLocked}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('KRW amount charged per unit of balance')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='TossMinTopUp'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Min Top-Up (KRW)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        step='1'
+                        min={100}
+                        max={2_147_483_647}
+                        disabled={tossConfigurationLocked}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Minimum recharge amount in KRW')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
 

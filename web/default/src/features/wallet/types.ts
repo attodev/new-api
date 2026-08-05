@@ -38,6 +38,7 @@ export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
 }
+export type TopupAmountMode = 'krw' | 'quota'
 export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type PayPalPaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
@@ -46,6 +47,55 @@ export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
 >
+export interface TossTopupQuote {
+  amount_mode?: TopupAmountMode
+  input_amount?: number
+  charge_amount: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+}
+
+/**
+ * Exact server quote the buyer reviewed before starting a Toss checkout.
+ * Every field is required so the later `/toss/pay` response can be matched
+ * field-for-field before the SDK receives a charge request.
+ */
+export interface TossPaymentConfirmation extends TossTopupQuote {
+  amount_mode: TopupAmountMode
+  input_amount: number
+  charge_amount: number
+  credit_amount: number
+  credit_quota: number
+  unit_price: number
+}
+export type TossAmountResponse = ApiResponse<TossTopupQuote | string | number>
+
+export interface TossPaymentSession {
+  client_key: string
+  customer_key: string
+  order_id: string
+  order_name: string
+  amount: number
+  success_url: string
+  fail_url: string
+  charge_amount?: number
+  credit_amount?: number
+  credit_quota?: number
+  unit_price?: number
+  amount_mode?: TopupAmountMode
+}
+
+export type TossPaymentResponse = ApiResponse<TossPaymentSession>
+
+export interface TossBillingAuthSession {
+  client_key: string
+  customer_key: string
+  trade_no: string
+  success_url: string
+  fail_url: string
+}
+
 export type WaffoPancakePaymentResponse = ApiResponse<
   | {
       checkout_url?: string
@@ -165,6 +215,16 @@ export interface TopupInfo {
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
+  /** Whether Toss topup is enabled */
+  enable_toss_topup?: boolean
+  /** Minimum topup amount for Toss (KRW) */
+  toss_min_topup?: number
+  /** Toss unit price in KRW for 1 wallet credit unit */
+  toss_unit_price?: number
+  /** Whether Toss billing (recurring subscription) is enabled */
+  enable_toss_billing?: boolean
+  /** Whether separately approved Toss wallet auto recharge is enabled */
+  enable_toss_wallet_auto_recharge?: boolean
   /** Whether redemption code usage is enabled */
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
@@ -199,6 +259,8 @@ export interface PaymentRequest {
   amount: number
   /** Payment method identifier */
   payment_method: string
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
@@ -225,6 +287,8 @@ export interface WaffoPancakePaymentRequest {
 export interface AmountRequest {
   /** Topup amount to calculate */
   amount: number
+  /** Toss topup amount interpretation */
+  amount_mode?: TopupAmountMode
 }
 
 /**
@@ -302,3 +366,107 @@ export interface BillingHistoryResponse {
 export interface CompleteOrderRequest {
   trade_no: string
 }
+
+export type WalletAutoRechargeType = 'scheduled' | 'threshold'
+
+export type WalletAutoRechargeTargetScope = 'user' | 'organization' | 'all'
+
+export type WalletAutoRechargeIntervalUnit = 'month' | 'day' | 'custom'
+
+export type WalletAutoRechargeStatus =
+  | 'pending'
+  | 'active'
+  | 'cancel_pending'
+  | 'cancelled'
+  | 'failed'
+
+export interface WalletAutoRechargePolicy {
+  id: number
+  type: WalletAutoRechargeType
+  target_type: 'user' | 'organization'
+  target_id: number
+  amount: number
+  threshold_amount?: number
+  threshold_quota?: number
+  interval_unit?: WalletAutoRechargeIntervalUnit
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+  next_charge_time?: number
+  last_charge_time?: number
+  cooldown_until?: number
+  daily_charge_count?: number
+  status: WalletAutoRechargeStatus
+  fail_count?: number
+  last_error?: string
+  card_company?: string
+  card_number_masked?: string
+}
+
+export interface WalletAutoRechargePreset {
+  id: number
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description?: string
+  amount: number
+  threshold_amount?: number
+  threshold_quota?: number
+  interval_unit?: WalletAutoRechargeIntervalUnit
+  interval_value?: number
+  custom_seconds?: number
+  charge_immediately?: boolean
+  sort_order?: number
+  enabled: boolean
+  terms_fingerprint?: string
+}
+
+export interface WalletAutoRechargePresetTerms {
+  preset_id: number
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  amount: number
+  threshold_amount: number
+  threshold_quota: number
+  interval_unit: WalletAutoRechargeIntervalUnit | ''
+  interval_value: number
+  custom_seconds: number
+  charge_immediately: boolean
+  enabled: boolean
+}
+
+export interface WalletAutoRechargePresetRequest {
+  type: WalletAutoRechargeType
+  target_scope: WalletAutoRechargeTargetScope
+  name: string
+  description: string
+  amount: number
+  threshold_amount: number
+  threshold_quota: number
+  interval_unit: WalletAutoRechargeIntervalUnit
+  interval_value: number
+  custom_seconds: number
+  charge_immediately: boolean
+  sort_order: number
+  enabled: boolean
+}
+
+export interface WalletAutoRechargeRequest {
+  preset_id: number
+  preset_fingerprint: string
+  expected_policy: WalletAutoRechargePresetTerms
+}
+
+export type WalletAutoRechargeResponse = ApiResponse<WalletAutoRechargePolicy[]>
+
+export type WalletAutoRechargePresetResponse = ApiResponse<
+  WalletAutoRechargePreset[]
+>
+
+export interface WalletAutoRechargeBillingAuthSession extends TossBillingAuthSession {
+  preset_fingerprint: string
+  policy: WalletAutoRechargePresetTerms
+}
+
+export type WalletAutoRechargeTossResponse =
+  ApiResponse<WalletAutoRechargeBillingAuthSession>

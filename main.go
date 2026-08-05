@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -49,6 +50,9 @@ var classicIndexPage []byte
 
 //go:embed web/default/public
 var publicFS embed.FS
+
+//go:embed web/default/templates
+var templatesFS embed.FS
 
 func main() {
 	startTime := time.Now()
@@ -119,6 +123,18 @@ func main() {
 
 	// Subscription quota reset task (daily/weekly/monthly/custom)
 	service.StartSubscriptionQuotaResetTask()
+
+	// Expire stale Toss pending top-up orders (window-close sends no webhook)
+	service.StartTossPendingCleanupTask()
+
+	// Reconcile missed Toss approvals and refunds after callbacks/webhook retries.
+	controller.StartTossTransactionReconciliationTask()
+
+	// Toss auto-renew recurring billing (charges due subscriptions every minute)
+	service.StartTossBillingTask()
+
+	// Wallet auto-recharge background billing (scheduled + threshold policies)
+	service.StartWalletAutoRechargeTask()
 
 	// Wire task polling adaptor factory (breaks service -> relay import cycle)
 	service.GetTaskAdaptorFunc = func(platform constant.TaskPlatform) service.TaskPollingAdaptor {
@@ -196,6 +212,7 @@ func main() {
 		ClassicBuildFS:   classicBuildFS,
 		ClassicIndexPage: classicIndexPage,
 		PublicFS:         publicFS,
+		TemplatesFS:      templatesFS,
 	})
 	var port = os.Getenv("PORT")
 	if port == "" {
@@ -233,22 +250,19 @@ func InjectUmamiAnalytics() {
 }
 
 func InjectGoogleAnalytics() {
+	const gaID = "G-Z73Y7213LF"
 	analyticsInjectBuilder := &strings.Builder{}
-	if os.Getenv("GOOGLE_ANALYTICS_ID") != "" {
-		gaID := os.Getenv("GOOGLE_ANALYTICS_ID")
-		// Google Analytics 4 (gtag.js)
-		analyticsInjectBuilder.WriteString("<script async src=\"https://www.googletagmanager.com/gtag/js?id=")
-		analyticsInjectBuilder.WriteString(gaID)
-		analyticsInjectBuilder.WriteString("\"></script>")
-		analyticsInjectBuilder.WriteString("<script>")
-		analyticsInjectBuilder.WriteString("window.dataLayer = window.dataLayer || [];")
-		analyticsInjectBuilder.WriteString("function gtag(){dataLayer.push(arguments);}")
-		analyticsInjectBuilder.WriteString("gtag('js', new Date());")
-		analyticsInjectBuilder.WriteString("gtag('config', '")
-		analyticsInjectBuilder.WriteString(gaID)
-		analyticsInjectBuilder.WriteString("');")
-		analyticsInjectBuilder.WriteString("</script>")
-	}
+	analyticsInjectBuilder.WriteString("<script async src=\"https://www.googletagmanager.com/gtag/js?id=")
+	analyticsInjectBuilder.WriteString(gaID)
+	analyticsInjectBuilder.WriteString("\"></script>")
+	analyticsInjectBuilder.WriteString("<script>")
+	analyticsInjectBuilder.WriteString("window.dataLayer = window.dataLayer || [];")
+	analyticsInjectBuilder.WriteString("function gtag(){dataLayer.push(arguments);}")
+	analyticsInjectBuilder.WriteString("gtag('js', new Date());")
+	analyticsInjectBuilder.WriteString("gtag('config', '")
+	analyticsInjectBuilder.WriteString(gaID)
+	analyticsInjectBuilder.WriteString("');")
+	analyticsInjectBuilder.WriteString("</script>")
 	analyticsInjectBuilder.WriteString("<!--Google Analytics QuantumNous-->\n")
 	analyticsInject := []byte(analyticsInjectBuilder.String())
 	placeholder := []byte("<!--Google Analytics-->\n")
@@ -288,6 +302,22 @@ func InitResources() error {
 
 	// Initialize options, should after model.InitDB()
 	model.InitOptionMap()
+	if common.IsMasterNode {
+		tossState, stateErr := model.GetTossConfigState()
+		if stateErr != nil {
+			return fmt.Errorf("failed to inspect Toss configuration maintenance: %w", stateErr)
+		}
+		if tossState.MaintenanceRequired {
+			err := model.CompleteTossConfigurationMaintenance()
+			if err != nil {
+				if tossState.RepairRequired && errors.Is(err, model.ErrTossConfigRevisionStale) {
+					common.SysLog("legacy Toss maintenance deferred; Toss payments remain disabled until an administrator completes configuration repair")
+				} else {
+					return fmt.Errorf("failed to complete Toss configuration maintenance: %w", err)
+				}
+			}
+		}
+	}
 
 	common.CleanupOldCacheFiles()
 

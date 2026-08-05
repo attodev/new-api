@@ -16,7 +16,7 @@ import (
 
 func ReturnPreConsumedQuota(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
 	if relayInfo.FinalPreConsumedQuota != 0 {
-		logger.LogInfo(c, fmt.Sprintf("user %d request failed, refunding pre-charged quota: %s", relayInfo.UserId, logger.FormatQuota(relayInfo.FinalPreConsumedQuota)))
+		logger.LogInfo(c, fmt.Sprintf("user %d request failed, refunding pre-charged quota: %s", relayInfo.UserId, logger.FormatQuota(int64(relayInfo.FinalPreConsumedQuota))))
 		gopool.Go(func() {
 			relayInfoCopy := *relayInfo
 
@@ -38,14 +38,14 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 	if userQuota <= 0 {
 		return types.NewErrorWithStatusCode(fmt.Errorf("user quota insufficient, remaining: %s", logger.FormatQuota(userQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
-	if userQuota-preConsumedQuota < 0 {
-		return types.NewErrorWithStatusCode(fmt.Errorf("pre-charge failed, user remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+	if userQuota-int64(preConsumedQuota) < 0 {
+		return types.NewErrorWithStatusCode(fmt.Errorf("pre-charge failed, user remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(int64(preConsumedQuota))), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 
 	trustQuota := common.GetTrustQuota()
 
 	relayInfo.UserQuota = userQuota
-	if userQuota > trustQuota {
+	if userQuota > int64(trustQuota) {
 		if !relayInfo.TokenUnlimited {
 			tokenQuota := c.GetInt("token_quota")
 			if tokenQuota > trustQuota {
@@ -65,11 +65,11 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodePreConsumeTokenQuotaFailed, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		err = model.DecreaseUserQuota(relayInfo.UserId, preConsumedQuota, false)
+		err = model.DecreaseUserQuota(relayInfo.UserId, int64(preConsumedQuota), false)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
-		logger.LogInfo(c, fmt.Sprintf("user %d pre-charged: %s, remaining quota after pre-charge: %s", relayInfo.UserId, logger.FormatQuota(preConsumedQuota), logger.FormatQuota(userQuota-preConsumedQuota)))
+		logger.LogInfo(c, fmt.Sprintf("user %d pre-charged: %s, remaining quota after pre-charge: %s", relayInfo.UserId, logger.FormatQuota(int64(preConsumedQuota)), logger.FormatQuota(userQuota-int64(preConsumedQuota))))
 	}
 	relayInfo.FinalPreConsumedQuota = preConsumedQuota
 	return nil

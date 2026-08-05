@@ -17,7 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useMemo, useState } from 'react'
+import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 import {
@@ -190,6 +192,14 @@ export function Pricing() {
                 'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
               )}
             </p>
+            <Alert variant='notice' className='mx-auto mt-3 max-w-2xl'>
+              <Info aria-hidden='true' strokeWidth={2.5} />
+              <AlertDescription>
+                {t(
+                  'Prices reflect promotional rates and may vary over time and by model.'
+                )}
+              </AlertDescription>
+            </Alert>
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}

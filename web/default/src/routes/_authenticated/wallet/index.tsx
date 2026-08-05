@@ -16,8 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useEffect } from 'react'
 import { z } from 'zod'
 import { createFileRoute } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { hasOrganizationOwnerRole } from '@/lib/organization-roles'
 import { OrganizationMemberWalletSummary } from '@/features/organizations/components/organization-member-wallet-summary'
@@ -26,6 +29,10 @@ import { Wallet } from '@/features/wallet'
 
 const walletSearchSchema = z.object({
   show_history: z.boolean().optional(),
+  toss_error_code: z.string().optional(),
+  toss_error_message: z.string().optional(),
+  toss_order_id: z.string().optional(),
+  wallet_auto_recharge: z.enum(['success', 'failed']).optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/wallet/')({
@@ -34,13 +41,44 @@ export const Route = createFileRoute('/_authenticated/wallet/')({
 })
 
 function RouteComponent() {
-  const { show_history } = Route.useSearch()
+  const {
+    show_history,
+    toss_error_code,
+    toss_error_message,
+    wallet_auto_recharge,
+  } = Route.useSearch()
+  const { t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
   const organizationId = Number(user?.organization_id ?? 0)
 
+  useEffect(() => {
+    const detail = (toss_error_message || toss_error_code || '').trim()
+    let handled = false
+    if (detail) {
+      if (
+        toss_error_code === 'PAY_PROCESS_CANCELED' ||
+        toss_error_code === 'USER_CANCEL'
+      ) {
+        toast.info(t('Cancelled'))
+      } else {
+        toast.error(`${t('Payment request failed')}: ${detail}`)
+      }
+      handled = true
+    }
+    if (wallet_auto_recharge === 'success') {
+      toast.success(t('Setting updated successfully'))
+      handled = true
+    } else if (wallet_auto_recharge === 'failed' && !detail) {
+      toast.error(t('Payment request failed'))
+      handled = true
+    }
+    if (!handled) return
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [t, toss_error_code, toss_error_message, wallet_auto_recharge])
+
   if (organizationId > 0) {
     if (hasOrganizationOwnerRole(user?.organization_role)) {
-      return <OrganizationWallet />
+      return <OrganizationWallet initialShowHistory={show_history} />
     }
     return <OrganizationMemberWalletSummary />
   }

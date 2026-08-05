@@ -1,7 +1,14 @@
 package router
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
+	"fmt"
+	"html/template"
+	"io"
+	"io/fs"
 	"net/http"
 	"strings"
 
@@ -9,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/gin-contrib/gzip"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 )
@@ -20,40 +28,222 @@ type ThemeAssets struct {
 	ClassicBuildFS   embed.FS
 	ClassicIndexPage []byte
 	PublicFS         embed.FS
+	TemplatesFS      embed.FS
+}
+
+// webPageData is the data passed to the shared header/footer partials so
+// they can highlight the active nav item and point links at the right page.
+type webPageData struct {
+	Active       string       // "about" (index pages) or "guide" (guide pages)
+	IsLoggedIn   bool         // whether the current request carries a logged-in session
+	Username     string       // logged-in user's login name, empty when not logged in
+	DisplayName  string       // shown name (display_name, falls back to username) — matches the dashboard
+	UserInitial  string       // first rune of Username, upper-cased, for the avatar badge
+	UserRole     int          // session role (0/1/10/100); templates map it to a label
+	UserGroup    string       // session user group, e.g. "default"
+	UserAvatarBg template.CSS // hash-derived avatar background, matching the dashboard
+}
+
+// avatarBg reproduces the dashboard's getUserAvatarStyle (web/default/src/lib/avatar.ts)
+// so the landing badge gets the exact same per-user color as the app.
+func avatarBg(name string) template.CSS {
+	var hash uint32
+	for _, r := range name {
+		hash = hash*31 + uint32(r)
+	}
+	hue := hash % 360
+	sat := 54 + hash%8
+	light := 52 + ((hash >> 4) % 8)
+	return template.CSS(fmt.Sprintf("hsl(%d %d%% %d%% / 0.82)", hue, sat, light))
+}
+
+// buildWebPageData reads the current request session and assembles the data
+// the shared header/footer partials need, including the logged-in badge
+// fields. Shared by the dev and production render paths so the landing
+// reflects the current login state.
+func buildWebPageData(c *gin.Context, active string) webPageData {
+	session := sessions.Default(c)
+	data := webPageData{
+		Active:     active,
+		IsLoggedIn: session.Get("id") != nil,
+	}
+	if u, ok := session.Get("username").(string); ok {
+		data.Username = u
+		data.DisplayName = u
+		if r := []rune(u); len(r) > 0 {
+			data.UserInitial = strings.ToUpper(string(r[0]))
+		}
+		data.UserAvatarBg = avatarBg(u)
+	}
+	if dn, ok := session.Get("display_name").(string); ok && dn != "" {
+		data.DisplayName = dn
+	}
+	if r, ok := session.Get("role").(int); ok {
+		data.UserRole = r
+	}
+	if g, ok := session.Get("group").(string); ok {
+		data.UserGroup = g
+	}
+	return data
+}
+
+// renderWebTemplate executes a named template from tmpl with the given
+// active-nav context and returns the resulting bytes, or nil on error.
+func renderWebTemplate(tmpl *template.Template, name string, active string) []byte {
+	var buf bytes.Buffer
+	data := webPageData{
+		Active: active,
+	}
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		common.SysLog("failed to render web template " + name + ": " + err.Error())
+		return nil
+	}
+	return buf.Bytes()
+}
+
+// devWebTemplates re-parses the templates from disk on every call so edits
+// show up on refresh without a rebuild. Only used when common.DebugEnabled.
+func devWebTemplates() *template.Template {
+	return template.Must(template.ParseGlob("web/default/templates/*.tmpl"))
+}
+
+// buildAssetETags creates content-based validators for public files that use
+// stable URLs. The same content produces the same ETag across instances, while
+// a deployment that changes the file immediately invalidates browser caches.
+func buildAssetETags(fileSystem fs.FS, root string) (map[string]string, error) {
+	etags := make(map[string]string)
+	err := fs.WalkDir(fileSystem, root, func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		file, err := fileSystem.Open(filePath)
+		if err != nil {
+			return err
+		}
+		hash := sha256.New()
+		_, copyErr := io.Copy(hash, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+
+		urlPath := "/" + strings.TrimPrefix(strings.TrimPrefix(filePath, root), "/")
+		etags[urlPath] = `"` + hex.EncodeToString(hash.Sum(nil)) + `"`
+		return nil
+	})
+	return etags, err
 }
 
 func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	defaultFS := common.EmbedFolder(assets.DefaultBuildFS, "web/default/dist")
 	classicFS := common.EmbedFolder(assets.ClassicBuildFS, "web/classic/dist")
 	themeFS := common.NewThemeAwareFS(defaultFS, classicFS)
-	publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
 
-	landingKo, _ := assets.PublicFS.ReadFile("web/default/public/index.html")
-	landingEn, _ := assets.PublicFS.ReadFile("web/default/public/index_en.html")
+	devMode := common.DebugEnabled
+	var publicAssetETags map[string]string
+	if !devMode {
+		var err error
+		publicAssetETags, err = buildAssetETags(assets.PublicFS, "web/default/public")
+		if err != nil {
+			common.SysLog("failed to build public asset ETags: " + err.Error())
+			publicAssetETags = nil
+		}
+	}
 
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.Use(middleware.GlobalWebRateLimit())
-	router.Use(middleware.Cache())
+	router.Use(middleware.Cache(publicAssetETags))
 
-	// Landing page routes — served before the SPA static handler
-	router.GET("/", func(c *gin.Context) {
-		acceptLang := c.GetHeader("Accept-Language")
-		if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
-		} else {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
+	if devMode {
+		// Dev mode: re-render templates and re-read public/ from disk on every
+		// request, so editing guide.html/index.html or the partials is visible
+		// on refresh without rebuilding the binary.
+		common.SysLog("web dev mode enabled (DEBUG=true): templates/public served live from disk")
+		render := func(c *gin.Context, name string, active string) {
+			var buf bytes.Buffer
+			if err := devWebTemplates().ExecuteTemplate(&buf, name, buildWebPageData(c, active)); err != nil {
+				common.SysLog("failed to render web template " + name + ": " + err.Error())
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
 		}
-	})
-	router.GET("/index.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", landingKo)
-	})
-	router.GET("/index_en.html", func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", landingEn)
-	})
+		router.GET("/", func(c *gin.Context) {
+			acceptLang := c.GetHeader("Accept-Language")
+			if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
+				render(c, "index_en", "about")
+			} else {
+				render(c, "index_ko", "about")
+			}
+		})
+		router.GET("/en", func(c *gin.Context) { render(c, "index_en", "about") })
+		router.GET("/guide", func(c *gin.Context) { render(c, "guide_ko", "guide") })
+		router.GET("/en/guide", func(c *gin.Context) { render(c, "guide_en", "guide") })
 
-	// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
-	router.Use(static.Serve("/", publicFS))
-	router.Use(static.Serve("/", themeFS))
+		// Legacy filename URLs — redirect to the clean equivalents so old
+		// bookmarks/links still work but the address bar no longer shows .html
+		router.GET("/index.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/") })
+		router.GET("/index_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en") })
+		router.GET("/guide.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/guide") })
+		router.GET("/guide_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en/guide") })
+
+		router.Use(static.Serve("/", static.LocalFile("web/default/public", false)))
+		router.Use(static.Serve("/", themeFS))
+	} else {
+		publicFS := common.EmbedFolder(assets.PublicFS, "web/default/public")
+		webTmpl := template.Must(template.ParseFS(assets.TemplatesFS, "web/default/templates/*.tmpl"))
+
+		// Anonymous versions are rendered once and served as-is on the hot path
+		// (most landing traffic is logged-out). Logged-in requests are rendered
+		// per-request so the profile badge reflects the current user.
+		landingKo := renderWebTemplate(webTmpl, "index_ko", "about")
+		landingEn := renderWebTemplate(webTmpl, "index_en", "about")
+		guideKo := renderWebTemplate(webTmpl, "guide_ko", "guide")
+		guideEn := renderWebTemplate(webTmpl, "guide_en", "guide")
+
+		serve := func(c *gin.Context, name string, active string, anon []byte) {
+			if sessions.Default(c).Get("id") == nil {
+				c.Data(http.StatusOK, "text/html; charset=utf-8", anon)
+				return
+			}
+			var buf bytes.Buffer
+			if err := webTmpl.ExecuteTemplate(&buf, name, buildWebPageData(c, active)); err != nil {
+				common.SysLog("failed to render web template " + name + ": " + err.Error())
+				c.Data(http.StatusOK, "text/html; charset=utf-8", anon)
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", buf.Bytes())
+		}
+
+		// Landing page routes — served before the SPA static handler
+		router.GET("/", func(c *gin.Context) {
+			acceptLang := c.GetHeader("Accept-Language")
+			if strings.Contains(strings.ToLower(acceptLang), "en") && !strings.HasPrefix(strings.ToLower(acceptLang), "ko") {
+				serve(c, "index_en", "about", landingEn)
+			} else {
+				serve(c, "index_ko", "about", landingKo)
+			}
+		})
+		router.GET("/en", func(c *gin.Context) { serve(c, "index_en", "about", landingEn) })
+		router.GET("/guide", func(c *gin.Context) { serve(c, "guide_ko", "guide", guideKo) })
+		router.GET("/en/guide", func(c *gin.Context) { serve(c, "guide_en", "guide", guideEn) })
+
+		// Legacy filename URLs — redirect to the clean equivalents so old
+		// bookmarks/links still work but the address bar no longer shows .html
+		router.GET("/index.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/") })
+		router.GET("/index_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en") })
+		router.GET("/guide.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/guide") })
+		router.GET("/guide_en.html", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/en/guide") })
+
+		// Serve all other public/ assets (images, SVGs, etc.) — registered before SPA
+		router.Use(static.Serve("/", publicFS))
+		router.Use(static.Serve("/", themeFS))
+	}
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
 		if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
@@ -61,6 +251,10 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			return
 		}
 		c.Header("Cache-Control", "no-cache")
+		// Toss Payments recommends this header on the page that opens the payment window so the
+		// SDK's popups/redirects aren't blocked in some browsers. The "-allow-popups" variant keeps
+		// popups this app opens (e.g. OAuth) working.
+		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 		if common.GetTheme() == "classic" {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.ClassicIndexPage)
 		} else {

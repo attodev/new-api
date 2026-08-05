@@ -1,14 +1,26 @@
 package channel
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain ensures the shared HTTP client used by doRequest (via
+// service.GetHttpClient) is initialized before any test in this package
+// runs. In production this happens once at startup (main.go); tests that
+// exercise doRequest/DoRequest need the same setup.
+func TestMain(m *testing.M) {
+	service.InitHttpClient()
+	os.Exit(m.Run())
+}
 
 func TestProcessHeaderOverride_ChannelTestSkipsPassthroughRules(t *testing.T) {
 	t.Parallel()
@@ -190,4 +202,54 @@ func TestProcessHeaderOverride_PassHeadersTemplateSetsRuntimeHeaders(t *testing.
 	require.Equal(t, "Codex CLI", upstreamReq.Header.Get("Originator"))
 	require.Equal(t, "sess-123", upstreamReq.Header.Get("Session_id"))
 	require.Empty(t, upstreamReq.Header.Get("X-Codex-Beta-Features"))
+}
+
+func TestDoRequest_RecordsUpstreamTimingOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+	resp, err := DoRequest(ctx, req, info)
+	require.NoError(t, err)
+	require.False(t, info.UpstreamRequestStartTime.IsZero())
+	require.True(t, info.UpstreamResponseEndTime.IsZero(), "end time is only set once the body is drained")
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(body))
+	require.NoError(t, resp.Body.Close())
+
+	require.False(t, info.UpstreamResponseEndTime.IsZero())
+	require.False(t, info.UpstreamResponseEndTime.Before(info.UpstreamRequestStartTime))
+}
+
+func TestDoRequest_RecordsUpstreamTimingOnFailure(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:0", nil)
+	require.NoError(t, err)
+
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+	_, err = DoRequest(ctx, req, info)
+	require.Error(t, err)
+	require.False(t, info.UpstreamRequestStartTime.IsZero())
+	require.False(t, info.UpstreamResponseEndTime.IsZero())
 }

@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import * as React from 'react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { type Table } from '@tanstack/react-table'
 import { ChevronDown, Loader2, X as Cross2Icon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useDebounce } from '@/hooks/use-debounce'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +53,14 @@ export type DataTableToolbarProps<TData> = {
    * table's `globalFilter`.
    */
   searchKey?: string
+  /**
+   * Debounce (ms) applied before the global-filter search input commits
+   * to `table.setGlobalFilter`. Only relevant when `searchKey` is unset.
+   * Use for tables where `globalFilter` drives a server-side search
+   * query — leave unset for tables that filter already-loaded rows
+   * client-side, where the input should stay instant.
+   */
+  searchDebounceMs?: number
   /**
    * Column-level filter chips (faceted multi-select / single-select).
    */
@@ -120,6 +129,53 @@ export type DataTableToolbarProps<TData> = {
 }
 
 /**
+ * Global-filter search input whose committed value is debounced, so
+ * typing doesn't fire a server request per keystroke. The input itself
+ * stays locally controlled (instant echo); only the value propagated to
+ * `table.setGlobalFilter` — and therefore any query keyed off it — lags
+ * by `debounceMs`.
+ */
+function DebouncedGlobalFilterInput<TData>({
+  table,
+  placeholder,
+  className,
+  debounceMs,
+}: {
+  table: Table<TData>
+  placeholder: string
+  className: string
+  debounceMs: number
+}) {
+  const external = (table.getState().globalFilter as string) ?? ''
+  const [local, setLocal] = useState(external)
+  const debounced = useDebounce(local, debounceMs)
+
+  // Commit the debounced value once it settles.
+  useEffect(() => {
+    if (debounced !== ((table.getState().globalFilter as string) ?? '')) {
+      table.setGlobalFilter(debounced)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced])
+
+  // Resync when globalFilter changes from elsewhere (Reset button, URL
+  // state restore) so the input doesn't show a stale value.
+  useEffect(() => {
+    setLocal(external)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [external])
+
+  return (
+    <Input
+      placeholder={placeholder}
+      value={local}
+      onChange={(event) => setLocal(event.target.value)}
+      className={className}
+    />
+  )
+}
+
+/**
  * Unified data-table filter panel — Ant Design Pro inspired.
  *
  * Layout (single flex-wrap row):
@@ -161,6 +217,13 @@ export function DataTableToolbar<TData>(props: DataTableToolbarProps<TData>) {
           ?.setFilterValue(event.target.value)
       }
       className='w-full sm:w-[200px] lg:w-[240px]'
+    />
+  ) : props.searchDebounceMs ? (
+    <DebouncedGlobalFilterInput
+      table={props.table}
+      placeholder={placeholder}
+      className='w-full sm:w-[200px] lg:w-[240px]'
+      debounceMs={props.searchDebounceMs}
     />
   ) : (
     <Input

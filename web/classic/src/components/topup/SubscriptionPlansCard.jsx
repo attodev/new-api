@@ -17,12 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk';
 import {
   Badge,
   Button,
   Card,
   Divider,
+  Modal,
   Select,
   Skeleton,
   Space,
@@ -30,7 +32,13 @@ import {
   Tooltip,
   Typography,
 } from '@douyinfe/semi-ui';
-import { API, showError, showSuccess, renderQuota } from '../../helpers';
+import {
+  API,
+  showError,
+  showInfo,
+  showSuccess,
+  renderQuota,
+} from '../../helpers';
 import { getCurrencyConfig } from '../../helpers/render';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import SubscriptionPurchaseModal from './modals/SubscriptionPurchaseModal';
@@ -38,13 +46,23 @@ import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
 } from '../../helpers/subscriptionFormat';
+import {
+  createTossSubscriptionConfirmation,
+  getTossPaymentWindowTargetOptions,
+  getValidTossBillingTradeNo,
+  isTossSubscriptionBillingSession,
+  isTossUserCancellation,
+  tossSubscriptionSessionMatchesConfirmation,
+} from './tossSubscriptionCheckout';
+import { useTossPaymentLifecycle } from './tossPaymentLifecycle';
 
 const { Text } = Typography;
 
 // 过滤易支付方式
 function getEpayMethods(payMethods = []) {
   return (payMethods || []).filter(
-    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem',
+    (m) =>
+      m?.type && m.type !== 'stripe' && m.type !== 'creem' && m.type !== 'toss',
   );
 }
 
@@ -77,6 +95,7 @@ const SubscriptionPlansCard = ({
   enableOnlineTopUp = false,
   enableStripeTopUp = false,
   enableCreemTopUp = false,
+  enableTossBilling = false,
   billingPreference,
   onChangeBillingPreference,
   activeSubscriptions = [],
@@ -89,11 +108,26 @@ const SubscriptionPlansCard = ({
   const [paying, setPaying] = useState(false);
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [tossConfirmation, setTossConfirmation] = useState(null);
+  const tossBillingInFlightRef = useRef(false);
+  const tossPaymentLifecycle = useTossPaymentLifecycle();
+  const cancelAutoRenewInFlightRef = useRef(false);
+  const [cancellingAutoRenew, setCancellingAutoRenew] = useState(false);
 
   const epayMethods = useMemo(() => getEpayMethods(payMethods), [payMethods]);
+  const autoRenewCount = useMemo(
+    () =>
+      (allSubscriptions || []).filter(
+        (item) => item?.subscription?.auto_renew === true,
+      ).length,
+    [allSubscriptions],
+  );
 
   const openBuy = (p) => {
     setSelectedPlan(p);
+    // Snapshot the exact server-provided plan and KRW billing terms rendered in
+    // this modal. A later response must match before the SDK can open.
+    setTossConfirmation(createTossSubscriptionConfirmation(p));
     setSelectedEpayMethod(epayMethods?.[0]?.type || '');
     setOpen(true);
   };
@@ -101,6 +135,7 @@ const SubscriptionPlansCard = ({
   const closeBuy = () => {
     setOpen(false);
     setSelectedPlan(null);
+    setTossConfirmation(null);
     setPaying(false);
   };
 
@@ -196,6 +231,119 @@ const SubscriptionPlansCard = ({
     } finally {
       setPaying(false);
     }
+  };
+
+  const cancelPendingTossBilling = async (tradeNo) => {
+    if (!tradeNo) return;
+    try {
+      await API.delete(
+        `/api/subscription/toss/pending/${encodeURIComponent(tradeNo)}`,
+      );
+    } catch {
+      // The backend also expires untouched reservations. This cleanup is best
+      // effort so a transient network error does not mask the original failure.
+    }
+  };
+
+  const payToss = async () => {
+    if (
+      !enableTossBilling ||
+      !tossConfirmation ||
+      tossBillingInFlightRef.current
+    ) {
+      if (!tossBillingInFlightRef.current) showError(t('支付请求失败'));
+      return;
+    }
+
+    const lifecycleLease = tossPaymentLifecycle.beginRequest();
+    if (lifecycleLease === null) return;
+    tossBillingInFlightRef.current = true;
+    setPaying(true);
+    let pendingTradeNo = '';
+    try {
+      const res = await API.post('/api/subscription/toss/pay', {
+        plan_id: tossConfirmation.plan.id,
+      });
+      const session = res.data?.data;
+      pendingTradeNo = getValidTossBillingTradeNo(session);
+      if (
+        res.data?.message !== 'success' ||
+        !isTossSubscriptionBillingSession(session)
+      ) {
+        await cancelPendingTossBilling(pendingTradeNo);
+        showError(res.data?.message || t('支付请求失败'));
+        return;
+      }
+      if (
+        !tossSubscriptionSessionMatchesConfirmation(session, tossConfirmation)
+      ) {
+        await cancelPendingTossBilling(pendingTradeNo);
+        showError(t('支付请求失败'));
+        closeBuy();
+        return;
+      }
+
+      const tossPayments = await loadTossPayments(session.client_key);
+      const payment = tossPayments.payment({
+        customerKey: session.customer_key,
+      });
+      if (!(await tossPaymentLifecycle.adopt(payment, lifecycleLease))) {
+        await cancelPendingTossBilling(pendingTradeNo);
+        return;
+      }
+      await payment.requestBillingAuth({
+        method: 'CARD',
+        successUrl: session.success_url,
+        failUrl: session.fail_url,
+        ...getTossPaymentWindowTargetOptions(
+          session.success_url,
+          session.fail_url,
+        ),
+      });
+      // The usual path redirects. If the SDK resolves in a popup-capable
+      // browser, close the modal so another click cannot create a second
+      // durable subscription reservation.
+      closeBuy();
+    } catch (error) {
+      if (isTossUserCancellation(error)) {
+        showInfo(t('取消'));
+      } else {
+        showError(t('支付请求失败'));
+      }
+      await cancelPendingTossBilling(pendingTradeNo);
+    } finally {
+      tossPaymentLifecycle.finishRequest(lifecycleLease);
+      tossBillingInFlightRef.current = false;
+      setPaying(false);
+    }
+  };
+
+  const cancelTossAutoRenew = () => {
+    if (autoRenewCount <= 0 || cancelAutoRenewInFlightRef.current) return;
+    Modal.confirm({
+      title: t('确认'),
+      content: `${t('取消')} Toss ${t('自动续费')}?`,
+      centered: true,
+      onOk: async () => {
+        if (cancelAutoRenewInFlightRef.current) return;
+        cancelAutoRenewInFlightRef.current = true;
+        setCancellingAutoRenew(true);
+        try {
+          const response = await API.post('/api/subscription/toss/cancel', {});
+          if (!response.data?.success) {
+            showError(response.data?.message || t('请求失败'));
+            return;
+          }
+          showSuccess(t('更新成功'));
+          await reloadSubscriptionSelf?.();
+        } catch {
+          showError(t('请求失败'));
+        } finally {
+          cancelAutoRenewInFlightRef.current = false;
+          setCancellingAutoRenew(false);
+        }
+      },
+    });
   };
 
   // 当前订阅信息 - 支持多个订阅
@@ -328,6 +476,18 @@ const SubscriptionPlansCard = ({
                 )}
               </div>
               <div className='flex items-center gap-2'>
+                {autoRenewCount > 0 && (
+                  <Button
+                    size='small'
+                    theme='light'
+                    type='danger'
+                    onClick={cancelTossAutoRenew}
+                    loading={cancellingAutoRenew}
+                    disabled={cancellingAutoRenew}
+                  >
+                    Toss · {t('取消')} {t('自动续费')}
+                  </Button>
+                )}
                 <Select
                   value={displayBillingPreference}
                   onChange={onChangeBillingPreference}
@@ -423,6 +583,11 @@ const SubscriptionPlansCard = ({
                             ) : (
                               <Tag color='white' size='small' shape='circle'>
                                 {t('已过期')}
+                              </Tag>
+                            )}
+                            {subscription?.auto_renew && (
+                              <Tag color='blue' size='small' shape='circle'>
+                                Toss · {t('自动续费')}
                               </Tag>
                             )}
                           </div>
@@ -673,6 +838,8 @@ const SubscriptionPlansCard = ({
         enableOnlineTopUp={enableOnlineTopUp}
         enableStripeTopUp={enableStripeTopUp}
         enableCreemTopUp={enableCreemTopUp}
+        enableTossBilling={enableTossBilling}
+        tossCheckout={tossConfirmation?.checkout || null}
         purchaseLimitInfo={
           selectedPlan?.plan?.id
             ? {
@@ -683,6 +850,7 @@ const SubscriptionPlansCard = ({
         }
         onPayStripe={payStripe}
         onPayCreem={payCreem}
+        onPayToss={payToss}
         onPayEpay={payEpay}
       />
     </>

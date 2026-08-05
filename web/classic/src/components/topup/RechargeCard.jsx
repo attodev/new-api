@@ -50,6 +50,7 @@ import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime'
 import { useActualTheme } from '../../context/Theme';
 import { getCurrencyConfig } from '../../helpers/render';
 import SubscriptionPlansCard from './SubscriptionPlansCard';
+import WalletAutoRechargeCard from './WalletAutoRechargeCard';
 
 const { Text } = Typography;
 
@@ -89,6 +90,11 @@ const RechargeCard = ({
   topupInfo,
   onOpenHistory,
   enablePayPalTopUp,
+  enableTossTopUp,
+  enableTossBilling,
+  enableTossWalletAutoRecharge,
+  tossWalletScope = 'user',
+  tossWalletCanManage = true,
   enableWaffoTopUp,
   enableWaffoPancakeTopUp,
   subscriptionLoading = false,
@@ -235,6 +241,7 @@ const RechargeCard = ({
           enableStripeTopUp ||
           enableCreemTopUp ||
           enablePayPalTopUp ||
+          enableTossTopUp ||
           enableWaffoTopUp ||
           enableWaffoPancakeTopUp ? (
           <Form
@@ -245,6 +252,7 @@ const RechargeCard = ({
               {(enableOnlineTopUp ||
                 enableStripeTopUp ||
                 enablePayPalTopUp ||
+                enableTossTopUp ||
                 enableWaffoTopUp ||
                 enableWaffoPancakeTopUp) && (
                 <Row gutter={12}>
@@ -256,6 +264,7 @@ const RechargeCard = ({
                         !enableOnlineTopUp &&
                         !enableStripeTopUp &&
                         !enablePayPalTopUp &&
+                        !enableTossTopUp &&
                         !enableWaffoTopUp &&
                         !enableWaffoPancakeTopUp
                       }
@@ -319,22 +328,32 @@ const RechargeCard = ({
                               Number(payMethod.min_topup) || 0;
                             const isStripe = payMethod.type === 'stripe';
                             const isPayPal = payMethod.type === 'paypal';
+                            const isToss = payMethod.type === 'toss';
                             const isWaffo =
                               typeof payMethod.type === 'string' &&
                               payMethod.type.startsWith('waffo:');
                             const isWaffoPancake =
                               payMethod.type === 'waffo_pancake';
+                            // Toss's advertised minimum is a KRW charge while
+                            // this classic input is a quota-unit amount. The
+                            // authoritative /toss/amount quote validates the
+                            // converted charge, so do not compare unlike units
+                            // in this button gate.
+                            const belowMinimum =
+                              !isToss && minTopupVal > Number(topUpCount || 0);
                             const disabled =
                               (!enableOnlineTopUp &&
                                 !isStripe &&
                                 !isPayPal &&
+                                !isToss &&
                                 !isWaffo &&
                                 !isWaffoPancake) ||
                               (!enableStripeTopUp && isStripe) ||
                               (!enablePayPalTopUp && isPayPal) ||
+                              (!enableTossTopUp && isToss) ||
                               (!enableWaffoTopUp && isWaffo) ||
                               (!enableWaffoPancakeTopUp && isWaffoPancake) ||
-                              minTopupVal > Number(topUpCount || 0);
+                              belowMinimum;
 
                             const buttonEl = (
                               <Button
@@ -395,8 +414,7 @@ const RechargeCard = ({
                               </Button>
                             );
 
-                            return disabled &&
-                              minTopupVal > Number(topUpCount || 0) ? (
+                            return disabled && belowMinimum ? (
                               <Tooltip
                                 content={
                                   t('此支付方式最低充值金额为') +
@@ -420,7 +438,11 @@ const RechargeCard = ({
                 </Row>
               )}
 
-              {(enableOnlineTopUp || enableStripeTopUp || enablePayPalTopUp || enableWaffoTopUp) && (
+              {(enableOnlineTopUp ||
+                enableStripeTopUp ||
+                enablePayPalTopUp ||
+                enableTossTopUp ||
+                enableWaffoTopUp) && (
                 <Form.Slot
                   label={
                     <div className='flex items-center gap-2'>
@@ -586,6 +608,21 @@ const RechargeCard = ({
         )}
       </Card>
 
+      {tossWalletCanManage ? (
+        <WalletAutoRechargeCard
+          key={tossWalletScope}
+          t={t}
+          scope={tossWalletScope}
+          enabled={enableTossWalletAutoRecharge}
+          creationDisabled={
+            activeSubscriptions.length > 0 ||
+            allSubscriptions.some(
+              (record) => record?.subscription?.auto_renew === true,
+            )
+          }
+        />
+      ) : null}
+
       {/* 兑换码充值 */}
       {enableRedemption ? (
         <Card
@@ -694,6 +731,7 @@ const RechargeCard = ({
                 enableOnlineTopUp={enableOnlineTopUp}
                 enableStripeTopUp={enableStripeTopUp}
                 enableCreemTopUp={enableCreemTopUp}
+                enableTossBilling={enableTossBilling}
                 billingPreference={billingPreference}
                 onChangeBillingPreference={onChangeBillingPreference}
                 activeSubscriptions={activeSubscriptions}

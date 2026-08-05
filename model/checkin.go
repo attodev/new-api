@@ -124,7 +124,7 @@ func userCheckinWithoutTransaction(checkin *Checkin, userId int, quotaAwarded in
 		return nil, errors.New("check-in failed, please try again later")
 	}
 
-	if err := IncreaseUserQuota(userId, quotaAwarded, true); err != nil {
+	if err := IncreaseUserQuota(userId, int64(quotaAwarded), true); err != nil {
 		DB.Delete(checkin)
 		return nil, errors.New("check-in failed: quota update error")
 	}

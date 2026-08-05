@@ -207,7 +207,8 @@ function isModuleEnabled(
   const userSection = userConfig[section]
   if (!userSection) return true
   if (userSection.enabled === false) return false
-  return userSection[module] !== false
+  const userModule = url === '/usage-logs/drawing' ? 'task' : module
+  return userSection[userModule] !== false
 }
 
 /**
@@ -218,16 +219,11 @@ function isNavItemVisible(
   adminConfig: SidebarModulesAdminConfig,
   userConfig: SidebarModulesUserConfig
 ): boolean {
-  // Handle dynamic chat presets type — also runs the admin × user AND gate
+  // Users can hide the whole Chat area, but not chat presets independently.
   if ('type' in item && item.type === 'chat-presets') {
     const adminChat = adminConfig.chat
-    const adminAllowed = Boolean(adminChat?.enabled && adminChat.chat === true)
-    if (!adminAllowed) return false
-    if (!userConfig) return true
-    const userChat = userConfig.chat
-    if (!userChat) return true
-    if (userChat.enabled === false) return false
-    return userChat.chat !== false
+    if (!adminChat?.enabled || adminChat.chat !== true) return false
+    return userConfig?.chat?.enabled !== false
   }
 
   // Handle direct link type

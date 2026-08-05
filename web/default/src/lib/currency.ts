@@ -227,6 +227,19 @@ function removeTrailingZeros(str: string): string {
   return str.replace(/(\.[0-9]*?)0+$/, '$1').replace(/\.$/, '')
 }
 
+/**
+ * Magnitude tiers used when abbreviating raw token counts, largest first.
+ * Covers the full quota range (up to common.MaxQuota, 5e14 raw units) so large
+ * values keep a readable suffix instead of overflowing the smallest tier
+ * (e.g. `500000000000k`).
+ */
+const SUFFIX_TIERS = [
+  { threshold: 1e12, suffix: 'T' },
+  { threshold: 1e9, suffix: 'B' },
+  { threshold: 1e6, suffix: 'M' },
+  { threshold: 1e3, suffix: 'k' },
+] as const
+
 function formatNumberWithSuffix(
   value: number,
   digitsLarge: number,
@@ -235,8 +248,12 @@ function formatNumberWithSuffix(
 ): string {
   const abs = Math.abs(value)
   if (abbreviate && abs >= 1000) {
-    const result = value / 1000
-    return removeTrailingZeros(result.toFixed(1)) + 'k'
+    for (const tier of SUFFIX_TIERS) {
+      if (abs >= tier.threshold) {
+        const result = value / tier.threshold
+        return removeTrailingZeros(result.toFixed(1)) + tier.suffix
+      }
+    }
   }
 
   const digits = abs >= 1 ? digitsLarge : digitsSmall

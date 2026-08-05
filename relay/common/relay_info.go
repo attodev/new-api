@@ -96,6 +96,14 @@ type RelayInfo struct {
 	StartTime         time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
+
+	// UpstreamRequestStartTime/UpstreamResponseEndTime bracket the actual
+	// outbound HTTP call to the model provider (set in
+	// relay/channel/api_request.go's doRequest()). On retry, each attempt
+	// overwrites these with its own timestamps — only the final attempt's
+	// timing is reported.
+	UpstreamRequestStartTime time.Time
+	UpstreamResponseEndTime  time.Time
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -117,7 +125,7 @@ type RelayInfo struct {
 	ReasoningEffort        string
 	UserSetting            dto.UserSetting
 	UserEmail              string
-	UserQuota              int
+	UserQuota              int64
 	RelayFormat            types.RelayFormat
 	SendResponseCount      int
 	ReceivedResponseCount  int
@@ -463,7 +471,7 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		UserId:     common.GetContextKeyInt(c, constant.ContextKeyUserId),
 		UsingGroup: common.GetContextKeyString(c, constant.ContextKeyUsingGroup),
 		UserGroup:  common.GetContextKeyString(c, constant.ContextKeyUserGroup),
-		UserQuota:  common.GetContextKeyInt(c, constant.ContextKeyUserQuota),
+		UserQuota:  common.GetContextKeyInt64(c, constant.ContextKeyUserQuota),
 		UserEmail:  common.GetContextKeyString(c, constant.ContextKeyUserEmail),
 
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
@@ -656,6 +664,20 @@ func (info *RelayInfo) SetFirstResponseTime() {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
 	}
+}
+
+// SetUpstreamRequestStart records when the outbound HTTP call to the model
+// provider began. Safe to call multiple times across retries; the latest
+// call wins.
+func (info *RelayInfo) SetUpstreamRequestStart() {
+	info.UpstreamRequestStartTime = time.Now()
+}
+
+// SetUpstreamResponseEnd records when the model provider's response body was
+// fully read (EOF) or the call failed. Safe to call multiple times across
+// retries; the latest call wins.
+func (info *RelayInfo) SetUpstreamResponseEnd() {
+	info.UpstreamResponseEndTime = time.Now()
 }
 
 func (info *RelayInfo) HasSendResponse() bool {

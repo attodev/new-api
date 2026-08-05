@@ -10,6 +10,11 @@ const (
 	ContextKeyOriginalModel    ContextKey = "original_model"
 	ContextKeyRequestStartTime ContextKey = "request_start_time"
 
+	// ContextKeyGatewayEntryTime marks when the request first entered the
+	// gateway (earliest middleware), used to compute true end-to-end latency
+	// independent of auth/rate-limit/channel-selection overhead.
+	ContextKeyGatewayEntryTime ContextKey = "gateway_entry_time"
+
 	/* token related keys */
 	ContextKeyTokenUnlimited         ContextKey = "token_unlimited_quota"
 	ContextKeyTokenKey               ContextKey = "token_key"

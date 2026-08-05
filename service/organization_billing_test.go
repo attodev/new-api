@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func seedOrganizationUser(t *testing.T, id int, username string, quota int, organizationId int, organizationRole string) {
+func seedOrganizationUser(t *testing.T, id int, username string, quota int64, organizationId int, organizationRole string) {
 	t.Helper()
 	user := &model.User{
 		Id:               id,
@@ -53,7 +53,7 @@ func newOrganizationBillingContext() *gin.Context {
 	return c
 }
 
-func getUserQuotaForBillingTest(t *testing.T, userId int) int {
+func getUserQuotaForBillingTest(t *testing.T, userId int) int64 {
 	t.Helper()
 	quota, err := model.GetUserQuota(userId, true)
 	require.NoError(t, err)
@@ -78,11 +78,11 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 	require.Nil(t, apiErr)
 	require.NotNil(t, session)
 
-	require.Equal(t, 75, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, int64(75), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getUserQuotaForBillingTest(t, 1))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 975, org.Quota)
-	require.Equal(t, 0, org.UsedQuota)
+	require.Equal(t, int64(975), org.Quota)
+	require.Equal(t, int64(0), org.UsedQuota)
 }
 
 func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWallet(t *testing.T) {
@@ -103,11 +103,11 @@ func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWalle
 	require.Nil(t, apiErr)
 	require.NoError(t, session.Settle(10))
 
-	require.Equal(t, 90, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, int64(90), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getUserQuotaForBillingTest(t, 1))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 990, org.Quota)
-	require.Equal(t, 0, org.UsedQuota)
+	require.Equal(t, int64(990), org.Quota)
+	require.Equal(t, int64(0), org.UsedQuota)
 }
 
 func TestOrganizationWalletBillingOwnerRequestUsesOrganizationWallet(t *testing.T) {
@@ -127,10 +127,10 @@ func TestOrganizationWalletBillingOwnerRequestUsesOrganizationWallet(t *testing.
 	require.Nil(t, apiErr)
 	require.NotNil(t, session)
 
-	require.Equal(t, 975, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, int64(975), getUserQuotaForBillingTest(t, 1))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 975, org.Quota)
-	require.Equal(t, 0, org.UsedQuota)
+	require.Equal(t, int64(975), org.Quota)
+	require.Equal(t, int64(0), org.UsedQuota)
 }
 
 func TestOrganizationWalletBillingRejectsWhenOrganizationWalletInsufficient(t *testing.T) {
@@ -152,10 +152,10 @@ func TestOrganizationWalletBillingRejectsWhenOrganizationWalletInsufficient(t *t
 	require.Nil(t, session)
 	require.NotNil(t, apiErr)
 
-	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
-	require.Equal(t, 1000, getUserQuotaForBillingTest(t, 1))
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getUserQuotaForBillingTest(t, 1))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 10, org.Quota)
+	require.Equal(t, int64(10), org.Quota)
 }
 
 func TestOrganizationSubscriptionBillingPreConsumesSubscriptionAndOrganizationWallet(t *testing.T) {
@@ -188,9 +188,9 @@ func TestOrganizationSubscriptionBillingPreConsumesSubscriptionAndOrganizationWa
 	require.Nil(t, apiErr)
 	require.NotNil(t, session)
 
-	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 975, org.Quota)
+	require.Equal(t, int64(975), org.Quota)
 
 	var reloaded model.OrganizationUserSubscription
 	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
@@ -229,9 +229,9 @@ func TestOrganizationSubscriptionBillingRejectsWhenPlanLimitInsufficient(t *test
 	require.Nil(t, session)
 	require.NotNil(t, apiErr)
 
-	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 1000, org.Quota)
+	require.Equal(t, int64(1000), org.Quota)
 }
 
 func TestOrganizationSubscriptionBillingSettlesRefundToSubscriptionAndOrganizationWallet(t *testing.T) {
@@ -267,9 +267,9 @@ func TestOrganizationSubscriptionBillingSettlesRefundToSubscriptionAndOrganizati
 	var reloaded model.OrganizationUserSubscription
 	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
 	require.Equal(t, int64(10), reloaded.AmountUsed)
-	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
 	org := getOrganizationForBillingTest(t, 1)
-	require.Equal(t, 990, org.Quota)
+	require.Equal(t, int64(990), org.Quota)
 }
 
 func TestOrganizationSubscriptionBillingRefundRestoresSubscriptionAndOrganizationWallet(t *testing.T) {
@@ -310,5 +310,5 @@ func TestOrganizationSubscriptionBillingRefundRestoresSubscriptionAndOrganizatio
 		org := getOrganizationForBillingTest(t, 1)
 		return reloaded.AmountUsed == 0 && org.Quota == 1000
 	}, time.Second, 10*time.Millisecond)
-	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
 }

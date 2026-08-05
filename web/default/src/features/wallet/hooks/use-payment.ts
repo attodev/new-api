@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import i18next from 'i18next'
 import { toast } from 'sonner'
 import {
@@ -24,6 +24,7 @@ import {
   calculateStripeAmount,
   calculatePayPalAmount,
   calculateWaffoPancakeAmount,
+  calculateTossAmount,
   requestPayment,
   requestStripePayment,
   requestPayPalPayment,
@@ -33,8 +34,11 @@ import {
   isStripePayment,
   isPayPalPayment,
   isWaffoPancakePayment,
+  isTossPayment,
   submitPaymentForm,
 } from '../lib'
+import { parseTossQuoteData } from '../lib/topup-amount-mode'
+import type { ApiResponse, TopupAmountMode, TossTopupQuote } from '../types'
 
 // ============================================================================
 // Payment Hook
@@ -42,43 +46,78 @@ import {
 
 export function usePayment() {
   const [amount, setAmount] = useState<number>(0)
+  const [tossQuote, setTossQuote] = useState<Partial<TossTopupQuote> | null>(
+    null
+  )
   const [calculating, setCalculating] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const calculationRequestIdRef = useRef(0)
 
   // Calculate payment amount
   const calculatePaymentAmount = useCallback(
-    async (topupAmount: number, paymentType: string) => {
+    async (
+      topupAmount: number,
+      paymentType: string,
+      amountMode?: TopupAmountMode
+    ) => {
+      const requestId = ++calculationRequestIdRef.current
       try {
         setCalculating(true)
 
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const isPancake = isWaffoPancakePayment(paymentType)
-        let response: Awaited<ReturnType<typeof calculateAmount>>
+        const isToss = isTossPayment(paymentType)
+        let response: ApiResponse<string | number | TossTopupQuote>
         if (isStripe) {
           response = await calculateStripeAmount({ amount: topupAmount })
         } else if (isPayPal) {
           response = await calculatePayPalAmount({ amount: topupAmount })
         } else if (isPancake) {
           response = await calculateWaffoPancakeAmount({ amount: topupAmount })
+        } else if (isToss) {
+          response = await calculateTossAmount({
+            amount: topupAmount,
+            amount_mode: amountMode,
+          })
         } else {
           response = await calculateAmount({ amount: topupAmount })
         }
 
+        if (requestId !== calculationRequestIdRef.current) {
+          return { amount: 0, tossQuote: null, isCurrent: false }
+        }
+
         if (isApiSuccess(response) && response.data) {
-          const calculatedAmount = parseFloat(response.data)
+          const quote = isToss ? parseTossQuoteData(response.data) : null
+          setTossQuote(isToss ? quote : null)
+          const calculatedAmount =
+            quote?.charge_amount ?? parseFloat(String(response.data))
           setAmount(calculatedAmount)
-          return calculatedAmount
+          return {
+            amount: calculatedAmount,
+            tossQuote: isToss ? quote : null,
+            isCurrent: true,
+          }
         }
 
         // Don't show error for calculation, just set to 0
+        setTossQuote(null)
         setAmount(0)
-        return 0
+        return { amount: 0, tossQuote: null, isCurrent: true }
       } catch (_error) {
-        setAmount(0)
-        return 0
+        const isCurrent = requestId === calculationRequestIdRef.current
+        if (isCurrent) {
+          setTossQuote(null)
+          setAmount(0)
+        }
+        return { amount: 0, tossQuote: null, isCurrent }
       } finally {
-        setCalculating(false)
+        // An older response must not clear the loading state owned by a newer
+        // quote request or make its confirmation button appear ready early.
+        if (requestId === calculationRequestIdRef.current) {
+          setCalculating(false)
+        }
       }
     },
     []
@@ -90,17 +129,29 @@ export function usePayment() {
       try {
         setProcessing(true)
 
+        // Toss is handled by useTossPayment in the component, not here.
+        if (isTossPayment(paymentType)) return false
+
         const isStripe = isStripePayment(paymentType)
         const isPayPal = isPayPalPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
         let response
         if (isStripe) {
-          response = await requestStripePayment({ amount, payment_method: 'stripe' })
+          response = await requestStripePayment({
+            amount,
+            payment_method: 'stripe',
+          })
         } else if (isPayPal) {
-          response = await requestPayPalPayment({ amount, payment_method: 'paypal' })
+          response = await requestPayPalPayment({
+            amount,
+            payment_method: 'paypal',
+          })
         } else {
-          response = await requestPayment({ amount, payment_method: paymentType })
+          response = await requestPayment({
+            amount,
+            payment_method: paymentType,
+          })
         }
 
         if (!isApiSuccess(response)) {
@@ -152,5 +203,6 @@ export function usePayment() {
     calculatePaymentAmount,
     processPayment,
     setAmount,
+    tossQuote,
   }
 }

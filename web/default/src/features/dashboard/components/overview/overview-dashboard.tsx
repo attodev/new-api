@@ -227,16 +227,16 @@ function StartStepItem(props: {
 
   return (
     <li className='flex gap-3 pb-2.5 last:pb-0'>
-      <div className='relative flex w-8 shrink-0 self-stretch items-center justify-center'>
+      <div className='relative flex w-8 shrink-0 items-center justify-center self-stretch'>
         {props.index > 0 && (
           <span
-            className='bg-border absolute top-0 left-1/2 w-px -translate-x-1/2 bottom-[calc(50%+1rem)]'
+            className='bg-border absolute top-0 bottom-[calc(50%+calc(var(--spacing)*4))] left-1/2 w-px -translate-x-1/2'
             aria-hidden='true'
           />
         )}
         {!props.isLast && (
           <span
-            className='bg-border absolute left-1/2 w-px -translate-x-1/2 top-[calc(50%+1rem)] -bottom-2.5'
+            className='bg-border absolute top-[calc(50%+calc(var(--spacing)*4))] -bottom-2.5 left-1/2 w-px -translate-x-1/2'
             aria-hidden='true'
           />
         )}
@@ -479,6 +479,7 @@ export function OverviewDashboard() {
   const [manualSetupGuideExpanded, setManualSetupGuideExpanded] = useState<
     boolean | null
   >(() => getSavedSetupGuideExpanded())
+  const [userToggledThisSession, setUserToggledThisSession] = useState(false)
 
   const requestCount = Number(user?.request_count ?? 0)
   const remainQuota = Number(user?.quota ?? 0)
@@ -612,13 +613,22 @@ export function OverviewDashboard() {
 
   const completedStepCount = startSteps.filter((step) => step.completed).length
   const setupComplete = completedStepCount === startSteps.length
-  const setupGuideExpanded = manualSetupGuideExpanded ?? !setupComplete
+  // If setup is complete and the user hasn't toggled this session, ignore a stale
+  // 'expanded' saved from a previous session so the guide defaults to collapsed.
+  const effectiveManualExpanded =
+    setupComplete &&
+    !userToggledThisSession &&
+    manualSetupGuideExpanded === true
+      ? null
+      : manualSetupGuideExpanded
+  const setupGuideExpanded = effectiveManualExpanded ?? !setupComplete
   const showLeftContentPanels =
     isAdmin || showApiInfoPanel || showAnnouncementsPanel || showFAQPanel
   const showContentPanels = showLeftContentPanels || showUptimePanel
 
   const handleSetupGuideToggle = () => {
     const nextExpanded = !setupGuideExpanded
+    setUserToggledThisSession(true)
     setManualSetupGuideExpanded(nextExpanded)
     saveSetupGuideExpanded(nextExpanded)
   }

@@ -37,6 +37,14 @@ export type UpdateOptionRequest = {
 export type UpdateOptionResponse = {
   success: boolean
   message: string
+  maintenance_pending?: boolean
+}
+
+export type TossOptionsUpdateRequest = {
+  updates: UpdateOptionRequest[]
+  repair_complete_set?: boolean
+  expected_repair_token?: string
+  retry_maintenance?: boolean
 }
 
 export type ConfirmPaymentComplianceResponse = {
@@ -245,6 +253,23 @@ export type BillingSettings = {
   PayPalSandbox: boolean
   PayPalUnitPrice: number
   PayPalMinTopUp: number
+  TossEnabled: boolean
+  TossBillingEnabled: boolean
+  TossWalletAutoRechargeEnabled: boolean
+  TossTestMode: boolean
+  TossClientKey: string
+  TossSecretKey: string
+  TossTestClientKey: string
+  TossTestSecretKey: string
+  TossBillingClientKey: string
+  TossBillingSecretKey: string
+  TossBillingTestClientKey: string
+  TossBillingTestSecretKey: string
+  TossUnitPrice: number
+  TossMinTopUp: number
+  TossConfigRepairRequired: boolean
+  TossConfigMaintenanceRequired: boolean
+  TossConfigRepairToken: string
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean

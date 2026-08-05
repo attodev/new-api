@@ -39,19 +39,19 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 
 		if delta > 0 {
 			logger.LogInfo(ctx, fmt.Sprintf("post-charge after pre-charge: %s (actual: %s, pre-charged: %s)",
-				logger.FormatQuota(delta),
-				logger.FormatQuota(actualQuota),
-				logger.FormatQuota(preConsumed),
+				logger.FormatQuota(int64(delta)),
+				logger.FormatQuota(int64(actualQuota)),
+				logger.FormatQuota(int64(preConsumed)),
 			))
 		} else if delta < 0 {
 			logger.LogInfo(ctx, fmt.Sprintf("refund after pre-charge: %s (actual: %s, pre-charged: %s)",
-				logger.FormatQuota(-delta),
-				logger.FormatQuota(actualQuota),
-				logger.FormatQuota(preConsumed),
+				logger.FormatQuota(-int64(delta)),
+				logger.FormatQuota(int64(actualQuota)),
+				logger.FormatQuota(int64(preConsumed)),
 			))
 		} else {
 			logger.LogInfo(ctx, fmt.Sprintf("pre-charge matches actual consumption, no adjustment needed: %s (per-call billing)",
-				logger.FormatQuota(actualQuota),
+				logger.FormatQuota(int64(actualQuota)),
 			))
 		}
 

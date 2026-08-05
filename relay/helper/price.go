@@ -21,12 +21,12 @@ func modelPriceNotConfiguredError(modelName string, userId int) error {
 	if model.IsAdmin(userId) {
 		return fmt.Errorf(
 			"Model %s price is not configured. Please go to [System Settings → Operation Settings] to enable self-use mode, or configure the price for this model in [System Settings → Group & Model Pricing Settings];",
-			modelName, modelName,
+			modelName,
 		)
 	}
 	return fmt.Errorf(
 		"Model %s price has not been configured by the admin and is temporarily unavailable. Please contact the site admin to enable this model;",
-		modelName, modelName,
+		modelName,
 	)
 }
 

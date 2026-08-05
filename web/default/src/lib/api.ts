@@ -112,8 +112,14 @@ api.interceptors.response.use(
       }
     } else if (!skip) {
       // Other errors: show error message from response or default
-      const msg =
-        error?.response?.data?.message || error?.message || t('Request failed')
+      let msg = error?.response?.data?.message
+      if (!msg) {
+        if (status) {
+          msg = t('An error occurred (Error Code: {{code}})', { code: status })
+        } else {
+          msg = error?.message || t('Request failed')
+        }
+      }
       toast.error(msg)
     }
     return Promise.reject(error)
@@ -211,7 +217,10 @@ export async function getUserGroups(): Promise<{
 
 // Get system status
 export async function getStatus() {
-  const res = await api.get('/api/status')
+  // Scoped timeout: a stalled first-load request (e.g. cold backend/Redis
+  // connection) should reject and let callers retry, instead of hanging
+  // the loading state forever until a manual refresh.
+  const res = await api.get('/api/status', { timeout: 8000 })
   return res.data?.data as Record<string, unknown>
 }
 

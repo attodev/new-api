@@ -7,33 +7,23 @@ const STRINGS = {
   error:          isKo ? '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.'               : 'Something went wrong. Please try again later.',
   submitDefault:  isKo ? '문의하기 →'                                                  : 'Submit →',
   scaleTabLabel:  isKo ? '도입 규모 탭 전환'                                            : 'Team Size tab switch',
-  popupTerms:     isKo ? '이용약관'                                                     : 'Terms of Service',
-  popupPrivacy:   isKo ? '개인정보처리방침'                                              : 'Privacy Policy',
-  popupPricing:   isKo ? '전체 모델 및 가격표'                                           : 'Full Model & Pricing Table',
-  popupTermsUrl:  isKo ? './terms.html'                                                 : './terms_en.html',
-  popupPrivacyUrl:isKo ? './privacy.html'                                               : './privacy_en.html',
-  // renderPricingTable strings
-  pricingTitleFn: isKo
-    ? (d) => `전체 모델 및 가격표(${d} 기준, <span style="color:#fbbf24;">단가는 현재 시점 기준이며 추후 변동될 수 있음</span>)`
-    : (d) => `Full Model & Pricing (as of ${d}, <span style="color:#fbbf24;">prices are current and subject to change</span>)`,
-  pricingLoading: isKo ? '불러오는 중…'                                                 : 'Loading…',
-  pricingError:   isKo ? '가격 정보를 불러오지 못했습니다.'                               : 'Failed to load pricing data.',
-  tableModel:     isKo ? '모델명'                                                        : 'Model',
-  tableInput:     isKo ? '입력 단가 ($/M)'                                              : 'Input ($/M)',
-  tableOutput:    isKo ? '출력 단가 ($/M)'                                              : 'Output ($/M)',
   // calc strings
   calcLoadError:  isKo ? '모델 로드 실패'                                               : 'Failed to load models',
   calcInputRow:   isKo ? (m) => `입력 토큰 (${m}M)`                                    : (m) => `Input Tokens (${m}M)`,
   calcOutputRow:  isKo ? (m) => `출력 토큰 (${m}M)`                                    : (m) => `Output Tokens (${m}M)`,
   calcInputRate:  isKo ? '단가 입력'                                                    : 'Input rate',
   calcOutputRate: isKo ? '단가 출력'                                                    : 'Output rate',
+  calcUnit:       isKo ? (v) => `단가: $${v} / 1M`                                     : (v) => `$${v} / 1M`,
+  calcEmpty:      isKo ? '모델과 토큰을 입력하고<br>‘+ 목록에 추가하기’를 눌러주세요.'      : 'Select a model and enter tokens,<br>then click ‘+ Add to list’.',
+  calcRemove:     isKo ? '삭제'                                                         : 'Remove',
+  calcNeedTokens: isKo ? '입력·출력 토큰을 입력해 주세요.'                                : 'Enter input/output tokens first.',
+  calcItemDiscount: isKo ? (pct) => ` · ${pct}% 할인`                                   : (pct) => ` · ${pct}% off`,
+  calcTotalList:     isKo ? (list) => `정가 ${list}`                                     : (list) => `List price ${list}`,
+  calcTotalDiscount: isKo ? (list, save) => `<span class="ctd-gray">정가 <span class="ctd-list">${list}</span></span> · 할인 −${save}` : (list, save) => `<span class="ctd-gray">List <span class="ctd-list">${list}</span></span> · Save ${save}`,
+  calcTotalList:  isKo ? (list) => `<span class="ctd-gray">정가 ${list}</span>`          : (list) => `<span class="ctd-gray">List price ${list}</span>`,
   // video filenames
-  videoStd:       isKo ? 'alrouter_ko.mp4'                                              : 'alrouter_en.mp4',
-  videoLite:      isKo ? 'alrouter_ko_lite.mp4'                                         : 'alrouter_en_lite.mp4',
-  posterStd:      isKo ? './alrouter_ko_poster.png'                                     : './alrouter_en_poster.png',
-  posterLite:     isKo ? './alrouter_ko_lite_poster.png'                                : './alrouter_en_lite_poster.png',
-  ctaMap:         isKo ? { 'alrouter_ko.mp4': 18.1, 'alrouter_ko_lite.mp4': 19.5 }
-                       : { 'alrouter_en.mp4': 17.3, 'alrouter_en_lite.mp4': 21.6 },
+  videoStd:       isKo ? '/videos/main/alrouter_ko.mp4'                                 : '/videos/main/alrouter_en.mp4',
+  videoLite:      isKo ? '/videos/main/alrouter_ko_lite.mp4'                            : '/videos/main/alrouter_en_lite.mp4',
 };
 
 // ── Contact form ──
@@ -41,25 +31,21 @@ const STRINGS = {
   const overlay = document.getElementById("contactOverlay");
   const form = document.getElementById("contactForm");
   const result = document.getElementById("contactResult");
+  if (!overlay || !form || !result) return;
+
+  const contactDialog = window.createAccessibleModal({
+    overlay,
+    initialFocus: () => form.querySelector('[name="org"]'),
+  });
+
+  window.openContact = (opener) => contactDialog.open(opener);
 
   function closeContact() {
-    overlay.classList.remove("open");
+    contactDialog.close();
   }
   document
     .getElementById("contactClose")
     .addEventListener("click", closeContact);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeContact();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeContact();
-  });
-  new MutationObserver(() => {
-    document.body.style.overflow = overlay.classList.contains("open")
-      ? "hidden"
-      : "";
-  }).observe(overlay, { attributes: true, attributeFilter: ["class"] });
-
   // 도입 규모 탭 전환
   document
     .querySelectorAll('input[name="scale_type"]')
@@ -116,130 +102,10 @@ const STRINGS = {
   });
 })();
 
-// ── Popup system ──
-const POPUP_CONTENTS = {
-  terms:   { title: STRINGS.popupTerms,    iframe: STRINGS.popupTermsUrl },
-  privacy: { title: STRINGS.popupPrivacy,  iframe: STRINGS.popupPrivacyUrl },
-  pricing: { title: STRINGS.popupPricing,  wide: true, dynamic: true },
-};
-
-function openPopup(title, key) {
-  const overlay = document.getElementById('popupOverlay');
-  const modal   = overlay.querySelector('.popup-modal');
-  const body    = document.getElementById('popupBody');
-  const item    = POPUP_CONTENTS[key] || {};
-
-  document.getElementById('popupTitle').textContent = item.title || title;
-
-  if (item.iframe) {
-    modal.classList.add('wide');
-    body.innerHTML = '<iframe class="popup-iframe" src="' + item.iframe + '"></iframe>';
-  } else if (item.dynamic && key === 'pricing') {
-    modal.classList.add('wide');
-    renderPricingTable(body);
-  } else if (item.wide) {
-    modal.classList.add('wide');
-    body.innerHTML = item.body || '';
-  } else {
-    modal.classList.remove('wide');
-    body.innerHTML = item.body || '';
-  }
-
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-async function renderPricingTable(body) {
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`;
-  document.getElementById('popupTitle').innerHTML = STRINGS.pricingTitleFn(dateStr);
-
-  body.innerHTML = `<p style="color:#6b7280;font-size:13px;text-align:center;padding:24px 0;">${STRINGS.pricingLoading}</p>`;
-
-  try {
-    const res  = await fetch('/api/pricing');
-    const json = await res.json();
-    const groupRatio = 2;
-
-    function getProvider(name) {
-      if (name.startsWith('claude'))  return 'Anthropic';
-      if (name.startsWith('gemini'))  return 'Google';
-      if (name.startsWith('gpt') || name.startsWith('o1') || name.startsWith('o3') || name.startsWith('o4')) return 'OpenAI';
-      return 'Other';
-    }
-
-    function getTier(name) {
-      if (name.includes('haiku') || name.includes('flash-lite')) return 1;
-      if (name.includes('sonnet') || (name.includes('flash') && !name.includes('lite'))) return 2;
-      if (name.includes('opus') || name.includes('pro')) return 3;
-      return 2;
-    }
-
-    const sorted = [...json.data].sort((a, b) => {
-      const pa = getProvider(a.model_name), pb = getProvider(b.model_name);
-      if (pa !== pb) return pa.localeCompare(pb);
-      const ta = getTier(a.model_name), tb = getTier(b.model_name);
-      if (ta !== tb) return ta - tb;
-      return a.model_name.localeCompare(b.model_name);
-    });
-
-    let lastProvider = '';
-    const rows = sorted.map(m => {
-      const discount = (m.discount_percent || 0) / 100;
-      const inputPrice  = (m.model_ratio * groupRatio * (1 - discount)).toFixed(4);
-      const outputPrice = (m.model_ratio * m.completion_ratio * groupRatio * (1 - discount)).toFixed(4);
-      const provider = getProvider(m.model_name);
-      const providerRow = provider !== lastProvider
-        ? `<tr><td colspan="3" style="padding:12px 14px 4px;font-size:11px;font-weight:700;color:#0EA5E9;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #374151;">${provider}</td></tr>`
-        : '';
-      lastProvider = provider;
-      return providerRow + `
-        <tr>
-          <td style="padding:10px 14px;color:#f9fafb;font-size:13px;border-bottom:1px solid #1f2937;">${m.model_name}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${inputPrice}</td>
-          <td style="padding:10px 14px;color:#7dd3fc;font-size:13px;text-align:right;border-bottom:1px solid #1f2937;">$${outputPrice}</td>
-        </tr>`;
-    }).join('');
-
-    body.innerHTML = `
-      <div style="padding:20px 24px 0;">
-        <table style="width:100%;border-collapse:collapse;">
-          <thead style="position:sticky;top:0;z-index:1;">
-            <tr style="background:#1f2937;">
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:left;border-bottom:1px solid #374151;">${STRINGS.tableModel}</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">${STRINGS.tableInput}</th>
-              <th style="padding:10px 14px;color:#9ca3af;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;text-align:right;border-bottom:1px solid #374151;">${STRINGS.tableOutput}</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      `;
-  } catch (e) {
-    body.innerHTML = `<p style="color:#f87171;font-size:13px;text-align:center;padding:24px 0;">${STRINGS.pricingError}</p>`;
-  }
-}
-
-function closePopup() {
-  const overlay = document.getElementById('popupOverlay');
-  overlay.classList.remove('open');
-  overlay.querySelector('.popup-modal').classList.remove('wide');
-  document.getElementById('popupBody').innerHTML = '';
-  document.body.style.overflow = '';
-}
-
-document.getElementById('popupClose').addEventListener('click', closePopup);
-document.getElementById('popupOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closePopup();
-});
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closePopup();
-});
+// ── Popup system (openPopup/closePopup/renderPricingTable) now lives in popup.js ──
 
 // ── Video version check ──
 (function () {
-  const video = document.getElementById("animVideo");
-  const posterImg = document.getElementById("animPosterImg");
   const prev = sessionStorage.getItem("videoVersion");
   const ver =
     prev === "std"
@@ -250,10 +116,10 @@ document.addEventListener('keydown', function(e) {
           ? "std"
           : "lite";
   sessionStorage.setItem("videoVersion", ver);
-  window._videoVer = ver;
-  video.src = ver === "lite" ? STRINGS.videoLite : STRINGS.videoStd;
-  if (posterImg) posterImg.src = ver === "lite" ? STRINGS.posterLite : STRINGS.posterStd;
-  video.load();
+  // The template always starts on std. The requested initial variant is
+  // committed below only after its poster has loaded and decoded.
+  window._videoVer = "std";
+  window._initialVideoVer = ver;
 
   function _updateDots(v) {
     const s = document.getElementById("dotStd");
@@ -261,7 +127,7 @@ document.addEventListener('keydown', function(e) {
     if (s) s.classList.toggle("active", v === "std");
     if (l) l.classList.toggle("active", v === "lite");
   }
-  _updateDots(ver);
+  _updateDots("std");
   window._updateDots = _updateDots;
 
   // 언어 전환 링크에 스크롤 위치 저장
@@ -284,83 +150,130 @@ document.addEventListener('keydown', function(e) {
 // ── Video play/pause controls ──
 (function() {
   const video       = document.getElementById('animVideo');
-  const posterImg   = document.getElementById('animPosterImg');
+  const posterLayer = document.getElementById('animPosterLayer');
+  const posterImages = {
+    std: document.getElementById('animPosterStd'),
+    lite: document.getElementById('animPosterLite'),
+  };
   const playOverlay = document.getElementById('animPlayOverlay');
   const hoverOverlay= document.getElementById('animHoverOverlay');
   const pauseState  = document.getElementById('animPauseState');
   const resumeState = document.getElementById('animResumeState');
-  const ctaWrap     = document.getElementById('animCtaWrap');
-  const ctaBtn      = document.getElementById('animCtaBtn');
+  const endControls = document.getElementById('animEndControls');
   const replayBtn   = document.getElementById('animReplayBtn');
   const animWrap    = document.getElementById('anim');
-  const CTA_MAP = STRINGS.ctaMap;
-  let CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
+  let switchRequestId = 0;
+  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
+
+  function renderPlaybackToggle(isPaused) {
+    const unavailable = playOverlay.style.display !== 'none' || video.ended;
+    hoverOverlay.hidden = unavailable;
+    if (unavailable) return;
+
+    pauseState.style.display = isPaused ? 'none' : 'flex';
+    resumeState.style.display = isPaused ? 'flex' : 'none';
+    hoverOverlay.classList.toggle('is-paused', isPaused);
+    hoverOverlay.setAttribute(
+      'aria-label',
+      isPaused ? hoverOverlay.dataset.labelResume : hoverOverlay.dataset.labelPause,
+    );
+  }
+
+  function syncPlaybackToggle() {
+    renderPlaybackToggle(video.paused);
+  }
+
+  function playVideo() {
+    // play 이벤트를 기다리는 동안 이전 일시정지 UI가 깜빡이지 않도록
+    // 클릭 즉시 재생 중 상태를 먼저 표시한다.
+    renderPlaybackToggle(false);
+    if (video.readyState === HTMLMediaElement.HAVE_NOTHING) video.load();
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(syncPlaybackToggle);
+    }
+  }
+
+  function loadAndDecodePoster(img) {
+    const loaded = img.complete
+      ? (img.naturalWidth > 0
+          ? Promise.resolve()
+          : Promise.reject(new Error('Poster failed to load')))
+      : new Promise((resolve, reject) => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', () => reject(new Error('Poster failed to load')), { once: true });
+        });
+
+    return loaded.then(async () => {
+      if (typeof img.decode === 'function') await img.decode();
+      if (img.naturalWidth === 0) throw new Error('Poster failed to decode');
+      return img;
+    });
+  }
+
+  // Only the visible standard poster is requested at navigation time. The
+  // alternate poster is attached on user intent or during browser idle time,
+  // while the cached decode promise keeps switching atomic.
+  const posterReady = {
+    std: loadAndDecodePoster(posterImages.std),
+  };
+  posterReady.std.catch(() => {});
+
+  function ensurePosterReady(ver) {
+    if (posterReady[ver]) return posterReady[ver];
+
+    const img = posterImages[ver];
+    if (!img) return Promise.reject(new Error('Unknown poster version'));
+    if (!img.getAttribute('src')) {
+      if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+      if (img.dataset.sizes) img.sizes = img.dataset.sizes;
+      img.src = img.dataset.src;
+    }
+    posterReady[ver] = loadAndDecodePoster(img);
+    posterReady[ver].catch(() => {});
+    return posterReady[ver];
+  }
 
   playOverlay.addEventListener('click', () => {
+    if (_isSwiping) return;
+    // Playing the current video cancels a poster switch that is still loading.
+    switchRequestId += 1;
+    sessionStorage.setItem('videoVersion', window._videoVer);
     playOverlay.style.display = 'none';
-    if (posterImg) posterImg.style.display = 'none';
+    posterLayer.classList.add('is-hidden');
     video.currentTime = 0;
-    video.play();
+    playVideo();
   });
 
-  video.addEventListener('timeupdate', () => {
-    if (video.currentTime >= CTA_TIME && ctaWrap.style.display === 'none') {
-      ctaWrap.style.display = 'flex';
-      setTimeout(() => ctaBtn.classList.add('active'), 50);
+  hoverOverlay.addEventListener('click', () => {
+    if (_isSwiping || video.ended) return;
+    if (video.paused) {
+      playVideo();
+    } else {
+      video.pause();
     }
   });
 
+  video.addEventListener('play', syncPlaybackToggle);
+  video.addEventListener('pause', syncPlaybackToggle);
+
   video.addEventListener('ended', () => {
-    hoverOverlay.style.display = 'none';
+    syncPlaybackToggle();
+    endControls.style.display = 'flex';
     replayBtn.style.display = 'flex';
   });
 
   replayBtn.addEventListener('click', () => {
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
     video.currentTime = 0;
-    video.play();
-  });
-
-  const isTouch = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
-  animWrap.addEventListener('mouseenter', () => {
-    if (isTouch()) return;
-    if (playOverlay.style.display !== 'none') return;
-    if (video.ended) return;
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-  });
-  animWrap.addEventListener('mouseleave', () => {
-    if (isTouch()) return;
-    hoverOverlay.style.display = 'none';
-  });
-
-  // Mobile: tap to show controls, auto-hide after 2.5s
-  let _hideControlsTimer = null;
-  animWrap.addEventListener('click', () => {
-    if (!isTouch()) return;
-    if (_isSwiping) return;
-    if (playOverlay.style.display !== 'none') return; // play overlay handles this tap
-    if (video.ended) return;
-    clearTimeout(_hideControlsTimer);
-    if (hoverOverlay.style.display === 'flex') {
-      hoverOverlay.style.display = 'none';
-      return;
-    }
-    pauseState.style.display  = video.paused ? 'none' : 'flex';
-    resumeState.style.display = video.paused ? 'flex' : 'none';
-    hoverOverlay.style.display = 'flex';
-    _hideControlsTimer = setTimeout(() => {
-      hoverOverlay.style.display = 'none';
-    }, 2500);
+    playVideo();
   });
 
   // Mobile swipe to switch video (std ↔ lite)
-  let _touchStartX = 0, _touchStartY = 0, _isSwiping = false;
   animWrap.addEventListener('touchstart', (e) => {
+    const nextVer = window._videoVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(nextVer).catch(() => {});
     _touchStartX = e.touches[0].clientX;
     _touchStartY = e.touches[0].clientY;
     _isSwiping = false;
@@ -387,21 +300,35 @@ document.addEventListener('keydown', function(e) {
   function _doSwitch(newVer) {
     window._videoVer = newVer;
     sessionStorage.setItem('videoVersion', newVer);
-    ctaBtn.classList.remove('active');
-    ctaWrap.style.display = 'none';
+    endControls.style.display = 'none';
     replayBtn.style.display = 'none';
-    hoverOverlay.style.display = 'none';
+    hoverOverlay.hidden = true;
+    hoverOverlay.classList.remove('is-paused');
     playOverlay.style.display = '';
-    if (posterImg) { posterImg.src = newVer === 'lite' ? STRINGS.posterLite : STRINGS.posterStd; posterImg.style.display = ''; }
+    Object.entries(posterImages).forEach(([ver, img]) => {
+      img.classList.toggle('active', ver === newVer);
+    });
+    posterLayer.classList.remove('is-hidden');
     video.pause();
     video.src = newVer === 'lite' ? STRINGS.videoLite : STRINGS.videoStd;
-    video.load();
-    CTA_TIME = CTA_MAP[video.src.split('/').pop()] ?? 18.1;
     if (window._updateDots) window._updateDots(newVer);
   }
 
-  window.switchVideo = function(newVer, swipeDir) {
+  window.switchVideo = async function(newVer, swipeDir) {
+    if (!posterImages[newVer]) return;
+
+    // Increment before the same-version check so selecting the current dot can
+    // cancel an older pending switch to the other version.
+    const requestId = ++switchRequestId;
     if (window._videoVer === newVer) return;
+
+    try {
+      await ensurePosterReady(newVer);
+    } catch (error) {
+      console.warn('Video poster could not be prepared; keeping the current poster.', error);
+      return;
+    }
+    if (requestId !== switchRequestId) return;
 
     if (swipeDir) {
       // 스와이프: 기존 슬라이드 애니메이션
@@ -425,75 +352,341 @@ document.addEventListener('keydown', function(e) {
     }
   };
 
-  pauseState.addEventListener('click', () => {
-    video.pause();
-    pauseState.style.display  = 'none';
-    resumeState.style.display = 'flex';
+  Object.entries({ std: document.getElementById('dotStd'), lite: document.getElementById('dotLite') })
+    .forEach(([ver, dot]) => {
+      if (!dot) return;
+      ['pointerenter', 'focus', 'touchstart'].forEach((eventName) => {
+        dot.addEventListener(eventName, () => ensurePosterReady(ver).catch(() => {}), { passive: true });
+      });
+    });
+
+  const warmAlternatePoster = () => {
+    const initialVer = window._initialVideoVer;
+    if (initialVer !== window._videoVer) {
+      window.switchVideo(initialVer);
+      return;
+    }
+    const alternateVer = initialVer === 'std' ? 'lite' : 'std';
+    ensurePosterReady(alternateVer).catch(() => {});
+  };
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(warmAlternatePoster, { timeout: 2000 });
+  } else {
+    window.setTimeout(warmAlternatePoster, 1200);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !video.paused) video.pause();
   });
 
-  resumeState.addEventListener('click', () => {
-    video.play();
-    hoverOverlay.style.display = 'none';
-  });
+  syncPlaybackToggle();
 })();
 
 // ── Calculator pricing ──
-// TODO: 모델 목록 및 가격은 추후 API에서 가져올 예정
-let _calcPricing = {}; // model_name → { input, output }
+// AI cost calculator (cart-style): add model/token estimates to a list and
+// see the running total. Model prices come from /api/pricing.
+let _calcPricing = Object.create(null); // model_name → { input, output }  ($ / 1M)
 let _calcGroupRatio = 1;
+let _calcItems = [];
+let _calcSeq = 0;
+let _calcLastAddedId = null; // 렌더 1회에만 소비되는 "새로 추가됨" 표시
+
+// full amount → "$1,234.56"; very large → compact "$1.2B" so the total never overflows
+const _calcMoney = (v) =>
+  "$" +
+  (Math.abs(v) >= 1e6
+    ? new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(v)
+    : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+const _calcUnitStr = (v) =>
+  v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// "모델 & 가격" 전체 가격표(popup.js renderPricingTable)와 동일한 제공사·티어 정렬 기준.
+function _calcProvider(name) {
+  if (name.startsWith("claude")) return "Anthropic";
+  if (name.startsWith("gemini")) return "Google";
+  if (name.startsWith("gpt") || name.startsWith("o1") || name.startsWith("o3") || name.startsWith("o4")) return "OpenAI";
+  return "Other";
+}
+function _calcTier(name) {
+  if (name.includes("haiku") || name.includes("flash-lite")) return 1;
+  if (name.includes("sonnet") || (name.includes("flash") && !name.includes("lite"))) return 2;
+  if (name.includes("opus") || name.includes("pro")) return 3;
+  return 2;
+}
 
 async function loadCalcModels() {
   const sel = document.getElementById("calcModel");
+  if (!sel) return;
   try {
     const res = await fetch("/api/pricing");
     const json = await res.json();
     _calcGroupRatio = 2;
-    json.data.forEach((m) => {
-      const d = (m.discount_percent || 0) / 100;
+    const models = json.data
+      .map((model) => ({ ...model, model_name: String(model.model_name ?? "") }))
+      .sort((a, b) => {
+        const pa = _calcProvider(a.model_name), pb = _calcProvider(b.model_name);
+        if (pa !== pb) return pa.localeCompare(pb);
+        const ta = _calcTier(a.model_name), tb = _calcTier(b.model_name);
+        if (ta !== tb) return ta - tb;
+        return a.model_name.localeCompare(b.model_name);
+      });
+    models.forEach((m) => {
+      // 전체 가격표의 discount_percent는 적용하지 않고 원래(정가) 금액으로 계산.
+      // 로그인 사용자의 할인율은 addCalcItem에서 별도로 반영한다.
       _calcPricing[m.model_name] = {
-        input: m.model_ratio * _calcGroupRatio * (1 - d),
-        output: m.model_ratio * m.completion_ratio * _calcGroupRatio * (1 - d),
+        input: m.model_ratio * _calcGroupRatio,
+        output: m.model_ratio * m.completion_ratio * _calcGroupRatio,
       };
     });
-    sel.innerHTML = json.data
-      .map((m) => `<option value="${m.model_name}">${m.model_name}</option>`)
-      .join("");
+    let lastProvider = "";
+    const nodes = [];
+    models.forEach((m) => {
+      const provider = _calcProvider(m.model_name);
+      if (provider !== lastProvider) {
+        const group = document.createElement("optgroup");
+        group.label = provider;
+        group.dataset.provider = provider;
+        nodes.push(group);
+        lastProvider = provider;
+      }
+      const option = document.createElement("option");
+      option.value = m.model_name;
+      const p = _calcPricing[m.model_name];
+      option.textContent = `${m.model_name} ($${_calcUnitStr(p.input)} / $${_calcUnitStr(p.output)})`;
+      nodes[nodes.length - 1].appendChild(option);
+    });
+    sel.replaceChildren(...nodes);
+    updateCalcUnitLabels();
   } catch (e) {
-    sel.innerHTML = `<option value="">${STRINGS.calcLoadError}</option>`;
+    const errorOption = document.createElement("option");
+    errorOption.value = "";
+    errorOption.textContent = STRINGS.calcLoadError;
+    sel.replaceChildren(errorOption);
   }
 }
 loadCalcModels();
+// 초기(0개) 상태에서도 정가 라인을 노출해 하단이 비어 보이지 않도록 한다.
+renderCalcCart();
 
-function runCalc() {
-  const model = document.getElementById("calcModel").value;
-  const inputM =
-    parseFloat(document.getElementById("calcInputTokens").value) || 0;
-  const outputM =
-    parseFloat(document.getElementById("calcOutputTokens").value) || 0;
-  const prices = _calcPricing[model] || { input: 0, output: 0 };
-  const inputCost = inputM * prices.input;
-  const outputCost = outputM * prices.output;
-  const total = inputCost + outputCost;
-  const fmt = (v) => "$" + v.toFixed(4);
-  document.getElementById("calcHint").style.display = "none";
-  document.getElementById("calcLabel").style.display = "";
-  const priceEl = document.getElementById("calcPrice");
-  priceEl.style.display = "";
-  priceEl.textContent = "$" + total.toFixed(2);
-  document.getElementById("calcBreakdown").innerHTML =
-    `<div class="calc-breakdown-row"><span>${STRINGS.calcInputRow(inputM)}</span><span>${fmt(inputCost)}</span></div>` +
-    `<div class="calc-breakdown-row"><span>${STRINGS.calcOutputRow(outputM)}</span><span>${fmt(outputCost)}</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;margin-top:4px;padding-top:4px;border-top:1px solid #374151;color:#9ca3af"><span>${STRINGS.calcInputRate}</span><span>$${prices.input.toFixed(4)}/M</span></div>` +
-    `<div class="calc-breakdown-row" style="display:none;color:#9ca3af"><span>${STRINGS.calcOutputRate}</span><span>$${prices.output.toFixed(4)}/M</span></div>`;
+function updateCalcUnitLabels() {
+  const sel = document.getElementById("calcModel");
+  const p = sel && _calcPricing[sel.value];
+  const inEl = document.getElementById("calcInUnit");
+  const outEl = document.getElementById("calcOutUnit");
+  if (inEl) inEl.textContent = p ? STRINGS.calcUnit(_calcUnitStr(p.input)) : "";
+  if (outEl) outEl.textContent = p ? STRINGS.calcUnit(_calcUnitStr(p.output)) : "";
 }
 
-// ── Lucide icon init + lang-switch click handler ──
-lucide.createIcons();
-document.addEventListener("click", function (e) {
-  document.querySelectorAll(".lang-switch.open").forEach(function (el) {
-    if (!el.contains(e.target)) el.classList.remove("open");
+// 할인율 뱃지(0/5/10/15/20)를 클릭하면 직접입력 인풋에 값을 채우고 활성 상태를 표시.
+function setCalcDiscount(v, el) {
+  const input = document.getElementById("calcDiscount");
+  if (input) input.value = v;
+  document
+    .querySelectorAll(".calc-disc-badge")
+    .forEach((b) => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+}
+
+// 직접입력 시: 정수(0~100)만 허용하고, 프리셋과 값이 일치하는 뱃지만 활성화(없으면 전부 해제).
+function onCalcDiscountInput(input) {
+  let v = input.value.replace(/[^\d]/g, ""); // 숫자만 (음수·소수점·문자 차단)
+  if (v !== "") {
+    let n = parseInt(v, 10);
+    if (n > 100) n = 100;
+    v = String(n);
+  }
+  if (v !== input.value) input.value = v;
+  const val = v === "" ? null : parseFloat(v);
+  document.querySelectorAll(".calc-disc-badge").forEach((b) => {
+    b.classList.toggle("active", val !== null && parseFloat(b.dataset.disc) === val);
   });
-});
+}
+
+// 입력값이 비어 있을 때 살짝 안내 + 인풋 강조.
+function calcHintNeedTokens() {
+  const hint = document.getElementById("calcHint");
+  if (hint) hint.textContent = STRINGS.calcNeedTokens;
+  ["calcInputTokens", "calcOutputTokens"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el || _calcPositive(id) > 0) return; // 0 초과인 정상 필드는 강조하지 않음
+    el.classList.add("calc-input-invalid");
+    setTimeout(() => el.classList.remove("calc-input-invalid"), 1200);
+  });
+}
+
+// 토큰 입력 최댓값(placeholder "0.1~100,000"과 동일한 단위: 백만 토큰).
+const CALC_MAX_TOKENS_M = 100000;
+
+// 토큰 입력 정제: 입력 순간부터 숫자와 소수점 하나만 허용한다.
+// -, +, e, 공백, 문자 등은 애초에 들어가지 못하게 즉시 제거(음수 불가 → 값은 항상 0 이상).
+// 최댓값을 넘으면 즉시 상한으로 클램프.
+function sanitizeCalcNum(el) {
+  let v = el.value.replace(/[^\d.]/g, ""); // 숫자·점만 남김
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    // 첫 소수점만 유지, 이후의 점은 제거
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+  }
+  const n = parseFloat(v);
+  if (Number.isFinite(n) && n > CALC_MAX_TOKENS_M) {
+    v = String(CALC_MAX_TOKENS_M);
+  }
+  if (v !== el.value) el.value = v;
+}
+
+// 안전 파싱: 유한한 양수만 인정, 그 외(음수·NaN·문자열)는 0.
+function _calcPositive(id) {
+  const v = parseFloat(document.getElementById(id).value);
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+function addCalcItem() {
+  const model = document.getElementById("calcModel").value;
+  const p = _calcPricing[model];
+  if (!p) return;
+  const inputM = _calcPositive("calcInputTokens");
+  const outputM = _calcPositive("calcOutputTokens");
+  // 입력·출력 모두 0 초과여야 유효한 견적. 한쪽이라도 0/빈값이면 차단.
+  if (inputM <= 0 || outputM <= 0) {
+    calcHintNeedTokens();
+    return;
+  }
+  const hint = document.getElementById("calcHint");
+  if (hint) hint.textContent = "";
+  // 로그인 시 노출되는 할인율(뱃지/직접입력)이 있으면 반영 (없으면 정가)
+  const discountEl = document.getElementById("calcDiscount");
+  let discountPct = discountEl ? parseFloat(discountEl.value) || 0 : 0;
+  discountPct = Math.min(100, Math.max(0, discountPct));
+  const listCost = inputM * p.input + outputM * p.output;
+  const cost = listCost * (1 - discountPct / 100);
+  // 기존 항목들이 아래로 밀리는 것도 부드럽게 보이도록, 삽입 전 위치를 기록해둔다.
+  const prevTops = {};
+  document.querySelectorAll(".calc-cart-item").forEach((el) => {
+    prevTops[el.dataset.id] = el.getBoundingClientRect().top;
+  });
+  // 새로 추가한 항목이 맨 위에 보이도록 앞에 삽입한다.
+  _calcItems.unshift({ id: ++_calcSeq, model, inputM, outputM, listCost, cost, discount: discountPct });
+  _calcLastAddedId = _calcSeq; // 방금 추가된 항목에만 등장 애니메이션 적용
+  renderCalcCart();
+  _calcFlipShift(prevTops);
+}
+
+// FLIP: 삭제로 아래 항목들이 순간이동하듯 튀지 않도록, 이전 위치에서 새 위치로 부드럽게 슬라이드.
+function _calcFlipShift(prevTops) {
+  document.querySelectorAll(".calc-cart-item").forEach((el) => {
+    const prevTop = prevTops[el.dataset.id];
+    if (prevTop == null) return;
+    const delta = prevTop - el.getBoundingClientRect().top;
+    if (Math.abs(delta) < 0.5) return;
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.22s ease-out";
+        el.style.transform = "";
+        el.addEventListener("transitionend", () => { el.style.transition = ""; }, { once: true });
+      });
+    });
+  });
+}
+
+function removeCalcItem(id) {
+  // 삭제 애니메이션(fade-out) 재생 후 실제로 목록에서 제거한다.
+  const row = document.querySelector(`.calc-cart-item[data-id="${id}"]`);
+  if (row) {
+    row.classList.remove("cci-new"); // 등장 애니메이션과 겹치지 않도록 먼저 해제
+    row.classList.add("cci-removing");
+    setTimeout(() => {
+      const prevTops = {};
+      document.querySelectorAll(".calc-cart-item").forEach((el) => {
+        if (el.dataset.id !== String(id)) prevTops[el.dataset.id] = el.getBoundingClientRect().top;
+      });
+      _calcItems = _calcItems.filter((it) => it.id !== id);
+      renderCalcCart();
+      _calcFlipShift(prevTops);
+    }, 220);
+  } else {
+    _calcItems = _calcItems.filter((it) => it.id !== id);
+    renderCalcCart();
+  }
+}
+
+function clearCalcItems() {
+  const rows = [...document.querySelectorAll(".calc-cart-item")];
+  if (rows.length === 0) {
+    _calcItems = [];
+    renderCalcCart();
+    return;
+  }
+  // 한 번에 사라지지 않고 위에서부터 순서대로 하나씩 fade-out 되도록 지연을 준다.
+  const STAGGER_MS = 50;
+  const FADE_MS = 220;
+  rows.forEach((row, i) => {
+    setTimeout(() => {
+      row.classList.remove("cci-new");
+      row.classList.add("cci-removing");
+    }, i * STAGGER_MS);
+  });
+  setTimeout(() => {
+    _calcItems = [];
+    renderCalcCart();
+  }, (rows.length - 1) * STAGGER_MS + FADE_MS);
+}
+
+function renderCalcCart() {
+  const list = document.getElementById("calcItemList");
+  const totalEl = document.getElementById("calcTotal");
+  const countEl = document.getElementById("calcItemCount");
+  const discEl = document.getElementById("calcTotalDiscount");
+  if (!list) return;
+  if (countEl) countEl.textContent = _calcItems.length;
+
+  if (_calcItems.length === 0) {
+    list.innerHTML = `<div class="calc-cart-empty">${STRINGS.calcEmpty}</div>`;
+    if (totalEl) totalEl.textContent = "$0.00";
+    // 비어 있어도 정가 라인을 그대로 노출해 아래 공간이 허전하지 않도록 한다.
+    if (discEl) discEl.innerHTML = STRINGS.calcTotalList(_calcMoney(0));
+    return;
+  }
+
+  let totalCost = 0;
+  let totalList = 0;
+  list.innerHTML = "";
+  _calcItems.forEach((it) => {
+    totalCost += it.cost;
+    totalList += it.listCost != null ? it.listCost : it.cost;
+    // inputM/outputM/discount 는 정제된 숫자라 innerHTML 삽입이 안전(모델명만 textContent).
+    const subDisc =
+      it.discount > 0
+        ? `<span class="cci-disc">${STRINGS.calcItemDiscount(it.discount)}</span>`
+        : "";
+    const row = document.createElement("div");
+    row.className = "calc-cart-item" + (it.id === _calcLastAddedId ? " cci-new" : "");
+    row.dataset.id = it.id;
+    row.innerHTML =
+      `<div><div class="cci-name"></div><div class="cci-sub">In: ${it.inputM}M / Out: ${it.outputM}M${subDisc}</div></div>` +
+      `<div class="cci-right"><span class="cci-cost">${_calcMoney(it.cost)}</span>` +
+      `<button class="cci-remove" type="button" aria-label="${STRINGS.calcRemove}" onclick="removeCalcItem(${it.id})">✕</button></div>`;
+    row.querySelector(".cci-name").textContent = it.model; // set as text to avoid HTML injection
+    list.appendChild(row);
+  });
+  _calcLastAddedId = null; // 이번 렌더에서 소비 완료
+  if (totalEl) totalEl.textContent = _calcMoney(totalCost);
+  if (discEl) {
+    const saved = totalList - totalCost;
+    // 정가는 항상 노출하고, 할인이 있으면 옆에 할인액을 덧붙인다.
+    discEl.innerHTML =
+      saved > 0.005
+        ? STRINGS.calcTotalDiscount(_calcMoney(totalList), _calcMoney(saved))
+        : STRINGS.calcTotalList(_calcMoney(totalList));
+  }
+}
+
+// ── Lucide icon init ──
+if (window.lucide && typeof window.lucide.createIcons === 'function') {
+  window.lucide.createIcons();
+}
 
 // ── Scroll reveal ──
 (function () {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const UserNameMaxLength = 20
@@ -37,22 +38,23 @@ type User struct {
 	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
 	VerificationCode string         `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
 	AccessToken      *string        `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
-	Quota            int            `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	Quota            int64          `json:"quota" gorm:"type:bigint;default:0"`
+	UsedQuota        int64          `json:"used_quota" gorm:"type:bigint;default:0;column:used_quota"` // used quota
+	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`                  // request number
 	Group            string         `json:"group" gorm:"type:varchar(64);default:'default'"`
 	OrganizationId   int            `json:"organization_id" gorm:"type:int;default:0;column:organization_id;index"`
 	OrganizationRole string         `json:"organization_role" gorm:"type:varchar(16);default:'';column:organization_role"`
 	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota         int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // remaining invitation quota
-	AffHistoryQuota  int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // historical invitation quota
+	AffQuota         int64          `json:"aff_quota" gorm:"type:bigint;default:0;column:aff_quota"`           // remaining invitation quota
+	AffHistoryQuota  int64          `json:"aff_history_quota" gorm:"type:bigint;default:0;column:aff_history"` // historical invitation quota
 	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	TossCustomerKey  string         `json:"-" gorm:"type:varchar(64);default:''"`
 	CreatedAt        int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 }
@@ -338,8 +340,8 @@ func HardDeleteUserById(id int) error {
 	if id == 0 {
 		return errors.New("id is empty")
 	}
-	err := DB.Unscoped().Delete(&User{}, "id = ?", id).Error
-	return err
+	user := User{Id: id}
+	return user.HardDelete()
 }
 
 func inviteUser(inviterId int) (err error) {
@@ -353,10 +355,10 @@ func inviteUser(inviterId int) (err error) {
 	return DB.Save(user).Error
 }
 
-func (user *User) TransferAffQuotaToQuota(quota int) error {
+func (user *User) TransferAffQuotaToQuota(quota int64) error {
 	// check if quota is below the minimum amount
 	if float64(quota) < common.QuotaPerUnit {
-		return fmt.Errorf("minimum transfer quota is %s", logger.LogQuota(int(common.QuotaPerUnit)))
+		return fmt.Errorf("minimum transfer quota is %s", logger.LogQuota(int64(common.QuotaPerUnit)))
 	}
 
 	// begin database transaction
@@ -367,7 +369,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	defer tx.Rollback() // ensure transaction is rolled back on function exit
 
 	// lock-query user to ensure data consistency
-	err := tx.Set("gorm:query_option", "FOR UPDATE").First(&user, user.Id).Error
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, user.Id).Error
 	if err != nil {
 		return err
 	}
@@ -514,13 +516,47 @@ func (user *User) Update(updatePassword bool) error {
 		}
 	}
 	newUser := *user
-	DB.First(&user, user.Id)
-	if err = DB.Model(user).Updates(newUser).Error; err != nil {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if newUser.Status == common.UserStatusDisabled {
+			if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+				return err
+			}
+		}
+		return tx.Model(&current).Updates(newUser).Error
+	})
+	if err != nil {
+		return err
+	}
+	if err := DB.First(user, user.Id).Error; err != nil {
 		return err
 	}
 
 	// Update cache
 	return updateUserCache(*user)
+}
+
+// UpdateUserFieldsWithBillingLifecycle applies controller-owned field updates
+// while ensuring a transition to disabled atomically stops recurring billing.
+func UpdateUserFieldsWithBillingLifecycle(id int, updates map[string]interface{}) error {
+	if id <= 0 {
+		return errors.New("id is empty")
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, id).Error; err != nil {
+			return err
+		}
+		if status, ok := updates["status"].(int); ok && status == common.UserStatusDisabled {
+			if err := DeactivateTossBillingForUser(tx, id); err != nil {
+				return err
+			}
+		}
+		return tx.Model(&current).Updates(updates).Error
+	})
 }
 
 func (user *User) Edit(updatePassword bool) error {
@@ -587,7 +623,19 @@ func (user *User) Delete() error {
 	if user.Id == 0 {
 		return errors.New("id is empty")
 	}
-	if err := DB.Delete(user).Error; err != nil {
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if err := prepareUserTossPaymentsForDeletionTx(tx, user.Id); err != nil {
+			return err
+		}
+		if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+			return err
+		}
+		return tx.Delete(&current).Error
+	}); err != nil {
 		return err
 	}
 
@@ -599,8 +647,22 @@ func (user *User) HardDelete() error {
 	if user.Id == 0 {
 		return errors.New("id is empty")
 	}
-	err := DB.Unscoped().Delete(user).Error
-	return err
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		var current User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, user.Id).Error; err != nil {
+			return err
+		}
+		if err := prepareUserTossPaymentsForDeletionTx(tx, user.Id); err != nil {
+			return err
+		}
+		if err := DeactivateTossBillingForUser(tx, user.Id); err != nil {
+			return err
+		}
+		return tx.Unscoped().Delete(&current).Error
+	}); err != nil {
+		return err
+	}
+	return invalidateUserCache(user.Id)
 }
 
 // ValidateAndFill check password & user status
@@ -791,7 +853,7 @@ func ValidateAccessToken(token string) (*User, error) {
 }
 
 // GetUserQuota gets quota from Redis first, falls back to DB if needed
-func GetUserQuota(id int, fromDB bool) (quota int, err error) {
+func GetUserQuota(id int, fromDB bool) (quota int64, err error) {
 	defer func() {
 		// Update Redis cache asynchronously on successful DB read
 		if shouldUpdateRedis(fromDB, err) {
@@ -818,7 +880,7 @@ func GetUserQuota(id int, fromDB bool) (quota int, err error) {
 	return quota, nil
 }
 
-func GetUserUsedQuota(id int) (quota int, err error) {
+func GetUserUsedQuota(id int) (quota int64, err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Select("used_quota").Find(&quota).Error
 	return quota, err
 }
@@ -894,12 +956,12 @@ func GetUserSetting(id int, fromDB bool) (settingMap dto.UserSetting, err error)
 	return userBase.GetSetting(), nil
 }
 
-func IncreaseUserQuota(id int, quota int, db bool) (err error) {
+func IncreaseUserQuota(id int, quota int64, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
 	gopool.Go(func() {
-		err := cacheIncrUserQuota(id, int64(quota))
+		err := cacheIncrUserQuota(id, quota)
 		if err != nil {
 			common.SysLog("failed to increase user quota: " + err.Error())
 		}
@@ -911,7 +973,19 @@ func IncreaseUserQuota(id int, quota int, db bool) (err error) {
 	return increaseUserQuota(id, quota)
 }
 
-func increaseUserQuota(id int, quota int) (err error) {
+// increaseUserQuota deliberately does NOT enforce common.MaxQuota. Most callers
+// are refund and compensation paths (relay settlement, task/video refunds,
+// rollback of a failed reserve), and a refund that cannot be applied silently
+// destroys quota the user already paid for -- strictly worse than the precision
+// drift a ceiling here would prevent. For payments the ceiling is enforced where
+// new quota enters instead, in CreditTopUpTarget.
+//
+// Note the remaining gap: the admin grant paths (ManageUser add_quota/override in
+// controller/user.go) validate only the sign, so a root admin can still write a
+// balance above common.MaxQuota and past Number.MAX_SAFE_INTEGER, after which the
+// frontend reads that balance imprecisely. Widening this column to bigint removed
+// the out-of-range rejection that MySQL and PostgreSQL used to supply there.
+func increaseUserQuota(id int, quota int64) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
 	if err != nil {
 		return err
@@ -919,12 +993,12 @@ func increaseUserQuota(id int, quota int) (err error) {
 	return err
 }
 
-func DecreaseUserQuota(id int, quota int, db bool) (err error) {
+func DecreaseUserQuota(id int, quota int64, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
 	gopool.Go(func() {
-		err := cacheDecrUserQuota(id, int64(quota))
+		err := cacheDecrUserQuota(id, quota)
 		if err != nil {
 			common.SysLog("failed to decrease user quota: " + err.Error())
 		}
@@ -936,7 +1010,7 @@ func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	return decreaseUserQuota(id, quota)
 }
 
-func decreaseUserQuota(id int, quota int) (err error) {
+func decreaseUserQuota(id int, quota int64) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error
 	if err != nil {
 		return err
@@ -944,7 +1018,7 @@ func decreaseUserQuota(id int, quota int) (err error) {
 	return err
 }
 
-func DeltaUpdateUserQuota(id int, delta int) (err error) {
+func DeltaUpdateUserQuota(id int, delta int64) (err error) {
 	if delta == 0 {
 		return nil
 	}
@@ -971,7 +1045,7 @@ func UpdateUserLastLoginAt(id int) {
 	}
 }
 
-func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {
+func UpdateUserUsedQuotaAndRequestCount(id int, quota int64) {
 	if common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUsedQuota, id, quota)
 		addNewRecord(BatchUpdateTypeRequestCount, id, 1)
@@ -980,7 +1054,7 @@ func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {
 	updateUserUsedQuotaAndRequestCount(id, quota, 1)
 }
 
-func updateUserUsedQuotaAndRequestCount(id int, quota int, count int) {
+func updateUserUsedQuotaAndRequestCount(id int, quota int64, count int64) {
 	err := DB.Model(&User{}).Where("id = ?", id).Updates(
 		map[string]interface{}{
 			"used_quota":    gorm.Expr("used_quota + ?", quota),
@@ -998,7 +1072,7 @@ func updateUserUsedQuotaAndRequestCount(id int, quota int, count int) {
 	//}
 }
 
-func updateUserUsedQuota(id int, quota int) {
+func updateUserUsedQuota(id int, quota int64) {
 	err := DB.Model(&User{}).Where("id = ?", id).Updates(
 		map[string]interface{}{
 			"used_quota": gorm.Expr("used_quota + ?", quota),
@@ -1009,7 +1083,7 @@ func updateUserUsedQuota(id int, quota int) {
 	}
 }
 
-func updateUserRequestCount(id int, count int) {
+func updateUserRequestCount(id int, count int64) {
 	err := DB.Model(&User{}).Where("id = ?", id).Update("request_count", gorm.Expr("request_count + ?", count)).Error
 	if err != nil {
 		common.SysLog("failed to update user request count: " + err.Error())

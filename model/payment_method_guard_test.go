@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func insertUserForPaymentGuardTest(t *testing.T, id int, quota int) {
+func insertUserForPaymentGuardTest(t *testing.T, id int, quota int64) {
 	t.Helper()
 	user := &User{
 		Id:       id,
@@ -80,7 +82,7 @@ func countUserSubscriptionsForPaymentGuardTest(t *testing.T, userID int) int64 {
 	return count
 }
 
-func getUserQuotaForPaymentGuardTest(t *testing.T, userID int) int {
+func getUserQuotaForPaymentGuardTest(t *testing.T, userID int) int64 {
 	t.Helper()
 	var user User
 	require.NoError(t, DB.Select("quota").Where("id = ?", userID).First(&user).Error)
@@ -99,7 +101,7 @@ func TestRechargeWaffoPancake_RejectsMismatchedPaymentMethod(t *testing.T) {
 	topUp := GetTopUpByTradeNo("waffo-pancake-guard")
 	require.NotNil(t, topUp)
 	assert.Equal(t, common.TopUpStatusPending, topUp.Status)
-	assert.Equal(t, 0, getUserQuotaForPaymentGuardTest(t, 101))
+	assert.Equal(t, int64(0), getUserQuotaForPaymentGuardTest(t, 101))
 }
 
 func TestUpdatePendingTopUpStatus_RejectsMismatchedPaymentProvider(t *testing.T) {
@@ -139,6 +141,45 @@ func TestUpdatePendingTopUpStatus_RejectsMismatchedPaymentProvider(t *testing.T)
 	}
 }
 
+func TestRechargeTossUsesQuotedCreditQuotaWithoutFloatDrift(t *testing.T) {
+	truncateTables(t)
+
+	originalUnitPrice := setting.TossUnitPrice
+	originalQuotaPerUnit := common.QuotaPerUnit
+	originalDiscount := operation_setting.GetPaymentSetting().AmountDiscount
+	setting.TossUnitPrice = 3
+	common.QuotaPerUnit = 3
+	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{}
+	t.Cleanup(func() {
+		setting.TossUnitPrice = originalUnitPrice
+		common.QuotaPerUnit = originalQuotaPerUnit
+		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscount
+	})
+
+	insertUserForPaymentGuardTest(t, 170, 0)
+	quote := QuoteTossTopUp(1, TossTopUpAmountModeKRW, "default")
+	require.Equal(t, 1, quote.CreditQuota)
+	topUp := &TopUp{
+		UserId:          170,
+		Amount:          quote.ChargeKRW,
+		Money:           quote.CreditAmount,
+		Quota:           quote.CreditQuota,
+		TradeNo:         "toss-float-drift",
+		ProviderOrderId: "toss-float-drift",
+		PaymentMethod:   PaymentMethodToss,
+		PaymentProvider: PaymentProviderToss,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      time.Now().Unix(),
+	}
+	require.NoError(t, topUp.Insert())
+
+	err := RechargeToss(topUp.TradeNo, "payment-key", "127.0.0.1")
+	require.NoError(t, err)
+
+	assert.Equal(t, common.TopUpStatusSuccess, getTopUpStatusForPaymentGuardTest(t, topUp.TradeNo))
+	assert.Equal(t, int64(1), getUserQuotaForPaymentGuardTest(t, 170))
+}
+
 func TestManualCompleteTopUp_CreditsOrganizationWalletTarget(t *testing.T) {
 	truncateTables(t)
 
@@ -172,11 +213,11 @@ func TestManualCompleteTopUp_CreditsOrganizationWalletTarget(t *testing.T) {
 	reloadedTopUp := GetTopUpByTradeNo(topUp.TradeNo)
 	require.NotNil(t, reloadedTopUp)
 	assert.Equal(t, common.TopUpStatusSuccess, reloadedTopUp.Status)
-	assert.Equal(t, 100, getUserQuotaForPaymentGuardTest(t, 501))
+	assert.Equal(t, int64(100), getUserQuotaForPaymentGuardTest(t, 501))
 
 	var reloadedOrg Organization
 	require.NoError(t, DB.First(&reloadedOrg, org.Id).Error)
-	assert.Equal(t, 10+2*int(common.QuotaPerUnit), reloadedOrg.Quota)
+	assert.Equal(t, 10+2*int64(common.QuotaPerUnit), reloadedOrg.Quota)
 }
 
 func TestCompleteSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) {

@@ -21,6 +21,7 @@ import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
 import { PaymentSettingsSection } from '../integrations/payment-settings-section'
+import { WalletAutoRechargePresetsSection } from '../integrations/wallet-auto-recharge-presets-section'
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
@@ -155,6 +156,21 @@ const BILLING_SECTIONS = [
           PayPalSandbox: settings.PayPalSandbox ?? false,
           PayPalUnitPrice: settings.PayPalUnitPrice ?? 1,
           PayPalMinTopUp: settings.PayPalMinTopUp ?? 1,
+          TossEnabled: settings.TossEnabled ?? false,
+          TossBillingEnabled: settings.TossBillingEnabled ?? false,
+          TossWalletAutoRechargeEnabled:
+            settings.TossWalletAutoRechargeEnabled ?? false,
+          TossTestMode: settings.TossTestMode ?? false,
+          TossClientKey: settings.TossClientKey ?? '',
+          TossSecretKey: settings.TossSecretKey ?? '',
+          TossTestClientKey: settings.TossTestClientKey ?? '',
+          TossTestSecretKey: settings.TossTestSecretKey ?? '',
+          TossBillingClientKey: settings.TossBillingClientKey ?? '',
+          TossBillingSecretKey: settings.TossBillingSecretKey ?? '',
+          TossBillingTestClientKey: settings.TossBillingTestClientKey ?? '',
+          TossBillingTestSecretKey: settings.TossBillingTestSecretKey ?? '',
+          TossUnitPrice: settings.TossUnitPrice ?? 1300,
+          TossMinTopUp: settings.TossMinTopUp ?? 100,
           CreemApiKey: settings.CreemApiKey,
           CreemWebhookSecret: settings.CreemWebhookSecret,
           CreemTestMode: settings.CreemTestMode,
@@ -191,8 +207,18 @@ const BILLING_SECTIONS = [
           confirmedAt: settings['payment_setting.compliance_confirmed_at'] ?? 0,
           confirmedBy: settings['payment_setting.compliance_confirmed_by'] ?? 0,
         }}
+        tossConfigRepairRequired={settings.TossConfigRepairRequired ?? false}
+        tossConfigMaintenanceRequired={
+          settings.TossConfigMaintenanceRequired ?? false
+        }
+        tossConfigRepairToken={settings.TossConfigRepairToken ?? ''}
       />
     ),
+  },
+  {
+    id: 'wallet-auto-recharge-presets',
+    titleKey: 'Auto Recharge Presets',
+    build: () => <WalletAutoRechargePresetsSection />,
   },
   {
     id: 'checkin',

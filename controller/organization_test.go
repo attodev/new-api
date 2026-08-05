@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
@@ -27,18 +29,30 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 	originalUsingMySQL := common.UsingMySQL
 	originalUsingPostgreSQL := common.UsingPostgreSQL
 	originalRedisEnabled := common.RedisEnabled
+	originalCryptoSecret := common.CryptoSecret
+	originalTranslateMessage := common.TranslateMessage
+	originalTossConfig := setting.GetTossConfigSnapshot()
 
 	gin.SetMode(gin.TestMode)
+	require.NoError(t, i18n.Init())
+	common.TranslateMessage = func(c *gin.Context, key string, args ...map[string]any) string {
+		return i18n.Translate(i18n.LangEn, key, args...)
+	}
 	common.UsingSQLite = true
 	common.UsingMySQL = false
 	common.UsingPostgreSQL = false
 	common.RedisEnabled = false
+	t.Setenv("CRYPTO_SECRET", "organization-controller-test-secret")
+	common.CryptoSecret = "organization-controller-test-secret"
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 	model.DB = db
 	model.LOG_DB = db
+	// Every test database is a distinct authoritative configuration store. Do
+	// not carry a revision observed from a previous in-memory database into it.
+	require.NoError(t, setting.ApplyTossOptionValuesWithRevision(nil, ""))
 	require.NoError(t, db.AutoMigrate(
 		&model.Organization{},
 		&model.User{},
@@ -46,6 +60,9 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 		&model.Log{},
 		&model.OrganizationSubscriptionPlan{},
 		&model.OrganizationUserSubscription{},
+		&model.UserSubscription{},
+		&model.UserBillingKey{},
+		&model.WalletAutoRecharge{},
 	))
 
 	t.Cleanup(func() {
@@ -59,6 +76,9 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 		common.UsingMySQL = originalUsingMySQL
 		common.UsingPostgreSQL = originalUsingPostgreSQL
 		common.RedisEnabled = originalRedisEnabled
+		common.CryptoSecret = originalCryptoSecret
+		common.TranslateMessage = originalTranslateMessage
+		restoreTossConfigForOptionTest(t, originalTossConfig)
 	})
 
 	return db
@@ -113,7 +133,7 @@ func TestOrganizationRootCanCreateOrganization(t *testing.T) {
 
 	var org model.Organization
 	require.NoError(t, model.DB.First(&org, reloaded.OrganizationId).Error)
-	require.Equal(t, 500, org.Quota)
+	require.Equal(t, int64(500), org.Quota)
 }
 
 func TestOrganizationRootAcceptsCreateBoundaryInput(t *testing.T) {
@@ -121,7 +141,7 @@ func TestOrganizationRootAcceptsCreateBoundaryInput(t *testing.T) {
 		name        string
 		orgName     string
 		description string
-		quota       int
+		quota       int64
 		ownerId     int
 	}{
 		{
@@ -200,12 +220,12 @@ func TestOrganizationRootRejectsInvalidCreateInput(t *testing.T) {
 		{
 			name:    "quota below minimum",
 			body:    `{"name":"Acme","owner_user_id":1,"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"name":"Acme","owner_user_id":1,"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "unsupported field",
@@ -254,14 +274,14 @@ func TestOrganizationRootCanUpdateOrganizationQuota(t *testing.T) {
 
 	var reloaded model.Organization
 	require.NoError(t, model.DB.First(&reloaded, org.Id).Error)
-	require.Equal(t, 750, reloaded.Quota)
+	require.Equal(t, int64(750), reloaded.Quota)
 }
 
 func TestOrganizationRootAcceptsUpdateBoundaryInput(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		body        string
-		wantQuota   int
+		wantQuota   int64
 		wantStatus  int
 		wantComment string
 	}{
@@ -322,12 +342,12 @@ func TestOrganizationRootRejectsInvalidUpdateInput(t *testing.T) {
 		{
 			name:    "quota below minimum",
 			body:    `{"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "status below enum",
@@ -685,7 +705,7 @@ func TestOrganizationAdminCannotUpdateOutsideOrganization(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 10, reloaded.Quota)
+	require.Equal(t, int64(10), reloaded.Quota)
 }
 
 func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
@@ -709,7 +729,7 @@ func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 100, reloaded.Quota)
+	require.Equal(t, int64(100), reloaded.Quota)
 	require.Equal(t, "reviewed", reloaded.Remark)
 }
 
@@ -717,7 +737,7 @@ func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		body       string
-		wantQuota  int
+		wantQuota  int64
 		wantStatus int
 		wantRemark string
 	}{
@@ -773,12 +793,12 @@ func TestOrganizationAdminRejectsInvalidUserUpdateInput(t *testing.T) {
 		{
 			name:    "negative quota",
 			body:    `{"quota":-1}`,
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "quota too large",
 			body:    fmt.Sprintf(`{"quota":%d}`, MaxOrganizationQuota+1),
-			message: "quota must be between 0 and 1000000000",
+			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
 			name:    "invalid status",
@@ -843,7 +863,7 @@ func TestOrganizationAdminCannotUpdateGlobalAdmin(t *testing.T) {
 
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
-	require.Equal(t, 10, reloaded.Quota)
+	require.Equal(t, int64(10), reloaded.Quota)
 }
 
 func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {
@@ -852,6 +872,7 @@ func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {
 	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
 	require.NoError(t, model.DB.Create(&owner).Error)
 	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&model.Organization{Id: 1, Name: "owner-assignment-org", OwnerUserId: owner.Id, Status: model.OrganizationStatusEnabled}).Error)
 
 	res := performOrganizationRequest(
 		AssignOrganizationUser,
@@ -966,6 +987,7 @@ func TestOrganizationAdminCanAssignMemberRole(t *testing.T) {
 	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
 	require.NoError(t, model.DB.Create(&admin).Error)
 	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&model.Organization{Id: 1, Name: "admin-member-assignment-org", OwnerUserId: admin.Id, Status: model.OrganizationStatusEnabled}).Error)
 
 	res := performOrganizationRequest(
 		AssignOrganizationUser,
@@ -991,6 +1013,7 @@ func TestOrganizationAdminCanAssignAdminRole(t *testing.T) {
 	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
 	require.NoError(t, model.DB.Create(&admin).Error)
 	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&model.Organization{Id: 1, Name: "admin-role-assignment-org", OwnerUserId: admin.Id, Status: model.OrganizationStatusEnabled}).Error)
 
 	res := performOrganizationRequest(
 		AssignOrganizationUser,
@@ -1015,6 +1038,7 @@ func TestOrganizationAdminCannotAssignOwnerRole(t *testing.T) {
 	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, AffCode: "target"}
 	require.NoError(t, model.DB.Create(&admin).Error)
 	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&model.Organization{Id: 1, Name: "admin-role-change-org", OwnerUserId: admin.Id, Status: model.OrganizationStatusEnabled}).Error)
 
 	res := performOrganizationRequest(
 		AssignOrganizationUser,
@@ -1039,6 +1063,7 @@ func TestOrganizationAdminCanChangeRoleOfMember(t *testing.T) {
 	target := model.User{Username: "target", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "target"}
 	require.NoError(t, model.DB.Create(&admin).Error)
 	require.NoError(t, model.DB.Create(&target).Error)
+	require.NoError(t, model.DB.Create(&model.Organization{Id: 1, Name: "admin-member-role-change-org", OwnerUserId: admin.Id, Status: model.OrganizationStatusEnabled}).Error)
 
 	res := performOrganizationRequest(
 		AssignOrganizationUser,
@@ -1254,6 +1279,92 @@ func TestOrganizationNonRootCannotDeleteOrganization(t *testing.T) {
 	)
 
 	requireOrganizationApiError(t, res, "root permission required")
+}
+
+func TestOrganizationDisableCancelsWalletBillingAndQueuesKeyRevocation(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	root := model.User{Id: 1, Username: "root-billing-lifecycle", Password: "password", Role: common.RoleRootUser, Status: common.UserStatusEnabled, AffCode: "root-billing-lifecycle"}
+	owner := model.User{Id: 7, Username: "owner-billing-lifecycle", Password: "password", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, OrganizationId: 3, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-billing-lifecycle"}
+	org := model.Organization{Id: 3, Name: "Billing Lifecycle Org", OwnerUserId: owner.Id, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&root).Error)
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	keyID, err := model.StoreTossBillingKeyWithSecret(owner.Id, "cust_org_disable", "billing_org_disable", "현대", "433012******1234", "sk_org_disable")
+	require.NoError(t, err)
+	activeKey := "organization:3:scheduled"
+	require.NoError(t, model.DB.Create(&model.WalletAutoRecharge{
+		Type:         model.WalletAutoRechargeTypeScheduled,
+		TargetType:   model.TopUpTargetTypeOrganization,
+		TargetId:     org.Id,
+		OwnerUserId:  owner.Id,
+		BillingKeyId: keyID,
+		Status:       model.WalletAutoRechargeStatusActive,
+		ActiveKey:    &activeKey,
+	}).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganization,
+		root,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organizations/%d", org.Id),
+		`{"status":2}`,
+		gin.Param{Key: "id", Value: strconv.Itoa(org.Id)},
+	)
+	require.Equal(t, http.StatusOK, res.Code)
+	var key model.UserBillingKey
+	require.NoError(t, model.DB.First(&key, keyID).Error)
+	require.Equal(t, model.BillingKeyStatusPendingRevocation, key.Status)
+	var policy model.WalletAutoRecharge
+	require.NoError(t, model.DB.Where("billing_key_id = ?", keyID).First(&policy).Error)
+	require.Equal(t, model.WalletAutoRechargeStatusCancelled, policy.Status)
+	require.Nil(t, policy.ActiveKey)
+}
+
+func TestOrganizationAdminDisablingUserStopsTossRecurringBilling(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Id: 1, Username: "org-admin-billing", Password: "password", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, OrganizationId: 3, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "org-admin-billing"}
+	target := model.User{Id: 7, Username: "org-target-billing", Password: "password", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, OrganizationId: 3, OrganizationRole: model.OrganizationRoleMember, AffCode: "org-target-billing"}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&target).Error)
+	keyID, err := model.StoreTossBillingKeyWithSecret(target.Id, "cust_user_disable", "billing_user_disable", "현대", "433012******1234", "sk_user_disable")
+	require.NoError(t, err)
+	require.NoError(t, model.DB.Create(&model.UserSubscription{
+		Id:           11,
+		UserId:       target.Id,
+		PlanId:       1,
+		Status:       "active",
+		AutoRenew:    true,
+		BillingKeyId: keyID,
+	}).Error)
+	activeKey := "user:7:threshold"
+	require.NoError(t, model.DB.Create(&model.WalletAutoRecharge{
+		Type:         model.WalletAutoRechargeTypeThreshold,
+		TargetType:   model.TopUpTargetTypeUser,
+		TargetId:     target.Id,
+		OwnerUserId:  target.Id,
+		BillingKeyId: keyID,
+		Status:       model.WalletAutoRechargeStatusActive,
+		ActiveKey:    &activeKey,
+	}).Error)
+
+	res := performOrganizationRequest(
+		UpdateOrganizationUser,
+		admin,
+		http.MethodPatch,
+		fmt.Sprintf("/api/organization/users/%d", target.Id),
+		`{"status":2}`,
+		gin.Param{Key: "id", Value: strconv.Itoa(target.Id)},
+	)
+	require.Equal(t, http.StatusOK, res.Code)
+	var key model.UserBillingKey
+	require.NoError(t, model.DB.First(&key, keyID).Error)
+	require.Equal(t, model.BillingKeyStatusPendingRevocation, key.Status)
+	var sub model.UserSubscription
+	require.NoError(t, model.DB.First(&sub, 11).Error)
+	require.False(t, sub.AutoRenew)
+	var policy model.WalletAutoRecharge
+	require.NoError(t, model.DB.Where("billing_key_id = ?", keyID).First(&policy).Error)
+	require.Equal(t, model.WalletAutoRechargeStatusCancelled, policy.Status)
 }
 
 // ---------------------------------------------------------------------------
