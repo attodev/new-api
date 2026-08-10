@@ -53,7 +53,7 @@
       "offers": {
         "@type": "Offer",
         "priceCurrency": "KRW",
-        "description": "사용량 기반 요금제, 공식가 대비 최대 10% 절감"
+        "description": "사용량 기반 요금제"
       },
       "provider": {
         "@type": "Organization",
@@ -92,7 +92,7 @@
     </script>
     <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
   </head>
-  <body>
+  <body data-logged-in="{{if .IsLoggedIn}}true{{else}}false{{end}}">
     <!-- ── SECTION 1: GNB ── -->
     {{template "header_ko" .}}
 
@@ -106,8 +106,8 @@
           <h1>AI 도입했는데,<br>비용이 <span class="highlight">감당이 안 되시나요?</span></h1>
           <p class="hero-sub">OpenAI, Claude, Gemini — 모델마다 따로 계약하고,<br>
         예산은 초과되고, 누가 얼마나 쓰는지도 모르고.<br><br>
-        AlRouter 하나로 전부 통합하고,<br>
-        공식 가격보다 <strong style="color:#EC4899">최대 10% 절약</strong>하세요.</p>
+        AlRouter 하나로 전부 통합하고<br>
+        편하게 관리하세요.</p>
           <div class="hero-cta">
             <a href="/sign-in" class="btn-hero-primary" hidden>체험해보기 →</a>
             <button
@@ -120,10 +120,6 @@
             </button>
           </div>
           <div class="hero-stats">
-            <div class="stat-item">
-              <div class="stat-value">10%</div>
-              <div class="stat-label">최대 비용 절감</div>
-            </div>
             <div class="stat-item">
               <div class="stat-value">₩0</div>
               <div class="stat-label">월 구독료</div>
@@ -276,7 +272,7 @@
         <span class="section-tag">해결책</span>
         <h2>AlRouter가 해결합니다</h2>
         <p class="section-sub">
-          하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 관리하고, 공식 가격보다 저렴하게 쓰세요.
+          하나의 계정, 하나의 청구서, 완전한 통제.<br>조직 단위로 AI 사용을 편하게 관리하세요.
         </p>
 
         <!-- 가로 트리 다이어그램 -->
@@ -852,7 +848,7 @@
           "
         >
           <div class="diagram-result-item">
-            <i data-lucide="circle-dollar-sign"></i> 최대 10% 비용 절감
+            <i data-lucide="layers"></i> 주요 AI 모델 통합
           </div>
           <div class="diagram-result-item">
             <i data-lucide="sliders-horizontal"></i> 사용자별 쿼터 제어
@@ -869,47 +865,11 @@
 
     <!-- ── SECTION 6: FEATURE - COST ── -->
     <div class="section feature-section">
-      <div class="feature-grid">
-        <div class="feature-content">
-          <span class="section-tag">비용 절감</span>
-          <h2>공식 가격보다<br>최대 10% 저렴하게</h2>
-          <p>AlRouter를 통해 주요 AI 모델을 공식 API보다 할인된 가격으로 사용하세요.<br>사용한 만큼만 청구됩니다.</p>
-          <table class="price-table">
-            <thead>
-              <tr>
-                <th>모델</th>
-                <th>가격</th>
-                <th>절감</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>gpt-5-mini</td>
-                <td
-                  rowspan="3"
-                  style="text-align: center; vertical-align: middle"
-                >
-                  공식 가격
-                </td>
-                <td
-                  rowspan="3"
-                  class="discount-pct"
-                  style="text-align: center; vertical-align: middle"
-                >
-                  -10%
-                </td>
-              </tr>
-              <tr>
-                <td>claude-sonnet-4.6</td>
-              </tr>
-              <tr>
-                <td>gemini-3.1-pro</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="payg-badge">💳 Pay-as-you-go — 쓴 만큼만. 최소 약정 없음.</div>
-        </div>
-        <div class="feature-visual">
+      <div class="cost-calc-inner">
+        <span class="section-tag">비용 절감</span>
+        <h2>공식 가격보다 저렴하게</h2>
+        <p class="section-sub">AlRouter를 통해 주요 AI 모델을 공식 API보다 저렴한 가격으로 사용하세요.<br>사용한 만큼만 청구됩니다.</p>
+        <div class="feature-visual cost-calc-card">
           <div class="calc-card-header">
             <span class="calc-card-title">AI 도입 비용 계산기</span>
             <a
@@ -921,70 +881,103 @@
           </div>
           <div class="calc-body">
             <div class="calc-form">
+              <div class="calc-fields">
               <div class="calc-group">
                 <label for="calcModel">모델 선택</label>
-                <select class="calc-select" id="calcModel">
+                <select class="calc-select" id="calcModel" onchange="updateCalcUnitLabels()">
                   <option value="">모델 불러오는 중…</option>
                 </select>
               </div>
+              {{if .IsLoggedIn}}
               <div class="calc-group">
-                <label for="calcInputTokens">입력 토큰</label>
+                <label for="calcDiscount">할인율</label>
+                <div class="calc-discount-badges">
+                  <button type="button" class="calc-disc-badge active" data-disc="0" onclick="setCalcDiscount(0, this)">0%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="5" onclick="setCalcDiscount(5, this)">5%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="10" onclick="setCalcDiscount(10, this)">10%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="15" onclick="setCalcDiscount(15, this)">15%</button>
+                  <button type="button" class="calc-disc-badge" data-disc="20" onclick="setCalcDiscount(20, this)">20%</button>
+                </div>
+                <div class="calc-input-wrap calc-disc-custom">
+                  <input
+                    type="text"
+                    id="calcDiscount"
+                    value="0"
+                    placeholder="0~100"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    oninput="onCalcDiscountInput(this)"
+                  />
+                  <span class="calc-input-suffix">%</span>
+                </div>
+                <p class="calc-commit-note">약정 금액에 따라 할인율은 달라질 수 있습니다.</p>
+              </div>
+              {{end}}
+              <div class="calc-group">
+                <div class="calc-label-row">
+                  <label for="calcInputTokens">입력 토큰</label>
+                  <span class="calc-unit" id="calcInUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcInputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
               <div class="calc-group">
-                <label for="calcOutputTokens">출력 토큰</label>
+                <div class="calc-label-row">
+                  <label for="calcOutputTokens">출력 토큰</label>
+                  <span class="calc-unit" id="calcOutUnit"></span>
+                </div>
                 <div class="calc-input-wrap">
                   <input
-                    type="number"
+                    type="text"
                     id="calcOutputTokens"
-                    placeholder="0"
-                    min="0"
-                    step="0.1"
+                    value="1"
+                    placeholder="0.1~100,000"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    oninput="sanitizeCalcNum(this)"
+                    onkeydown="if(event.key==='Enter'){addCalcItem();}"
                   />
                   <span class="calc-input-suffix">백만 토큰</span>
                 </div>
               </div>
-              <button type="button" class="calc-btn" onclick="runCalc()">
-                계산하기
-              </button>
-            </div>
-            <div class="calc-result" id="calcResult" role="status" aria-live="polite">
-              <div class="calc-result-hint" id="calcHint">모델과 토큰 수를 입력하고<br>계산하기를 눌러주세요</div>
-              <div
-                class="calc-result-label"
-                id="calcLabel"
-                style="display: none"
-              >
-                예상 비용
               </div>
-              <div
-                class="calc-result-price"
-                id="calcPrice"
-                style="display: none"
-              ></div>
-              <div class="calc-breakdown" id="calcBreakdown"></div>
+              <div class="calc-btn-wrap">
+                <p class="calc-hint" id="calcHint"></p>
+                <button type="button" class="calc-btn" onclick="addCalcItem()">
+                  + 목록에 추가하기
+                </button>
+              </div>
+            </div>
+            <div class="calc-cart">
+              <div class="calc-cart-total">
+                <span class="calc-cart-total-label">총 예상 비용</span>
+                <div class="calc-cart-total-price" id="calcTotal">$0.00</div>
+                {{if .IsLoggedIn}}<div class="calc-total-discount" id="calcTotalDiscount"></div>{{end}}
+              </div>
+              <div class="calc-cart-head">
+                <span class="calc-cart-head-label">견적 항목 (<span id="calcItemCount">0</span>)</span>
+                <button type="button" class="calc-cart-clear" onclick="clearCalcItems()">전체 삭제</button>
+              </div>
+              <div class="calc-cart-list" id="calcItemList" role="status" aria-live="polite">
+                <div class="calc-cart-empty">모델과 토큰을 입력하고<br>‘+ 목록에 추가하기’를 눌러주세요.</div>
+              </div>
             </div>
           </div>
-          <p
-            style="
-              margin-top: 14px;
-              font-size: 11px;
-              color: #6b7280;
-              line-height: 1.6;
-            "
-          >
-            위 금액은 공개 단가 기준 예상치입니다.<br>
-        실제 도입 비용은 사용 패턴에 따라 달라질 수 있으니
-        <a href="#" onclick="openContact(this);return false;" style="color:#EC4899; text-decoration:underline;">기업 도입 문의</a>로
+          <p class="calc-disclaimer">
+            * 위 금액은 공개 단가 기준 예상치입니다.<br>
+            * 실제 도입 비용은 사용 패턴에 따라 달라질 수 있으니
+        <a href="#" onclick="openContact(this);return false;" class="calc-contact-link">기업 도입 문의</a>로
         정확한 견적을 받아보세요.
           </p>
         </div>
@@ -1078,9 +1071,7 @@
       <div class="integration-inner">
         <span class="section-tag">통합</span>
         <h2>주요 AI 모델을 하나의 API로</h2>
-        <p class="section-sub" style="margin: 0 auto; text-align: center">
-          모델마다 별도 계약 없이, AlRouter API 하나로 바로 사용하세요.
-        </p>
+        <p class="section-sub">모델마다 별도 계약 없이, AlRouter API 하나로 바로 사용하세요.</p>
         <div class="provider-logos">
           <div class="provider-logo">
             <div class="logo-box"><i data-lucide="bot"></i></div>
@@ -1113,7 +1104,8 @@
       </div>
     </div>
 
-    <!-- ── SECTION 9: PRICING PREVIEW ── -->
+    <!-- ── SECTION 9: PRICING PREVIEW (임시 비활성화) ── -->
+    {{if false}}
     <div class="pricing-section" id="pricing">
       <div class="pricing-inner">
         <span class="section-tag">가격</span>
@@ -1210,6 +1202,7 @@
         </div>
       </div>
     </div>
+    {{end}}
 
     <!-- ── SECTION 10: DUAL CTA ── -->
     <div class="cta-section">

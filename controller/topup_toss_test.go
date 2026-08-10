@@ -1903,7 +1903,7 @@ func TestTossWebhookSettlesWalletAutoRechargeAndFinalizesPolicyOnce(t *testing.T
 
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 81).Error)
-	require.Equal(t, model.TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(model.TossCreditQuotaFromKRW(10000)), user.Quota)
 	var topUp model.TopUp
 	require.NoError(t, model.DB.First(&topUp, "trade_no = ?", tradeNo).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)

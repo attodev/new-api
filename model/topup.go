@@ -255,14 +255,16 @@ func (topUp *TopUp) EffectiveTargetId() int {
 	return topUp.UserId
 }
 
-func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int) error {
+func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int64) error {
 	if quota <= 0 {
 		return errors.New("invalid top-up quota")
 	}
-	if int64(quota) > math.MaxInt32 {
-		return fmt.Errorf("%w: top-up quota exceeds database capacity", ErrTopUpQuotaCapacityExceeded)
+	if quota > common.MaxQuota {
+		return fmt.Errorf("%w: top-up quota exceeds the quota ceiling", ErrTopUpQuotaCapacityExceeded)
 	}
-	maxCurrentQuota := int64(math.MaxInt32) - int64(quota)
+	// The quota columns are bigint; the binding ceiling is common.MaxQuota, which
+	// keeps balances exactly representable as JSON numbers in the browser.
+	maxCurrentQuota := common.MaxQuota - quota
 	switch topUp.EffectiveTargetType() {
 	case TopUpTargetTypeOrganization:
 		targetId := topUp.EffectiveTargetId()
@@ -324,8 +326,8 @@ func CreditedQuotaForTossTopUp(topUp *TopUp) int {
 	if topUp.Quota != 0 {
 		// A non-zero Quota is proof that the immutable snapshot column was
 		// populated. Never reinterpret a corrupt snapshot through legacy Money or
-		// today's amount conversion, and enforce the portable SQL INT ceiling even
-		// on SQLite where a manually damaged row can hold a wider integer.
+		// today's amount conversion, and keep the per-payment 32-bit ceiling even on
+		// SQLite where a manually damaged row can hold a wider integer.
 		if topUp.Quota < 1 || int64(topUp.Quota) > math.MaxInt32 {
 			return 0
 		}
@@ -485,7 +487,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 				return err
 			}
 		}
-		err = CreditTopUpTarget(tx, topUp, quota)
+		err = CreditTopUpTarget(tx, topUp, int64(quota))
 		if err != nil {
 			return err
 		}
@@ -498,7 +500,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		return errors.New("top-up failed, please try again later")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("online top-up successful, quota: %v, payment amount: %d", logger.FormatQuota(quota), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("online top-up successful, quota: %v, payment amount: %d", logger.FormatQuota(int64(quota)), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
 	return nil
 }
@@ -797,7 +799,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		}
 
 		// credit target wallet quota (write to DB immediately for consistency)
-		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 
@@ -812,7 +814,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	}
 
 	// record log outside transaction to avoid blocking
-	RecordTopupLog(userId, fmt.Sprintf("admin manual top-up successful, quota: %v, payment amount: %f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
+	RecordTopupLog(userId, fmt.Sprintf("admin manual top-up successful, quota: %v, payment amount: %f", logger.FormatQuota(int64(quotaToAdd)), payMoney), callerIp, paymentMethod, "admin")
 	return nil
 }
 func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
@@ -869,7 +871,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			}
 		}
 
-		err = CreditTopUpTarget(tx, topUp, int(quota))
+		err = CreditTopUpTarget(tx, topUp, int64(quota))
 		if err != nil {
 			return err
 		}
@@ -921,7 +923,7 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 
 		// Use decimal arithmetic to avoid float64 → int type mismatch on PostgreSQL.
 		quotaToAdd = int(decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
-		return CreditTopUpTarget(tx, topUp, quotaToAdd)
+		return CreditTopUpTarget(tx, topUp, int64(quotaToAdd))
 	})
 
 	if err != nil {
@@ -929,7 +931,7 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 		return errors.New("top-up failed, please try again later")
 	}
 
-	RecordTopupLog(topUp.UserId, fmt.Sprintf("PayPal top-up successful — quota: %v, payment amount: %.2f USD", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderPayPal)
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("PayPal top-up successful — quota: %v, payment amount: %.2f USD", logger.FormatQuota(int64(quotaToAdd)), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderPayPal)
 
 	return nil
 }
@@ -1992,7 +1994,7 @@ func rechargeToss(ctx context.Context, tradeNo string, paymentKey string, caller
 		if quotaToAdd <= 0 {
 			return errors.New("invalid top-up quota")
 		}
-		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 		settlementWon = true
@@ -2045,7 +2047,7 @@ func rechargeToss(ctx context.Context, tradeNo string, paymentKey string, caller
 	}
 
 	if settlementWon {
-		content := fmt.Sprintf("Toss 충전 성공 — 적립: %v, 결제 금액: %d원", logger.FormatQuota(quotaToAdd), topUp.Amount)
+		content := fmt.Sprintf("Toss 충전 성공 — 적립: %v, 결제 금액: %d원", logger.FormatQuota(int64(quotaToAdd)), topUp.Amount)
 		if requestScoped {
 			RecordTopupLogWithContext(ctx, topUp.UserId, content, callerIp, topUp.PaymentMethod, PaymentProviderToss)
 		} else {
@@ -2100,7 +2102,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return err
 		}
 
-		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 
@@ -2113,7 +2115,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 	}
 
 	if quotaToAdd > 0 {
-		RecordTopupLog(topUp.UserId, fmt.Sprintf("Waffo top-up successful, quota: %v, payment amount: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodWaffo)
+		RecordTopupLog(topUp.UserId, fmt.Sprintf("Waffo top-up successful, quota: %v, payment amount: %.2f", logger.FormatQuota(int64(quotaToAdd)), topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodWaffo)
 	}
 
 	return nil
@@ -2161,7 +2163,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
-		if err := CreditTopUpTarget(tx, topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 
@@ -2174,7 +2176,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	if quotaToAdd > 0 {
-		RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("Waffo Pancake top-up successful, quota: %v, payment amount: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money))
+		RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("Waffo Pancake top-up successful, quota: %v, payment amount: %.2f", logger.FormatQuota(int64(quotaToAdd)), topUp.Money))
 	}
 
 	return nil

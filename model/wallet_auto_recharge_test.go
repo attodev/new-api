@@ -592,7 +592,7 @@ func TestCreatePendingThresholdWalletAutoRechargeStoresThresholdQuotaDirectly(t 
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, 250000, policy.ThresholdQuota)
+	require.Equal(t, int64(250000), policy.ThresholdQuota)
 	require.Equal(t, 999999.0, policy.ThresholdAmount)
 }
 
@@ -799,7 +799,7 @@ func TestProcessWalletAutoRechargeCreditsUserWallet(t *testing.T) {
 
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, int(10*common.QuotaPerUnit), user.Quota)
+	require.Equal(t, int64(10*common.QuotaPerUnit), user.Quota)
 
 	var topUp TopUp
 	require.NoError(t, DB.First(&topUp, "target_type = ? AND target_id = ?", TopUpTargetTypeUser, 1).Error)
@@ -1528,7 +1528,7 @@ func TestLegacyWalletAliasConflictKeepsReplacementFenceThroughDelayedDONE(t *tes
 	}
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	require.NoError(t, DB.First(&policy, policy.Id).Error)
 	require.NotNil(t, policy.ActiveKey)
 	require.True(t, strings.HasPrefix(policy.LastError, walletAutoRechargeManualReconciliationPrefix))
@@ -1604,7 +1604,7 @@ func TestCancelProviderAttemptKeepsFenceUntilDelayedDONESettlesOnce(t *testing.T
 	}
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	require.NoError(t, DB.First(&policy, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusCancelled, policy.Status)
 	require.Nil(t, policy.ActiveKey)
@@ -1661,7 +1661,7 @@ func TestLifecycleAndBillingDeletionKeepProviderAttemptReplacementFence(t *testi
 			}
 			var user User
 			require.NoError(t, DB.First(&user, 1).Error)
-			require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+			require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 			require.NoError(t, DB.First(&policy, policy.Id).Error)
 			require.Equal(t, WalletAutoRechargeStatusCancelled, policy.Status)
 			require.Nil(t, policy.ActiveKey)
@@ -1764,7 +1764,7 @@ func TestCancelledStaleNotFoundKeepsExactFenceUntilLateDONESettles(t *testing.T)
 	}
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	require.NoError(t, DB.First(&policy, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusCancelled, policy.Status)
 	require.Nil(t, policy.ActiveKey)
@@ -2362,7 +2362,7 @@ func TestTargetWideFenceSerializesScheduledAndThresholdProviderPOSTs(t *testing.
 	require.Equal(t, 1, thresholdPosts)
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, 2*TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(2*TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestDefinitiveWalletDeclineWritesTerminalMarkerAndDoesNotPoisonTargetFence(t *testing.T) {
@@ -2568,7 +2568,7 @@ func TestProcessWalletAutoRechargeChargesPresetKRWWithoutGroupOrDiscountAdjustme
 
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, int(20*common.QuotaPerUnit), user.Quota)
+	require.Equal(t, int64(20*common.QuotaPerUnit), user.Quota)
 
 	var topUp TopUp
 	require.NoError(t, DB.First(&topUp, "target_type = ? AND target_id = ?", TopUpTargetTypeUser, 1).Error)
@@ -2765,7 +2765,7 @@ func TestProcessThresholdWalletAutoRechargeReusesChargedTopUpAfterHourChanges(t 
 
 	var org Organization
 	require.NoError(t, DB.First(&org, 504).Error)
-	require.Equal(t, int(10*common.QuotaPerUnit), org.Quota)
+	require.Equal(t, int64(10*common.QuotaPerUnit), org.Quota)
 }
 
 func TestProcessThresholdWalletAutoRechargeResumesReconciliationTopUpWithoutChargedMarkerAfterHourChanges(t *testing.T) {
@@ -2854,7 +2854,7 @@ func TestProcessThresholdWalletAutoRechargeResumesReconciliationTopUpWithoutChar
 
 	var org Organization
 	require.NoError(t, DB.First(&org, 505).Error)
-	require.Equal(t, int(10*common.QuotaPerUnit), org.Quota)
+	require.Equal(t, int64(10*common.QuotaPerUnit), org.Quota)
 }
 
 func TestCompleteWalletAutoRechargeTopUpCreditsCancelledPolicy(t *testing.T) {
@@ -2900,7 +2900,7 @@ func TestCompleteWalletAutoRechargeTopUpCreditsCancelledPolicy(t *testing.T) {
 
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 
 	var reloaded WalletAutoRecharge
 	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
@@ -3233,7 +3233,7 @@ func TestSettleWalletAutoRechargeWebhookDoneIsAtomicAndIdempotent(t *testing.T) 
 
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var topUp TopUp
 	require.NoError(t, DB.First(&topUp, "trade_no = ?", tradeNo).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
@@ -3257,7 +3257,7 @@ func TestWalletAutoRechargeDONEEvidenceSurvivesQuotaCapacityFailure(t *testing.T
 	setWalletAutoRechargeUnitPriceForTest(t, 1000)
 	require.NoError(t, DB.Create(&User{
 		Id: 1, Username: "capacity-owner", Role: common.RoleCommonUser,
-		AffCode: "capacity-owner", Quota: math.MaxInt32 - 5,
+		AffCode: "capacity-owner", Quota: common.MaxQuota - 5,
 	}).Error)
 	now := time.Date(2026, 7, 10, 2, 30, 0, 0, time.UTC)
 	activeKey := walletAutoRechargeActiveKey(TopUpTargetTypeUser, 1, WalletAutoRechargeTypeScheduled)
@@ -3295,14 +3295,14 @@ func TestWalletAutoRechargeDONEEvidenceSurvivesQuotaCapacityFailure(t *testing.T
 	require.Contains(t, storedPolicy.LastError, walletAutoRechargeReconciliationPendingPrefix)
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, math.MaxInt32-5, user.Quota)
+	require.Equal(t, common.MaxQuota-5, user.Quota)
 
 	// Once capacity becomes available, the same recorded payment settles without
 	// another provider charge and resolves the durable operator work item.
 	require.NoError(t, DB.Model(&User{}).Where("id = ?", 1).Update("quota", 0).Error)
 	require.NoError(t, SettleWalletAutoRechargeWebhookDone(policy.Id, tradeNo, evidence.PaymentKey, evidence.ProviderPayload, now.Add(time.Minute)))
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, quota, user.Quota)
+	require.Equal(t, int64(quota), user.Quota)
 	require.NoError(t, DB.First(&event, "order_id = ? AND event_type = ?", tradeNo, TossPaymentEventTypeFulfillment).Error)
 	require.Equal(t, TossReconciliationStatusResolved, event.ReconciliationStatus)
 }
@@ -3328,7 +3328,7 @@ func TestSettleWalletAutoRechargeWebhookDoneRepairsPrecreditedPolicyOnly(t *test
 	require.NoError(t, SettleWalletAutoRechargeWebhookDone(policy.Id, tradeNo, "pay_precredited", `{"status":"DONE"}`, now))
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, 12345, user.Quota)
+	require.Equal(t, int64(12345), user.Quota)
 	var reloaded WalletAutoRecharge
 	require.NoError(t, DB.First(&reloaded, policy.Id).Error)
 	require.Equal(t, tradeNo, reloaded.LastTradeNo)
@@ -3388,7 +3388,7 @@ func TestSettleWalletAutoRechargeWebhookDonePropagatesAndRetriesEventResolution(
 	require.Equal(t, firstNextChargeTime, pendingResolution.NextChargeTime)
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, 777, user.Quota)
+	require.Equal(t, int64(777), user.Quota)
 }
 
 func TestWalletAutoRechargeWebhookTerminalIsIdempotentAndAdvancesRetrySequence(t *testing.T) {
@@ -3701,7 +3701,7 @@ func TestProcessWalletAutoRechargeLegacyChargedMarkerSettlesWithoutProviderCall(
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var markerEvent TossPaymentEvent
 	require.NoError(t, DB.Where("order_id = ? AND event_type = ?", tradeNo, TossPaymentEventTypeFulfillment).First(&markerEvent).Error)
 	require.Equal(t, tradeNo+":charged", markerEvent.PaymentKey)
@@ -3719,7 +3719,7 @@ func TestProcessWalletAutoRechargeLegacyChargedMarkerSettlesWithoutProviderCall(
 	require.NoError(t, DB.First(&topUp, topUp.Id).Error)
 	require.Equal(t, actualPaymentKey, topUp.ProviderOrderId)
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var fulfillmentEvents []TossPaymentEvent
 	require.NoError(t, DB.Where("order_id = ? AND event_type = ?", tradeNo, TossPaymentEventTypeFulfillment).Find(&fulfillmentEvents).Error)
 	require.Len(t, fulfillmentEvents, 2)
@@ -3915,7 +3915,7 @@ func TestThresholdWalletAutoRechargeCrashBeforeProviderPostReusesDurableOrder(t 
 
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 
 	// The credited balance is now above the threshold. A later worker pass must
 	// neither create a second order nor credit the first one again.
@@ -3928,7 +3928,7 @@ func TestThresholdWalletAutoRechargeCrashBeforeProviderPostReusesDurableOrder(t 
 	require.NoError(t, DB.Model(&TopUp{}).Count(&topUpCount).Error)
 	require.Equal(t, int64(1), topUpCount)
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func seedStaleWalletAutoRechargeAttempt(t *testing.T) (WalletAutoRecharge, TopUp) {
@@ -4090,7 +4090,7 @@ func TestLateProviderDoneSettlesExpiredStaleWalletAttemptExactlyOnce(t *testing.
 	require.Equal(t, "pay_late_stale_wallet_done", storedTopUp.ProviderOrderId)
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var storedPolicy WalletAutoRecharge
 	require.NoError(t, DB.First(&storedPolicy, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusFailed, storedPolicy.Status)
@@ -4168,7 +4168,7 @@ func TestWalletAutoRechargeFreshProviderLeaseRejectsStaleCloserDuringPOST(t *tes
 	require.Contains(t, settledTopUp.ProviderPayload, "pay_done_after_stale_close")
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var storedPolicy WalletAutoRecharge
 	require.NoError(t, DB.First(&storedPolicy, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusActive, storedPolicy.Status)
@@ -4187,7 +4187,7 @@ func TestWalletAutoRechargeFreshProviderLeaseRejectsStaleCloserDuringPOST(t *tes
 	))
 	require.Zero(t, postCalls)
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestWalletAutoRechargeCanceledWinsAgainstOlderInFlightDONE(t *testing.T) {
@@ -4440,7 +4440,7 @@ func TestHistoricalWalletCancellationStillRecoversNewerPendingDONEWithoutPOST(t 
 	require.Equal(t, "pay_newer_pending_done", settled.ProviderOrderId)
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, initialQuota+TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(initialQuota+TossCreditQuotaFromKRW(10000)), user.Quota)
 	var storedPolicy WalletAutoRecharge
 	require.NoError(t, DB.First(&storedPolicy, policy.Id).Error)
 	require.Equal(t, WalletAutoRechargeStatusFailed, storedPolicy.Status)
@@ -4803,7 +4803,7 @@ func TestWalletAutoRechargePersistsExactRotatedSecretBeforeEachPOST(t *testing.T
 	require.Equal(t, 1, recoveryPosts)
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestWalletAutoRechargeRechecksLifecycleBeforeRotatedSecretFallbackPOST(t *testing.T) {
@@ -4890,7 +4890,7 @@ func TestWalletAutoRechargeResumesPromotedCredentialAfterGateInterruption(t *tes
 	require.Equal(t, 1, recoveryPosts)
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestStaleWalletAutoRechargeDoneSettlesExactlyOnceWithoutPost(t *testing.T) {
@@ -4926,13 +4926,13 @@ func TestStaleWalletAutoRechargeDoneSettlesExactlyOnceWithoutPost(t *testing.T) 
 	require.Equal(t, "pay_stale_wallet_done", storedTopUp.ProviderOrderId)
 	var user User
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 
 	require.NoError(t, ProcessWalletAutoRecharge(context.Background(), policy.Id, time.Now().Add(time.Hour), 3, charger))
 	require.Equal(t, 1, lookupCalls)
 	require.Zero(t, postCalls)
 	require.NoError(t, DB.First(&user, policy.OwnerUserId).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestValidateWalletAutoRechargeChargeAttemptRejectsStalePendingOrder(t *testing.T) {
@@ -5867,7 +5867,7 @@ func TestPendingWalletSettlementRecoversFutureScheduledLegacyOrphanWithoutPrefix
 	require.Equal(t, "pay_legacy_wallet_orphan", topUp.ProviderOrderId)
 	var user User
 	require.NoError(t, DB.First(&user, 1).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 }
 
 func TestAdvanceStaleScheduledWalletAutoRechargePreservesPreparedAttemptForSettlementQueue(t *testing.T) {

@@ -20,8 +20,8 @@ type OrganizationDashboard struct {
 type OrganizationDashboardOrganization struct {
 	Id        int    `json:"id"`
 	Name      string `json:"name"`
-	Quota     int    `json:"quota"`
-	UsedQuota int    `json:"used_quota"`
+	Quota     int64  `json:"quota"`
+	UsedQuota int64  `json:"used_quota"`
 }
 
 type OrganizationDashboardSummary struct {
@@ -41,8 +41,8 @@ type OrganizationDashboardUserUsage struct {
 	UserID         int    `json:"user_id"`
 	Username       string `json:"username"`
 	DisplayName    string `json:"display_name"`
-	Quota          int    `json:"quota"`
-	UsedQuota      int    `json:"used_quota"`
+	Quota          int64  `json:"quota"`
+	UsedQuota      int64  `json:"used_quota"`
 	PeriodQuota    int    `json:"period_quota"`
 	PeriodRequests int    `json:"period_requests"`
 }

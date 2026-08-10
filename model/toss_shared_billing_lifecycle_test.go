@@ -109,7 +109,7 @@ func TestSharedBillingKeyConcurrentSchedulersSettleIndependentOrders(t *testing.
 	require.Greater(t, storedPolicy.NextChargeTime, now.Unix())
 	var user User
 	require.NoError(t, DB.First(&user, 7).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var key UserBillingKey
 	require.NoError(t, DB.First(&key, keyID).Error)
 	require.Equal(t, BillingKeyStatusActive, key.Status)
@@ -195,7 +195,7 @@ func TestBillingDeletedDuringSharedKeyProviderCallsSettlesPaidResultsWithoutRear
 		"a provider-accepted wallet charge must still credit exactly once")
 	var user User
 	require.NoError(t, DB.First(&user, 7).Error)
-	require.Equal(t, TossCreditQuotaFromKRW(10000), user.Quota)
+	require.Equal(t, int64(TossCreditQuotaFromKRW(10000)), user.Quota)
 	var key UserBillingKey
 	require.NoError(t, DB.First(&key, keyID).Error)
 	require.Equal(t, BillingKeyStatusRevoked, key.Status)

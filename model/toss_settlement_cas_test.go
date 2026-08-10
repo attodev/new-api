@@ -153,7 +153,7 @@ func TestRechargeTossConcurrentSettlementCreditsWalletOnce(t *testing.T) {
 
 	var user User
 	require.NoError(t, DB.First(&user, 101).Error)
-	require.Equal(t, 321, user.Quota)
+	require.Equal(t, int64(321), user.Quota)
 	topUp, err := GetTopUpByTradeNoWithError("toss-cas-topup")
 	require.NoError(t, err)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)
@@ -218,7 +218,7 @@ func TestWalletAutoRechargeConcurrentWebhookSettlementCreditsOnce(t *testing.T) 
 
 	var user User
 	require.NoError(t, DB.First(&user, 151).Error)
-	require.Equal(t, 654, user.Quota)
+	require.Equal(t, int64(654), user.Quota)
 	var topUp TopUp
 	require.NoError(t, DB.Where("trade_no = ?", tradeNo).First(&topUp).Error)
 	require.Equal(t, common.TopUpStatusSuccess, topUp.Status)

@@ -60,8 +60,8 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		Group:     info.UsingGroup,
 		Other:     other,
 	})
-	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
-	UpdateOrganizationUsedQuotaForUser(info.UserId, info.PriceData.Quota)
+	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, int64(info.PriceData.Quota))
+	UpdateOrganizationUsedQuotaForUser(info.UserId, int64(info.PriceData.Quota))
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
 }
 
@@ -101,7 +101,7 @@ func taskAdjustFunding(task *model.Task, delta int) error {
 			if err := model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta)); err != nil {
 				return err
 			}
-			if err := model.DecreaseOrganizationQuota(sub.OrganizationId, delta); err != nil {
+			if err := model.DecreaseOrganizationQuota(sub.OrganizationId, int64(delta)); err != nil {
 				_ = model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, -int64(delta))
 				return err
 			}
@@ -109,17 +109,17 @@ func taskAdjustFunding(task *model.Task, delta int) error {
 		}
 		if delta < 0 {
 			refund := -delta
-			if err := model.IncreaseOrganizationQuota(sub.OrganizationId, refund); err != nil {
+			if err := model.IncreaseOrganizationQuota(sub.OrganizationId, int64(refund)); err != nil {
 				return err
 			}
 			if err := model.PostConsumeOrganizationUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta)); err != nil {
-				_ = model.DecreaseOrganizationQuota(sub.OrganizationId, refund)
+				_ = model.DecreaseOrganizationQuota(sub.OrganizationId, int64(refund))
 				return err
 			}
 		}
 		return nil
 	}
-	return AdjustWalletQuotaForUser(task.UserId, delta)
+	return AdjustWalletQuotaForUser(task.UserId, int64(delta))
 }
 
 // taskAdjustTokenQuota delta > 0 delta < 0
@@ -220,15 +220,15 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 
 	if quotaDelta == 0 {
 		logger.LogInfo(ctx, fmt.Sprintf("task %s pre-charge accurate (%s, %s)",
-			task.TaskID, logger.LogQuota(actualQuota), reason))
+			task.TaskID, logger.LogQuota(int64(actualQuota)), reason))
 		return
 	}
 
 	logger.LogInfo(ctx, fmt.Sprintf("task %s settlement delta: delta=%s (actual: %s, pre-charged: %s, %s)",
 		task.TaskID,
-		logger.LogQuota(quotaDelta),
-		logger.LogQuota(actualQuota),
-		logger.LogQuota(preConsumedQuota),
+		logger.LogQuota(int64(quotaDelta)),
+		logger.LogQuota(int64(actualQuota)),
+		logger.LogQuota(int64(preConsumedQuota)),
 		reason,
 	))
 
@@ -247,8 +247,8 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	if quotaDelta > 0 {
 		logType = model.LogTypeConsume
 		logQuota = quotaDelta
-		model.UpdateUserUsedQuotaAndRequestCount(task.UserId, quotaDelta)
-		UpdateOrganizationUsedQuotaForUser(task.UserId, quotaDelta)
+		model.UpdateUserUsedQuotaAndRequestCount(task.UserId, int64(quotaDelta))
+		UpdateOrganizationUsedQuotaForUser(task.UserId, int64(quotaDelta))
 		model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 	} else {
 		logType = model.LogTypeRefund

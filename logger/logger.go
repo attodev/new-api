@@ -119,7 +119,7 @@ func logHelper(ctx context.Context, level string, msg string) {
 	}
 }
 
-func LogQuota(quota int) string {
+func LogQuota(quota int64) string {
 	q := float64(quota)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:
@@ -145,7 +145,7 @@ func LogQuota(quota int) string {
 	}
 }
 
-func FormatQuota(quota int) string {
+func FormatQuota(quota int64) string {
 	q := float64(quota)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:

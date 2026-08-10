@@ -38,7 +38,7 @@ func (w *WalletFunding) PreConsume(amount int) error {
 	if amount <= 0 {
 		return nil
 	}
-	if err := model.DecreaseUserQuota(w.userId, amount, false); err != nil {
+	if err := model.DecreaseUserQuota(w.userId, int64(amount), false); err != nil {
 		return err
 	}
 	w.consumed = amount
@@ -50,9 +50,9 @@ func (w *WalletFunding) Settle(delta int) error {
 		return nil
 	}
 	if delta > 0 {
-		return model.DecreaseUserQuota(w.userId, delta, false)
+		return model.DecreaseUserQuota(w.userId, int64(delta), false)
 	}
-	return model.IncreaseUserQuota(w.userId, -delta, false)
+	return model.IncreaseUserQuota(w.userId, -int64(delta), false)
 }
 
 func (w *WalletFunding) Refund() error {
@@ -61,7 +61,7 @@ func (w *WalletFunding) Refund() error {
 	}
 	// IncreaseUserQuota quota += N
 	// RefundSubscriptionPreConsume requestId
-	return model.IncreaseUserQuota(w.userId, w.consumed, false)
+	return model.IncreaseUserQuota(w.userId, int64(w.consumed), false)
 }
 
 func resolveOrganizationForWallet(userId int) (int, error) {
@@ -75,7 +75,7 @@ func resolveOrganizationForWallet(userId int) (int, error) {
 	return user.OrganizationId, nil
 }
 
-func AdjustWalletQuotaForUser(userId int, delta int) error {
+func AdjustWalletQuotaForUser(userId int, delta int64) error {
 	if delta == 0 {
 		return nil
 	}
@@ -109,7 +109,7 @@ func AdjustWalletQuotaForUser(userId int, delta int) error {
 	return nil
 }
 
-func UpdateOrganizationUsedQuotaForUser(userId int, quota int) {
+func UpdateOrganizationUsedQuotaForUser(userId int, quota int64) {
 	if quota <= 0 {
 		return
 	}
@@ -141,7 +141,7 @@ func (o *OrganizationWalletFunding) PreConsume(amount int) error {
 	if o.memberId <= 0 || o.organizationId <= 0 {
 		return errors.New("invalid organization wallet funding")
 	}
-	if err := AdjustWalletQuotaForUser(o.memberId, amount); err != nil {
+	if err := AdjustWalletQuotaForUser(o.memberId, int64(amount)); err != nil {
 		return err
 	}
 	o.consumed = amount
@@ -152,14 +152,14 @@ func (o *OrganizationWalletFunding) Settle(delta int) error {
 	if delta == 0 {
 		return nil
 	}
-	return AdjustWalletQuotaForUser(o.memberId, delta)
+	return AdjustWalletQuotaForUser(o.memberId, int64(delta))
 }
 
 func (o *OrganizationWalletFunding) Refund() error {
 	if o.consumed <= 0 {
 		return nil
 	}
-	return AdjustWalletQuotaForUser(o.memberId, -o.consumed)
+	return AdjustWalletQuotaForUser(o.memberId, -int64(o.consumed))
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ type OrganizationSubscriptionFunding struct {
 	amount                         int64
 	organizationUserSubscriptionId int
 	preConsumed                    int64
-	organizationWalletConsumed     int
+	organizationWalletConsumed     int64
 	AmountTotal                    int64
 	AmountUsedAfter                int64
 	PlanId                         int
@@ -253,36 +253,37 @@ func (o *OrganizationSubscriptionFunding) PreConsume(_ int) error {
 	if o.preConsumed <= 0 {
 		return nil
 	}
-	if err := model.DecreaseOrganizationQuota(o.organizationId, int(o.preConsumed)); err != nil {
+	if err := model.DecreaseOrganizationQuota(o.organizationId, o.preConsumed); err != nil {
 		_ = model.RefundOrganizationSubscriptionPreConsume(o.requestId)
 		o.preConsumed = 0
 		return err
 	}
-	o.organizationWalletConsumed = int(o.preConsumed)
+	o.organizationWalletConsumed = o.preConsumed
 	return nil
 }
 
 func (o *OrganizationSubscriptionFunding) Settle(delta int) error {
-	if delta == 0 {
+	d := int64(delta)
+	if d == 0 {
 		return nil
 	}
-	if delta > 0 {
-		if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, int64(delta)); err != nil {
+	if d > 0 {
+		if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, d); err != nil {
 			return err
 		}
-		if err := model.DecreaseOrganizationQuota(o.organizationId, delta); err != nil {
-			_ = model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, -int64(delta))
+		if err := model.DecreaseOrganizationQuota(o.organizationId, d); err != nil {
+			_ = model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, -d)
 			return err
 		}
-		o.organizationWalletConsumed += delta
+		o.organizationWalletConsumed += d
 		return nil
 	}
 
-	refund := -delta
+	refund := -d
 	if err := model.IncreaseOrganizationQuota(o.organizationId, refund); err != nil {
 		return err
 	}
-	if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, int64(delta)); err != nil {
+	if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, d); err != nil {
 		_ = model.DecreaseOrganizationQuota(o.organizationId, refund)
 		return err
 	}

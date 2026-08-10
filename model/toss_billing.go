@@ -1523,9 +1523,11 @@ func tossTopUpPriceFactor(amount int64, group string) float64 {
 }
 
 func tossTopUpPositiveInt(value decimal.Decimal) (int, bool) {
-	// User/Organization quota columns are explicitly SQL INT on every supported
-	// database, so the portable storage ceiling is signed 32-bit even when the
-	// Go process itself uses a 64-bit int.
+	// The user/organization quota columns are bigint, so this 32-bit bound is not a
+	// storage limit but a deliberate ceiling on a single payment: it keeps the
+	// immutable top_ups.quota snapshot within signed-32-bit range and caps how much
+	// any one Toss checkout can be worth. Widening it is a payment-policy decision,
+	// not a schema one.
 	maxInt := int64(math.MaxInt32)
 	if value.LessThan(decimal.NewFromInt(1)) || value.GreaterThan(decimal.NewFromInt(maxInt)) {
 		return 0, false

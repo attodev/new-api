@@ -67,7 +67,7 @@ func TestRechargeTossWithContextDoesNotSettleAfterCancellation(t *testing.T) {
 	require.Equal(t, common.TopUpStatusPending, topUp.Status)
 	var user User
 	require.NoError(t, DB.First(&user, 9101).Error)
-	require.Equal(t, 17, user.Quota)
+	require.Equal(t, int64(17), user.Quota)
 }
 
 func TestRecordLogWithContextBoundsSeparateSQLiteLogDatabaseLock(t *testing.T) {

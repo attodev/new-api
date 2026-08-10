@@ -48,7 +48,26 @@
           <i data-lucide="languages"></i>
           <div class="lang-dropdown" id="languageMenu"><a href="{{if eq .Active "guide"}}/en/guide{{else}}/en{{end}}" lang="en" aria-current="page">English<span class="check">✓</span></a><a href="{{if eq .Active "guide"}}/guide{{else}}/{{end}}" lang="ko">한국어</a></div>
         </button>
+        {{if .IsLoggedIn}}
+        <div class="profile-menu">
+          <button type="button" class="btn-profile profile-menu-trigger" aria-haspopup="true" aria-expanded="false" aria-label="{{.DisplayName}} account menu" title="{{.DisplayName}}" style="background-color:{{.UserAvatarBg}}">{{.UserInitial}}</button>
+          <div class="profile-dropdown" role="menu">
+            <div class="pd-head">
+              <span class="pd-avatar" style="background-color:{{.UserAvatarBg}}">{{.UserInitial}}</span>
+              <span class="pd-info">
+                <span class="pd-name">{{.DisplayName}}</span>
+                <span class="pd-sub">{{if eq .UserRole 100}}Super Admin{{else if eq .UserRole 10}}Admin{{else if eq .UserRole 1}}User{{else}}Guest{{end}}{{if .UserGroup}} · {{.UserGroup}}{{end}}</span>
+              </span>
+            </div>
+            <div class="pd-sep"></div>
+            <a href="/dashboard" role="menuitem"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+            <div class="pd-sep"></div>
+            <button type="button" class="pd-logout" role="menuitem"><i data-lucide="log-out"></i><span>Log out</span></button>
+          </div>
+        </div>
+        {{else}}
         <a href="/sign-in" class="btn-login">Log in</a>
+        {{end}}
         <a href="/sign-in" class="btn-primary" hidden>Get Started</a>
       </div>
       <button class="gnb-hamburger" aria-label="Open menu" aria-expanded="false">

@@ -81,7 +81,7 @@ type WalletAutoRecharge struct {
 	BillingKeyId       int     `json:"billing_key_id" gorm:"index"`
 	Amount             float64 `json:"amount"`
 	ThresholdAmount    float64 `json:"threshold_amount"`
-	ThresholdQuota     int     `json:"threshold_quota"`
+	ThresholdQuota     int64   `json:"threshold_quota"`
 	IntervalUnit       string  `json:"interval_unit" gorm:"type:varchar(16)"`
 	IntervalValue      int     `json:"interval_value"`
 	CustomSeconds      int64   `json:"custom_seconds"`
@@ -129,7 +129,7 @@ type CreateWalletAutoRechargeRequest struct {
 	ProviderClientKeyHash string
 	Amount                float64
 	ThresholdAmount       float64
-	ThresholdQuota        int
+	ThresholdQuota        int64
 	IntervalUnit          string
 	IntervalValue         int
 	CustomSeconds         int64
@@ -2468,11 +2468,11 @@ func walletAutoRechargeMoney(amountKRW float64) float64 {
 	return TossUSDEquivalent(decimal.NewFromFloat(amountKRW).Round(0).IntPart())
 }
 
-func walletAutoRechargeQuota(amount float64) int {
+func walletAutoRechargeQuota(amount float64) int64 {
 	if amount <= 0 {
 		return 0
 	}
-	return TossCreditQuotaFromKRW(walletAutoRechargeKRW(amount))
+	return int64(TossCreditQuotaFromKRW(walletAutoRechargeKRW(amount)))
 }
 
 func walletAutoRechargeTradeNo(policy WalletAutoRecharge, now time.Time) string {
@@ -5706,7 +5706,7 @@ func completeWalletAutoRechargeTopUp(policyId int, tradeNo string, now time.Time
 		if quotaToAdd <= 0 {
 			return errors.New("invalid wallet auto recharge quota")
 		}
-		if err := CreditTopUpTarget(tx, &topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, &topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 		return finalizeWalletAutoRechargeSettlement(tx, &policy, tradeNo, now)
@@ -5841,7 +5841,7 @@ func SettleWalletAutoRechargeWebhookDoneWithContext(ctx context.Context, policyI
 		if quotaToAdd <= 0 {
 			return errors.New("invalid wallet auto recharge quota")
 		}
-		if err := CreditTopUpTarget(tx, &topUp, quotaToAdd); err != nil {
+		if err := CreditTopUpTarget(tx, &topUp, int64(quotaToAdd)); err != nil {
 			return err
 		}
 		return finalizeWalletAutoRechargeSettlement(tx, &policy, tradeNo, now)

@@ -95,7 +95,7 @@ func TestCreateWalletAutoRechargePresetAcceptsThresholdQuota(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Code)
 	var preset model.WalletAutoRechargePreset
 	require.NoError(t, model.DB.Where("name = ?", "Quota threshold").First(&preset).Error)
-	require.Equal(t, 250000, preset.ThresholdQuota)
+	require.Equal(t, int64(250000), preset.ThresholdQuota)
 }
 
 func TestUserPresetListFiltersByWalletTarget(t *testing.T) {

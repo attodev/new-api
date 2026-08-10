@@ -43,6 +43,7 @@ import {
   calculatePresetPricing,
   isTossPayment,
   shouldBlockPaymentMethodBeforeQuote,
+  TOSS_MAXIMUM_CHARGE_KRW,
 } from '../lib'
 import {
   TOSS_KRW_PRESETS,
@@ -211,6 +212,24 @@ export function RechargeFormCard({
         : formatCurrency(paymentAmount)
   const customInputMin =
     usesTossAmountMode && activeAmountMode === 'quota' ? 1 : minTopup
+  // Per-payment Toss ceiling, shown so the buyer knows it up front. Display only
+  // -- enforcement already lives on the server.
+  //
+  // The notice appears whenever Toss is offered at all, including alongside other
+  // providers: the ceiling is a fixed KRW figure, so stating it is always correct.
+  // The *warning* is deliberately narrower and only fires in the Toss-only amount
+  // mode with KRW selected, the one case where the typed number is unambiguously
+  // the KRW charge. In quota mode the charge is derived server-side from group
+  // ratio and discount, and when Toss shares the form with other providers the
+  // input is not necessarily KRW at all -- warning there would be guesswork
+  // against a number we do not have.
+  const tossAvailable =
+    !!topupInfo?.enable_toss_topup ||
+    (topupInfo?.pay_methods ?? []).some((method) => isTossPayment(method.type))
+  const overTossMax =
+    usesTossAmountMode &&
+    activeAmountMode === 'krw' &&
+    topupAmount > TOSS_MAXIMUM_CHARGE_KRW
 
   if (loading) {
     return (
@@ -438,6 +457,24 @@ export function RechargeFormCard({
                     )}
                   </div>
                 </div>
+                {tossAvailable && (
+                  <p
+                    className={
+                      overTossMax
+                        ? 'text-destructive text-xs font-medium'
+                        : 'text-muted-foreground text-xs'
+                    }
+                  >
+                    {overTossMax
+                      ? t(
+                          'Exceeds the maximum for a single payment ({{amount}}). Please enter a smaller amount.',
+                          { amount: formatWonAmount(TOSS_MAXIMUM_CHARGE_KRW) }
+                        )
+                      : t('Maximum for a single payment: {{amount}}', {
+                          amount: formatWonAmount(TOSS_MAXIMUM_CHARGE_KRW),
+                        })}
+                  </p>
+                )}
               </div>
 
               <div className='space-y-2.5 sm:space-y-3'>

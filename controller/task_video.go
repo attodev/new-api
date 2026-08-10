@@ -183,47 +183,47 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 							if quotaDelta > 0 {
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s post-charge deduction: %s (actual: %s, pre-charged: %s, tokens: %d)",
 									task.TaskID,
-									logger.LogQuota(quotaDelta),
-									logger.LogQuota(actualQuota),
-									logger.LogQuota(preConsumedQuota),
+									logger.LogQuota(int64(quotaDelta)),
+									logger.LogQuota(int64(actualQuota)),
+									logger.LogQuota(int64(preConsumedQuota)),
 									taskResult.TotalTokens,
 								))
-								if err := model.DecreaseUserQuota(task.UserId, quotaDelta, false); err != nil {
+								if err := model.DecreaseUserQuota(task.UserId, int64(quotaDelta), false); err != nil {
 									logger.LogError(ctx, fmt.Sprintf("post-charge deduction failed: %s", err.Error()))
 								} else {
-									model.UpdateUserUsedQuotaAndRequestCount(task.UserId, quotaDelta)
+									model.UpdateUserUsedQuotaAndRequestCount(task.UserId, int64(quotaDelta))
 									model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 									task.Quota = actualQuota
 
 									// record billing log
 									logContent := fmt.Sprintf("video task post-charge succeeded, model ratio %.2f, group ratio %.2f, tokens %d, pre-charged %s, actual %s, deducted %s",
 										modelRatio, finalGroupRatio, taskResult.TotalTokens,
-										logger.LogQuota(preConsumedQuota), logger.LogQuota(actualQuota), logger.LogQuota(quotaDelta))
+										logger.LogQuota(int64(preConsumedQuota)), logger.LogQuota(int64(actualQuota)), logger.LogQuota(int64(quotaDelta)))
 									model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 								}
 							} else if quotaDelta < 0 {
 								refundQuota := -quotaDelta
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s post-charge refund: %s (actual: %s, pre-charged: %s, tokens: %d)",
 									task.TaskID,
-									logger.LogQuota(refundQuota),
-									logger.LogQuota(actualQuota),
-									logger.LogQuota(preConsumedQuota),
+									logger.LogQuota(int64(refundQuota)),
+									logger.LogQuota(int64(actualQuota)),
+									logger.LogQuota(int64(preConsumedQuota)),
 									taskResult.TotalTokens,
 								))
-								if err := model.IncreaseUserQuota(task.UserId, refundQuota, false); err != nil {
+								if err := model.IncreaseUserQuota(task.UserId, int64(refundQuota), false); err != nil {
 									logger.LogError(ctx, fmt.Sprintf("post-charge refund failed: %s", err.Error()))
 								} else {
 									task.Quota = actualQuota
 
 									logContent := fmt.Sprintf("video task refund succeeded, model ratio %.2f, group ratio %.2f, tokens %d, pre-charged %s, actual %s, refunded %s",
 										modelRatio, finalGroupRatio, taskResult.TotalTokens,
-										logger.LogQuota(preConsumedQuota), logger.LogQuota(actualQuota), logger.LogQuota(refundQuota))
+										logger.LogQuota(int64(preConsumedQuota)), logger.LogQuota(int64(actualQuota)), logger.LogQuota(int64(refundQuota)))
 									model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 								}
 							} else {
 								// quotaDelta == 0,
 								logger.LogInfo(ctx, fmt.Sprintf("video task %s pre-charge accurate (%s, tokens: %d)",
-									task.TaskID, logger.LogQuota(actualQuota), taskResult.TotalTokens))
+									task.TaskID, logger.LogQuota(int64(actualQuota)), taskResult.TotalTokens))
 							}
 						}
 					}
@@ -259,10 +259,10 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 	}
 
 	if shouldRefund {
-		if err := model.IncreaseUserQuota(task.UserId, quota, false); err != nil {
+		if err := model.IncreaseUserQuota(task.UserId, int64(quota), false); err != nil {
 			logger.LogWarn(ctx, "Failed to increase user quota: "+err.Error())
 		}
-		logContent := fmt.Sprintf("Video async task failed %s, refund %s", task.TaskID, logger.LogQuota(quota))
+		logContent := fmt.Sprintf("Video async task failed %s, refund %s", task.TaskID, logger.LogQuota(int64(quota)))
 		model.RecordLog(task.UserId, model.LogTypeSystem, logContent)
 	}
 
