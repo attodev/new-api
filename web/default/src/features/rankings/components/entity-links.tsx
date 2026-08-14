@@ -25,31 +25,19 @@ type EntityLinkBaseProps = {
 }
 
 type ModelLinkProps = EntityLinkBaseProps & {
-  /** model_name as it appears in the pricing API. Used as the route param. */
+  /** model_name as it appears in the pricing API. */
   modelName: string
 }
 
 /**
- * Link wrapping a model name. Navigates to the existing model details
- * page (`/pricing/{modelName}`). Renders the model name itself by
- * default; pass `children` to wrap arbitrary content.
- *
- * A subtle persistent underline acts as the link affordance (so
- * clickability is obvious in lists with dozens of entries) and brightens
- * on hover.
+ * Renders a model name without linking to a model details page. Model
+ * details are intentionally unavailable in the public marketplace.
  */
 export function ModelLink(props: ModelLinkProps) {
   return (
-    <Link
-      to='/pricing/$modelId'
-      params={{ modelId: props.modelName }}
-      className={cn(
-        'decoration-foreground/30 hover:decoration-foreground underline decoration-1 underline-offset-4 transition-colors',
-        props.className
-      )}
-    >
+    <span className={cn(props.className)}>
       {props.children ?? props.modelName}
-    </Link>
+    </span>
   )
 }
 
@@ -60,10 +48,8 @@ type VendorLinkProps = EntityLinkBaseProps & {
 
 /**
  * Link wrapping a vendor name. Navigates to the pricing page filtered by
- * that vendor (`/pricing?vendor={vendor}`). Renders the vendor name
- * itself by default. Uses the same subtle persistent underline as
- * {@link ModelLink}, scaled for the smaller secondary text it usually
- * wraps.
+ * that vendor (`/pricing?vendor={vendor}`). Renders the vendor name itself
+ * by default.
  */
 export function VendorLink(props: VendorLinkProps) {
   return (
