@@ -81,9 +81,14 @@ Response (`200`):
 {
   "sub": "<new-api user id, stable>",
   "email": "<user email>",
-  "name": "<user display name>"
+  "name": "<user display name>",
+  "is_admin": true
 }
 ```
+
+`is_admin` reflects new-api's own `Role >= RoleAdminUser` check — use it to
+auto-sync the admin/user role on your side instead of relying only on a
+manual "first SSO login becomes admin" bootstrap.
 
 `401` if the access token is invalid/expired — shouldn't happen immediately
 after a fresh exchange, but handle it the same way as an expired session
@@ -96,6 +101,18 @@ Look up or auto-create a local OpenWebUI user keyed by `sub` (fall back to
 that user exactly as its existing auth system does today. This part is
 unchanged from how OpenWebUI already handles first-time account creation
 for any external login method.
+
+**Session-swap note (IdP-initiated flow):** because new-api mints the code
+unsolicited rather than in response to a request you initiated and can
+validate `state` against, a user who shares their own valid link with
+someone else can cause that person's browser to land in the *sender's*
+account — not an account takeover, just an unwanted "wrong room" outcome.
+This is an accepted, structural trade-off of IdP-initiated SSO (the same
+one SAML IdP-initiated login has always had), bounded by the code's 120s
+single-use window. As a cheap mitigation, please surface the authenticated
+account's email prominently on the landing screen right after this step,
+so an attentive user notices immediately if they ended up in the wrong
+account.
 
 ### d. Store the access token as this user's per-session connection credential
 
