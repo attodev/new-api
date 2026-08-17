@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -43,4 +44,9 @@ func TestRedisGetDel_MissingKeyReturnsRedisNil(t *testing.T) {
 	_, err := RedisGetDel("test:getdel:does-not-exist")
 	require.Error(t, err)
 	require.ErrorIs(t, err, redis.Nil)
+}
+
+func TestIsRedisNotFound(t *testing.T) {
+	require.True(t, IsRedisNotFound(redis.Nil))
+	require.False(t, IsRedisNotFound(errors.New("boom")))
 }

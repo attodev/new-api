@@ -91,7 +91,10 @@ func IssueOAuth2Token(userId int, group string, clientId string) (*Token, error)
 func RevokeOAuth2Token(userId int) error {
 	rawKey, err := common.RedisGet(oauth2SessionTokenPrefix + strconv.Itoa(userId))
 	if err != nil {
-		return nil
+		if common.IsRedisNotFound(err) {
+			return nil
+		}
+		return err
 	}
 	if err := cacheDeleteToken(rawKey); err != nil {
 		return err

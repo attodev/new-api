@@ -16,6 +16,12 @@ import (
 var RDB *redis.Client
 var RedisEnabled = true
 
+// IsRedisNotFound reports whether err represents a "key not found" result
+// from Redis (redis.Nil), as opposed to any other (e.g. connectivity) error.
+func IsRedisNotFound(err error) bool {
+	return errors.Is(err, redis.Nil)
+}
+
 func RedisKeyCacheSeconds() int {
 	return SyncFrequency
 }
