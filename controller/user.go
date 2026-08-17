@@ -125,6 +125,9 @@ func setupLogin(user *model.User, c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	if userId, ok := session.Get("id").(int); ok {
+		_ = model.RevokeOAuth2Token(userId)
+	}
 	session.Clear()
 	err := session.Save()
 	if err != nil {
