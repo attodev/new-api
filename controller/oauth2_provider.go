@@ -13,6 +13,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// oauth2Configured reports whether the OAuth2 provider feature is not just
+// enabled but actually usable. An admin can flip settings.Enabled to true
+// without filling in client_id/client_secret/redirect_uri (they default to
+// ""), which would otherwise let an empty client_secret from a caller match
+// an empty configured one. From the caller's perspective, an unconfigured
+// feature must look identical to a disabled one.
+func oauth2Configured(settings *system_setting.OAuth2Settings) bool {
+	return settings.Enabled && settings.ClientId != "" && settings.ClientSecret != "" && settings.RedirectURI != ""
+}
+
 // OAuth2SessionInit is called from new-api's own frontend (same-origin,
 // authenticated via the normal session cookie through middleware.UserAuth()).
 // It mints a short-lived authorization code and returns a ready-to-navigate
@@ -21,7 +31,7 @@ import (
 // "Revision note" for why.
 func OAuth2SessionInit(c *gin.Context) {
 	settings := system_setting.GetOAuth2Settings()
-	if !settings.Enabled {
+	if !oauth2Configured(settings) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
 		return
 	}
@@ -47,7 +57,7 @@ func OAuth2SessionInit(c *gin.Context) {
 // token. Called server-to-server by the external app's backend.
 func OAuth2Token(c *gin.Context) {
 	settings := system_setting.GetOAuth2Settings()
-	if !settings.Enabled {
+	if !oauth2Configured(settings) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
 		return
 	}
@@ -106,6 +116,12 @@ func OAuth2UserInfo(c *gin.Context) {
 
 	token, err := model.ValidateUserToken(key)
 	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+		return
+	}
+
+	expectedName := "oauth2-" + settings.ClientId
+	if token.Name != expectedName {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
 		return
 	}

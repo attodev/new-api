@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -188,6 +189,91 @@ func TestOAuth2UserInfo_ValidTokenReturnsIdentity(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.Contains(t, recorder.Body.String(), `"sub":"`+strconv.Itoa(7)+`"`)
+}
+
+func TestOAuth2SessionInit_UnconfiguredClientSecretReturns404(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	system_setting.GetOAuth2Settings().ClientSecret = ""
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/oauth2/session-init", nil)
+	ctx.Set("id", 42)
+
+	OAuth2SessionInit(ctx)
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+}
+
+func TestOAuth2Token_UnconfiguredClientIdReturns404(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	setupOAuth2ProviderTestDB(t)
+	system_setting.GetOAuth2Settings().ClientId = ""
+	code, err := model.StoreAuthCode(7)
+	require.NoError(t, err)
+
+	recorder := postForm(t, OAuth2Token, url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"client_id":     {""},
+		"client_secret": {"test-secret"},
+	})
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+}
+
+func TestOAuth2Token_UnconfiguredClientSecretReturns404(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	setupOAuth2ProviderTestDB(t)
+	system_setting.GetOAuth2Settings().ClientSecret = ""
+	code, err := model.StoreAuthCode(7)
+	require.NoError(t, err)
+
+	recorder := postForm(t, OAuth2Token, url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"client_id":     {"openwebui"},
+		"client_secret": {""},
+	})
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+}
+
+func TestOAuth2UserInfo_NonOAuth2TokenReturns401(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	setupOAuth2ProviderTestDB(t)
+
+	// Simulate an ordinary relay API key (not issued via the OAuth2 flow) by
+	// caching a token whose Name doesn't match the "oauth2-<clientId>"
+	// pattern that IssueOAuth2Token always uses.
+	key, err := common.GenerateKey()
+	require.NoError(t, err)
+	now := common.GetTimestamp()
+	token := model.Token{
+		Id:           -2,
+		UserId:       7,
+		Key:          key,
+		Status:       common.TokenStatusEnabled,
+		Name:         "my-regular-relay-key",
+		CreatedTime:  now,
+		AccessedTime: now,
+		ExpiredTime:  -1,
+		Group:        "default",
+	}
+	hmacKey := common.GenerateHMAC(token.Key)
+	cacheToken := token
+	cacheToken.Clean()
+	require.NoError(t, common.RedisHSetObj("token:"+hmacKey, &cacheToken, 24*time.Hour))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/oauth2/userinfo", nil)
+	ctx.Request.Header.Set("Authorization", "Bearer "+key)
+
+	OAuth2UserInfo(ctx)
+
+	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "invalid_token")
 }
 
 func TestOAuth2UserInfo_InvalidTokenReturns401(t *testing.T) {

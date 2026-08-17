@@ -51,7 +51,9 @@ func ConsumeAuthCode(code string) (int, error) {
 // creates a DB row. Any token previously issued for this user via this
 // path is invalidated first, so at most one stays live at a time.
 func IssueOAuth2Token(userId int, group string, clientId string) (*Token, error) {
-	_ = RevokeOAuth2Token(userId)
+	if err := RevokeOAuth2Token(userId); err != nil {
+		return nil, err
+	}
 
 	key, err := common.GenerateKey()
 	if err != nil {

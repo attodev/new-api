@@ -251,8 +251,10 @@ None of these live under the existing `/api/oauth/:provider` catch-all
 
 ## Security notes
 
-- `client_secret` is generated server-side (not user-chosen) and stored via
-  the existing system-setting admin flow; never logged.
+- `client_secret` is supplied by the admin directly via the existing
+  system-setting admin flow (not generated server-side) — the admin
+  generates it themselves with any sufficiently random value before sharing
+  it with the external-app team out of band; never logged.
 - The auth code is single-use (atomically consumed) and short-lived (120s).
 - The external app's callback link is never rendered as static/copyable
   markup on the new-api side (see "New files" above) — this bounds, but does
