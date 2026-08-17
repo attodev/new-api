@@ -75,3 +75,20 @@ export async function getUserGroups(): Promise<GroupOption[]> {
     desc: info.desc,
   }))
 }
+
+/**
+ * Mint a one-time OAuth2 authorization code and get the external chat
+ * app's callback URL. The caller must navigate to the returned URL
+ * immediately (window.location.href) and must never render it as a
+ * static, copyable <a href> — the code is single-use and short-lived
+ * (120s), and a shared/unfurled link would burn it before the real user
+ * clicks it.
+ */
+export async function getOpenInChatAppUrl(): Promise<string> {
+  const res = await api.post(API_ENDPOINTS.OAUTH2_SESSION_INIT)
+  const { data } = res
+  if (!data.redirect_url) {
+    throw new Error('oauth2 is not configured')
+  }
+  return data.redirect_url as string
+}

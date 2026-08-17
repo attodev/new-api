@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   CHAT_COMPLETIONS: '/pg/chat/completions',
   USER_MODELS: '/api/user/models',
   USER_GROUPS: '/api/user/self/groups',
+  OAUTH2_SESSION_INIT: '/oauth2/session-init',
 } as const
 
 // Default group — uses 'default' as the safe fallback; auto-group is

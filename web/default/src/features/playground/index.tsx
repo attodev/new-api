@@ -20,12 +20,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getUserModels, getUserGroups } from './api'
+import { getUserModels, getUserGroups, getOpenInChatAppUrl } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
 import { usePlaygroundState, useChatHandler } from './hooks'
 import { createUserMessage, createLoadingAssistantMessage } from './lib'
 import type { Message as MessageType } from './types'
+import { Button } from '@/components/ui/button'
+import { ExternalLinkIcon } from 'lucide-react'
 
 export function Playground() {
   const { t } = useTranslation()
@@ -188,8 +190,23 @@ export function Playground() {
     updateMessages(newMessages)
   }
 
+  const handleOpenInChatApp = useCallback(async () => {
+    try {
+      const redirectUrl = await getOpenInChatAppUrl()
+      window.location.href = redirectUrl
+    } catch {
+      toast.error(t('External chat app is not configured'))
+    }
+  }, [t])
+
   return (
     <div className='relative flex size-full flex-col overflow-hidden'>
+      <div className='flex items-center justify-end px-4 pt-2'>
+        <Button variant='ghost' size='sm' onClick={handleOpenInChatApp}>
+          <ExternalLinkIcon className='mr-1 size-4' />
+          {t('Open in Chat App')}
+        </Button>
+      </div>
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex flex-1 flex-col overflow-hidden'>
         <PlaygroundChat
