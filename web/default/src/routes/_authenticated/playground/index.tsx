@@ -23,10 +23,16 @@ import { Playground } from '@/features/playground'
 import { getOpenInChatAppUrl } from '@/features/playground/api'
 
 export const Route = createFileRoute('/_authenticated/playground/')({
-  beforeLoad: async () => {
+  beforeLoad: async ({ preload }) => {
     if (!isSidebarModuleEnabled('chat', 'playground')) {
       throw redirect({ to: '/dashboard' })
     }
+
+    // The router preloads on hover (defaultPreload: 'intent' in main.tsx),
+    // which runs beforeLoad too — without this check, just hovering the
+    // Playground nav item would open a new window / navigate away.
+    // Only run the redirect below on an actual navigation.
+    if (preload) return
 
     // "Replace Playground": clicking the Playground nav item is a genuine
     // user gesture, so handling the redirect right here (rather than after
