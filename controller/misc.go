@@ -118,6 +118,10 @@ func GetStatus(c *gin.Context) {
 		"user_agreement_enabled":      legalSetting.UserAgreement != "",
 		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
+
+		"oauth2_enabled":            system_setting.GetOAuth2Settings().Enabled,
+		"oauth2_open_in_new_window": system_setting.GetOAuth2Settings().OpenInNewWindow,
+		"oauth2_replace_playground": system_setting.GetOAuth2Settings().ReplacePlayground,
 	}
 
 	if cs.ApiInfoEnabled {

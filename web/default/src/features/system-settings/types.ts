@@ -87,6 +87,8 @@ export type SiteSettings = {
   'oauth2.client_id': string
   'oauth2.client_secret': string
   'oauth2.redirect_uri': string
+  'oauth2.open_in_new_window': boolean
+  'oauth2.replace_playground': boolean
 }
 
 export type AuthSettings = {

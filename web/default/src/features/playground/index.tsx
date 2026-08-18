@@ -28,9 +28,87 @@ import { createUserMessage, createLoadingAssistantMessage } from './lib'
 import type { Message as MessageType } from './types'
 import { Button } from '@/components/ui/button'
 import { ExternalLinkIcon } from 'lucide-react'
+import { useStatus } from '@/hooks/use-status'
+
+/**
+ * Opens the external chat app per the admin's configured preference:
+ * a new tab (window.open, requires a direct user gesture — browsers
+ * block popups triggered any other way) or the current tab
+ * (location.href, works regardless of gesture).
+ */
+function openChatApp(redirectUrl: string, openInNewWindow: boolean) {
+  if (openInNewWindow) {
+    window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+  } else {
+    window.location.href = redirectUrl
+  }
+}
+
+/**
+ * Shown instead of the built-in playground when an admin has enabled
+ * "Replace Playground". Same-window mode redirects immediately on
+ * mount (a plain navigation, not blocked by popup rules). New-window
+ * mode cannot auto-open reliably — browsers block window.open() calls
+ * not triggered by a direct click — so it shows a single button instead.
+ */
+function PlaygroundReplacedByChatApp({
+  openInNewWindow,
+}: {
+  openInNewWindow: boolean
+}) {
+  const { t } = useTranslation()
+  const [failed, setFailed] = useState(false)
+
+  const goToChatApp = useCallback(async () => {
+    try {
+      const redirectUrl = await getOpenInChatAppUrl()
+      openChatApp(redirectUrl, openInNewWindow)
+    } catch {
+      setFailed(true)
+      toast.error(t('External chat app is not configured'))
+    }
+  }, [openInNewWindow])
+
+  useEffect(() => {
+    if (!openInNewWindow) {
+      void goToChatApp()
+    }
+  }, [openInNewWindow, goToChatApp])
+
+  if (openInNewWindow) {
+    return (
+      <div className='flex size-full flex-col items-center justify-center gap-4'>
+        <p className='text-muted-foreground text-sm'>
+          {t('Playground has been replaced by the external chat app')}
+        </p>
+        <Button onClick={goToChatApp}>
+          <ExternalLinkIcon className='mr-1 size-4' />
+          {t('Open Chat App')}
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className='flex size-full flex-col items-center justify-center gap-4'>
+      <p className='text-muted-foreground text-sm'>
+        {failed
+          ? t('External chat app is not configured')
+          : t('Redirecting to the external chat app...')}
+      </p>
+    </div>
+  )
+}
 
 export function Playground() {
   const { t } = useTranslation()
+  const { status } = useStatus()
+  // getStatus() already unwraps the server envelope's outer `data` key, so
+  // these are top-level fields on `status`, not `status.data.*`.
+  const oauth2Enabled = Boolean(status?.oauth2_enabled)
+  const openInNewWindow = Boolean(status?.oauth2_open_in_new_window)
+  const replacePlayground = Boolean(status?.oauth2_replace_playground)
+
   const {
     config,
     parameterEnabled,
@@ -116,6 +194,10 @@ export function Playground() {
     }
   }, [groupsData, setGroups, config.group, updateConfig])
 
+  if (oauth2Enabled && replacePlayground) {
+    return <PlaygroundReplacedByChatApp openInNewWindow={openInNewWindow} />
+  }
+
   const handleSendMessage = (text: string) => {
     const userMessage = createUserMessage(text)
     const assistantMessage = createLoadingAssistantMessage()
@@ -193,20 +275,22 @@ export function Playground() {
   const handleOpenInChatApp = useCallback(async () => {
     try {
       const redirectUrl = await getOpenInChatAppUrl()
-      window.location.href = redirectUrl
+      openChatApp(redirectUrl, openInNewWindow)
     } catch {
       toast.error(t('External chat app is not configured'))
     }
-  }, [t])
+  }, [t, openInNewWindow])
 
   return (
     <div className='relative flex size-full flex-col overflow-hidden'>
-      <div className='flex items-center justify-end px-4 pt-2'>
-        <Button variant='ghost' size='sm' onClick={handleOpenInChatApp}>
-          <ExternalLinkIcon className='mr-1 size-4' />
-          {t('Open in Chat App')}
-        </Button>
-      </div>
+      {oauth2Enabled && (
+        <div className='flex items-center justify-end px-4 pt-2'>
+          <Button variant='ghost' size='sm' onClick={handleOpenInChatApp}>
+            <ExternalLinkIcon className='mr-1 size-4' />
+            {t('Open in Chat App')}
+          </Button>
+        </div>
+      )}
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex flex-1 flex-col overflow-hidden'>
         <PlaygroundChat

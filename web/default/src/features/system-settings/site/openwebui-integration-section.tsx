@@ -52,6 +52,8 @@ const oauth2Schema = z.object({
     client_id: z.string(),
     client_secret: z.string(),
     redirect_uri: z.string(),
+    open_in_new_window: z.boolean(),
+    replace_playground: z.boolean(),
   }),
 })
 
@@ -62,6 +64,8 @@ type FlatOauth2Defaults = {
   'oauth2.client_id': string
   'oauth2.client_secret': string
   'oauth2.redirect_uri': string
+  'oauth2.open_in_new_window': boolean
+  'oauth2.replace_playground': boolean
 }
 
 const buildFormDefaults = (defaults: FlatOauth2Defaults): Oauth2FormValues => ({
@@ -70,6 +74,8 @@ const buildFormDefaults = (defaults: FlatOauth2Defaults): Oauth2FormValues => ({
     client_id: defaults['oauth2.client_id'] ?? '',
     client_secret: defaults['oauth2.client_secret'] ?? '',
     redirect_uri: defaults['oauth2.redirect_uri'] ?? '',
+    open_in_new_window: defaults['oauth2.open_in_new_window'],
+    replace_playground: defaults['oauth2.replace_playground'],
   },
 })
 
@@ -78,6 +84,8 @@ const normalizeFormValues = (values: Oauth2FormValues): FlatOauth2Defaults => ({
   'oauth2.client_id': values.oauth2.client_id,
   'oauth2.client_secret': values.oauth2.client_secret,
   'oauth2.redirect_uri': values.oauth2.redirect_uri,
+  'oauth2.open_in_new_window': values.oauth2.open_in_new_window,
+  'oauth2.replace_playground': values.oauth2.replace_playground,
 })
 
 interface OpenWebUIOAuth2SectionProps {
@@ -241,6 +249,52 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
                 </FormDescription>
                 <FormMessage />
               </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.open_in_new_window'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Open in a New Window')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Open the external chat app in a new tab, keeping this window open, instead of navigating away from it'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.replace_playground'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Replace Playground')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Make the Playground page itself act like the "Open in Chat App" button — visiting Playground goes straight to the external app instead of showing the built-in playground'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
             )}
           />
         </SettingsForm>

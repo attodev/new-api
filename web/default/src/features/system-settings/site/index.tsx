@@ -41,6 +41,8 @@ const defaultSiteSettings: SiteSettings = {
   'oauth2.client_id': '',
   'oauth2.client_secret': '',
   'oauth2.redirect_uri': '',
+  'oauth2.open_in_new_window': false,
+  'oauth2.replace_playground': false,
 }
 
 export function SiteSettings() {

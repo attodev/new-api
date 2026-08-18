@@ -101,6 +101,8 @@ const SITE_SECTIONS = [
           'oauth2.client_id': settings['oauth2.client_id'],
           'oauth2.client_secret': settings['oauth2.client_secret'],
           'oauth2.redirect_uri': settings['oauth2.redirect_uri'],
+          'oauth2.open_in_new_window': settings['oauth2.open_in_new_window'],
+          'oauth2.replace_playground': settings['oauth2.replace_playground'],
         }}
       />
     ),
