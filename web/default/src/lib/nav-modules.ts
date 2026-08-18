@@ -142,7 +142,7 @@ export function parseHeaderNavModulesFromStatus(
   return parseHeaderNavModules(status?.HeaderNavModules)
 }
 
-function getCachedStatus(): Record<string, unknown> | null {
+export function getCachedStatus(): Record<string, unknown> | null {
   try {
     if (typeof window === 'undefined') return null
     const raw = window.localStorage.getItem('status')

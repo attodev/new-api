@@ -17,15 +17,46 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { isSidebarModuleEnabled } from '@/lib/nav-modules'
+import { getCachedStatus, isSidebarModuleEnabled } from '@/lib/nav-modules'
 import { Main } from '@/components/layout'
 import { Playground } from '@/features/playground'
+import { getOpenInChatAppUrl } from '@/features/playground/api'
 
 export const Route = createFileRoute('/_authenticated/playground/')({
-  beforeLoad: () => {
+  beforeLoad: async () => {
     if (!isSidebarModuleEnabled('chat', 'playground')) {
       throw redirect({ to: '/dashboard' })
     }
+
+    // "Replace Playground": clicking the Playground nav item is a genuine
+    // user gesture, so handling the redirect right here (rather than after
+    // the route finishes loading and the component mounts) means a
+    // new-window open still counts as gesture-triggered and isn't blocked
+    // by the browser — no intermediate button needed for the normal
+    // click-to-navigate path. Direct URL loads/refreshes have no such
+    // gesture; Playground's own component still falls back to a
+    // click-to-open button for that case.
+    const status = getCachedStatus()
+    const oauth2Enabled = Boolean(status?.oauth2_enabled)
+    const replacePlayground = Boolean(status?.oauth2_replace_playground)
+    if (!oauth2Enabled || !replacePlayground) return
+
+    let redirectUrl: string
+    try {
+      redirectUrl = await getOpenInChatAppUrl()
+    } catch {
+      return
+    }
+
+    const openInNewWindow = Boolean(status?.oauth2_open_in_new_window)
+    if (openInNewWindow) {
+      window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+      throw redirect({ to: '/dashboard' })
+    }
+    window.location.href = redirectUrl
+    // Block rendering while the browser navigates away, so the old
+    // playground UI never flashes on screen in the meantime.
+    return new Promise<never>(() => {})
   },
   component: PlaygroundPage,
 })
