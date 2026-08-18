@@ -21,6 +21,7 @@ import {
   Box,
   CreditCard,
   Layout,
+  Plug,
   Settings,
   Shield,
   ShieldAlert,
@@ -30,6 +31,7 @@ import { getAuthSectionNavItems } from '@/features/system-settings/auth/section-
 import { getBillingSectionNavItems } from '@/features/system-settings/billing/section-registry.tsx'
 import { getContentSectionNavItems } from '@/features/system-settings/content/section-registry.tsx'
 import { getModelsSectionNavItems } from '@/features/system-settings/models/section-registry.tsx'
+import { getOpenWebUISectionNavItems } from '@/features/system-settings/openwebui/section-registry.tsx'
 import { getOperationsSectionNavItems } from '@/features/system-settings/operations/section-registry.tsx'
 import { getSecuritySectionNavItems } from '@/features/system-settings/security/section-registry.tsx'
 import { getSiteSectionNavItems } from '@/features/system-settings/site/section-registry.tsx'
@@ -62,6 +64,11 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
           title: t('Billing & Payment'),
           icon: CreditCard,
           items: getBillingSectionNavItems(t),
+        },
+        {
+          title: t('OpenWebUI Integration'),
+          icon: Plug,
+          items: getOpenWebUISectionNavItems(t),
         },
         {
           title: t('Models & Routing'),
