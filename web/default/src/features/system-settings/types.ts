@@ -100,10 +100,6 @@ export type AuthSettings = {
   'oidc.authorization_endpoint': string
   'oidc.token_endpoint': string
   'oidc.user_info_endpoint': string
-  'oauth2.enabled': boolean
-  'oauth2.client_id': string
-  'oauth2.client_secret': string
-  'oauth2.redirect_uri': string
   TelegramOAuthEnabled: boolean
   TelegramBotToken: string
   TelegramBotName: string
