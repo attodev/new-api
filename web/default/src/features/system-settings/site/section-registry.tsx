@@ -28,6 +28,7 @@ import { NoticeSection } from '../maintenance/notice-section'
 import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
 import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { OpenWebUIOAuth2Section } from './openwebui-integration-section'
 
 const SITE_SECTIONS = [
   {
@@ -89,6 +90,20 @@ const SITE_SECTIONS = [
         />
       )
     },
+  },
+  {
+    id: 'openwebui-integration',
+    titleKey: 'OpenWebUI Integration',
+    build: (settings: SiteSettings) => (
+      <OpenWebUIOAuth2Section
+        defaultValues={{
+          'oauth2.enabled': settings['oauth2.enabled'],
+          'oauth2.client_id': settings['oauth2.client_id'],
+          'oauth2.client_secret': settings['oauth2.client_secret'],
+          'oauth2.redirect_uri': settings['oauth2.redirect_uri'],
+        }}
+      />
+    ),
   },
 ] as const
 

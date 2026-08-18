@@ -77,6 +77,16 @@ export type SiteSettings = {
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string
+  /**
+   * Settings for new-api acting as an OAuth2 *provider* for an external
+   * chat app (e.g. OpenWebUI) — the reverse of AuthSettings' OAuth
+   * fields below, which cover new-api as an OAuth *client* signing users
+   * in via GitHub/OIDC/etc.
+   */
+  'oauth2.enabled': boolean
+  'oauth2.client_id': string
+  'oauth2.client_secret': string
+  'oauth2.redirect_uri': string
 }
 
 export type AuthSettings = {
@@ -121,18 +131,6 @@ export type AuthSettings = {
   'passkey.allow_insecure_origin': boolean
   'passkey.user_verification': 'required' | 'preferred' | 'discouraged'
   'passkey.attachment_preference': '' | 'platform' | 'cross-platform'
-}
-
-/**
- * Settings for new-api acting as an OAuth2 *provider* for an external chat
- * app (e.g. OpenWebUI) — the reverse direction of AuthSettings above, which
- * covers new-api as an OAuth *client* signing users in via GitHub/OIDC/etc.
- */
-export type OpenWebUISettings = {
-  'oauth2.enabled': boolean
-  'oauth2.client_id': string
-  'oauth2.client_secret': string
-  'oauth2.redirect_uri': string
 }
 
 export type ContentSettings = {

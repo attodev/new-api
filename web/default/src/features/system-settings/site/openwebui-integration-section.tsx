@@ -42,8 +42,9 @@ import { useUpdateOption } from '../hooks/use-update-option'
  * This settings panel is the reverse direction of the "OAuth Integrations"
  * tab under Authentication: it doesn't let new-api users sign in via an
  * external provider — it lets an external chat app (e.g. OpenWebUI) sign
- * users in as themselves, using new-api as the identity provider. Kept as
- * its own top-level settings area for that reason, not folded into Auth.
+ * users in as themselves, using new-api as the identity provider. Kept
+ * under Site & Branding as its own section for that reason, not folded
+ * into Auth's OAuth Integrations tab.
  */
 const oauth2Schema = z.object({
   oauth2: z.object({

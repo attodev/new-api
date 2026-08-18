@@ -37,6 +37,10 @@ const defaultSiteSettings: SiteSettings = {
   'legal.privacy_policy': '',
   HeaderNavModules: '',
   SidebarModulesAdmin: '',
+  'oauth2.enabled': false,
+  'oauth2.client_id': '',
+  'oauth2.client_secret': '',
+  'oauth2.redirect_uri': '',
 }
 
 export function SiteSettings() {

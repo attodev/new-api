@@ -61,7 +61,6 @@ import { Route as authUserResetRouteImport } from './routes/(auth)/user/reset'
 import { Route as AuthenticatedSystemSettingsSiteIndexRouteImport } from './routes/_authenticated/system-settings/site/index'
 import { Route as AuthenticatedSystemSettingsSecurityIndexRouteImport } from './routes/_authenticated/system-settings/security/index'
 import { Route as AuthenticatedSystemSettingsOperationsIndexRouteImport } from './routes/_authenticated/system-settings/operations/index'
-import { Route as AuthenticatedSystemSettingsOpenwebuiIndexRouteImport } from './routes/_authenticated/system-settings/openwebui/index'
 import { Route as AuthenticatedSystemSettingsModelsIndexRouteImport } from './routes/_authenticated/system-settings/models/index'
 import { Route as AuthenticatedSystemSettingsContentIndexRouteImport } from './routes/_authenticated/system-settings/content/index'
 import { Route as AuthenticatedSystemSettingsBillingIndexRouteImport } from './routes/_authenticated/system-settings/billing/index'
@@ -70,7 +69,6 @@ import { Route as AuthenticatedOrganizationUsageLogsIndexRouteImport } from './r
 import { Route as AuthenticatedSystemSettingsSiteSectionRouteImport } from './routes/_authenticated/system-settings/site/$section'
 import { Route as AuthenticatedSystemSettingsSecuritySectionRouteImport } from './routes/_authenticated/system-settings/security/$section'
 import { Route as AuthenticatedSystemSettingsOperationsSectionRouteImport } from './routes/_authenticated/system-settings/operations/$section'
-import { Route as AuthenticatedSystemSettingsOpenwebuiSectionRouteImport } from './routes/_authenticated/system-settings/openwebui/$section'
 import { Route as AuthenticatedSystemSettingsModelsSectionRouteImport } from './routes/_authenticated/system-settings/models/$section'
 import { Route as AuthenticatedSystemSettingsContentSectionRouteImport } from './routes/_authenticated/system-settings/content/$section'
 import { Route as AuthenticatedSystemSettingsBillingSectionRouteImport } from './routes/_authenticated/system-settings/billing/$section'
@@ -357,12 +355,6 @@ const AuthenticatedSystemSettingsOperationsIndexRoute =
     path: '/operations/',
     getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
   } as any)
-const AuthenticatedSystemSettingsOpenwebuiIndexRoute =
-  AuthenticatedSystemSettingsOpenwebuiIndexRouteImport.update({
-    id: '/openwebui/',
-    path: '/openwebui/',
-    getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
-  } as any)
 const AuthenticatedSystemSettingsModelsIndexRoute =
   AuthenticatedSystemSettingsModelsIndexRouteImport.update({
     id: '/models/',
@@ -409,12 +401,6 @@ const AuthenticatedSystemSettingsOperationsSectionRoute =
   AuthenticatedSystemSettingsOperationsSectionRouteImport.update({
     id: '/operations/$section',
     path: '/operations/$section',
-    getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
-  } as any)
-const AuthenticatedSystemSettingsOpenwebuiSectionRoute =
-  AuthenticatedSystemSettingsOpenwebuiSectionRouteImport.update({
-    id: '/openwebui/$section',
-    path: '/openwebui/$section',
     getParentRoute: () => AuthenticatedSystemSettingsRouteRoute,
   } as any)
 const AuthenticatedSystemSettingsModelsSectionRoute =
@@ -501,7 +487,6 @@ export interface FileRoutesByFullPath {
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
   '/system-settings/models/$section': typeof AuthenticatedSystemSettingsModelsSectionRoute
-  '/system-settings/openwebui/$section': typeof AuthenticatedSystemSettingsOpenwebuiSectionRoute
   '/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
@@ -510,7 +495,6 @@ export interface FileRoutesByFullPath {
   '/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/system-settings/models/': typeof AuthenticatedSystemSettingsModelsIndexRoute
-  '/system-settings/openwebui/': typeof AuthenticatedSystemSettingsOpenwebuiIndexRoute
   '/system-settings/operations/': typeof AuthenticatedSystemSettingsOperationsIndexRoute
   '/system-settings/security/': typeof AuthenticatedSystemSettingsSecurityIndexRoute
   '/system-settings/site/': typeof AuthenticatedSystemSettingsSiteIndexRoute
@@ -567,7 +551,6 @@ export interface FileRoutesByTo {
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
   '/system-settings/models/$section': typeof AuthenticatedSystemSettingsModelsSectionRoute
-  '/system-settings/openwebui/$section': typeof AuthenticatedSystemSettingsOpenwebuiSectionRoute
   '/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
@@ -576,7 +559,6 @@ export interface FileRoutesByTo {
   '/system-settings/billing': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/system-settings/content': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/system-settings/models': typeof AuthenticatedSystemSettingsModelsIndexRoute
-  '/system-settings/openwebui': typeof AuthenticatedSystemSettingsOpenwebuiIndexRoute
   '/system-settings/operations': typeof AuthenticatedSystemSettingsOperationsIndexRoute
   '/system-settings/security': typeof AuthenticatedSystemSettingsSecurityIndexRoute
   '/system-settings/site': typeof AuthenticatedSystemSettingsSiteIndexRoute
@@ -637,7 +619,6 @@ export interface FileRoutesById {
   '/_authenticated/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/_authenticated/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
   '/_authenticated/system-settings/models/$section': typeof AuthenticatedSystemSettingsModelsSectionRoute
-  '/_authenticated/system-settings/openwebui/$section': typeof AuthenticatedSystemSettingsOpenwebuiSectionRoute
   '/_authenticated/system-settings/operations/$section': typeof AuthenticatedSystemSettingsOperationsSectionRoute
   '/_authenticated/system-settings/security/$section': typeof AuthenticatedSystemSettingsSecuritySectionRoute
   '/_authenticated/system-settings/site/$section': typeof AuthenticatedSystemSettingsSiteSectionRoute
@@ -646,7 +627,6 @@ export interface FileRoutesById {
   '/_authenticated/system-settings/billing/': typeof AuthenticatedSystemSettingsBillingIndexRoute
   '/_authenticated/system-settings/content/': typeof AuthenticatedSystemSettingsContentIndexRoute
   '/_authenticated/system-settings/models/': typeof AuthenticatedSystemSettingsModelsIndexRoute
-  '/_authenticated/system-settings/openwebui/': typeof AuthenticatedSystemSettingsOpenwebuiIndexRoute
   '/_authenticated/system-settings/operations/': typeof AuthenticatedSystemSettingsOperationsIndexRoute
   '/_authenticated/system-settings/security/': typeof AuthenticatedSystemSettingsSecurityIndexRoute
   '/_authenticated/system-settings/site/': typeof AuthenticatedSystemSettingsSiteIndexRoute
@@ -706,7 +686,6 @@ export interface FileRouteTypes {
     | '/system-settings/billing/$section'
     | '/system-settings/content/$section'
     | '/system-settings/models/$section'
-    | '/system-settings/openwebui/$section'
     | '/system-settings/operations/$section'
     | '/system-settings/security/$section'
     | '/system-settings/site/$section'
@@ -715,7 +694,6 @@ export interface FileRouteTypes {
     | '/system-settings/billing/'
     | '/system-settings/content/'
     | '/system-settings/models/'
-    | '/system-settings/openwebui/'
     | '/system-settings/operations/'
     | '/system-settings/security/'
     | '/system-settings/site/'
@@ -772,7 +750,6 @@ export interface FileRouteTypes {
     | '/system-settings/billing/$section'
     | '/system-settings/content/$section'
     | '/system-settings/models/$section'
-    | '/system-settings/openwebui/$section'
     | '/system-settings/operations/$section'
     | '/system-settings/security/$section'
     | '/system-settings/site/$section'
@@ -781,7 +758,6 @@ export interface FileRouteTypes {
     | '/system-settings/billing'
     | '/system-settings/content'
     | '/system-settings/models'
-    | '/system-settings/openwebui'
     | '/system-settings/operations'
     | '/system-settings/security'
     | '/system-settings/site'
@@ -841,7 +817,6 @@ export interface FileRouteTypes {
     | '/_authenticated/system-settings/billing/$section'
     | '/_authenticated/system-settings/content/$section'
     | '/_authenticated/system-settings/models/$section'
-    | '/_authenticated/system-settings/openwebui/$section'
     | '/_authenticated/system-settings/operations/$section'
     | '/_authenticated/system-settings/security/$section'
     | '/_authenticated/system-settings/site/$section'
@@ -850,7 +825,6 @@ export interface FileRouteTypes {
     | '/_authenticated/system-settings/billing/'
     | '/_authenticated/system-settings/content/'
     | '/_authenticated/system-settings/models/'
-    | '/_authenticated/system-settings/openwebui/'
     | '/_authenticated/system-settings/operations/'
     | '/_authenticated/system-settings/security/'
     | '/_authenticated/system-settings/site/'
@@ -1243,13 +1217,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSystemSettingsOperationsIndexRouteImport
       parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
     }
-    '/_authenticated/system-settings/openwebui/': {
-      id: '/_authenticated/system-settings/openwebui/'
-      path: '/openwebui'
-      fullPath: '/system-settings/openwebui/'
-      preLoaderRoute: typeof AuthenticatedSystemSettingsOpenwebuiIndexRouteImport
-      parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
-    }
     '/_authenticated/system-settings/models/': {
       id: '/_authenticated/system-settings/models/'
       path: '/models'
@@ -1304,13 +1271,6 @@ declare module '@tanstack/react-router' {
       path: '/operations/$section'
       fullPath: '/system-settings/operations/$section'
       preLoaderRoute: typeof AuthenticatedSystemSettingsOperationsSectionRouteImport
-      parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
-    }
-    '/_authenticated/system-settings/openwebui/$section': {
-      id: '/_authenticated/system-settings/openwebui/$section'
-      path: '/openwebui/$section'
-      fullPath: '/system-settings/openwebui/$section'
-      preLoaderRoute: typeof AuthenticatedSystemSettingsOpenwebuiSectionRouteImport
       parentRoute: typeof AuthenticatedSystemSettingsRouteRoute
     }
     '/_authenticated/system-settings/models/$section': {
@@ -1383,7 +1343,6 @@ interface AuthenticatedSystemSettingsRouteRouteChildren {
   AuthenticatedSystemSettingsBillingSectionRoute: typeof AuthenticatedSystemSettingsBillingSectionRoute
   AuthenticatedSystemSettingsContentSectionRoute: typeof AuthenticatedSystemSettingsContentSectionRoute
   AuthenticatedSystemSettingsModelsSectionRoute: typeof AuthenticatedSystemSettingsModelsSectionRoute
-  AuthenticatedSystemSettingsOpenwebuiSectionRoute: typeof AuthenticatedSystemSettingsOpenwebuiSectionRoute
   AuthenticatedSystemSettingsOperationsSectionRoute: typeof AuthenticatedSystemSettingsOperationsSectionRoute
   AuthenticatedSystemSettingsSecuritySectionRoute: typeof AuthenticatedSystemSettingsSecuritySectionRoute
   AuthenticatedSystemSettingsSiteSectionRoute: typeof AuthenticatedSystemSettingsSiteSectionRoute
@@ -1391,7 +1350,6 @@ interface AuthenticatedSystemSettingsRouteRouteChildren {
   AuthenticatedSystemSettingsBillingIndexRoute: typeof AuthenticatedSystemSettingsBillingIndexRoute
   AuthenticatedSystemSettingsContentIndexRoute: typeof AuthenticatedSystemSettingsContentIndexRoute
   AuthenticatedSystemSettingsModelsIndexRoute: typeof AuthenticatedSystemSettingsModelsIndexRoute
-  AuthenticatedSystemSettingsOpenwebuiIndexRoute: typeof AuthenticatedSystemSettingsOpenwebuiIndexRoute
   AuthenticatedSystemSettingsOperationsIndexRoute: typeof AuthenticatedSystemSettingsOperationsIndexRoute
   AuthenticatedSystemSettingsSecurityIndexRoute: typeof AuthenticatedSystemSettingsSecurityIndexRoute
   AuthenticatedSystemSettingsSiteIndexRoute: typeof AuthenticatedSystemSettingsSiteIndexRoute
@@ -1409,8 +1367,6 @@ const AuthenticatedSystemSettingsRouteRouteChildren: AuthenticatedSystemSettings
       AuthenticatedSystemSettingsContentSectionRoute,
     AuthenticatedSystemSettingsModelsSectionRoute:
       AuthenticatedSystemSettingsModelsSectionRoute,
-    AuthenticatedSystemSettingsOpenwebuiSectionRoute:
-      AuthenticatedSystemSettingsOpenwebuiSectionRoute,
     AuthenticatedSystemSettingsOperationsSectionRoute:
       AuthenticatedSystemSettingsOperationsSectionRoute,
     AuthenticatedSystemSettingsSecuritySectionRoute:
@@ -1425,8 +1381,6 @@ const AuthenticatedSystemSettingsRouteRouteChildren: AuthenticatedSystemSettings
       AuthenticatedSystemSettingsContentIndexRoute,
     AuthenticatedSystemSettingsModelsIndexRoute:
       AuthenticatedSystemSettingsModelsIndexRoute,
-    AuthenticatedSystemSettingsOpenwebuiIndexRoute:
-      AuthenticatedSystemSettingsOpenwebuiIndexRoute,
     AuthenticatedSystemSettingsOperationsIndexRoute:
       AuthenticatedSystemSettingsOperationsIndexRoute,
     AuthenticatedSystemSettingsSecurityIndexRoute:
