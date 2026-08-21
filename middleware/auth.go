@@ -271,6 +271,18 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 	}
 }
 
+// isGeminiQueryKeyPath reports whether path is a model-listing/retrieval
+// route that Gemini clients may authenticate against via a "?key=" query
+// parameter instead of a header. "/v1/models" (no trailing id) is the
+// Gemini-style model-listing route; "/v1/models/{id}" (trailing slash) is
+// per-model retrieval.
+func isGeminiQueryKeyPath(path string) bool {
+	return path == "/v1/models" ||
+		strings.HasPrefix(path, "/v1beta/models") ||
+		strings.HasPrefix(path, "/v1beta/openai/models") ||
+		strings.HasPrefix(path, "/v1/models/")
+}
+
 func TokenAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		// ws
@@ -296,9 +308,7 @@ func TokenAuth() func(c *gin.Context) {
 			}
 		}
 		// gemini api querykey
-		if strings.HasPrefix(c.Request.URL.Path, "/v1beta/models") ||
-			strings.HasPrefix(c.Request.URL.Path, "/v1beta/openai/models") ||
-			strings.HasPrefix(c.Request.URL.Path, "/v1/models/") {
+		if isGeminiQueryKeyPath(c.Request.URL.Path) {
 			skKey := c.Query("key")
 			if skKey != "" {
 				c.Request.Header.Set("Authorization", "Bearer "+skKey)
