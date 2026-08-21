@@ -34,6 +34,16 @@ func getScannerBufferSize() int {
 	return DefaultMaxScannerBufferSize
 }
 
+// NewStreamScanner returns a bufio.Scanner configured with the same larger
+// buffer StreamScannerHandler uses, so a channel handler that scans a
+// response body directly doesn't fall back to bufio's default ~64KB max
+// line size on one long SSE line.
+func NewStreamScanner(reader io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, InitialScannerBufferSize), getScannerBufferSize())
+	return scanner
+}
+
 func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) {
 
 	if resp == nil || dataHandler == nil {
@@ -53,7 +63,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 
 	var (
 		stopChan   = make(chan bool, 3)
-		scanner    = bufio.NewScanner(resp.Body)
+		scanner    = NewStreamScanner(resp.Body)
 		ticker     = time.NewTicker(streamingTimeout)
 		pingTicker *time.Ticker
 		writeMutex sync.Mutex     // Mutex to protect concurrent writes
@@ -103,7 +113,6 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		close(stopChan)
 	}()
 
-	scanner.Buffer(make([]byte, InitialScannerBufferSize), getScannerBufferSize())
 	scanner.Split(bufio.ScanLines)
 	SetEventStreamHeaders(c)
 

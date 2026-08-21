@@ -1,7 +1,6 @@
 package ollama
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 
@@ -396,7 +396,7 @@ func PullOllamaModelStream(baseURL, apiKey, modelName string, progressCallback f
 		return fmt.Errorf("failed to pull model %d: %s", response.StatusCode, string(body))
 	}
 
-	scanner := bufio.NewScanner(response.Body)
+	scanner := helper.NewStreamScanner(response.Body)
 	successful := false
 	for scanner.Scan() {
 		line := scanner.Text()

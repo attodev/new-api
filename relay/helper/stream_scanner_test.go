@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,6 +80,27 @@ func TestStreamScannerHandler_NilInputs(t *testing.T) {
 
 	StreamScannerHandler(c, nil, info, func(data string, sr *StreamResult) {})
 	StreamScannerHandler(c, &http.Response{Body: io.NopCloser(strings.NewReader(""))}, info, nil)
+}
+
+// TestNewStreamScanner_AllowsLargeStreamLine reproduces a real bug: channel
+// handlers that built their own bare bufio.NewScanner(resp.Body) instead of
+// going through the configured larger buffer would hit Go's default ~64KB
+// max token size on one long SSE line (a big tool-call payload, a final
+// usage chunk) and drop the rest of the stream - including billing data.
+func TestNewStreamScanner_AllowsLargeStreamLine(t *testing.T) {
+	oldBufferMB := constant.StreamScannerMaxBufferMB
+	constant.StreamScannerMaxBufferMB = 1
+	t.Cleanup(func() {
+		constant.StreamScannerMaxBufferMB = oldBufferMB
+	})
+
+	payload := strings.Repeat("x", 128<<10)
+	scanner := NewStreamScanner(strings.NewReader("data: " + payload + "\n"))
+	scanner.Split(bufio.ScanLines)
+
+	require.True(t, scanner.Scan())
+	assert.Equal(t, "data: "+payload, scanner.Text())
+	require.NoError(t, scanner.Err())
 }
 
 func TestStreamScannerHandler_EmptyBody(t *testing.T) {
