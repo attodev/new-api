@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -572,6 +573,49 @@ func TestComposeTieredTextQuotaKeepsToolCallSurcharges(t *testing.T) {
 
 	require.Equal(t, int64(13000), summary.ToolCallSurchargeQuota.Round(0).IntPart())
 	require.Equal(t, 14000, quota)
+}
+
+// TestComposeTieredTextQuota_SaturatesCombinedSum reproduces a real
+// billing-overflow bug: tieredQuota alone can sit near the int32 bound, and
+// adding the tool-call surcharge on top of it (int addition) can wrap the
+// combined total into a negative charge instead of saturating.
+func TestComposeTieredTextQuota_SaturatesCombinedSum(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Set("image_generation_call", true)
+	ctx.Set("image_generation_call_quality", "low")
+	ctx.Set("image_generation_call_size", "1024x1024")
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "o1",
+		PriceData: types.PriceData{
+			ModelRatio:      1,
+			CompletionRatio: 1,
+			GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+		},
+		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
+				dto.BuildInToolFileSearch: {CallCount: 1_000_000_000},
+			},
+		},
+		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
+			BillingMode:               "tiered_expr",
+			GroupRatio:                1,
+			EstimatedQuotaBeforeGroup: 2_000_000_000,
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150}
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	quota := composeTieredTextQuota(relayInfo, summary, 2_000_000_000, &billingexpr.TieredResult{
+		ActualQuotaBeforeGroup: 2_000_000_000,
+		ActualQuotaAfterGroup:  2_000_000_000,
+	})
+
+	require.GreaterOrEqual(t, quota, 0, "an oversized tieredQuota+surcharge sum must saturate, not go negative")
+	require.LessOrEqual(t, int64(quota), int64(math.MaxInt32), "quota is persisted to a 32-bit database column and must saturate at that bound")
 }
 
 func TestComposeTieredTextQuotaFallbackKeepsToolCallSurcharges(t *testing.T) {
