@@ -248,6 +248,33 @@ func TestRefundTaskQuota_Wallet(t *testing.T) {
 	assert.Equal(t, "test-model", log.ModelName)
 }
 
+// TestRefundTaskQuota_DecrementsUserAndChannelUsedQuota reproduces a real
+// bug: refunding a failed task restored the wallet quota but never
+// decremented user.used_quota or channel.used_quota - every refund cycle
+// inflated "total quota" (quota + used_quota) further past what the user
+// actually paid in.
+func TestRefundTaskQuota_DecrementsUserAndChannelUsedQuota(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 15, 15, 15
+	const initQuota, preConsumed = 10000, 3000
+	const tokenRemain = 5000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-refund-used-quota", tokenRemain)
+	seedChannel(t, channelID)
+	model.UpdateUserUsedQuotaAndRequestCount(userID, preConsumed)
+	model.UpdateChannelUsedQuota(channelID, preConsumed)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+
+	RefundTaskQuota(ctx, task, "task failed: upstream error")
+
+	assert.Equal(t, int64(0), getUserUsedQuota(t, userID), "user used_quota must be reduced by the refund")
+	assert.Equal(t, int64(0), getChannelUsedQuota(t, channelID), "channel used_quota must be reduced by the refund")
+}
+
 func TestRefundTaskQuota_Subscription(t *testing.T) {
 	truncate(t)
 	ctx := context.Background()

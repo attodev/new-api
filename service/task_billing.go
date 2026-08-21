@@ -191,7 +191,13 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	// 2.
 	taskAdjustTokenQuota(ctx, task, -quota)
 
-	// 3.
+	// 3. Refunding only restores the wallet/subscription balance and token
+	// quota above; without this, used_quota would never come back down and
+	// "total quota" (quota + used_quota) inflates further with every refund.
+	model.UpdateUserUsedQuota(task.UserId, int64(-quota))
+	model.UpdateChannelUsedQuota(task.ChannelId, -quota)
+
+	// 4.
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
 	other["reason"] = reason

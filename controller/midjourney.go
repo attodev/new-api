@@ -179,6 +179,10 @@ func UpdateMidjourneyTaskBulk() {
 					if err != nil {
 						logger.LogError(ctx, "fail to increase user quota: "+err.Error())
 					}
+					// Restoring quota alone leaves used_quota permanently
+					// inflated by every refund - it must come back down too.
+					model.UpdateUserUsedQuota(task.UserId, -int64(task.Quota))
+					model.UpdateChannelUsedQuota(task.ChannelId, -task.Quota)
 					model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 						UserId:    task.UserId,
 						LogType:   model.LogTypeRefund,
