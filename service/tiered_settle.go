@@ -4,6 +4,9 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/types"
+
+	"github.com/gin-gonic/gin"
 )
 
 // TieredResultWrapper wraps billingexpr.TieredResult for use at the service layer.
@@ -86,6 +89,57 @@ func BuildTieredTokenParams(usage *dto.Usage, isClaudeUsageSemantic bool, usedVa
 		AI:   ai,
 		AO:   ao,
 	}
+}
+
+// refreshTieredBillingGroup syncs a frozen TieredBillingSnapshot's group
+// ratio to whatever group the request currently sits in. An auto-group
+// retry can move a request between differently-priced groups mid-flight
+// (relay/controller.getChannel updates PriceData.GroupRatioInfo.GroupRatio
+// on each attempt); without this, settlement would keep billing at the
+// ratio captured when the snapshot was first created.
+func refreshTieredBillingGroup(relayInfo *relaycommon.RelayInfo) (*billingexpr.BillingSnapshot, error) {
+	if relayInfo == nil {
+		return nil, nil
+	}
+	snap := relayInfo.TieredBillingSnapshot
+	if snap == nil || snap.BillingMode != "tiered_expr" {
+		return nil, nil
+	}
+
+	groupRatio := relayInfo.PriceData.GroupRatioInfo.GroupRatio
+	if snap.GroupRatio == groupRatio {
+		return snap, nil
+	}
+
+	snap.GroupRatio = groupRatio
+	snap.EstimatedQuotaAfterGroup = billingexpr.QuotaRound(snap.EstimatedQuotaBeforeGroup * groupRatio)
+	return snap, nil
+}
+
+// PrepareTieredBillingForSelectedGroup refreshes routing-dependent billing
+// state before an upstream attempt. Call this after a (possibly retried)
+// channel/group has been selected and before the request is sent. If the
+// refreshed estimate is higher than what's already reserved, it reserves
+// the difference before sending; if the initial group was free (no billing
+// session created yet) and this attempt landed on a paid group, it creates
+// the pre-consume session at that point.
+func PrepareTieredBillingForSelectedGroup(c *gin.Context, relayInfo *relaycommon.RelayInfo) *types.NewAPIError {
+	snap, err := refreshTieredBillingGroup(relayInfo)
+	if err != nil {
+		return types.NewErrorWithStatusCode(err, types.ErrorCodeModelPriceError, 400, types.ErrOptionWithSkipRetry())
+	}
+	if snap == nil || snap.GroupRatio == 0 {
+		return nil
+	}
+
+	if relayInfo.Billing == nil {
+		return PreConsumeBilling(c, snap.EstimatedQuotaAfterGroup, relayInfo)
+	}
+	if err := relayInfo.Billing.Reserve(snap.EstimatedQuotaAfterGroup); err != nil {
+		return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+	}
+	relayInfo.FinalPreConsumedQuota = relayInfo.Billing.GetPreConsumedQuota()
+	return nil
 }
 
 // TryTieredSettle checks if the request uses tiered_expr billing and, if so,
