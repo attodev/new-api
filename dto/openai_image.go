@@ -11,6 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// MaxImageN caps the image generation count. Without this bound a huge or
+// wrapped-negative n overflows quota calculation into a negative charge.
+const MaxImageN = 128
+
 type ImageRequest struct {
 	Model             string          `json:"model"`
 	Prompt            string          `json:"prompt" binding:"required"`
@@ -32,10 +36,10 @@ type ImageRequest struct {
 	InputFidelity json.RawMessage `json:"input_fidelity,omitempty"`
 	Watermark     *bool           `json:"watermark,omitempty"`
 	// zhipu 4v
-	WatermarkEnabled json.RawMessage `json:"watermark_enabled,omitempty"`
-	UserId           json.RawMessage `json:"user_id,omitempty"`
-	Image            json.RawMessage `json:"image,omitempty"`
-	Extra map[string]json.RawMessage `json:"-"`
+	WatermarkEnabled json.RawMessage            `json:"watermark_enabled,omitempty"`
+	UserId           json.RawMessage            `json:"user_id,omitempty"`
+	Image            json.RawMessage            `json:"image,omitempty"`
+	Extra            map[string]json.RawMessage `json:"-"`
 }
 
 func (i *ImageRequest) UnmarshalJSON(data []byte) error {

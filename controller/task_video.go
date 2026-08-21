@@ -174,8 +174,8 @@ func updateVideoSingleTask(ctx context.Context, adaptor channel.TaskAdaptor, cha
 								finalGroupRatio = groupRatio
 							}
 
-							// : totalTokens * modelRatio * groupRatio
-							actualQuota := int(float64(taskResult.TotalTokens) * modelRatio * finalGroupRatio)
+							// actualQuota = totalTokens * modelRatio * groupRatio (saturating, avoids overflow into a negative charge)
+							actualQuota := common.QuotaFromFloat(float64(taskResult.TotalTokens) * modelRatio * finalGroupRatio)
 
 							preConsumedQuota := task.Quota
 							quotaDelta := actualQuota - preConsumedQuota
