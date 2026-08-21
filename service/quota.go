@@ -29,6 +29,16 @@ type TokenDetails struct {
 	AudioTokens int
 }
 
+// decimalToQuota converts a decimal quota value to int with int32
+// saturation, the decimal-typed counterpart to common.QuotaFromFloat. Quota
+// products built from decimal.Decimal (audio, tool-call surcharge) must
+// clamp the same way: an oversized product must never wrap into a negative
+// charge.
+func decimalToQuota(d decimal.Decimal) int {
+	f, _ := d.Float64()
+	return common.QuotaFromFloat(f)
+}
+
 type QuotaInfo struct {
 	InputDetails  TokenDetails
 	OutputDetails TokenDetails
@@ -54,7 +64,7 @@ func calculateAudioQuota(info QuotaInfo) int {
 		groupRatio := decimal.NewFromFloat(info.GroupRatio)
 
 		quota := modelPrice.Mul(quotaPerUnit).Mul(groupRatio)
-		return int(quota.IntPart())
+		return decimalToQuota(quota)
 	}
 
 	completionRatio := decimal.NewFromFloat(ratio_setting.GetCompletionRatio(info.ModelName))
@@ -83,7 +93,7 @@ func calculateAudioQuota(info QuotaInfo) int {
 		quota = decimal.NewFromInt(1)
 	}
 
-	return int(quota.Round(0).IntPart())
+	return decimalToQuota(quota.Round(0))
 }
 
 func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage) error {

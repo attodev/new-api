@@ -102,7 +102,9 @@ func OpenaiTTSHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 			usage.CompletionTokenDetails.AudioTokens = estimatedTokens
 		} else if duration > 0 {
 			// token: ceil(duration) / 60.0 * 1000 1000 tokens
-			completionTokens := int(math.Round(math.Ceil(duration) / 60.0 * 1000))
+			// duration is parsed from upstream audio metadata; saturate to
+			// avoid an int overflow turning a charge into a credit.
+			completionTokens := common.QuotaFromFloat(math.Round(math.Ceil(duration) / 60.0 * 1000))
 			usage.CompletionTokens = completionTokens
 			usage.CompletionTokenDetails.AudioTokens = completionTokens
 		}
