@@ -15,3 +15,25 @@ func TestGetCreateCacheRatioGPT56FamilyIsExplicit(t *testing.T) {
 		}
 	}
 }
+
+func TestGetModelRatioGPT56FamilyIsExplicit(t *testing.T) {
+	InitRatioSettings()
+
+	want := map[string]float64{
+		"gpt-5.5":       2.5,
+		"gpt-5.6-sol":   2.5,
+		"gpt-5.6-terra": 1.25,
+		"gpt-5.6-luna":  0.5,
+	}
+	for model, wantRatio := range want {
+		ratio, ok, _ := GetModelRatio(model)
+		if !ok {
+			t.Fatalf("%s: expected an explicit model ratio entry, got none", model)
+		}
+		if ratio != wantRatio {
+			// Without this entry, an unconfigured model falls back to ratio 37.5 -
+			// a ~37x overcharge relative to gpt-5.6-terra's real price.
+			t.Fatalf("%s: model ratio = %v, want %v", model, ratio, wantRatio)
+		}
+	}
+}
