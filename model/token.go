@@ -432,6 +432,45 @@ func decreaseTokenQuota(id int, quota int) (err error) {
 	return err
 }
 
+// TryDecreaseTokenQuota atomically decrements a token's remain_quota only if
+// it currently covers the requested amount, closing a race where two
+// concurrent requests both read the same balance, both pass an earlier
+// check, and both decrement - overspending past what either check alone
+// permitted. Unlike DecreaseTokenQuota, this always hits the database
+// directly (bypassing the Redis/batched-update paths) since the whole point
+// is a live, consistent read-and-write; it is meant for the pre-consume gate
+// that decides whether a new request may start, not for settlement writes
+// that must always apply because the cost was already incurred.
+func TryDecreaseTokenQuota(id int, key string, quota int) (ok bool, err error) {
+	if quota < 0 {
+		return false, errors.New("quota cannot be negative")
+	}
+	if quota == 0 {
+		return true, nil
+	}
+	result := DB.Model(&Token{}).Where("id = ? AND remain_quota >= ?", id, quota).Updates(
+		map[string]interface{}{
+			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
+			"used_quota":    gorm.Expr("used_quota + ?", quota),
+			"accessed_time": common.GetTimestamp(),
+		},
+	)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+	if common.RedisEnabled {
+		gopool.Go(func() {
+			if err := cacheDecrTokenQuota(key, int64(quota)); err != nil {
+				common.SysLog("failed to decrease token quota: " + err.Error())
+			}
+		})
+	}
+	return true, nil
+}
+
 // CountUserTokens returns total number of tokens for the given user, used for pagination
 func CountUserTokens(userId int) (int64, error) {
 	var total int64

@@ -391,19 +391,24 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 	if relayInfo.IsPlayground {
 		return nil
 	}
-	//if relayInfo.TokenUnlimited {
-	//	return nil
-	//}
-	token, err := model.GetTokenByKey(relayInfo.TokenKey, false)
+	if relayInfo.TokenUnlimited {
+		return model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
+	}
+	// Guard the check-and-decrement as a single atomic UPDATE instead of a
+	// separate read-then-decrement: two concurrent requests reading the same
+	// balance could otherwise both pass the check and both decrement,
+	// overspending past what either check alone permitted.
+	ok, err := model.TryDecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
 	if err != nil {
 		return err
 	}
-	if !relayInfo.TokenUnlimited && token.RemainQuota < quota {
-		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(int64(token.RemainQuota)), logger.FormatQuota(int64(quota)))
-	}
-	err = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
-	if err != nil {
-		return err
+	if !ok {
+		token, ferr := model.GetTokenByKey(relayInfo.TokenKey, false)
+		remain := int64(0)
+		if ferr == nil {
+			remain = int64(token.RemainQuota)
+		}
+		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(remain), logger.FormatQuota(int64(quota)))
 	}
 	return nil
 }
