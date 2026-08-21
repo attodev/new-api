@@ -1,6 +1,9 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 type GroupRatioInfo struct {
 	GroupRatio         float64
@@ -30,11 +33,14 @@ type PriceData struct {
 }
 
 func (p *PriceData) AddOtherRatio(key string, ratio float64) {
+	// NaN and +Inf both compare false against "<= 0" (a NaN comparison is
+	// always false; +Inf is > 0), so a bare "ratio <= 0" guard lets both
+	// through to poison every downstream quota multiplication.
+	if !(ratio > 0) || math.IsInf(ratio, 1) {
+		return
+	}
 	if p.OtherRatios == nil {
 		p.OtherRatios = make(map[string]float64)
-	}
-	if ratio <= 0 {
-		return
 	}
 	p.OtherRatios[key] = ratio
 }
