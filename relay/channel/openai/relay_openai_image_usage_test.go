@@ -49,3 +49,30 @@ func TestOpenaiHandlerWithUsage_CopiesCachedAndAudioImageTokens(t *testing.T) {
 	require.Equal(t, 20, usage.PromptTokensDetails.TextTokens)
 	require.Equal(t, 10, usage.PromptTokensDetails.AudioTokens)
 }
+
+// TestOpenaiHandlerWithUsage_SurfacesUpstreamError reproduces a real
+// failover bug: when the upstream Images API rejects a request (e.g.
+// invalid size, moderation block) with a 400 body shaped like
+// {"error": {...}}, OpenaiHandlerWithUsage parsed it as a zero-usage
+// success instead of returning a NewAPIError - so the relay's
+// retry-on-error logic never saw a failure and never failed over to
+// another channel.
+func TestOpenaiHandlerWithUsage_SurfacesUpstreamError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+
+	body := []byte(`{
+		"error": {
+			"message": "Invalid size parameter",
+			"type": "invalid_request_error",
+			"code": "invalid_size"
+		}
+	}`)
+	resp := &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader(body))}
+
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+	usage, apiErr := OpenaiHandlerWithUsage(c, info, resp)
+	require.Nil(t, usage)
+	require.NotNil(t, apiErr)
+}

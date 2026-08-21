@@ -636,7 +636,15 @@ func TestStreamScannerHandler_StreamStatus_InitializedIfNil(t *testing.T) {
 	assert.NotNil(t, info.StreamStatus)
 }
 
-func TestStreamScannerHandler_StreamStatus_PreInitialized(t *testing.T) {
+// TestStreamScannerHandler_StreamStatus_ReplacesPreInitialized documents the
+// actual (and correct) behavior: StreamScannerHandler always starts a fresh
+// StreamStatus for its own run (relay/helper/stream_scanner.go always does
+// `info.StreamStatus = relaycommon.NewStreamStatus()` unconditionally), so a
+// pre-existing error recorded before the call does not leak into this run's
+// count. The previous version of this test asserted the opposite (expecting
+// the pre-existing error to survive) and had been failing/flaking ever
+// since - it was asserting stale, incorrect behavior, not catching a bug.
+func TestStreamScannerHandler_StreamStatus_ReplacesPreInitialized(t *testing.T) {
 	t.Parallel()
 
 	body := buildSSEBody(5)
@@ -648,7 +656,7 @@ func TestStreamScannerHandler_StreamStatus_PreInitialized(t *testing.T) {
 	StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {})
 
 	assert.Equal(t, relaycommon.StreamEndReasonDone, info.StreamStatus.EndReason)
-	assert.Equal(t, 1, info.StreamStatus.TotalErrorCount())
+	assert.Equal(t, 0, info.StreamStatus.TotalErrorCount())
 }
 
 func TestStreamScannerHandler_PingInterleavesWithSlowUpstream(t *testing.T) {
