@@ -47,8 +47,8 @@ type paramOverrideAuditRecorder struct {
 }
 
 type ConditionOperation struct {
-	Path           string      `json:"path"`             // JSON
-	Mode           string      `json:"mode"`             // full, prefix, suffix, contains, gt, gte, lt, lte
+	Path           string      `json:"path"` // JSON
+	Mode           string      `json:"mode"` // full, prefix, suffix, contains, gt, gte, lt, lte
 	Value          interface{} `json:"value"`
 	Invert         bool        `json:"invert"`           // true
 	PassMissingKey bool        `json:"pass_missing_key"` // json key
@@ -62,7 +62,7 @@ type ParamOperation struct {
 	From       string               `json:"from,omitempty"`
 	To         string               `json:"to,omitempty"`
 	Conditions []ConditionOperation `json:"conditions,omitempty"`
-	Logic      string               `json:"logic,omitempty"`      // AND, OR (OR)
+	Logic      string               `json:"logic,omitempty"` // AND, OR (OR)
 }
 
 type ParamOverrideReturnError struct {
@@ -2027,6 +2027,7 @@ func mergeObjects(data []byte, path string, value interface{}, keepOrigin bool) 
 // BuildParamOverrideContext ApplyParamOverride
 // - upstream_model/model
 // - original_model
+// - user_id / user_group / token_group / using_group
 // - request_path
 // - is_channel_test is_test
 func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
@@ -2035,6 +2036,10 @@ func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
 	}
 
 	ctx := make(map[string]interface{})
+	ctx["user_id"] = info.UserId
+	ctx["user_group"] = info.UserGroup
+	ctx["token_group"] = info.TokenGroup
+	ctx["using_group"] = info.UsingGroup
 	if info.ChannelMeta != nil && info.ChannelMeta.UpstreamModelName != "" {
 		ctx["model"] = info.ChannelMeta.UpstreamModelName
 		ctx["upstream_model"] = info.ChannelMeta.UpstreamModelName

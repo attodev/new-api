@@ -1259,6 +1259,125 @@ func TestApplyParamOverrideConditionFromRetryAndLastErrorContext(t *testing.T) {
 	assertJSONEqual(t, `{"temperature":0.1}`, string(out))
 }
 
+// TestApplyParamOverrideConditionByUserAndGPTModel reproduces a real
+// feature gap: BuildParamOverrideContext never exposed user_id, so a param
+// override rule conditioned on the requesting user (e.g. "give user 1
+// priority service_tier on GPT models") could never match - the condition
+// path "user_id" resolved to nothing regardless of who actually made the
+// request.
+func TestApplyParamOverrideConditionByUserAndGPTModel(t *testing.T) {
+	paramOverride := map[string]interface{}{
+		"operations": []interface{}{
+			map[string]interface{}{
+				"path":  "service_tier",
+				"mode":  "set",
+				"value": "priority",
+				"logic": "AND",
+				"conditions": []interface{}{
+					map[string]interface{}{
+						"path":  "user_id",
+						"mode":  "full",
+						"value": 1,
+					},
+					map[string]interface{}{
+						"path":  "upstream_model",
+						"mode":  "contains",
+						"value": "gpt",
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		userID   int
+		model    string
+		expected string
+	}{
+		{
+			name:     "target user and GPT model",
+			userID:   1,
+			model:    "gpt-5.2",
+			expected: `{"model":"gpt-5.2","service_tier":"priority"}`,
+		},
+		{
+			name:     "other user",
+			userID:   2,
+			model:    "gpt-5.2",
+			expected: `{"model":"gpt-5.2"}`,
+		},
+		{
+			name:     "non-GPT model",
+			userID:   1,
+			model:    "claude-sonnet-4-5",
+			expected: `{"model":"claude-sonnet-4-5"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := &RelayInfo{
+				UserId: tt.userID,
+				ChannelMeta: &ChannelMeta{
+					ParamOverride:     paramOverride,
+					UpstreamModelName: tt.model,
+				},
+			}
+			input := []byte(fmt.Sprintf(`{"model":%q}`, tt.model))
+
+			out, err := ApplyParamOverrideWithRelayInfo(input, info)
+
+			require.NoError(t, err)
+			require.JSONEq(t, tt.expected, string(out))
+		})
+	}
+}
+
+// TestApplyParamOverrideConditionByGroupContext covers the same gap for
+// group-based routing: user_group/token_group/using_group were likewise
+// absent from the override context.
+func TestApplyParamOverrideConditionByGroupContext(t *testing.T) {
+	info := &RelayInfo{
+		UserGroup:  "vip",
+		TokenGroup: "premium",
+		UsingGroup: "priority-route",
+	}
+	ctx := BuildParamOverrideContext(info)
+	paramOverride := map[string]interface{}{
+		"operations": []interface{}{
+			map[string]interface{}{
+				"path":  "service_tier",
+				"mode":  "set",
+				"value": "priority",
+				"logic": "AND",
+				"conditions": []interface{}{
+					map[string]interface{}{
+						"path":  "user_group",
+						"mode":  "full",
+						"value": "vip",
+					},
+					map[string]interface{}{
+						"path":  "token_group",
+						"mode":  "full",
+						"value": "premium",
+					},
+					map[string]interface{}{
+						"path":  "using_group",
+						"mode":  "full",
+						"value": "priority-route",
+					},
+				},
+			},
+		},
+	}
+
+	out, err := ApplyParamOverride([]byte(`{"model":"gpt-5.2"}`), paramOverride, ctx)
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{"model":"gpt-5.2","service_tier":"priority"}`, string(out))
+}
+
 func TestApplyParamOverrideConditionFromRequestHeaders(t *testing.T) {
 	input := []byte(`{"temperature":0.7}`)
 	override := map[string]interface{}{
