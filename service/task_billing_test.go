@@ -168,6 +168,20 @@ func getTokenUsedQuota(t *testing.T, id int) int {
 	return token.UsedQuota
 }
 
+func getUserUsedQuota(t *testing.T, id int) int64 {
+	t.Helper()
+	var user model.User
+	require.NoError(t, model.DB.Select("used_quota").Where("id = ?", id).First(&user).Error)
+	return user.UsedQuota
+}
+
+func getChannelUsedQuota(t *testing.T, id int) int64 {
+	t.Helper()
+	var channel model.Channel
+	require.NoError(t, model.DB.Select("used_quota").Where("id = ?", id).First(&channel).Error)
+	return channel.UsedQuota
+}
+
 func getSubscriptionUsed(t *testing.T, id int) int64 {
 	t.Helper()
 	var sub model.UserSubscription
@@ -412,6 +426,62 @@ func TestRecalculate_NegativeDelta(t *testing.T) {
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeRefund, log.Type)
 	assert.Equal(t, preConsumed-actualQuota, log.Quota)
+}
+
+// TestRecalculateTaskQuota_PersistsToDatabase reproduces a real bug: the
+// settled task.Quota was only updated on the in-memory struct the caller
+// happened to be holding, never written back to the database. A reload of
+// the same task (e.g. a later reconciliation pass, or another process) would
+// see the original pre-consumed estimate forever.
+func TestRecalculateTaskQuota_PersistsToDatabase(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 13, 13, 13
+	const initQuota, preConsumed = 10000, 2000
+	const actualQuota = 3000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-recalc-persist", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	require.NoError(t, model.DB.Create(task).Error)
+
+	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
+
+	var reloaded model.Task
+	require.NoError(t, model.DB.First(&reloaded, task.ID).Error)
+	assert.Equal(t, actualQuota, reloaded.Quota, "settled quota must be persisted, not just held in memory")
+}
+
+// TestRecalculate_NegativeDelta_AdjustsUsageDown reproduces a real bug: on a
+// negative delta (task was over-charged up front, some of it refunded back),
+// user.used_quota and channel.used_quota were only ever adjusted on the
+// positive-delta branch - an over-charge correction left both permanently
+// inflated by the refunded amount.
+func TestRecalculate_NegativeDelta_AdjustsUsageDown(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 14, 14, 14
+	const preConsumed = 5000
+	const actualQuota = 3000 // over-charged by 2000
+
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-recalc-neg-usage", 5000)
+	seedChannel(t, channelID)
+	model.UpdateUserUsedQuotaAndRequestCount(userID, preConsumed)
+	model.UpdateChannelUsedQuota(channelID, preConsumed)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+
+	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
+
+	assert.Equal(t, int64(preConsumed-(preConsumed-actualQuota)), getUserUsedQuota(t, userID),
+		"user used_quota must be corrected down by the refunded amount")
+	assert.Equal(t, int64(preConsumed-(preConsumed-actualQuota)), getChannelUsedQuota(t, channelID),
+		"channel used_quota must be corrected down by the refunded amount")
 }
 
 func TestRecalculate_ZeroDelta(t *testing.T) {

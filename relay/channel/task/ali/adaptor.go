@@ -51,7 +51,7 @@ type AliVideoParameters struct {
 	Duration     int    `json:"duration,omitempty"`      // : 3-10
 	PromptExtend bool   `json:"prompt_extend,omitempty"` // prompt
 	Watermark    bool   `json:"watermark,omitempty"`
-	Audio        *bool  `json:"audio,omitempty"`         // wan2.5
+	Audio        *bool  `json:"audio,omitempty"` // wan2.5
 	Seed         int    `json:"seed,omitempty"`
 }
 
@@ -95,8 +95,8 @@ type AliMetadata struct {
 	Template       string `json:"template,omitempty"`
 
 	// Parameters
-	Resolution   *string `json:"resolution,omitempty"`    // : 480P/720P/1080P
-	Size         *string `json:"size,omitempty"`          // : "832*480"
+	Resolution   *string `json:"resolution,omitempty"` // : 480P/720P/1080P
+	Size         *string `json:"size,omitempty"`       // : "832*480"
 	Duration     *int    `json:"duration,omitempty"`
 	PromptExtend *bool   `json:"prompt_extend,omitempty"` // prompt
 	Watermark    *bool   `json:"watermark,omitempty"`
@@ -317,7 +317,8 @@ func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relay
 		} else {
 			aliReq.Parameters.Duration = seconds
 		}
-	} else {
+	}
+	if aliReq.Parameters.Duration <= 0 {
 		aliReq.Parameters.Duration = 5 // 5
 	}
 

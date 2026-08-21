@@ -241,15 +241,25 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	taskAdjustTokenQuota(ctx, task, quotaDelta)
 
 	task.Quota = actualQuota
+	if err := task.Update(); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("failed to persist settled quota for task %s: %s", task.TaskID, err.Error()))
+	}
+
+	// Adjust accumulated usage by the delta regardless of sign: a positive
+	// delta is an additional charge, a negative delta is correcting an
+	// earlier over-charge back down. Both must move used_quota, or an
+	// over-charge correction leaves it permanently inflated. Uses
+	// UpdateUserUsedQuota (not ...AndRequestCount) since submission time
+	// already counted this request once.
+	model.UpdateUserUsedQuota(task.UserId, int64(quotaDelta))
+	UpdateOrganizationUsedQuotaForUser(task.UserId, int64(quotaDelta))
+	model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 
 	var logType int
 	var logQuota int
 	if quotaDelta > 0 {
 		logType = model.LogTypeConsume
 		logQuota = quotaDelta
-		model.UpdateUserUsedQuotaAndRequestCount(task.UserId, int64(quotaDelta))
-		UpdateOrganizationUsedQuotaForUser(task.UserId, int64(quotaDelta))
-		model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 	} else {
 		logType = model.LogTypeRefund
 		logQuota = -quotaDelta

@@ -1098,6 +1098,19 @@ func updateUserUsedQuota(id int, quota int64) {
 	}
 }
 
+// UpdateUserUsedQuota adjusts accumulated usage without touching
+// request_count. Unlike UpdateUserUsedQuotaAndRequestCount, this is meant
+// for settlement-time corrections (e.g. a task's actual cost differing from
+// its pre-consumed estimate) where the request was already counted once at
+// submission time and must not be counted again.
+func UpdateUserUsedQuota(id int, quota int64) {
+	if common.BatchUpdateEnabled {
+		addNewRecord(BatchUpdateTypeUsedQuota, id, quota)
+		return
+	}
+	updateUserUsedQuota(id, quota)
+}
+
 func updateUserRequestCount(id int, count int64) {
 	err := DB.Model(&User{}).Where("id = ?", id).Update("request_count", gorm.Expr("request_count + ?", count)).Error
 	if err != nil {
