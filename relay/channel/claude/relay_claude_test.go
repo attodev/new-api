@@ -310,6 +310,55 @@ func TestRequestOpenAI2ClaudeMessage_IgnoresUnsupportedFileContent(t *testing.T)
 	require.Equal(t, "see attachment", *content[0].Text)
 }
 
+// TestRequestOpenAI2ClaudeMessage_KeepsToolUseWithEmptyArguments reproduces
+// a real bug: a tool call with empty (or unparseable) arguments caused the
+// whole tool_use block to be dropped via "continue" instead of being kept
+// with an empty {} input - silently discarding the assistant's tool call
+// from the converted Claude request.
+func TestRequestOpenAI2ClaudeMessage_KeepsToolUseWithEmptyArguments(t *testing.T) {
+	message := dto.Message{
+		Role: "assistant",
+	}
+	message.SetToolCalls([]dto.ToolCallRequest{
+		{
+			ID:   "call_1",
+			Type: "function",
+			Function: dto.FunctionRequest{
+				Name:      "get_weather",
+				Arguments: "",
+			},
+		},
+	})
+
+	request := dto.GeneralOpenAIRequest{
+		Model:    "claude-3-5-sonnet",
+		Messages: []dto.Message{message},
+	}
+
+	claudeRequest, err := RequestOpenAI2ClaudeMessage(nil, request)
+	require.NoError(t, err)
+
+	var assistantMsg *dto.ClaudeMessage
+	for i := range claudeRequest.Messages {
+		if claudeRequest.Messages[i].Role == "assistant" {
+			assistantMsg = &claudeRequest.Messages[i]
+		}
+	}
+	require.NotNil(t, assistantMsg, "expected an assistant message in the converted request")
+
+	content, ok := assistantMsg.Content.([]dto.ClaudeMediaMessage)
+	require.True(t, ok)
+
+	var toolUse *dto.ClaudeMediaMessage
+	for i := range content {
+		if content[i].Type == "tool_use" {
+			toolUse = &content[i]
+		}
+	}
+	require.NotNil(t, toolUse, "the tool_use block must be kept, not dropped")
+	require.Equal(t, "call_1", toolUse.Id)
+}
+
 func TestRequestOpenAI2ClaudeMessage_SupportsPDFFileContent(t *testing.T) {
 	request := dto.GeneralOpenAIRequest{
 		Model: "claude-3-5-sonnet",
