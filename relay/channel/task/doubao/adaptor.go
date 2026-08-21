@@ -132,18 +132,20 @@ func (a *TaskAdaptor) BuildRequestHeader(_ *gin.Context, req *http.Request, _ *r
 	return nil
 }
 
-// EstimateBilling metadata OtherRatio
+// EstimateBilling returns the OtherRatio billing multiplier based on the
+// request metadata's output resolution and whether it includes video input.
 func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
 	req, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
 		return nil
 	}
-	if hasVideoInMetadata(req.Metadata) {
-		if ratio, ok := GetVideoInputRatio(info.OriginModelName); ok {
-			return map[string]float64{"video_input": ratio}
-		}
+	hasVideo := hasVideoInMetadata(req.Metadata)
+	resolution, _ := req.Metadata["resolution"].(string)
+	ratio, ok := GetVideoInputRatio(info.OriginModelName, resolution, hasVideo)
+	if !ok || ratio == 1.0 {
+		return nil
 	}
-	return nil
+	return map[string]float64{"video_input": ratio}
 }
 
 // hasVideoInMetadata metadata content video_url
