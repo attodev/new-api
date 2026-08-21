@@ -578,6 +578,15 @@ func OpenaiHandlerWithUsage(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if usageResp.InputTokensDetails != nil {
 		usageResp.PromptTokensDetails.ImageTokens += usageResp.InputTokensDetails.ImageTokens
 		usageResp.PromptTokensDetails.TextTokens += usageResp.InputTokensDetails.TextTokens
+		// This handler is only used on the OpenAI/xAI Images (generations/
+		// edits) relay path, which never reports prompt_tokens_details
+		// directly - so cached/cache-write/audio detail must come from here
+		// too, or cached image-input tokens get silently billed as
+		// uncached.
+		usageResp.PromptTokensDetails.CachedTokens += usageResp.InputTokensDetails.CachedTokens
+		usageResp.PromptTokensDetails.CachedCreationTokens += usageResp.InputTokensDetails.CachedCreationTokens
+		usageResp.PromptTokensDetails.CacheWriteTokens += usageResp.InputTokensDetails.CacheWriteTokens
+		usageResp.PromptTokensDetails.AudioTokens += usageResp.InputTokensDetails.AudioTokens
 	}
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
 	return &usageResp.Usage, nil
