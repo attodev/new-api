@@ -33,15 +33,22 @@ type AliVideoRequest struct {
 	Parameters *AliVideoParameters `json:"parameters,omitempty"`
 }
 
+// AliVideoMedia describes Wan2.7 image-to-video media inputs.
+type AliVideoMedia struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
+}
+
 // AliVideoInput
 type AliVideoInput struct {
-	Prompt         string `json:"prompt,omitempty"`
-	ImgURL         string `json:"img_url,omitempty"`         // URLBase64
-	FirstFrameURL  string `json:"first_frame_url,omitempty"` // URL
-	LastFrameURL   string `json:"last_frame_url,omitempty"`  // URL
-	AudioURL       string `json:"audio_url,omitempty"`       // URLwan2.5
-	NegativePrompt string `json:"negative_prompt,omitempty"`
-	Template       string `json:"template,omitempty"`
+	Prompt         string          `json:"prompt,omitempty"`
+	ImgURL         string          `json:"img_url,omitempty"`         // URLBase64
+	FirstFrameURL  string          `json:"first_frame_url,omitempty"` // URL
+	LastFrameURL   string          `json:"last_frame_url,omitempty"`  // URL
+	AudioURL       string          `json:"audio_url,omitempty"`       // URLwan2.5
+	Media          []AliVideoMedia `json:"media,omitempty"`           // wan2.7-i2v
+	NegativePrompt string          `json:"negative_prompt,omitempty"`
+	Template       string          `json:"template,omitempty"`
 }
 
 // AliVideoParameters
@@ -87,12 +94,13 @@ type AliUsage struct {
 
 type AliMetadata struct {
 	// Input
-	AudioURL       string `json:"audio_url,omitempty"`       // URL
-	ImgURL         string `json:"img_url,omitempty"`         // URL
-	FirstFrameURL  string `json:"first_frame_url,omitempty"` // URL
-	LastFrameURL   string `json:"last_frame_url,omitempty"`  // URL
-	NegativePrompt string `json:"negative_prompt,omitempty"`
-	Template       string `json:"template,omitempty"`
+	AudioURL       string          `json:"audio_url,omitempty"`       // URL
+	ImgURL         string          `json:"img_url,omitempty"`         // URL
+	FirstFrameURL  string          `json:"first_frame_url,omitempty"` // URL
+	LastFrameURL   string          `json:"last_frame_url,omitempty"`  // URL
+	Media          []AliVideoMedia `json:"media,omitempty"`           // wan2.7-i2v
+	NegativePrompt string          `json:"negative_prompt,omitempty"`
+	Template       string          `json:"template,omitempty"`
 
 	// Parameters
 	Resolution   *string `json:"resolution,omitempty"` // : 480P/720P/1080P
@@ -252,6 +260,96 @@ func ProcessAliOtherRatios(aliReq *AliVideoRequest) (map[string]float64, error) 
 	return otherRatios, nil
 }
 
+func isWan27I2VModel(model string) bool {
+	return strings.HasPrefix(model, "wan2.7-i2v")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func firstTaskImage(req relaycommon.TaskSubmitReq) string {
+	if image := strings.TrimSpace(req.Image); image != "" {
+		return image
+	}
+	for _, image := range req.Images {
+		if trimmed := strings.TrimSpace(image); trimmed != "" {
+			return trimmed
+		}
+	}
+	if inputReference := strings.TrimSpace(req.InputReference); inputReference != "" {
+		return inputReference
+	}
+	return ""
+}
+
+func secondTaskImage(req relaycommon.TaskSubmitReq) string {
+	nonEmptyImages := 0
+	for _, image := range req.Images {
+		trimmed := strings.TrimSpace(image)
+		if trimmed == "" {
+			continue
+		}
+		nonEmptyImages++
+		if nonEmptyImages == 2 {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+// normalizeWan27I2VInput maps legacy image fields onto Wan2.7 image-to-video's
+// new input.media protocol (a list of {type, url} entries), unless the
+// caller already supplied media explicitly via metadata.
+func normalizeWan27I2VInput(aliReq *AliVideoRequest, req relaycommon.TaskSubmitReq) error {
+	if !isWan27I2VModel(aliReq.Model) {
+		return nil
+	}
+
+	if len(aliReq.Input.Media) == 0 {
+		firstFrameURL := firstNonEmpty(aliReq.Input.FirstFrameURL, aliReq.Input.ImgURL, firstTaskImage(req))
+		lastFrameURL := firstNonEmpty(aliReq.Input.LastFrameURL, secondTaskImage(req))
+		audioURL := aliReq.Input.AudioURL
+
+		if firstFrameURL != "" {
+			aliReq.Input.Media = append(aliReq.Input.Media, AliVideoMedia{
+				Type: "first_frame",
+				URL:  firstFrameURL,
+			})
+		}
+		if lastFrameURL != "" {
+			aliReq.Input.Media = append(aliReq.Input.Media, AliVideoMedia{
+				Type: "last_frame",
+				URL:  lastFrameURL,
+			})
+		}
+		if audioURL != "" {
+			aliReq.Input.Media = append(aliReq.Input.Media, AliVideoMedia{
+				Type: "driving_audio",
+				URL:  audioURL,
+			})
+		}
+	}
+
+	if len(aliReq.Input.Media) == 0 {
+		return fmt.Errorf("wan2.7-i2v requires image, images, input_reference, or input.media")
+	}
+
+	// Wan2.7 image-to-video uses the new input.media protocol. Avoid sending
+	// legacy fields that belong to wan2.6 and earlier image-to-video APIs.
+	aliReq.Input.ImgURL = ""
+	aliReq.Input.FirstFrameURL = ""
+	aliReq.Input.LastFrameURL = ""
+	aliReq.Input.AudioURL = ""
+	return nil
+}
+
 func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relaycommon.TaskSubmitReq) (*AliVideoRequest, error) {
 	upstreamModel := req.Model
 	if info.IsModelMapped {
@@ -261,7 +359,7 @@ func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relay
 		Model: upstreamModel,
 		Input: AliVideoInput{
 			Prompt: req.Prompt,
-			ImgURL: req.InputReference,
+			ImgURL: firstTaskImage(req),
 		},
 		Parameters: &AliVideoParameters{
 			PromptExtend: true,
@@ -336,6 +434,10 @@ func (a *TaskAdaptor) convertToAliRequest(info *relaycommon.RelayInfo, req relay
 
 	if aliReq.Model != upstreamModel {
 		return nil, errors.New("can't change model with metadata")
+	}
+
+	if err := normalizeWan27I2VInput(aliReq, req); err != nil {
+		return nil, err
 	}
 
 	return aliReq, nil
