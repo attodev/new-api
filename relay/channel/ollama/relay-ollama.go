@@ -20,11 +20,39 @@ import (
 )
 
 func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*OllamaChatRequest, error) {
+	think := r.Think
+	if len(think) == 0 {
+		effort := r.ReasoningEffort
+		if len(r.Reasoning) > 0 {
+			var reasoning dto.Reasoning
+			if err := common.Unmarshal(r.Reasoning, &reasoning); err != nil {
+				return nil, fmt.Errorf("invalid ollama reasoning: %w", err)
+			}
+			effort = lo.CoalesceOrEmpty(reasoning.Effort, effort)
+		}
+		if effort != "" {
+			var thinkValue any
+			switch effort {
+			case "none":
+				thinkValue = false
+			case "low", "medium", "high", "max":
+				thinkValue = effort
+			default:
+				return nil, fmt.Errorf("unsupported ollama reasoning effort %q", effort)
+			}
+			var err error
+			think, err = common.Marshal(thinkValue)
+			if err != nil {
+				return nil, fmt.Errorf("marshal ollama think: %w", err)
+			}
+		}
+	}
+
 	chatReq := &OllamaChatRequest{
 		Model:   r.Model,
 		Stream:  lo.FromPtrOr(r.Stream, false),
 		Options: map[string]any{},
-		Think:   r.Think,
+		Think:   think,
 	}
 	if r.ResponseFormat != nil {
 		if r.ResponseFormat.Type == "json" {
@@ -89,6 +117,7 @@ func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*Ollam
 	}
 
 	chatReq.Messages = make([]OllamaChatMessage, 0, len(r.Messages))
+	toolNamesByCallID := make(map[string]string)
 	for _, m := range r.Messages {
 		var textBuilder strings.Builder
 		var images []string
@@ -117,8 +146,18 @@ func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*Ollam
 		if len(images) > 0 {
 			cm.Images = images
 		}
-		if m.Role == "tool" && m.Name != nil {
-			cm.ToolName = *m.Name
+		if m.Role == "assistant" {
+			if reasoning, ok := lo.Coalesce(m.ReasoningContent, m.Reasoning); ok {
+				thinking, err := common.Marshal(*reasoning)
+				if err != nil {
+					return nil, fmt.Errorf("marshal ollama thinking: %w", err)
+				}
+				cm.Thinking = thinking
+			}
+		}
+		if m.Role == "tool" {
+			cm.ToolCallID = m.ToolCallId
+			cm.ToolName = lo.CoalesceOrEmpty(lo.FromPtr(m.Name), toolNamesByCallID[m.ToolCallId])
 		}
 		if m.ToolCalls != nil && len(m.ToolCalls) > 0 {
 			parsed := m.ParseToolCalls()
@@ -127,15 +166,18 @@ func openAIChatToOllamaChat(c *gin.Context, r *dto.GeneralOpenAIRequest) (*Ollam
 				for _, tc := range parsed {
 					var args interface{}
 					if tc.Function.Arguments != "" {
-						_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+						_ = common.Unmarshal([]byte(tc.Function.Arguments), &args)
 					}
 					if args == nil {
 						args = map[string]any{}
 					}
-					oc := OllamaToolCall{}
+					oc := OllamaToolCall{ID: tc.ID}
 					oc.Function.Name = tc.Function.Name
 					oc.Function.Arguments = args
 					calls = append(calls, oc)
+					if tc.ID != "" {
+						toolNamesByCallID[tc.ID] = tc.Function.Name
+					}
 				}
 				cm.ToolCalls = calls
 			}
