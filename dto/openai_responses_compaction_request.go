@@ -10,10 +10,14 @@ import (
 )
 
 type OpenAIResponsesCompactionRequest struct {
-	Model              string          `json:"model"`
-	Input              json.RawMessage `json:"input,omitempty"`
-	Instructions       json.RawMessage `json:"instructions,omitempty"`
-	PreviousResponseID string          `json:"previous_response_id,omitempty"`
+	Model                string          `json:"model"`
+	Input                json.RawMessage `json:"input,omitempty"`
+	Instructions         json.RawMessage `json:"instructions,omitempty"`
+	PreviousResponseID   string          `json:"previous_response_id,omitempty"`
+	ParallelToolCalls    json.RawMessage `json:"parallel_tool_calls,omitempty"`
+	ServiceTier          string          `json:"service_tier,omitempty"`
+	PromptCacheKey       json.RawMessage `json:"prompt_cache_key,omitempty"`
+	PromptCacheRetention json.RawMessage `json:"prompt_cache_retention,omitempty"`
 }
 
 func (r *OpenAIResponsesCompactionRequest) GetTokenCountMeta() *types.TokenCountMeta {

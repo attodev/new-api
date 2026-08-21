@@ -20,6 +20,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// compactionRequestToResponsesRequest maps the /v1/responses/compact request
+// shape onto the underlying Responses API request. Only fields documented
+// for that endpoint are forwarded: model, input, instructions,
+// previous_response_id, parallel_tool_calls, service_tier,
+// prompt_cache_key, prompt_cache_retention.
+func compactionRequestToResponsesRequest(req *dto.OpenAIResponsesCompactionRequest) *dto.OpenAIResponsesRequest {
+	return &dto.OpenAIResponsesRequest{
+		Model:                req.Model,
+		Input:                req.Input,
+		Instructions:         req.Instructions,
+		PreviousResponseID:   req.PreviousResponseID,
+		ParallelToolCalls:    req.ParallelToolCalls,
+		ServiceTier:          req.ServiceTier,
+		PromptCacheKey:       req.PromptCacheKey,
+		PromptCacheRetention: req.PromptCacheRetention,
+	}
+}
+
 func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact {
@@ -40,12 +58,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	case *dto.OpenAIResponsesRequest:
 		responsesReq = req
 	case *dto.OpenAIResponsesCompactionRequest:
-		responsesReq = &dto.OpenAIResponsesRequest{
-			Model:              req.Model,
-			Input:              req.Input,
-			Instructions:       req.Instructions,
-			PreviousResponseID: req.PreviousResponseID,
-		}
+		responsesReq = compactionRequestToResponsesRequest(req)
 	default:
 		return types.NewErrorWithStatusCode(
 			fmt.Errorf("invalid request type, expected dto.OpenAIResponsesRequest or dto.OpenAIResponsesCompactionRequest, got %T", info.Request),
