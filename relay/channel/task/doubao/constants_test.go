@@ -22,6 +22,9 @@ func TestGetVideoInputRatio_BillsByResolution(t *testing.T) {
 		{"1080p with video", "doubao-seedance-2-0-260128", "1080p", true, 31.0 / 46.0, true},
 		{"fast model 480p with video", "doubao-seedance-2-0-fast-260128", "480p", true, 22.0 / 37.0, true},
 		{"fast model has no 1080p price, falls back to baseline", "doubao-seedance-2-0-fast-260128", "1080p", false, 1.0, true},
+		{"4k no video", "doubao-seedance-2-0-260128", "4k", false, 26.0 / 46.0, true},
+		{"4k with video", "doubao-seedance-2-0-260128", "4k", true, 16.0 / 46.0, true},
+		{"4k resolution is case-insensitive", "doubao-seedance-2-0-260128", "4K", true, 16.0 / 46.0, true},
 		{"unconfigured model", "doubao-seedance-1-0-pro-250528", "1080p", true, 0, false},
 	}
 	for _, tc := range cases {
