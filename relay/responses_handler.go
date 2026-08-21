@@ -24,7 +24,7 @@ import (
 // shape onto the underlying Responses API request. Only fields documented
 // for that endpoint are forwarded: model, input, instructions,
 // previous_response_id, parallel_tool_calls, service_tier,
-// prompt_cache_key, prompt_cache_retention.
+// prompt_cache_key, prompt_cache_retention, tools, reasoning, text.
 func compactionRequestToResponsesRequest(req *dto.OpenAIResponsesCompactionRequest) *dto.OpenAIResponsesRequest {
 	return &dto.OpenAIResponsesRequest{
 		Model:                req.Model,
@@ -35,6 +35,9 @@ func compactionRequestToResponsesRequest(req *dto.OpenAIResponsesCompactionReque
 		ServiceTier:          req.ServiceTier,
 		PromptCacheKey:       req.PromptCacheKey,
 		PromptCacheRetention: req.PromptCacheRetention,
+		Tools:                req.Tools,
+		Reasoning:            req.Reasoning,
+		Text:                 req.Text,
 	}
 }
 

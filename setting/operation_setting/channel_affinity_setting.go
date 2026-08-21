@@ -35,12 +35,25 @@ type ChannelAffinitySetting struct {
 	Rules             []ChannelAffinityRule `json:"rules"`
 }
 
+// Keep Codex CLI passthrough aligned with upstream Codex releases. Header
+// matching here is case-insensitive.
 var codexCliPassThroughHeaders = []string{
 	"Originator",
 	"Session_id",
+	"Thread_id",
+	"Session-Id",
+	"Thread-Id",
+	"X-Client-Request-Id",
 	"User-Agent",
 	"X-Codex-Beta-Features",
+	"X-Codex-Turn-State",
 	"X-Codex-Turn-Metadata",
+	"X-Codex-Window-Id",
+	"X-Codex-Parent-Thread-Id",
+	"X-OpenAI-Subagent",
+	"X-OpenAI-Memgen-Request",
+	"X-ResponsesAPI-Include-Timing-Metrics",
+	"X-OpenAI-Internal-Codex-Responses-Lite",
 }
 
 var claudeCliPassThroughHeaders = []string{

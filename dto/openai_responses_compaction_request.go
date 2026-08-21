@@ -18,6 +18,9 @@ type OpenAIResponsesCompactionRequest struct {
 	ServiceTier          string          `json:"service_tier,omitempty"`
 	PromptCacheKey       json.RawMessage `json:"prompt_cache_key,omitempty"`
 	PromptCacheRetention json.RawMessage `json:"prompt_cache_retention,omitempty"`
+	Tools                json.RawMessage `json:"tools,omitempty"`
+	Reasoning            *Reasoning      `json:"reasoning,omitempty"`
+	Text                 json.RawMessage `json:"text,omitempty"`
 }
 
 func (r *OpenAIResponsesCompactionRequest) GetTokenCountMeta() *types.TokenCountMeta {
