@@ -308,6 +308,22 @@ func TestQuotaRound(t *testing.T) {
 	}
 }
 
+// TestQuotaRoundStrict guards a stricter invariant than QuotaRound:
+// pre-consume must reject an out-of-range estimate instead of silently
+// proceeding with a saturated value that would charge the wrong amount.
+func TestQuotaRoundStrict(t *testing.T) {
+	q, err := billingexpr.QuotaRoundStrict(999.5)
+	if err != nil || q != 1000 {
+		t.Fatalf("QuotaRoundStrict(999.5) = %d, %v; want 1000, nil", q, err)
+	}
+	if _, err := billingexpr.QuotaRoundStrict(1e19); err == nil {
+		t.Fatal("expected an error for an out-of-range estimate, got nil")
+	}
+	if _, err := billingexpr.QuotaRoundStrict(math.NaN()); err == nil {
+		t.Fatal("expected an error for NaN, got nil")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Settlement
 // ---------------------------------------------------------------------------

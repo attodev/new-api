@@ -20,3 +20,21 @@ func TestQuotaFromFloat(t *testing.T) {
 	assert.Equal(t, math.MinInt32, QuotaFromFloat(math.Inf(-1)))
 	assert.Equal(t, 0, QuotaFromFloat(math.NaN()))
 }
+
+// TestQuotaFromFloatStrict guards a stricter invariant than QuotaFromFloat:
+// pre-consume must not silently proceed with a saturated estimate (which
+// would charge the wrong amount) - it should reject the request outright.
+func TestQuotaFromFloatStrict(t *testing.T) {
+	q, err := QuotaFromFloatStrict(42.4)
+	assert.NoError(t, err)
+	assert.Equal(t, 42, q)
+
+	_, err = QuotaFromFloatStrict(2000 * 1.8446744073686647e19)
+	assert.Error(t, err)
+
+	_, err = QuotaFromFloatStrict(math.Inf(1))
+	assert.Error(t, err)
+
+	_, err = QuotaFromFloatStrict(math.NaN())
+	assert.Error(t, err)
+}

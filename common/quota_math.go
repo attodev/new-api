@@ -1,6 +1,9 @@
 package common
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // QuotaFromFloat converts a computed quota value to int with saturation.
 // Quota products can include user-controlled multipliers (image n, video
@@ -18,4 +21,19 @@ func QuotaFromFloat(value float64) int {
 		return math.MinInt32
 	}
 	return int(value)
+}
+
+// QuotaFromFloatStrict is QuotaFromFloat but rejects an out-of-range value
+// instead of silently saturating it. Pre-consume callers must use this: a
+// silently clamped estimate would go on to charge the wrong amount, whereas
+// settlement callers (the cost is already incurred and must be recorded
+// regardless) should keep using the saturating QuotaFromFloat.
+func QuotaFromFloatStrict(value float64) (int, error) {
+	if math.IsNaN(value) {
+		return 0, fmt.Errorf("quota conversion received NaN")
+	}
+	if value >= math.MaxInt32 || value <= math.MinInt32 {
+		return 0, fmt.Errorf("quota conversion out of range: %g", value)
+	}
+	return int(value), nil
 }

@@ -1,6 +1,9 @@
 package billingexpr
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // QuotaRound converts a float64 quota value to int using half-away-from-zero
 // rounding. Every tiered billing path (pre-consume, settlement, breakdown
@@ -21,4 +24,18 @@ func QuotaRound(f float64) int {
 		return math.MinInt32
 	}
 	return int(r)
+}
+
+// QuotaRoundStrict is QuotaRound but rejects an out-of-range value instead
+// of silently saturating it. Pre-consume callers must use this: a silently
+// clamped estimate would go on to charge the wrong amount.
+func QuotaRoundStrict(f float64) (int, error) {
+	r := math.Round(f)
+	if math.IsNaN(r) {
+		return 0, fmt.Errorf("quota conversion received NaN")
+	}
+	if r >= math.MaxInt32 || r <= math.MinInt32 {
+		return 0, fmt.Errorf("quota conversion out of range: %g", r)
+	}
+	return int(r), nil
 }
