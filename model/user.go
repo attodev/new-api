@@ -2,7 +2,6 @@ package model
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -88,7 +87,7 @@ func (user *User) SetAccessToken(token string) {
 func (user *User) GetSetting() dto.UserSetting {
 	setting := dto.UserSetting{}
 	if user.Setting != "" {
-		err := json.Unmarshal([]byte(user.Setting), &setting)
+		err := common.Unmarshal([]byte(user.Setting), &setting)
 		if err != nil {
 			common.SysLog("failed to unmarshal setting: " + err.Error())
 		}
@@ -97,7 +96,7 @@ func (user *User) GetSetting() dto.UserSetting {
 }
 
 func (user *User) SetSetting(setting dto.UserSetting) {
-	settingBytes, err := json.Marshal(setting)
+	settingBytes, err := common.Marshal(setting)
 	if err != nil {
 		common.SysLog("failed to marshal setting: " + err.Error())
 		return
@@ -168,7 +167,7 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 	// regular users do not include the admin section
 
 	// convert to JSON string
-	configBytes, err := json.Marshal(defaultConfig)
+	configBytes, err := common.Marshal(defaultConfig)
 	if err != nil {
 		common.SysLog("failed to generate default sidebar config: " + err.Error())
 		return ""
@@ -344,15 +343,19 @@ func HardDeleteUserById(id int) error {
 	return user.HardDelete()
 }
 
-func inviteUser(inviterId int) (err error) {
-	user, err := GetUserById(inviterId, true)
-	if err != nil {
-		return err
+func inviteUser(inviterId int) error {
+	result := DB.Model(&User{}).Where("id = ?", inviterId).Updates(map[string]interface{}{
+		"aff_count":   gorm.Expr("aff_count + ?", 1),
+		"aff_quota":   gorm.Expr("aff_quota + ?", common.QuotaForInviter),
+		"aff_history": gorm.Expr("aff_history + ?", common.QuotaForInviter),
+	})
+	if result.Error != nil {
+		return result.Error
 	}
-	user.AffCount++
-	user.AffQuota += common.QuotaForInviter
-	user.AffHistoryQuota += common.QuotaForInviter
-	return DB.Save(user).Error
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (user *User) TransferAffQuotaToQuota(quota int64) error {
@@ -526,7 +529,19 @@ func (user *User) Update(updatePassword bool) error {
 				return err
 			}
 		}
-		return tx.Model(&current).Updates(newUser).Error
+		// Omit fields that other code paths update out-of-band (billing,
+		// affiliate accrual, access-token rotation) - a routine profile edit
+		// built from a snapshot taken before one of those ran must not write
+		// its now-stale value back over the concurrent change.
+		return tx.Model(&current).Omit(
+			"access_token",
+			"quota",
+			"used_quota",
+			"request_count",
+			"aff_count",
+			"aff_quota",
+			"aff_history",
+		).Updates(newUser).Error
 	})
 	if err != nil {
 		return err
