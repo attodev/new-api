@@ -187,7 +187,7 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	summary.CompletionTokens = usage.CompletionTokens
 	summary.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
-	summary.CacheCreationTokens = usage.PromptTokensDetails.CachedCreationTokens
+	summary.CacheCreationTokens = usage.PromptTokensDetails.CacheCreationTokensTotal()
 	summary.CacheCreationTokens5m = usage.ClaudeCacheCreation5mTokens
 	summary.CacheCreationTokens1h = usage.ClaudeCacheCreation1hTokens
 	summary.ImageTokens = usage.PromptTokensDetails.ImageTokens
@@ -205,7 +205,14 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	// and signals disjoint Anthropic-style counts. Treat such usage as Claude-semantic
 	// so cache is not subtracted into a negative base (which previously underflowed
 	// and clamped quota to 1, i.e. severe under-billing).
+	//
+	// Exception: OpenAI's native cache_write_tokens (GPT-5.6+) is reported
+	// alongside cached_tokens and the two can legitimately overlap/exceed
+	// prompt_tokens. That's a known upstream quirk, not a Claude-relay signal,
+	// so it's handled below via zero-clamping the base instead of reclassifying
+	// the whole response as Claude-semantic (which would double-bill it).
 	if !summary.IsClaudeUsageSemantic && !legacyClaudeDerived && !isOpenRouterClaudeBilling &&
+		usage.PromptTokensDetails.CacheWriteTokens == 0 &&
 		(summary.CacheTokens > 0 || summary.CacheCreationTokens > 0) &&
 		summary.CacheTokens+summary.CacheCreationTokens > summary.PromptTokens {
 		summary.IsClaudeUsageSemantic = true
@@ -286,6 +293,14 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 				audioInputQuota = decimal.NewFromFloat(summary.AudioInputPrice).
 					Div(decimal.NewFromInt(1000000)).Mul(dAudioTokens).Mul(dGroupRatio).Mul(dQuotaPerUnit)
 			}
+		}
+
+		// Some upstreams (e.g. GPT-5.6) can report cached + cache-write tokens
+		// that together exceed prompt_tokens. Clamp the remainder at zero
+		// instead of letting it go negative and silently discounting the
+		// cache portions that are billed separately below.
+		if baseTokens.IsNegative() {
+			baseTokens = decimal.Zero
 		}
 
 		promptQuota := baseTokens.Add(cachedTokensWithRatio).Add(imageTokensWithRatio).Add(cachedCreationTokensWithRatio)

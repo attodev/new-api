@@ -106,6 +106,12 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-opus-4-7-high":                1.25,
 	"claude-opus-4-7-medium":              1.25,
 	"claude-opus-4-7-low":                 1.25,
+
+	// OpenAI GPT-5.6 family reports native cache_write_tokens, billed at 1.25x
+	// the uncached input rate (same ratio as Claude's cache-creation billing).
+	"gpt-5.6-sol":   1.25,
+	"gpt-5.6-terra": 1.25,
+	"gpt-5.6-luna":  1.25,
 }
 
 //var defaultCreateCacheRatio = map[string]float64{}

@@ -646,3 +646,72 @@ func TestComposeTieredTextQuotaErrorFallbackUsesPreConsumedQuota(t *testing.T) {
 	require.Equal(t, int64(12500), summary.ToolCallSurchargeQuota.Round(0).IntPart())
 	require.Equal(t, 14500, quota)
 }
+
+func TestCalculateTextQuotaSummaryBillsOpenAICacheWriteTokensAtCacheCreationRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "gpt-5.6-terra",
+		PriceData: types.PriceData{
+			ModelRatio:         1,
+			CompletionRatio:    1,
+			CacheCreationRatio: 1.25,
+			GroupRatioInfo:     types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     2604,
+		CompletionTokens: 383,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CacheWriteTokens: 100,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	// OpenAI's native gpt-5.6 field is cache_write_tokens (not the Claude-style
+	// cached_creation_tokens), but it must still be billed at CacheCreationRatio
+	// instead of silently falling into the base prompt rate.
+	// quota = (2604 - 100) + 100*1.25 + 383 = 3012
+	require.Equal(t, 2604, summary.PromptTokens)
+	require.Equal(t, 3012, summary.Quota)
+}
+
+func TestCalculateTextQuotaSummaryClampsBaseTokensWhenCacheCountsExceedPromptTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "gpt-5.6-terra",
+		PriceData: types.PriceData{
+			ModelRatio:         1,
+			CompletionRatio:    1,
+			CacheRatio:         0.1,
+			CacheCreationRatio: 1.25,
+			GroupRatioInfo:     types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+
+	// Pathological upstream report: cached + cache-write alone exceed prompt_tokens.
+	usage := &dto.Usage{
+		PromptTokens:     100,
+		CompletionTokens: 0,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens:     60,
+			CacheWriteTokens: 60,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	// Without clamping, base = 100 - 60 - 60 = -20, which would silently
+	// undercharge the cache portions. Clamped base is 0.
+	// quota = 0 + 60*0.1 + 60*1.25 = 81
+	require.Equal(t, 81, summary.Quota)
+}

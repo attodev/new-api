@@ -470,6 +470,27 @@ func TestBuildTieredTokenParams_GPT_WithCache(t *testing.T) {
 	}
 }
 
+func TestBuildTieredTokenParams_GPT_CacheWriteTokens(t *testing.T) {
+	usage := &dto.Usage{
+		PromptTokens:     1000,
+		CompletionTokens: 500,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CacheWriteTokens: 200,
+			TextTokens:       800,
+		},
+	}
+	expr := `tier("base", p * 2.5 + c * 15 + cc * 3.125)`
+	got := tieredQuota(expr, usage, false, 1.0)
+	// OpenAI's native gpt-5.6 field is cache_write_tokens; it must feed the
+	// generic "cc" (cache creation) variable just like Claude's
+	// cached_creation_tokens does.
+	// P=800, C=500, CC=200 → (800*2.5 + 500*15 + 200*3.125) = 10125, halved by testQuotaPerUnit=500,000
+	want := 5062.5
+	if math.Abs(got-want) > 0.01 {
+		t.Fatalf("quota = %f, want %f", got, want)
+	}
+}
+
 func TestBuildTieredTokenParams_GPT_NoCacheVar(t *testing.T) {
 	usage := &dto.Usage{
 		PromptTokens:     1000,

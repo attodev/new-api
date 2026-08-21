@@ -255,9 +255,24 @@ type OpenAIVideoResponse struct {
 type InputTokenDetails struct {
 	CachedTokens         int `json:"cached_tokens"`
 	CachedCreationTokens int `json:"cached_creation_tokens,omitempty"`
-	TextTokens           int `json:"text_tokens"`
-	AudioTokens          int `json:"audio_tokens"`
-	ImageTokens          int `json:"image_tokens"`
+	// CacheWriteTokens is OpenAI's native field name for cache-creation tokens
+	// (introduced with the GPT-5.6 family: gpt-5.6-sol/-terra/-luna). It is
+	// reported alongside, not instead of, CachedCreationTokens, so billing
+	// must consult CacheCreationTokensTotal() rather than either field alone.
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
+	TextTokens       int `json:"text_tokens"`
+	AudioTokens      int `json:"audio_tokens"`
+	ImageTokens      int `json:"image_tokens"`
+}
+
+// CacheCreationTokensTotal returns the cache-write token count regardless of
+// which field the upstream reported it in (Claude's CachedCreationTokens or
+// OpenAI's native CacheWriteTokens).
+func (d InputTokenDetails) CacheCreationTokensTotal() int {
+	if d.CacheWriteTokens > d.CachedCreationTokens {
+		return d.CacheWriteTokens
+	}
+	return d.CachedCreationTokens
 }
 
 type OutputTokenDetails struct {
