@@ -77,9 +77,9 @@ func formatUserLogs(logs []*Log, startIdx int) {
 			// delete(otherMap, "reject_reason")
 			delete(otherMap, "stream_status")
 
-            // Do not expose internal model routing details to users.
-            delete(otherMap, "is_model_mapped")
-            delete(otherMap, "upstream_model_name")
+			// Do not expose internal model routing details to users.
+			delete(otherMap, "is_model_mapped")
+			delete(otherMap, "upstream_model_name")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
 		logs[i].Id = startIdx + i + 1
@@ -357,6 +357,7 @@ type RecordTaskBillingLogParams struct {
 	TokenId   int
 	Group     string
 	Other     map[string]interface{}
+	NodeName  string // node that submitted the task; falls back to the current node when empty
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -370,6 +371,20 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 			tokenName = token.Name
 		}
 	}
+	nodeName := params.NodeName
+	if nodeName == "" {
+		nodeName = common.NodeName
+	}
+	other := params.Other
+	if other == nil {
+		other = make(map[string]interface{})
+	}
+	adminInfo, _ := other["admin_info"].(map[string]interface{})
+	if adminInfo == nil {
+		adminInfo = make(map[string]interface{})
+	}
+	adminInfo["node_name"] = nodeName
+	other["admin_info"] = adminInfo
 	log := &Log{
 		UserId:    params.UserId,
 		Username:  username,
@@ -382,7 +397,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		ChannelId: params.ChannelId,
 		TokenId:   params.TokenId,
 		Group:     params.Group,
-		Other:     common.MapToJsonStr(params.Other),
+		Other:     common.MapToJsonStr(other),
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {

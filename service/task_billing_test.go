@@ -482,6 +482,79 @@ func TestRecalculateTaskQuota_PersistsToDatabase(t *testing.T) {
 	assert.Equal(t, actualQuota, reloaded.Quota, "settled quota must be persisted, not just held in memory")
 }
 
+// TestRecalculateTaskQuota_AttributesLogToOriginatingNode reproduces a real
+// bug: in a multi-node deployment, the task's settlement consume log always
+// recorded the *current* node (whichever node happened to poll the task to
+// completion), never the node that actually submitted it. For token/
+// adaptor-billed tasks the pre-deduction is often 0, so the entire quota
+// landed on the last polling node's usage accounting instead of the
+// submitting node's.
+func TestRecalculateTaskQuota_AttributesLogToOriginatingNode(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	originalNodeName := common.NodeName
+	common.NodeName = "node-polling"
+	t.Cleanup(func() { common.NodeName = originalNodeName })
+
+	const userID, tokenID, channelID = 15, 15, 15
+	const preConsumed = 2000
+	const actualQuota = 3000
+
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-recalc-node", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.PrivateData.NodeName = "node-submitting"
+	require.NoError(t, model.DB.Create(task).Error)
+
+	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	var other map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(log.Other), &other))
+	adminInfo, _ := other["admin_info"].(map[string]interface{})
+	require.NotNil(t, adminInfo, "node_name must be recorded under admin_info")
+	assert.Equal(t, "node-submitting", adminInfo["node_name"],
+		"the settlement log must attribute usage to the submitting node, not whichever node polled it to completion")
+}
+
+// TestRecalculateTaskQuota_FallsBackToCurrentNodeWhenUnset covers
+// compatibility with tasks created before node attribution existed: an
+// empty PrivateData.NodeName must fall back to the current node rather than
+// leaving the log's node attribution blank.
+func TestRecalculateTaskQuota_FallsBackToCurrentNodeWhenUnset(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	originalNodeName := common.NodeName
+	common.NodeName = "node-fallback"
+	t.Cleanup(func() { common.NodeName = originalNodeName })
+
+	const userID, tokenID, channelID = 16, 16, 16
+	const preConsumed = 2000
+	const actualQuota = 3000
+
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-recalc-node-fallback", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	require.NoError(t, model.DB.Create(task).Error)
+
+	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	var other map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(log.Other), &other))
+	adminInfo, _ := other["admin_info"].(map[string]interface{})
+	require.NotNil(t, adminInfo)
+	assert.Equal(t, "node-fallback", adminInfo["node_name"])
+}
+
 // TestRecalculate_NegativeDelta_AdjustsUsageDown reproduces a real bug: on a
 // negative delta (task was over-charged up front, some of it refunded back),
 // user.used_quota and channel.used_quota were only ever adjusted on the

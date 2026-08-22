@@ -104,6 +104,7 @@ type TaskPrivateData struct {
 	BillingSource  string              `json:"billing_source,omitempty"`  // "wallet" "subscription"
 	SubscriptionId int                 `json:"subscription_id,omitempty"` // ID
 	TokenId        int                 `json:"token_id,omitempty"`        // ID
+	NodeName       string              `json:"node_name,omitempty"`       // node that submitted the task; settlement logs attribute usage here instead of whichever node polled it to completion
 	BillingContext *TaskBillingContext `json:"billing_context,omitempty"`
 }
 
