@@ -109,3 +109,39 @@ func TestUpdateSunoTasks_DoesNotDoubleRefundAcrossPolls(t *testing.T) {
 	require.NoError(t, updateSunoTasks(ctx, channelID, []string{reloaded.TaskID}, taskM2))
 	require.Equal(t, int64(initQuota+preConsumed), getUserQuota(t, userID), "a second poll on an already-failed task must not refund again")
 }
+
+// TestUpdateSunoTasks_IgnoresUnknownTaskID reproduces a real crash: the
+// upstream response is keyed by task_id, but updateSunoTasks looked it up in
+// taskM without checking for a miss - taskM[id] on a miss returns a nil
+// *model.Task, and the very next call (taskNeedsUpdate) dereferences it
+// unconditionally. A response referencing a task_id we didn't ask about
+// (e.g. a stale/mismatched report, or a map built from a narrower task set
+// than the upstream's answer) must be skipped, not panic the poller.
+func TestUpdateSunoTasks_IgnoresUnknownTaskID(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 21, 21, 21
+	const initQuota, preConsumed = 10000, 3000
+
+	seedUser(t, userID, initQuota)
+	seedToken(t, tokenID, userID, "sk-suno-unknown", 5000)
+	seedChannelWithBaseURL(t, channelID)
+
+	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.TaskID = "suno-task-known"
+	task.Status = model.TaskStatusInProgress
+	require.NoError(t, model.DB.Create(task).Error)
+
+	prevAdaptorFn := GetTaskAdaptorFunc
+	t.Cleanup(func() { GetTaskAdaptorFunc = prevAdaptorFn })
+
+	fake := &fakeSunoAdaptor{responseBody: sunoFailureResponseBody(t, "suno-task-unrequested", "upstream build failed")}
+	GetTaskAdaptorFunc = func(platform constant.TaskPlatform) TaskPollingAdaptor { return fake }
+
+	taskM := map[string]*model.Task{task.TaskID: task}
+	require.NotPanics(t, func() {
+		require.NoError(t, updateSunoTasks(ctx, channelID, []string{task.TaskID}, taskM))
+	})
+	require.Equal(t, int64(initQuota), getUserQuota(t, userID), "a response for an unrequested task_id must not touch billing")
+}
