@@ -89,6 +89,38 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 	require.Equal(t, 1, task.PrivateData.OrganizationId)
 }
 
+func TestOrganizationWalletFundingPinsOrganizationAcrossMembershipChange(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner-one", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 3, "owner-two", 1000, 2, model.OrganizationRoleOwner)
+	seedOrganization(t, 1, 1)
+	second := &model.Organization{Id: 2, Name: "org-two", OwnerUserId: 3, Status: model.OrganizationStatusEnabled, Quota: 1000}
+	require.NoError(t, model.DB.Create(second).Error)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.NoError(t, funding.PreConsume(25))
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 2).Update("organization_id", 2).Error)
+	require.NoError(t, funding.Refund())
+
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 1).Quota)
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 2).Quota)
+}
+
+func TestOrganizationWalletFundingRollsBackMemberWhenOrganizationInsufficient(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 10).Error)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.ErrorIs(t, funding.PreConsume(25), ErrInsufficientWalletQuota)
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(10), getOrganizationForBillingTest(t, 1).Quota)
+}
+
 func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWallet(t *testing.T) {
 	truncate(t)
 

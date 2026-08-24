@@ -122,6 +122,27 @@ func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int6
 	return nil
 }
 
+func reserveWalletQuotaForOrganization(userId int, organizationId int, amount int64) error {
+	reserved, err := model.TryReserveUserQuota(userId, amount)
+	if err != nil {
+		return err
+	}
+	if !reserved {
+		return ErrInsufficientWalletQuota
+	}
+	reserved, err = model.TryReserveOrganizationQuota(organizationId, amount)
+	if err != nil || !reserved {
+		if rollbackErr := model.IncreaseUserQuota(userId, amount, false); rollbackErr != nil {
+			return errors.Join(err, rollbackErr)
+		}
+		if err != nil {
+			return err
+		}
+		return ErrInsufficientWalletQuota
+	}
+	return nil
+}
+
 func UpdateOrganizationUsedQuotaForUser(userId int, quota int64) {
 	if quota == 0 {
 		return
@@ -154,7 +175,7 @@ func (o *OrganizationWalletFunding) PreConsume(amount int) error {
 	if o.memberId <= 0 || o.organizationId <= 0 {
 		return errors.New("invalid organization wallet funding")
 	}
-	if err := AdjustWalletQuotaForUser(o.memberId, int64(amount)); err != nil {
+	if err := reserveWalletQuotaForOrganization(o.memberId, o.organizationId, int64(amount)); err != nil {
 		return err
 	}
 	o.consumed = amount
@@ -165,14 +186,14 @@ func (o *OrganizationWalletFunding) Settle(delta int) error {
 	if delta == 0 {
 		return nil
 	}
-	return AdjustWalletQuotaForUser(o.memberId, int64(delta))
+	return adjustWalletQuotaForOrganization(o.memberId, o.organizationId, int64(delta))
 }
 
 func (o *OrganizationWalletFunding) Refund() error {
 	if o.consumed <= 0 {
 		return nil
 	}
-	return AdjustWalletQuotaForUser(o.memberId, -int64(o.consumed))
+	return adjustWalletQuotaForOrganization(o.memberId, o.organizationId, -int64(o.consumed))
 }
 
 // ---------------------------------------------------------------------------
