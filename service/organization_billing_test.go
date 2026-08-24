@@ -110,6 +110,36 @@ func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWalle
 	require.Equal(t, int64(0), org.UsedQuota)
 }
 
+func TestOrganizationWalletBillingReserveIncreasesRetryPreConsume(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.NoError(t, session.Reserve(40))
+
+	require.Equal(t, 40, session.GetPreConsumedQuota())
+	require.Equal(t, int64(60), getUserQuotaForBillingTest(t, 2))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, int64(960), org.Quota)
+
+	session.Refund(newOrganizationBillingContext())
+	require.Eventually(t, func() bool {
+		org = getOrganizationForBillingTest(t, 1)
+		return getUserQuotaForBillingTest(t, 2) == 100 && org.Quota == 1000
+	}, time.Second, 10*time.Millisecond)
+}
+
 func TestOrganizationWalletBillingOwnerRequestUsesOrganizationWallet(t *testing.T) {
 	truncate(t)
 

@@ -25,7 +25,7 @@ import (
 type BillingSession struct {
 	relayInfo        *relaycommon.RelayInfo
 	funding          FundingSource
-	preConsumedQuota int  // 0
+	preConsumedQuota int // 0
 	tokenConsumed    int
 	extraReserved    int
 	trusted          bool
@@ -242,6 +242,18 @@ func (s *BillingSession) reserveFunding(delta int) error {
 		}
 		funding.consumed += delta
 		return nil
+	case *OrganizationWalletFunding:
+		if err := funding.Settle(delta); err != nil {
+			return types.NewErrorWithStatusCode(
+				fmt.Errorf("organization wallet quota insufficient: %s", err.Error()),
+				types.ErrorCodeInsufficientUserQuota,
+				http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(),
+				types.ErrOptionWithNoRecordErrorLog(),
+			)
+		}
+		funding.consumed += delta
+		return nil
 	case *SubscriptionFunding:
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, int64(delta)); err != nil {
 			return types.NewErrorWithStatusCode(
@@ -274,6 +286,12 @@ func (s *BillingSession) rollbackFundingReserve(delta int) {
 	case *WalletFunding:
 		if err := model.IncreaseUserQuota(funding.userId, int64(delta), false); err != nil {
 			common.SysLog("error rolling back wallet funding reserve: " + err.Error())
+		} else {
+			funding.consumed -= delta
+		}
+	case *OrganizationWalletFunding:
+		if err := funding.Settle(-delta); err != nil {
+			common.SysLog("error rolling back organization wallet funding reserve: " + err.Error())
 		} else {
 			funding.consumed -= delta
 		}
