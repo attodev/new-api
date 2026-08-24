@@ -103,3 +103,18 @@ func TestUserQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(13), cached.Quota)
 }
+
+func TestUserCacheHydrationPreservesExistingQuota(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	user := insertUserWithQuota(t, 20)
+
+	require.NoError(t, writeUserCache(*user, true))
+	require.NoError(t, cacheIncrUserQuota(user.Id, -7))
+	require.NoError(t, writeUserCache(*user, true))
+
+	cached, err := cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(13), cached.Quota)
+}

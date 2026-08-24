@@ -122,7 +122,10 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 	}
 
 	if common.RedisEnabled {
-		if cacheErr := writeUserCache(*user, false); cacheErr != nil {
+		// A read miss may be a transient Redis error rather than an absent hash.
+		// Preserve an already-complete cache balance so a stale DB snapshot cannot
+		// overwrite batched quota deltas that have not reached the database yet.
+		if cacheErr := writeUserCache(*user, true); cacheErr != nil {
 			common.SysLog("failed to synchronously populate user cache: " + cacheErr.Error())
 		}
 	}
