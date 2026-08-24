@@ -44,6 +44,10 @@ func InitBatchUpdater() {
 func addNewRecord(type_ int, id int, value int64) {
 	batchUpdateLocks[type_].Lock()
 	defer batchUpdateLocks[type_].Unlock()
+	addNewRecordLocked(type_, id, value)
+}
+
+func addNewRecordLocked(type_ int, id int, value int64) {
 	if _, ok := batchUpdateStores[type_][id]; !ok {
 		batchUpdateStores[type_][id] = value
 	} else {
@@ -54,6 +58,10 @@ func addNewRecord(type_ int, id int, value int64) {
 func hasPendingBatchRecord(type_ int, id int) bool {
 	batchUpdateLocks[type_].Lock()
 	defer batchUpdateLocks[type_].Unlock()
+	return hasPendingBatchRecordLocked(type_, id)
+}
+
+func hasPendingBatchRecordLocked(type_ int, id int) bool {
 	_, queued := batchUpdateStores[type_][id]
 	_, inFlight := batchUpdateInFlight[type_][id]
 	return queued || inFlight

@@ -56,6 +56,8 @@ func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, reserved)
 	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
+	_, err = GetTokenByKey(tok.Key, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
 
 	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
 	require.ErrorIs(t, err, ErrQuotaCachePending)

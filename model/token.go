@@ -259,6 +259,9 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 	}
 	if common.RedisEnabled {
 		if _, cacheErr := cacheInitToken(*token); cacheErr != nil {
+			if errors.Is(cacheErr, ErrQuotaCachePending) {
+				return nil, cacheErr
+			}
 			common.SysLog("failed to init token cache: " + cacheErr.Error())
 		}
 	}

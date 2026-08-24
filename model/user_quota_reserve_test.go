@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -117,4 +118,38 @@ func TestUserCacheHydrationPreservesExistingQuota(t *testing.T) {
 	cached, err := cacheGetUserBase(user.Id)
 	require.NoError(t, err)
 	require.Equal(t, int64(13), cached.Quota)
+}
+
+func TestGetUserQuotaSynchronouslyBuildsCompleteCache(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	user := insertUserWithQuota(t, 20)
+
+	quota, err := GetUserQuota(user.Id, false)
+	require.NoError(t, err)
+	require.Equal(t, int64(20), quota)
+
+	cached, err := cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, user.Id, cached.Id)
+	require.Equal(t, int64(20), cached.Quota)
+}
+
+func TestUserHydrationFailsClosedWithPendingBatch(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	user := insertUserWithQuota(t, 9)
+
+	reserved, err := TryReserveUserQuota(user.Id, 7)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getUserCacheKey(user.Id)).Err())
+
+	_, err = GetUserQuota(user.Id, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	_, err = cacheGetUserBase(user.Id)
+	require.Error(t, err, "a stale database snapshot must not be published")
 }

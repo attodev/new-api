@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
@@ -107,6 +108,21 @@ func updateUserCache(user User) error {
 	return writeUserCache(user, true)
 }
 
+func populateUserCache(user User) error {
+	if !common.RedisEnabled {
+		return nil
+	}
+	if !common.BatchUpdateEnabled {
+		return writeUserCache(user, true)
+	}
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	if hasPendingBatchRecordLocked(BatchUpdateTypeUserQuota, user.Id) {
+		return fmt.Errorf("%w: user %d", ErrQuotaCachePending, user.Id)
+	}
+	return writeUserCache(user, true)
+}
+
 // GetUserCache gets complete user cache from hash
 func GetUserCache(userId int) (userCache *UserBase, err error) {
 	// Try getting from Redis first
@@ -125,7 +141,10 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		// A read miss may be a transient Redis error rather than an absent hash.
 		// Preserve an already-complete cache balance so a stale DB snapshot cannot
 		// overwrite batched quota deltas that have not reached the database yet.
-		if cacheErr := writeUserCache(*user, true); cacheErr != nil {
+		if cacheErr := populateUserCache(*user); cacheErr != nil {
+			if errors.Is(cacheErr, ErrQuotaCachePending) {
+				return nil, cacheErr
+			}
 			common.SysLog("failed to synchronously populate user cache: " + cacheErr.Error())
 		}
 	}
@@ -153,7 +172,8 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-	return common.RedisHIncrBy(getUserCacheKey(userId), "Quota", delta)
+	_, err := cacheApplyUserQuotaDelta(userId, delta)
+	return err
 }
 
 func cacheDecrUserQuota(userId int, delta int64) error {
@@ -211,13 +231,6 @@ func updateUserStatusCache(userId int, status bool) error {
 		statusInt = common.UserStatusDisabled
 	}
 	return common.RedisHSetField(getUserCacheKey(userId), "Status", fmt.Sprintf("%d", statusInt))
-}
-
-func updateUserQuotaCache(userId int, quota int64) error {
-	if !common.RedisEnabled {
-		return nil
-	}
-	return common.RedisHSetField(getUserCacheKey(userId), "Quota", fmt.Sprintf("%d", quota))
 }
 
 func updateUserGroupCache(userId int, group string) error {

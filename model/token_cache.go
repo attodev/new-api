@@ -51,6 +51,18 @@ func cacheInitToken(token Token) (int, error) {
 	if !common.RedisEnabled {
 		return 0, nil
 	}
+	if !common.BatchUpdateEnabled {
+		return cacheInitTokenUnlocked(token)
+	}
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+	defer batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+	if hasPendingBatchRecordLocked(BatchUpdateTypeTokenQuota, token.Id) {
+		return 0, fmt.Errorf("%w: token %d", ErrQuotaCachePending, token.Id)
+	}
+	return cacheInitTokenUnlocked(token)
+}
+
+func cacheInitTokenUnlocked(token Token) (int, error) {
 	allowIPs := ""
 	if token.AllowIps != nil {
 		allowIPs = *token.AllowIps

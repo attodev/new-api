@@ -127,6 +127,17 @@ func persistTokenQuotaDelta(id int, delta int) error {
 }
 
 func applyTokenQuotaDelta(id int, key string, delta int) error {
+	if common.BatchUpdateEnabled {
+		batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+		defer batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+		addNewRecordLocked(BatchUpdateTypeTokenQuota, id, int64(delta))
+		if common.RedisEnabled {
+			if _, cacheErr := cacheApplyTokenQuotaDelta(id, key, int64(delta)); cacheErr != nil {
+				common.SysLog("failed to synchronously update token quota cache: " + cacheErr.Error())
+			}
+		}
+		return nil
+	}
 	cacheApplied := false
 	if common.RedisEnabled {
 		result, cacheErr := cacheApplyTokenQuotaDelta(id, key, int64(delta))
@@ -166,6 +177,17 @@ func persistUserQuotaDelta(id int, delta int64, forceDB bool) error {
 }
 
 func applyUserQuotaDelta(id int, delta int64, forceDB bool) error {
+	if !forceDB && common.BatchUpdateEnabled {
+		batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+		defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+		addNewRecordLocked(BatchUpdateTypeUserQuota, id, delta)
+		if common.RedisEnabled {
+			if _, cacheErr := cacheApplyUserQuotaDelta(id, delta); cacheErr != nil {
+				common.SysLog("failed to synchronously update user quota cache: " + cacheErr.Error())
+			}
+		}
+		return nil
+	}
 	cacheApplied := false
 	if common.RedisEnabled {
 		result, cacheErr := cacheApplyUserQuotaDelta(id, delta)
@@ -218,6 +240,22 @@ func TryReserveUserQuota(id int, quota int64) (bool, error) {
 	if !common.RedisEnabled {
 		return reserveUserQuotaDB(id, quota)
 	}
+	if common.BatchUpdateEnabled {
+		if _, err := GetUserCache(id); err != nil {
+			return false, err
+		}
+		batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+		defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+		result, err := cacheTryReserveUserQuota(id, quota)
+		if err != nil || result == cacheQuotaMiss {
+			return false, fmt.Errorf("%w: user %d", ErrQuotaCachePending, id)
+		}
+		if result == cacheQuotaInsufficient {
+			return false, nil
+		}
+		addNewRecordLocked(BatchUpdateTypeUserQuota, id, -quota)
+		return true, nil
+	}
 
 	result, err := cacheTryReserveUserQuota(id, quota)
 	if err == nil && result == cacheQuotaMiss && !hasPendingBatchRecord(BatchUpdateTypeUserQuota, id) {
@@ -259,6 +297,22 @@ func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, 
 	}
 	if !common.RedisEnabled {
 		return reserveTokenQuotaDB(id, quota)
+	}
+	if common.BatchUpdateEnabled {
+		if _, err := GetTokenByKey(key, false); err != nil {
+			return false, err
+		}
+		batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+		defer batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+		result, err := cacheTryReserveTokenQuota(id, key, int64(quota))
+		if err != nil || result == cacheQuotaMiss {
+			return false, fmt.Errorf("%w: token %d", ErrQuotaCachePending, id)
+		}
+		if result == cacheQuotaInsufficient {
+			return false, nil
+		}
+		addNewRecordLocked(BatchUpdateTypeTokenQuota, id, -int64(quota))
+		return true, nil
 	}
 
 	result, err := cacheTryReserveTokenQuota(id, key, int64(quota))
