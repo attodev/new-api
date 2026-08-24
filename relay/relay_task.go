@@ -19,6 +19,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -242,9 +243,21 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// 11. OtherRatios
 	finalQuota := info.PriceData.Quota
 	if adjustedRatios := adaptor.AdjustBillingOnSubmit(info, taskData); len(adjustedRatios) > 0 {
+		// Unlike AddOtherRatio (used for the pre-consume estimate earlier in
+		// this same flow), this replaces the whole map wholesale with
+		// whatever the adaptor computed from the upstream's actual response
+		// (duration, resolution) - validate it the same way before it can
+		// reach the quota multiplication below or get read back by any other
+		// consumer of info.PriceData.OtherRatios (settlement, logging).
+		validRatios := make(map[string]float64, len(adjustedRatios))
+		for key, ratio := range adjustedRatios {
+			if types.IsValidOtherRatio(ratio) {
+				validRatios[key] = ratio
+			}
+		}
 		// ratios quota
-		finalQuota = recalcQuotaFromRatios(info, adjustedRatios)
-		info.PriceData.OtherRatios = adjustedRatios
+		finalQuota = recalcQuotaFromRatios(info, validRatios)
+		info.PriceData.OtherRatios = validRatios
 		info.PriceData.Quota = finalQuota
 	}
 
@@ -268,13 +281,17 @@ func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float6
 		}
 	}
 	// ratios
+	// Self-defending against an invalid ratio (NaN/+Inf/non-positive) even
+	// though the current caller already filters - a money-handling function
+	// shouldn't rely solely on its caller's discipline.
 	result := float64(baseQuota)
 	for _, ra := range ratios {
-		if ra != 1.0 {
-			result *= ra
+		if ra == 1.0 || !types.IsValidOtherRatio(ra) {
+			continue
 		}
+		result *= ra
 	}
-	return int(result)
+	return common.QuotaFromFloat(result)
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
