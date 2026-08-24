@@ -49,6 +49,13 @@ func addNewRecord(type_ int, id int, value int64) {
 	}
 }
 
+func hasPendingBatchRecord(type_ int, id int) bool {
+	batchUpdateLocks[type_].Lock()
+	defer batchUpdateLocks[type_].Unlock()
+	_, ok := batchUpdateStores[type_][id]
+	return ok
+}
+
 func batchUpdate() {
 	// check if there's any data to update
 	hasData := false

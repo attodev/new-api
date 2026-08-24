@@ -27,6 +27,8 @@ type FundingSource interface {
 // WalletFunding —
 // ---------------------------------------------------------------------------
 
+var ErrInsufficientWalletQuota = errors.New("wallet quota insufficient")
+
 type WalletFunding struct {
 	userId   int
 	consumed int
@@ -38,8 +40,12 @@ func (w *WalletFunding) PreConsume(amount int) error {
 	if amount <= 0 {
 		return nil
 	}
-	if err := model.DecreaseUserQuota(w.userId, int64(amount), false); err != nil {
+	reserved, err := model.TryReserveUserQuota(w.userId, int64(amount))
+	if err != nil {
 		return err
+	}
+	if !reserved {
+		return ErrInsufficientWalletQuota
 	}
 	w.consumed = amount
 	return nil

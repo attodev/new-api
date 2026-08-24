@@ -17,6 +17,30 @@ const (
 	cacheQuotaMiss
 )
 
+var ErrQuotaCachePending = errors.New("quota cache unavailable while database updates are pending")
+
+const userQuotaReserveScript = `
+if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
+  or tonumber(redis.call('HGET', KEYS[1], 'CacheSchema') or '0') ~= tonumber(ARGV[3])
+  or redis.call('HEXISTS', KEYS[1], 'Quota') == 0 then
+  return -1
+end
+local quota = tonumber(redis.call('HGET', KEYS[1], 'Quota'))
+if quota == nil or quota < tonumber(ARGV[1]) then
+  return 0
+end
+redis.call('HINCRBY', KEYS[1], 'Quota', -tonumber(ARGV[1]))
+return 1`
+
+const userQuotaDeltaScript = `
+if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
+  or tonumber(redis.call('HGET', KEYS[1], 'CacheSchema') or '0') ~= tonumber(ARGV[3])
+  or redis.call('HEXISTS', KEYS[1], 'Quota') == 0 then
+  return -1
+end
+redis.call('HINCRBY', KEYS[1], 'Quota', tonumber(ARGV[1]))
+return 1`
+
 const tokenQuotaReserveScript = `
 if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'RemainQuota') == 0
@@ -57,6 +81,18 @@ func quotaResultFromLua(result int, err error) (cacheQuotaResult, error) {
 	}
 }
 
+func cacheTryReserveUserQuota(userID int, amount int64) (cacheQuotaResult, error) {
+	result, err := common.RDB.Eval(context.Background(), userQuotaReserveScript,
+		[]string{getUserCacheKey(userID)}, amount, userID, userCacheSchemaVersion).Int()
+	return quotaResultFromLua(result, err)
+}
+
+func cacheApplyUserQuotaDelta(userID int, delta int64) (cacheQuotaResult, error) {
+	result, err := common.RDB.Eval(context.Background(), userQuotaDeltaScript,
+		[]string{getUserCacheKey(userID)}, delta, userID, userCacheSchemaVersion).Int()
+	return quotaResultFromLua(result, err)
+}
+
 func cacheTryReserveTokenQuota(id int, key string, amount int64) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), tokenQuotaReserveScript,
 		[]string{getTokenCacheKey(key)}, amount, id, common.GetTimestamp()).Int()
@@ -90,6 +126,29 @@ func persistTokenQuotaDelta(id int, delta int) error {
 	return nil
 }
 
+func persistUserQuotaDelta(id int, delta int64) error {
+	if common.BatchUpdateEnabled {
+		addNewRecord(BatchUpdateTypeUserQuota, id, delta)
+		return nil
+	}
+	result := DB.Model(&User{}).Where("id = ?", id).
+		Update("quota", gorm.Expr("quota + ?", delta))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func reserveUserQuotaDB(id int, quota int64) (bool, error) {
+	result := DB.Model(&User{}).
+		Where("id = ? AND quota >= ?", id, quota).
+		Update("quota", gorm.Expr("quota - ?", quota))
+	return result.RowsAffected == 1, result.Error
+}
+
 func reserveTokenQuotaDB(id int, quota int) (bool, error) {
 	result := DB.Model(&Token{}).
 		Where("id = ? AND remain_quota >= ?", id, quota).
@@ -99,6 +158,44 @@ func reserveTokenQuotaDB(id int, quota int) (bool, error) {
 			"accessed_time": common.GetTimestamp(),
 		})
 	return result.RowsAffected == 1, result.Error
+}
+
+// TryReserveUserQuota atomically checks and deducts user wallet quota. Redis
+// remains authoritative while batched database deltas are pending.
+func TryReserveUserQuota(id int, quota int64) (bool, error) {
+	if quota < 0 {
+		return false, errors.New("quota cannot be negative")
+	}
+	if quota == 0 {
+		return true, nil
+	}
+	if !common.RedisEnabled {
+		return reserveUserQuotaDB(id, quota)
+	}
+
+	result, err := cacheTryReserveUserQuota(id, quota)
+	if err == nil && result == cacheQuotaMiss && !hasPendingBatchRecord(BatchUpdateTypeUserQuota, id) {
+		if _, hydrateErr := GetUserCache(id); hydrateErr == nil {
+			result, err = cacheTryReserveUserQuota(id, quota)
+		}
+	}
+	if err != nil || result == cacheQuotaMiss {
+		if common.BatchUpdateEnabled && hasPendingBatchRecord(BatchUpdateTypeUserQuota, id) {
+			return false, fmt.Errorf("%w: user %d", ErrQuotaCachePending, id)
+		}
+		return reserveUserQuotaDB(id, quota)
+	}
+	if result == cacheQuotaInsufficient {
+		return false, nil
+	}
+	if err = persistUserQuotaDelta(id, -quota); err != nil {
+		compensated, compensateErr := cacheApplyUserQuotaDelta(id, quota)
+		if compensateErr != nil || compensated != cacheQuotaOK {
+			common.SysError(fmt.Sprintf("failed to compensate reserved user quota: result=%d error=%v", compensated, compensateErr))
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // TryReserveTokenQuota atomically checks and deducts token quota. Redis is

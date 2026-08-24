@@ -69,6 +69,7 @@ func (user *User) ToBaseUser() *UserBase {
 		Username:         user.Username,
 		Setting:          user.Setting,
 		Email:            user.Email,
+		CacheSchema:      userCacheSchemaVersion,
 	}
 	return cache
 }

@@ -1,17 +1,17 @@
 package model
 
 import (
+	"context"
 	"fmt"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
+
+const userCacheSchemaVersion = 1
 
 // UserBase struct remains the same as it represents the cached data structure
 type UserBase struct {
@@ -24,6 +24,7 @@ type UserBase struct {
 	Status           int    `json:"status"`
 	Username         string `json:"username"`
 	Setting          string `json:"setting"`
+	CacheSchema      int    `json:"-"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -65,34 +66,49 @@ func InvalidateUserCache(userId int) error {
 	return invalidateUserCache(userId)
 }
 
-// updateUserCache updates all user cache fields using hash
-func updateUserCache(user User) error {
+const writeUserCacheScript = `
+local preserveQuota = tonumber(ARGV[11]) == 1
+local complete = tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') == tonumber(ARGV[1])
+  and redis.call('HEXISTS', KEYS[1], 'Quota') == 1
+local quota = ARGV[6]
+if preserveQuota and complete then
+  quota = redis.call('HGET', KEYS[1], 'Quota')
+end
+redis.call('HSET', KEYS[1],
+  'Id', ARGV[1], 'Group', ARGV[2], 'OrganizationId', ARGV[3],
+  'OrganizationRole', ARGV[4], 'Email', ARGV[5], 'Quota', quota,
+  'Status', ARGV[7], 'Username', ARGV[8], 'Setting', ARGV[9],
+  'CacheSchema', ARGV[10])
+redis.call('EXPIRE', KEYS[1], ARGV[12])
+return 1`
+
+func writeUserCache(user User, preserveQuota bool) error {
 	if !common.RedisEnabled {
 		return nil
 	}
+	ttl := common.RedisKeyCacheSeconds()
+	if ttl <= 0 {
+		ttl = 60
+	}
+	preserve := 0
+	if preserveQuota {
+		preserve = 1
+	}
+	return common.RDB.Eval(context.Background(), writeUserCacheScript,
+		[]string{getUserCacheKey(user.Id)}, user.Id, user.Group,
+		user.OrganizationId, user.OrganizationRole, user.Email, user.Quota,
+		user.Status, user.Username, user.Setting, userCacheSchemaVersion,
+		preserve, ttl).Err()
+}
 
-	return common.RedisHSetObj(
-		getUserCacheKey(user.Id),
-		user.ToBaseUser(),
-		time.Duration(common.RedisKeyCacheSeconds())*time.Second,
-	)
+// updateUserCache refreshes metadata without replacing quota maintained by
+// atomic delta operations.
+func updateUserCache(user User) error {
+	return writeUserCache(user, true)
 }
 
 // GetUserCache gets complete user cache from hash
 func GetUserCache(userId int) (userCache *UserBase, err error) {
-	var user *User
-	var fromDB bool
-	defer func() {
-		// Update Redis cache asynchronously on successful DB read
-		if shouldUpdateRedis(fromDB, err) && user != nil {
-			gopool.Go(func() {
-				if err := updateUserCache(*user); err != nil {
-					common.SysLog("failed to update user status cache: " + err.Error())
-				}
-			})
-		}
-	}()
-
 	// Try getting from Redis first
 	userCache, err = cacheGetUserBase(userId)
 	if err == nil {
@@ -100,24 +116,17 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 	}
 
 	// If Redis fails, get from DB
-	fromDB = true
-	user, err = GetUserById(userId, false)
+	user, err := GetUserById(userId, false)
 	if err != nil {
 		return nil, err // Return nil and error if DB lookup fails
 	}
 
-	// Create cache object from user data
-	userCache = &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+	if common.RedisEnabled {
+		if cacheErr := writeUserCache(*user, false); cacheErr != nil {
+			common.SysLog("failed to synchronously populate user cache: " + cacheErr.Error())
+		}
 	}
-
-	return userCache, nil
+	return user.ToBaseUser(), nil
 }
 
 func cacheGetUserBase(userId int) (*UserBase, error) {
@@ -129,6 +138,9 @@ func cacheGetUserBase(userId int) (*UserBase, error) {
 	err := common.RedisHGetObj(getUserCacheKey(userId), &userCache)
 	if err != nil {
 		return nil, err
+	}
+	if userCache.Id != userId || userCache.CacheSchema != userCacheSchemaVersion {
+		return nil, fmt.Errorf("user cache schema is stale")
 	}
 	return &userCache, nil
 }
