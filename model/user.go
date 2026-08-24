@@ -84,6 +84,23 @@ func (user *User) SetAccessToken(token string) {
 	user.AccessToken = &token
 }
 
+// UpdateUserAccessToken rotates a dashboard personal access token without
+// writing a stale user snapshot back over concurrently updated fields -
+// Update() Omits "access_token" precisely so callers use this instead.
+func UpdateUserAccessToken(id int, token string) error {
+	if id == 0 {
+		return errors.New("id is required")
+	}
+	result := DB.Model(&User{}).Where("id = ?", id).Update("access_token", token)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (user *User) GetSetting() dto.UserSetting {
 	setting := dto.UserSetting{}
 	if user.Setting != "" {
