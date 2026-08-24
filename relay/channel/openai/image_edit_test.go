@@ -49,7 +49,7 @@ func TestConvertImageEditRequestKeepsValidMultipartStreamFields(t *testing.T) {
 	request := dto.ImageRequest{
 		Model:  "gpt-image-1",
 		Prompt: "edit this image",
-		Stream: true,
+		Stream: common.GetPointer(true),
 	}
 
 	converted, err := (&Adaptor{}).ConvertImageRequest(c, info, request)
@@ -112,7 +112,7 @@ func TestConvertImageEditRequestParsesReusableMultipartWhenFormIsMissing(t *test
 	request := dto.ImageRequest{
 		Model:  "gpt-image-1",
 		Prompt: "edit without pre-parsed form",
-		Stream: true,
+		Stream: common.GetPointer(true),
 	}
 
 	converted, err := (&Adaptor{}).ConvertImageRequest(c, info, request)
