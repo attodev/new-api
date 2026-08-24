@@ -401,14 +401,7 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 	if relayInfo.IsPlayground {
 		return nil
 	}
-	if relayInfo.TokenUnlimited {
-		return model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
-	}
-	// Guard the check-and-decrement as a single atomic UPDATE instead of a
-	// separate read-then-decrement: two concurrent requests reading the same
-	// balance could otherwise both pass the check and both decrement,
-	// overspending past what either check alone permitted.
-	ok, err := model.TryDecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
+	ok, err := model.TryReserveTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota, relayInfo.TokenUnlimited)
 	if err != nil {
 		return err
 	}
