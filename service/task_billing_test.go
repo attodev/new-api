@@ -278,6 +278,48 @@ func TestRefundTaskQuota_DecrementsUserAndChannelUsedQuota(t *testing.T) {
 	assert.Equal(t, int64(0), getChannelUsedQuota(t, channelID), "channel used_quota must be reduced by the refund")
 }
 
+func TestRefundTaskQuotaUsesSnapshottedOrganizationAfterMembershipChange(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, channelID, chargedOrgID, currentOrgID = 16, 16, 16, 17
+	const chargedQuota = 200
+
+	seedOrganizationUser(t, userID, "moved-task-user", 800, chargedOrgID, model.OrganizationRoleMember)
+	seedOrganization(t, chargedOrgID, userID)
+	require.NoError(t, model.DB.Create(&model.Organization{
+		Id:          currentOrgID,
+		Name:        "current-task-org",
+		OwnerUserId: userID,
+		Status:      model.OrganizationStatusEnabled,
+		Quota:       1000,
+	}).Error)
+	seedChannel(t, channelID)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", chargedOrgID).Updates(map[string]any{
+		"quota":      800,
+		"used_quota": chargedQuota,
+	}).Error)
+	model.UpdateUserUsedQuotaAndRequestCount(userID, chargedQuota)
+	model.UpdateChannelUsedQuota(channelID, chargedQuota)
+
+	task := makeTask(userID, channelID, chargedQuota, 0, BillingSourceWallet, 0)
+	task.PrivateData.OrganizationId = chargedOrgID
+
+	// Membership changed after submission. Refund must still reverse the
+	// organization that funded the original task.
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", userID).Update("organization_id", currentOrgID).Error)
+
+	RefundTaskQuota(ctx, task, "task failed after organization move")
+
+	require.Equal(t, int64(1000), getUserQuota(t, userID))
+	chargedOrg := getOrganizationForBillingTest(t, chargedOrgID)
+	require.Equal(t, int64(1000), chargedOrg.Quota)
+	require.Zero(t, chargedOrg.UsedQuota)
+	currentOrg := getOrganizationForBillingTest(t, currentOrgID)
+	require.Equal(t, int64(1000), currentOrg.Quota)
+	require.Zero(t, currentOrg.UsedQuota)
+}
+
 func TestRefundTaskQuota_Subscription(t *testing.T) {
 	truncate(t)
 	ctx := context.Background()

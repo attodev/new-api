@@ -72,6 +72,7 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 		OriginModelName: "test-model",
 		IsPlayground:    true,
 		ForcePreConsume: true,
+		ChannelMeta:     &relaycommon.ChannelMeta{ChannelId: 1},
 	}
 
 	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
@@ -83,6 +84,9 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, int64(975), org.Quota)
 	require.Equal(t, int64(0), org.UsedQuota)
+	require.Equal(t, 1, relayInfo.BillingOrganizationId)
+	task := model.InitTask("", relayInfo)
+	require.Equal(t, 1, task.PrivateData.OrganizationId)
 }
 
 func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWallet(t *testing.T) {

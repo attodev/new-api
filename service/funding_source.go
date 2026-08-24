@@ -83,7 +83,13 @@ func AdjustWalletQuotaForUser(userId int, delta int64) error {
 	if err != nil {
 		return err
 	}
+	return adjustWalletQuotaForOrganization(userId, organizationId, delta)
+}
 
+func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int64) error {
+	if delta == 0 {
+		return nil
+	}
 	if delta > 0 {
 		if err := model.DecreaseUserQuota(userId, delta, false); err != nil {
 			return err
@@ -103,6 +109,7 @@ func AdjustWalletQuotaForUser(userId int, delta int64) error {
 	}
 	if organizationId > 0 {
 		if err := model.IncreaseOrganizationQuota(organizationId, refund); err != nil {
+			_ = model.DecreaseUserQuota(userId, refund, false)
 			return err
 		}
 	}

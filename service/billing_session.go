@@ -360,6 +360,7 @@ func (s *BillingSession) syncRelayInfo() {
 	info := s.relayInfo
 	info.FinalPreConsumedQuota = s.preConsumedQuota
 	info.BillingSource = s.funding.Source()
+	info.BillingOrganizationId = 0
 
 	if sub, ok := s.funding.(*SubscriptionFunding); ok {
 		info.SubscriptionId = sub.subscriptionId
@@ -370,6 +371,7 @@ func (s *BillingSession) syncRelayInfo() {
 		info.SubscriptionPlanId = sub.PlanId
 		info.SubscriptionPlanTitle = sub.PlanTitle
 	} else if sub, ok := s.funding.(*OrganizationSubscriptionFunding); ok {
+		info.BillingOrganizationId = sub.organizationId
 		info.SubscriptionId = sub.organizationUserSubscriptionId
 		info.SubscriptionPreConsumed = sub.preConsumed + int64(s.extraReserved)
 		info.SubscriptionPostDelta = 0
@@ -378,6 +380,9 @@ func (s *BillingSession) syncRelayInfo() {
 		info.SubscriptionPlanId = sub.PlanId
 		info.SubscriptionPlanTitle = sub.PlanTitle
 	} else {
+		if wallet, ok := s.funding.(*OrganizationWalletFunding); ok {
+			info.BillingOrganizationId = wallet.organizationId
+		}
 		info.SubscriptionId = 0
 		info.SubscriptionPreConsumed = 0
 	}

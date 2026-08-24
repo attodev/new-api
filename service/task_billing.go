@@ -120,7 +120,23 @@ func taskAdjustFunding(task *model.Task, delta int) error {
 		}
 		return nil
 	}
+	if task.PrivateData.OrganizationId > 0 {
+		return adjustWalletQuotaForOrganization(task.UserId, task.PrivateData.OrganizationId, int64(delta))
+	}
 	return AdjustWalletQuotaForUser(task.UserId, int64(delta))
+}
+
+func taskAdjustOrganizationUsedQuota(task *model.Task, delta int64) {
+	if delta == 0 {
+		return
+	}
+	if task.PrivateData.OrganizationId > 0 {
+		_ = model.UpdateOrganizationUsedQuota(task.PrivateData.OrganizationId, delta)
+		return
+	}
+	// Legacy tasks created before OrganizationId was snapshotted retain the
+	// previous best-effort behavior based on the user's current membership.
+	UpdateOrganizationUsedQuotaForUser(task.UserId, delta)
 }
 
 // taskAdjustTokenQuota delta > 0 delta < 0
@@ -196,6 +212,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	// quota above; without this, used_quota would never come back down and
 	// "total quota" (quota + used_quota) inflates further with every refund.
 	model.UpdateUserUsedQuota(task.UserId, int64(-quota))
+	taskAdjustOrganizationUsedQuota(task, int64(-quota))
 	model.UpdateChannelUsedQuota(task.ChannelId, -quota)
 
 	// 4.
@@ -277,7 +294,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	// UpdateUserUsedQuota (not ...AndRequestCount) since submission time
 	// already counted this request once.
 	model.UpdateUserUsedQuota(task.UserId, int64(quotaDelta))
-	UpdateOrganizationUsedQuotaForUser(task.UserId, int64(quotaDelta))
+	taskAdjustOrganizationUsedQuota(task, int64(quotaDelta))
 	model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 
 	var logType int
