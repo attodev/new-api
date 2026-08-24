@@ -678,6 +678,12 @@ func OpenaiImageStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp 
 				}
 			}
 		}
+		// Unlike StreamScannerHandler (used by the chat/completion streaming
+		// path), this loop writes directly to c.Writer with no deadline of its
+		// own - without this, a stalled client (TCP window never drains) can
+		// block this write forever, leaking the goroutine and the held
+		// upstream connection.
+		helper.ExtendWriteDeadline(c)
 		if _, err := c.Writer.Write(append([]byte(line), '\n')); err != nil {
 			if info != nil && info.StreamStatus != nil {
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, err)
