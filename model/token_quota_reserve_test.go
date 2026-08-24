@@ -62,17 +62,27 @@ func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {
 	require.False(t, reserved)
 }
 
+func TestHasPendingBatchRecordIncludesInFlightDelta(t *testing.T) {
+	resetTokenQuotaBatchState(t)
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+	batchUpdateInFlight[BatchUpdateTypeTokenQuota][42] = -7
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+	require.True(t, hasPendingBatchRecord(BatchUpdateTypeTokenQuota, 42))
+}
+
 func resetTokenQuotaBatchState(t *testing.T) {
 	t.Helper()
 	oldBatchEnabled := common.BatchUpdateEnabled
 	common.BatchUpdateEnabled = false
 	batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
 	batchUpdateStores[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+	batchUpdateInFlight[BatchUpdateTypeTokenQuota] = make(map[int]int64)
 	batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
 	t.Cleanup(func() {
 		common.BatchUpdateEnabled = oldBatchEnabled
 		batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
 		batchUpdateStores[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+		batchUpdateInFlight[BatchUpdateTypeTokenQuota] = make(map[int]int64)
 		batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
 	})
 }

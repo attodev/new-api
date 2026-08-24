@@ -14,11 +14,13 @@ func resetUserQuotaBatchState(t *testing.T) {
 	common.BatchUpdateEnabled = false
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
 	batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int64)
+	batchUpdateInFlight[BatchUpdateTypeUserQuota] = make(map[int]int64)
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 	t.Cleanup(func() {
 		common.BatchUpdateEnabled = oldBatchEnabled
 		batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
 		batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int64)
+		batchUpdateInFlight[BatchUpdateTypeUserQuota] = make(map[int]int64)
 		batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 	})
 }
