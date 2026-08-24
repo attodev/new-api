@@ -110,7 +110,7 @@ func AdjustWalletQuotaForUser(userId int, delta int64) error {
 }
 
 func UpdateOrganizationUsedQuotaForUser(userId int, quota int64) {
-	if quota <= 0 {
+	if quota == 0 {
 		return
 	}
 	organizationId, err := resolveOrganizationForWallet(userId)
