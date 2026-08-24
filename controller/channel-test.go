@@ -710,6 +710,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Prompt: "a cute cat",
 				N:      lo.ToPtr(uint(1)),
 				Size:   "1024x1024",
+				Stream: lo.ToPtr(isStream),
 			}
 		case constant.EndpointTypeJinaRerank:
 			// RerankRequest
