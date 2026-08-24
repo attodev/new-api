@@ -993,17 +993,7 @@ func IncreaseUserQuota(id int, quota int64, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	gopool.Go(func() {
-		err := cacheIncrUserQuota(id, quota)
-		if err != nil {
-			common.SysLog("failed to increase user quota: " + err.Error())
-		}
-	})
-	if !db && common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
-		return nil
-	}
-	return increaseUserQuota(id, quota)
+	return applyUserQuotaDelta(id, quota, db)
 }
 
 // increaseUserQuota deliberately does NOT enforce common.MaxQuota. Most callers
@@ -1030,17 +1020,7 @@ func DecreaseUserQuota(id int, quota int64, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	gopool.Go(func() {
-		err := cacheDecrUserQuota(id, quota)
-		if err != nil {
-			common.SysLog("failed to decrease user quota: " + err.Error())
-		}
-	})
-	if !db && common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, -quota)
-		return nil
-	}
-	return decreaseUserQuota(id, quota)
+	return applyUserQuotaDelta(id, -quota, db)
 }
 
 func decreaseUserQuota(id int, quota int64) (err error) {

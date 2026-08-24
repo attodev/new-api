@@ -149,8 +149,8 @@ func applyTokenQuotaDelta(id int, key string, delta int) error {
 	return nil
 }
 
-func persistUserQuotaDelta(id int, delta int64) error {
-	if common.BatchUpdateEnabled {
+func persistUserQuotaDelta(id int, delta int64, forceDB bool) error {
+	if !forceDB && common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, delta)
 		return nil
 	}
@@ -161,6 +161,29 @@ func persistUserQuotaDelta(id int, delta int64) error {
 	}
 	if result.RowsAffected != 1 {
 		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func applyUserQuotaDelta(id int, delta int64, forceDB bool) error {
+	cacheApplied := false
+	if common.RedisEnabled {
+		result, cacheErr := cacheApplyUserQuotaDelta(id, delta)
+		if cacheErr != nil {
+			common.SysLog("failed to synchronously update user quota cache: " + cacheErr.Error())
+		} else {
+			cacheApplied = result == cacheQuotaOK
+		}
+	}
+
+	if err := persistUserQuotaDelta(id, delta, forceDB); err != nil {
+		if cacheApplied {
+			compensated, compensateErr := cacheApplyUserQuotaDelta(id, -delta)
+			if compensateErr != nil || compensated != cacheQuotaOK {
+				common.SysError(fmt.Sprintf("failed to compensate user quota delta: result=%d error=%v", compensated, compensateErr))
+			}
+		}
+		return err
 	}
 	return nil
 }
@@ -211,7 +234,7 @@ func TryReserveUserQuota(id int, quota int64) (bool, error) {
 	if result == cacheQuotaInsufficient {
 		return false, nil
 	}
-	if err = persistUserQuotaDelta(id, -quota); err != nil {
+	if err = persistUserQuotaDelta(id, -quota, false); err != nil {
 		compensated, compensateErr := cacheApplyUserQuotaDelta(id, quota)
 		if compensateErr != nil || compensated != cacheQuotaOK {
 			common.SysError(fmt.Sprintf("failed to compensate reserved user quota: result=%d error=%v", compensated, compensateErr))

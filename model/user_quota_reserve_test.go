@@ -85,3 +85,19 @@ func TestRedisBatchUserReserveNeverFallsBackToStaleDatabaseBalance(t *testing.T)
 	require.NoError(t, DB.First(&afterFlush, user.Id).Error)
 	require.Equal(t, int64(2), afterFlush.Quota)
 }
+
+func TestUserQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	user := insertUserWithQuota(t, 20)
+
+	_, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.NoError(t, DecreaseUserQuota(user.Id, 7, false))
+
+	cached, err := cacheGetUserBase(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(13), cached.Quota)
+}
