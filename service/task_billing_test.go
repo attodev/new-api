@@ -595,6 +595,26 @@ func TestRecalculateTaskQuotaByTokens_SaturatesOnOverflow(t *testing.T) {
 		"an oversized charge must saturate to math.MaxInt32, not pass the raw >32-bit product through to a column the database can't hold")
 }
 
+// TestOtherRatiosMultiplier_RejectsInvalidRatios reproduces a real bug: the
+// otherMultiplier loop in RecalculateTaskQuotaByTokens validated each
+// BillingContext.OtherRatios entry with a bespoke `r != 1.0 && r > 0` check
+// instead of the shared types.IsValidOtherRatio used everywhere else this
+// session's billing-overflow hardening touched (relay/relay_task.go,
+// types/price_data.go) - `r > 0` is true for +Inf, so a malformed +Inf ratio
+// left over in BillingContext would multiply straight through into
+// otherMultiplier and then into the settled quota, saturating it to
+// math.MaxInt32 instead of being discarded like every other invalid-ratio
+// consumer in the codebase does.
+func TestOtherRatiosMultiplier_RejectsInvalidRatios(t *testing.T) {
+	got := otherRatiosMultiplier(map[string]float64{"bad": math.Inf(1), "nan": math.NaN(), "zero": 0})
+	require.Equal(t, 1.0, got, "every entry is invalid, so the multiplier must fall back to a no-op 1.0")
+}
+
+func TestOtherRatiosMultiplier_AppliesValidRatiosAndDropsInvalidOnes(t *testing.T) {
+	got := otherRatiosMultiplier(map[string]float64{"double": 2.0, "bad": math.Inf(1), "noop": 1.0})
+	require.Equal(t, 2.0, got, "the valid ratio must still apply even when a sibling ratio in the same map is invalid")
+}
+
 // TestRecalculate_NegativeDelta_AdjustsUsageDown reproduces a real bug: on a
 // negative delta (task was over-charged up front, some of it refunded back),
 // user.used_quota and channel.used_quota were only ever adjusted on the
