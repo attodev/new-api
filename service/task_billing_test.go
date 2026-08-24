@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -553,6 +556,43 @@ func TestRecalculateTaskQuota_FallsBackToCurrentNodeWhenUnset(t *testing.T) {
 	adminInfo, _ := other["admin_info"].(map[string]interface{})
 	require.NotNil(t, adminInfo)
 	assert.Equal(t, "node-fallback", adminInfo["node_name"])
+}
+
+// TestRecalculateTaskQuotaByTokens_SaturatesOnOverflow reproduces a real bug:
+// this is the live token-based task settlement path (called from
+// service/task_polling.go after every async task completion billed by
+// token count), but it computed actualQuota with a raw, unguarded
+// int(float64(...)) conversion instead of the saturating common.QuotaFromFloat
+// used elsewhere in this session's billing-overflow hardening
+// (62a545720/82db6c0dc) - an oversized token*ratio product could overflow the
+// 32-bit quota DB column on persistence, turning a large charge into a
+// negative one (a credit).
+func TestRecalculateTaskQuotaByTokens_SaturatesOnOverflow(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 17, 17, 17
+	const modelName = "task-overflow-test-model"
+
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(fmt.Sprintf(`{%q:1e7}`, modelName)))
+
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-recalc-overflow", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, 0, tokenID, BillingSourceWallet, 0)
+	task.Group = "default"
+	task.PrivateData.BillingContext.OriginModelName = modelName
+	require.NoError(t, model.DB.Create(task).Error)
+
+	// totalTokens=1000 * modelRatio=1e7 = 1e10, decisively over the 32-bit
+	// quota column's range (math.MaxInt32 ~= 2.1e9).
+	RecalculateTaskQuotaByTokens(ctx, task, 1000)
+
+	var reloaded model.Task
+	require.NoError(t, model.DB.First(&reloaded, task.ID).Error)
+	require.Equal(t, math.MaxInt32, reloaded.Quota,
+		"an oversized charge must saturate to math.MaxInt32, not pass the raw >32-bit product through to a column the database can't hold")
 }
 
 // TestRecalculate_NegativeDelta_AdjustsUsageDown reproduces a real bug: on a
