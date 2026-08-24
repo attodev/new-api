@@ -194,6 +194,7 @@ func UpdateMidjourneyTaskBulk() {
 						ChannelId: task.ChannelId,
 						ModelName: service.CovertMjpActionToModelName(task.Action),
 						Quota:     task.Quota,
+						NodeName:  task.NodeName,
 						Other: map[string]interface{}{
 							"task_id": task.MjId,
 							"reason":  "composition failed",
