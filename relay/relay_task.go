@@ -195,11 +195,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 6. OtherRatios
 	if !common.StringsContains(constant.TaskPricePatches, modelName) {
-		for _, ra := range info.PriceData.OtherRatios {
-			if ra != 1.0 {
-				info.PriceData.Quota = int(float64(info.PriceData.Quota) * ra)
-			}
-		}
+		info.PriceData.Quota = applyOtherRatiosToQuota(info.PriceData.Quota, info.PriceData.OtherRatios)
 	}
 
 	// 7. — info.Billing
@@ -273,20 +269,34 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 // : baseQuota × ∏(ratio) — baseQuota OtherRatios
 func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float64) int {
 	// PriceData OtherRatios
-	baseQuota := info.PriceData.Quota
+	baseQuota := float64(info.PriceData.Quota)
 	// OtherRatios
 	for _, ra := range info.PriceData.OtherRatios {
-		if ra != 1.0 && ra > 0 {
-			baseQuota = int(float64(baseQuota) / ra)
+		if ra == 1.0 || !types.IsValidOtherRatio(ra) {
+			continue
 		}
+		baseQuota /= ra
 	}
 	// ratios
 	// Self-defending against an invalid ratio (NaN/+Inf/non-positive) even
 	// though the current caller already filters - a money-handling function
 	// shouldn't rely solely on its caller's discipline.
-	result := float64(baseQuota)
+	result := baseQuota
 	for _, ra := range ratios {
 		if ra == 1.0 || !types.IsValidOtherRatio(ra) {
+			continue
+		}
+		result *= ra
+	}
+	return common.QuotaFromFloat(result)
+}
+
+// applyOtherRatiosToQuota multiplies quota by every ratio in the map,
+// saturating the result to the quota column's range instead of overflowing.
+func applyOtherRatiosToQuota(quota int, ratios map[string]float64) int {
+	result := float64(quota)
+	for _, ra := range ratios {
+		if ra == 1.0 {
 			continue
 		}
 		result *= ra
