@@ -7,7 +7,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
 
@@ -343,18 +342,7 @@ func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	if common.RedisEnabled {
-		gopool.Go(func() {
-			if _, err := cacheApplyTokenQuotaDelta(tokenId, key, int64(quota)); err != nil {
-				common.SysLog("failed to increase token quota: " + err.Error())
-			}
-		})
-	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, int64(quota))
-		return nil
-	}
-	return increaseTokenQuota(tokenId, quota)
+	return applyTokenQuotaDelta(tokenId, key, quota)
 }
 
 func increaseTokenQuota(id int, quota int) (err error) {
@@ -372,18 +360,7 @@ func DecreaseTokenQuota(id int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	if common.RedisEnabled {
-		gopool.Go(func() {
-			if _, err := cacheApplyTokenQuotaDelta(id, key, int64(-quota)); err != nil {
-				common.SysLog("failed to decrease token quota: " + err.Error())
-			}
-		})
-	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -int64(quota))
-		return nil
-	}
-	return decreaseTokenQuota(id, quota)
+	return applyTokenQuotaDelta(id, key, -quota)
 }
 
 func decreaseTokenQuota(id int, quota int) (err error) {

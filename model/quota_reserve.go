@@ -126,6 +126,29 @@ func persistTokenQuotaDelta(id int, delta int) error {
 	return nil
 }
 
+func applyTokenQuotaDelta(id int, key string, delta int) error {
+	cacheApplied := false
+	if common.RedisEnabled {
+		result, cacheErr := cacheApplyTokenQuotaDelta(id, key, int64(delta))
+		if cacheErr != nil {
+			common.SysLog("failed to synchronously update token quota cache: " + cacheErr.Error())
+		} else {
+			cacheApplied = result == cacheQuotaOK
+		}
+	}
+
+	if err := persistTokenQuotaDelta(id, delta); err != nil {
+		if cacheApplied {
+			compensated, compensateErr := cacheApplyTokenQuotaDelta(id, key, -int64(delta))
+			if compensateErr != nil || compensated != cacheQuotaOK {
+				common.SysError(fmt.Sprintf("failed to compensate token quota delta: result=%d error=%v", compensated, compensateErr))
+			}
+		}
+		return err
+	}
+	return nil
+}
+
 func persistUserQuotaDelta(id int, delta int64) error {
 	if common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, delta)
@@ -216,12 +239,15 @@ func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, 
 	}
 
 	result, err := cacheTryReserveTokenQuota(id, key, int64(quota))
-	if err == nil && result == cacheQuotaMiss {
+	if err == nil && result == cacheQuotaMiss && !hasPendingBatchRecord(BatchUpdateTypeTokenQuota, id) {
 		if _, hydrateErr := GetTokenByKey(key, true); hydrateErr == nil {
 			result, err = cacheTryReserveTokenQuota(id, key, int64(quota))
 		}
 	}
 	if err != nil || result == cacheQuotaMiss {
+		if common.BatchUpdateEnabled && hasPendingBatchRecord(BatchUpdateTypeTokenQuota, id) {
+			return false, fmt.Errorf("%w: token %d", ErrQuotaCachePending, id)
+		}
 		if err != nil {
 			common.SysLog("token quota cache reserve unavailable, falling back to database: " + err.Error())
 		}

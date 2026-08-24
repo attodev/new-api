@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -25,6 +26,40 @@ func useTokenQuotaMiniRedis(t *testing.T) {
 		common.RDB = oldRDB
 		common.SyncFrequency = oldSyncFrequency
 	})
+}
+
+func TestTokenQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 20)
+
+	_, err := GetTokenByKey(tok.Key, true)
+	require.NoError(t, err)
+	require.NoError(t, DecreaseTokenQuota(tok.Id, tok.Key, 7))
+
+	cached, err := cacheGetTokenByKey(tok.Key)
+	require.NoError(t, err)
+	require.Equal(t, 13, cached.RemainQuota)
+	require.Equal(t, 7, cached.UsedQuota)
+}
+
+func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 9)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
+
+	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	require.False(t, reserved)
 }
 
 func resetTokenQuotaBatchState(t *testing.T) {
