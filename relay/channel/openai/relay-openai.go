@@ -716,9 +716,6 @@ func isOpenAIImageStreamErrorEvent(eventName string, data []byte) bool {
 	if strings.EqualFold(strings.TrimSpace(eventName), "error") {
 		return true
 	}
-	if !json.Valid(data) {
-		return false
-	}
 	var payload struct {
 		Type  string          `json:"type"`
 		Error json.RawMessage `json:"error"`
@@ -727,11 +724,12 @@ func isOpenAIImageStreamErrorEvent(eventName string, data []byte) bool {
 		return false
 	}
 	payloadType := strings.ToLower(strings.TrimSpace(payload.Type))
-	return payloadType == "error" || payloadType == "upstream_error" || len(payload.Error) > 0
+	hasError := len(payload.Error) > 0 && string(payload.Error) != "null"
+	return payloadType == "error" || payloadType == "upstream_error" || hasError
 }
 
 func extractOpenAIImageStreamErrorMessage(data []byte) string {
-	if len(data) == 0 || !json.Valid(data) {
+	if len(data) == 0 {
 		return "upstream image stream returned error event"
 	}
 	var payload struct {
@@ -744,7 +742,7 @@ func extractOpenAIImageStreamErrorMessage(data []byte) string {
 	if msg := strings.TrimSpace(payload.Message); msg != "" {
 		return msg
 	}
-	if len(payload.Error) > 0 {
+	if len(payload.Error) > 0 && string(payload.Error) != "null" {
 		var nested struct {
 			Message string `json:"message"`
 		}
