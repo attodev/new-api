@@ -17,7 +17,7 @@ func getTokenCacheFenceKey(key string) string {
 	return fmt.Sprintf("token:fence:%s", common.GenerateHMAC(key))
 }
 
-func tokenCacheTTLSeconds() int {
+func quotaCacheTTLSeconds() int {
 	ttl := common.RedisKeyCacheSeconds()
 	if ttl <= 0 {
 		return 60
@@ -91,7 +91,7 @@ return 1`
 		token.CreatedTime, token.AccessedTime, token.ExpiredTime,
 		strconv.FormatBool(token.UnlimitedQuota), strconv.FormatBool(token.ModelLimitsEnabled),
 		token.ModelLimits, allowIPs, token.Group, strconv.FormatBool(token.CrossGroupRetry),
-		token.RemainQuota, token.UsedQuota, tokenCacheTTLSeconds(),
+		token.RemainQuota, token.UsedQuota, quotaCacheTTLSeconds(),
 	).Int()
 }
 

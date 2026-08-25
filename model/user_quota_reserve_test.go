@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
@@ -103,6 +104,35 @@ func TestUserQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
 	cached, err := cacheGetUserBase(user.Id)
 	require.NoError(t, err)
 	require.Equal(t, int64(13), cached.Quota)
+}
+
+func TestUserQuotaMutationsRefreshCacheTTLWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	server := useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	user := insertUserWithQuota(t, 20)
+
+	_, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	server.FastForward(1500 * time.Millisecond)
+
+	reserved, err := TryReserveUserQuota(user.Id, 7)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.Greater(t, server.TTL(getUserCacheKey(user.Id)), time.Second)
+
+	server.FastForward(1500 * time.Millisecond)
+	require.NoError(t, DecreaseUserQuota(user.Id, 1, false))
+	require.Greater(t, server.TTL(getUserCacheKey(user.Id)), time.Second)
+
+	// The original TTL and the reservation-refreshed TTL have both elapsed.
+	// The delta refresh must keep the authoritative cache available while its
+	// database updates are still pending.
+	server.FastForward(time.Second)
+	_, err = GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.True(t, hasPendingBatchRecord(BatchUpdateTypeUserQuota, user.Id))
 }
 
 func TestUserCacheHydrationPreservesExistingQuota(t *testing.T) {

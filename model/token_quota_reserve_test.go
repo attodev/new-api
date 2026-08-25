@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/alicebob/miniredis/v2"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func useTokenQuotaMiniRedis(t *testing.T) {
+func useTokenQuotaMiniRedis(t *testing.T) *miniredis.Miniredis {
 	t.Helper()
 	server := miniredis.RunT(t)
 	oldRedisEnabled := common.RedisEnabled
@@ -26,6 +27,7 @@ func useTokenQuotaMiniRedis(t *testing.T) {
 		common.RDB = oldRDB
 		common.SyncFrequency = oldSyncFrequency
 	})
+	return server
 }
 
 func TestTokenQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
@@ -43,6 +45,35 @@ func TestTokenQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 13, cached.RemainQuota)
 	require.Equal(t, 7, cached.UsedQuota)
+}
+
+func TestTokenQuotaMutationsRefreshCacheTTLWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	server := useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 20)
+
+	_, err := GetTokenByKey(tok.Key, true)
+	require.NoError(t, err)
+	server.FastForward(1500 * time.Millisecond)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.Greater(t, server.TTL(getTokenCacheKey(tok.Key)), time.Second)
+
+	server.FastForward(1500 * time.Millisecond)
+	require.NoError(t, DecreaseTokenQuota(tok.Id, tok.Key, 1))
+	require.Greater(t, server.TTL(getTokenCacheKey(tok.Key)), time.Second)
+
+	// The original TTL and the reservation-refreshed TTL have both elapsed.
+	// The delta refresh must keep the authoritative cache available while its
+	// database updates are still pending.
+	server.FastForward(time.Second)
+	_, err = GetTokenByKey(tok.Key, false)
+	require.NoError(t, err)
+	require.True(t, hasPendingBatchRecord(BatchUpdateTypeTokenQuota, tok.Id))
 }
 
 func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {

@@ -87,10 +87,7 @@ func writeUserCache(user User, preserveQuota bool) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-	ttl := common.RedisKeyCacheSeconds()
-	if ttl <= 0 {
-		ttl = 60
-	}
+	ttl := quotaCacheTTLSeconds()
 	preserve := 0
 	if preserveQuota {
 		preserve = 1

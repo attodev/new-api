@@ -25,6 +25,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'Quota') == 0 then
   return -1
 end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
 local quota = tonumber(redis.call('HGET', KEYS[1], 'Quota'))
 if quota == nil or quota < tonumber(ARGV[1]) then
   return 0
@@ -38,6 +39,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'Quota') == 0 then
   return -1
 end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
 redis.call('HINCRBY', KEYS[1], 'Quota', tonumber(ARGV[1]))
 return 1`
 
@@ -47,6 +49,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'UsedQuota') == 0 then
   return -1
 end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
 local remain = tonumber(redis.call('HGET', KEYS[1], 'RemainQuota'))
 if remain == nil or remain < tonumber(ARGV[1]) then
   return 0
@@ -62,6 +65,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'UsedQuota') == 0 then
   return -1
 end
+redis.call('EXPIRE', KEYS[1], ARGV[4])
 redis.call('HINCRBY', KEYS[1], 'RemainQuota', tonumber(ARGV[1]))
 redis.call('HINCRBY', KEYS[1], 'UsedQuota', -tonumber(ARGV[1]))
 redis.call('HSET', KEYS[1], 'AccessedTime', ARGV[3])
@@ -83,25 +87,29 @@ func quotaResultFromLua(result int, err error) (cacheQuotaResult, error) {
 
 func cacheTryReserveUserQuota(userID int, amount int64) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), userQuotaReserveScript,
-		[]string{getUserCacheKey(userID)}, amount, userID, userCacheSchemaVersion).Int()
+		[]string{getUserCacheKey(userID)}, amount, userID, userCacheSchemaVersion,
+		quotaCacheTTLSeconds()).Int()
 	return quotaResultFromLua(result, err)
 }
 
 func cacheApplyUserQuotaDelta(userID int, delta int64) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), userQuotaDeltaScript,
-		[]string{getUserCacheKey(userID)}, delta, userID, userCacheSchemaVersion).Int()
+		[]string{getUserCacheKey(userID)}, delta, userID, userCacheSchemaVersion,
+		quotaCacheTTLSeconds()).Int()
 	return quotaResultFromLua(result, err)
 }
 
 func cacheTryReserveTokenQuota(id int, key string, amount int64) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), tokenQuotaReserveScript,
-		[]string{getTokenCacheKey(key)}, amount, id, common.GetTimestamp()).Int()
+		[]string{getTokenCacheKey(key)}, amount, id, common.GetTimestamp(),
+		quotaCacheTTLSeconds()).Int()
 	return quotaResultFromLua(result, err)
 }
 
 func cacheApplyTokenQuotaDelta(id int, key string, delta int64) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), tokenQuotaDeltaScript,
-		[]string{getTokenCacheKey(key)}, delta, id, common.GetTimestamp()).Int()
+		[]string{getTokenCacheKey(key)}, delta, id, common.GetTimestamp(),
+		quotaCacheTTLSeconds()).Int()
 	return quotaResultFromLua(result, err)
 }
 
