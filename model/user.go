@@ -888,7 +888,7 @@ func ValidateAccessToken(token string) (*User, error) {
 // GetUserQuota gets quota from Redis first, falls back to DB if needed
 func GetUserQuota(id int, fromDB bool) (quota int64, err error) {
 	if !fromDB && common.RedisEnabled {
-		userCache, cacheErr := GetUserCache(id)
+		userCache, cacheErr := hydrateUserCache(id)
 		if cacheErr != nil {
 			return 0, cacheErr
 		}

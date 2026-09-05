@@ -87,7 +87,7 @@ func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, reserved)
 	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
-	_, err = GetTokenByKey(tok.Key, false)
+	_, err = hydrateTokenCache(tok.Key, false)
 	require.ErrorIs(t, err, ErrQuotaCachePending)
 
 	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
@@ -242,4 +242,32 @@ func TestRedisBatchReserveNeverFallsBackToStaleDatabaseBalance(t *testing.T) {
 	require.NoError(t, DB.First(&afterFlush, tok.Id).Error)
 	require.Equal(t, 2, afterFlush.RemainQuota)
 	require.Equal(t, 7, afterFlush.UsedQuota)
+}
+
+func TestGetTokenByKeyServesDatabaseSnapshotWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 9)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
+
+	// Authentication only needs the token's identity and status. A pending
+	// quota batch must not turn a healthy database read into a 500.
+	cached, err := GetTokenByKey(tok.Key, false)
+	require.NoError(t, err)
+	require.Equal(t, tok.Id, cached.Id)
+	require.Equal(t, common.TokenStatusEnabled, cached.Status)
+
+	_, err = cacheGetTokenByKey(tok.Key)
+	require.Error(t, err, "a stale database snapshot must not be published")
+
+	// Spending stays fail-closed.
+	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	require.False(t, reserved)
 }

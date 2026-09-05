@@ -120,8 +120,13 @@ func populateUserCache(user User) error {
 	return writeUserCache(user, true)
 }
 
-// GetUserCache gets complete user cache from hash
-func GetUserCache(userId int) (userCache *UserBase, err error) {
+// hydrateUserCache resolves the user profile and, on a cache miss, publishes
+// the database snapshot to Redis. It reports ErrQuotaCachePending when batched
+// quota deltas have not reached the database yet, because republishing that
+// snapshot would resurrect quota the cache has already spent. The profile is
+// returned alongside that error so callers that do not need an authoritative
+// balance can still proceed. Use this only where the balance must be exact.
+func hydrateUserCache(userId int) (userCache *UserBase, err error) {
 	// Try getting from Redis first
 	userCache, err = cacheGetUserBase(userId)
 	if err == nil {
@@ -140,12 +145,26 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 		// overwrite batched quota deltas that have not reached the database yet.
 		if cacheErr := populateUserCache(*user); cacheErr != nil {
 			if errors.Is(cacheErr, ErrQuotaCachePending) {
-				return nil, cacheErr
+				return user.ToBaseUser(), cacheErr
 			}
 			common.SysLog("failed to synchronously populate user cache: " + cacheErr.Error())
 		}
 	}
 	return user.ToBaseUser(), nil
+}
+
+// GetUserCache gets complete user cache from hash.
+// A pending quota batch blocks cache publication, not the read itself: callers
+// such as request authentication need identity, status and group, and failing
+// them would turn routine quota bookkeeping into 500s under concurrency. The
+// returned quota may lag the cache by the pending deltas, so spending paths
+// must reserve through TryReserveUserQuota instead of trusting this value.
+func GetUserCache(userId int) (*UserBase, error) {
+	userCache, err := hydrateUserCache(userId)
+	if errors.Is(err, ErrQuotaCachePending) {
+		return userCache, nil
+	}
+	return userCache, err
 }
 
 func cacheGetUserBase(userId int) (*UserBase, error) {

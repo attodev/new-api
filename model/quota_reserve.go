@@ -249,7 +249,7 @@ func TryReserveUserQuota(id int, quota int64) (bool, error) {
 		return reserveUserQuotaDB(id, quota)
 	}
 	if common.BatchUpdateEnabled {
-		if _, err := GetUserCache(id); err != nil {
+		if _, err := hydrateUserCache(id); err != nil {
 			return false, err
 		}
 		batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
@@ -267,7 +267,7 @@ func TryReserveUserQuota(id int, quota int64) (bool, error) {
 
 	result, err := cacheTryReserveUserQuota(id, quota)
 	if err == nil && result == cacheQuotaMiss && !hasPendingBatchRecord(BatchUpdateTypeUserQuota, id) {
-		if _, hydrateErr := GetUserCache(id); hydrateErr == nil {
+		if _, hydrateErr := hydrateUserCache(id); hydrateErr == nil {
 			result, err = cacheTryReserveUserQuota(id, quota)
 		}
 	}
@@ -307,7 +307,7 @@ func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, 
 		return reserveTokenQuotaDB(id, quota)
 	}
 	if common.BatchUpdateEnabled {
-		if _, err := GetTokenByKey(key, false); err != nil {
+		if _, err := hydrateTokenCache(key, false); err != nil {
 			return false, err
 		}
 		batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
@@ -325,7 +325,7 @@ func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, 
 
 	result, err := cacheTryReserveTokenQuota(id, key, int64(quota))
 	if err == nil && result == cacheQuotaMiss && !hasPendingBatchRecord(BatchUpdateTypeTokenQuota, id) {
-		if _, hydrateErr := GetTokenByKey(key, true); hydrateErr == nil {
+		if _, hydrateErr := hydrateTokenCache(key, true); hydrateErr == nil {
 			result, err = cacheTryReserveTokenQuota(id, key, int64(quota))
 		}
 	}

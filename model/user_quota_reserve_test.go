@@ -183,3 +183,31 @@ func TestUserHydrationFailsClosedWithPendingBatch(t *testing.T) {
 	_, err = cacheGetUserBase(user.Id)
 	require.Error(t, err, "a stale database snapshot must not be published")
 }
+
+func TestGetUserCacheServesDatabaseSnapshotWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	user := insertUserWithQuota(t, 9)
+
+	reserved, err := TryReserveUserQuota(user.Id, 7)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getUserCacheKey(user.Id)).Err())
+
+	// Authentication only needs identity, status and group. A pending quota
+	// batch must not turn a healthy database read into a request failure.
+	cached, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, user.Id, cached.Id)
+	require.Equal(t, common.UserStatusEnabled, cached.Status)
+
+	_, err = cacheGetUserBase(user.Id)
+	require.Error(t, err, "a stale database snapshot must not be published")
+
+	// Spending stays fail-closed.
+	reserved, err = TryReserveUserQuota(user.Id, 1)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	require.False(t, reserved)
+}

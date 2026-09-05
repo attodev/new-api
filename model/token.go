@@ -244,7 +244,13 @@ func GetTokenById(id int) (*Token, error) {
 	return &token, err
 }
 
-func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
+// hydrateTokenCache resolves the token and, on a cache miss, publishes the
+// database snapshot to Redis. It reports ErrQuotaCachePending when batched
+// quota deltas have not reached the database yet, because republishing that
+// snapshot would resurrect quota the cache has already spent. The token is
+// returned alongside that error so callers that do not need an authoritative
+// balance can still proceed. Use this only where the balance must be exact.
+func hydrateTokenCache(key string, fromDB bool) (token *Token, err error) {
 	if !fromDB && common.RedisEnabled {
 		// Try Redis first
 		token, err := cacheGetTokenByKey(key)
@@ -260,12 +266,26 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 	if common.RedisEnabled {
 		if _, cacheErr := cacheInitToken(*token); cacheErr != nil {
 			if errors.Is(cacheErr, ErrQuotaCachePending) {
-				return nil, cacheErr
+				return token, cacheErr
 			}
 			common.SysLog("failed to init token cache: " + cacheErr.Error())
 		}
 	}
 	return token, nil
+}
+
+// GetTokenByKey resolves a token for authentication and metadata.
+// A pending quota batch blocks cache publication, not the read itself: failing
+// the lookup here surfaces as a 500 on every request that races a queued quota
+// delta. The returned RemainQuota may lag the cache by the pending deltas, so
+// spending paths must reserve through TryReserveTokenQuota instead of trusting
+// this value.
+func GetTokenByKey(key string, fromDB bool) (*Token, error) {
+	token, err := hydrateTokenCache(key, fromDB)
+	if errors.Is(err, ErrQuotaCachePending) {
+		return token, nil
+	}
+	return token, err
 }
 
 func (token *Token) Insert() error {
