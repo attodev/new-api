@@ -218,9 +218,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		}
 		claudeRequest.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
 		if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400
-			// and defaults display to "omitted"; restore the 4.6 visible summary.
-			claudeRequest.Thinking.Display = "summarized"
+			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
 			claudeRequest.Temperature = nil
 			claudeRequest.TopP = nil
 			claudeRequest.TopK = nil
@@ -234,7 +232,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		trimmedModel := strings.TrimSuffix(textRequest.Model, "-thinking")
 		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") {
 			// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
-			claudeRequest.Thinking = &dto.Thinking{Type: "adaptive", Display: "summarized"}
+			claudeRequest.Thinking = &dto.Thinking{Type: "adaptive"}
 			claudeRequest.OutputConfig = json.RawMessage(`{"effort":"high"}`)
 			claudeRequest.Temperature = nil
 			claudeRequest.TopP = nil
@@ -295,6 +293,11 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 			}
 		}
 	}
+
+	// Opus 4.7+ defaults adaptive display to "omitted", which bills thinking
+	// tokens while returning empty thinking blocks. Relayed clients surface
+	// reasoning to the user, so restore the summary unless asked otherwise.
+	claudeRequest.Thinking.NormalizeAdaptiveDisplay()
 
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string
