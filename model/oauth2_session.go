@@ -25,6 +25,18 @@ const (
 	oauth2TokenSentinelId = math.MaxInt32
 )
 
+// IsOAuth2SentinelTokenId reports whether a token id is the OAuth2 sentinel --
+// a token that lives only in Redis and has no row in the token table.
+//
+// Callers that would otherwise UPDATE the token row must check this first.
+// Billing settlement is the one that matters: it adjusts the token's quota
+// after the user's funding has already settled, and against this token that
+// UPDATE matches nothing and returns "record not found", failing a settlement
+// that in fact succeeded.
+func IsOAuth2SentinelTokenId(id int) bool {
+	return id == oauth2TokenSentinelId
+}
+
 var ErrOAuth2CodeInvalid = errors.New("oauth2 code invalid or expired")
 
 // StoreAuthCode mints a single-use, short-lived authorization code for

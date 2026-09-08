@@ -58,7 +58,13 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	// 2)
 	var tokenErr error
-	if !s.relayInfo.IsPlayground {
+	// The OAuth2 token is Redis-only and carries UnlimitedQuota, so there is no
+	// row to update and no quota to move -- the same reason the playground's
+	// synthetic token is skipped. Attempting it fails with "record not found"
+	// and turns a settlement that already succeeded into an error return.
+	syntheticToken := s.relayInfo.IsPlayground ||
+		model.IsOAuth2SentinelTokenId(s.relayInfo.TokenId)
+	if !syntheticToken {
 		if delta > 0 {
 			tokenErr = model.DecreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta)
 		} else {
