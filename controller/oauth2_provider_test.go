@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -292,4 +293,70 @@ func TestOAuth2UserInfo_InvalidTokenReturns401(t *testing.T) {
 	OAuth2UserInfo(ctx)
 
 	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
+func TestOAuth2SessionInit_ReturnsRawCodeWhenFormatIsCode(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/oauth2/session-init",
+		strings.NewReader(`{"format":"code"}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("id", 42)
+
+	OAuth2SessionInit(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), "redirect_url")
+
+	var body struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	require.NotEmpty(t, body.Code)
+
+	userId, err := model.ConsumeAuthCode(body.Code)
+	require.NoError(t, err)
+	require.Equal(t, 42, userId)
+}
+
+// Raw code mode navigates nowhere, so it must not demand a redirect target.
+// Requiring one makes operators invent a value the unified UI never reads,
+// which then becomes a quietly wrong destination if link-out mode is used.
+func TestOAuth2SessionInit_RawCodeDoesNotRequireRedirectURI(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	system_setting.GetOAuth2Settings().RedirectURI = ""
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/oauth2/session-init",
+		strings.NewReader(`{"format":"code"}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("id", 42)
+
+	OAuth2SessionInit(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+}
+
+// The redirect mode, by contrast, is not meaningful without a destination.
+func TestOAuth2SessionInit_RedirectModeStillRequiresRedirectURI(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	system_setting.GetOAuth2Settings().RedirectURI = ""
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/oauth2/session-init", nil)
+	ctx.Set("id", 42)
+
+	OAuth2SessionInit(ctx)
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
 }

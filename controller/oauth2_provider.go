@@ -13,25 +13,56 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// oauth2Configured reports whether the OAuth2 provider feature is not just
-// enabled but actually usable. An admin can flip settings.Enabled to true
-// without filling in client_id/client_secret/redirect_uri (they default to
-// ""), which would otherwise let an empty client_secret from a caller match
-// an empty configured one. From the caller's perspective, an unconfigured
-// feature must look identical to a disabled one.
+// oauth2CredentialsConfigured reports whether the client credentials are
+// usable. An admin can flip settings.Enabled to true without filling in
+// client_id/client_secret (they default to ""), which would otherwise let an
+// empty client_secret from a caller match an empty configured one. From the
+// caller's perspective, an unconfigured feature must look identical to a
+// disabled one.
+func oauth2CredentialsConfigured(settings *system_setting.OAuth2Settings) bool {
+	return settings.Enabled && settings.ClientId != "" && settings.ClientSecret != ""
+}
+
+// oauth2Configured additionally requires a redirect target. Only the
+// browser-redirect flow needs one; the unified UI receives a raw code and
+// navigates nowhere.
 func oauth2Configured(settings *system_setting.OAuth2Settings) bool {
-	return settings.Enabled && settings.ClientId != "" && settings.ClientSecret != "" && settings.RedirectURI != ""
+	return oauth2CredentialsConfigured(settings) && settings.RedirectURI != ""
 }
 
 // OAuth2SessionInit is called from new-api's own frontend (same-origin,
 // authenticated via the normal session cookie through middleware.UserAuth()).
-// It mints a short-lived authorization code and returns a ready-to-navigate
-// URL pointing at the external app's callback. There is no browser-facing
-// /oauth2/authorize redirect in this design — see the design spec's
-// "Revision note" for why.
+// It mints a short-lived, single-use authorization code and answers in one of
+// two modes, selected by an optional {"format": "code"} JSON body:
+//
+//   - format == "code": the raw code is returned as {"code": "..."}. This is
+//     what the unified UI — served from this same origin — uses: it hands the
+//     code to its own backend over fetch rather than navigating anywhere, so
+//     no RedirectURI need be configured. Keeping the code out of a URL also
+//     keeps it out of anything shareable or unfurlable.
+//   - anything else (including no body at all, which is what the link-out
+//     flow posts): a ready-to-navigate URL pointing at the external app's
+//     callback is returned as {"redirect_url": "..."}. This mode does require
+//     a configured RedirectURI.
+//
+// There is no browser-facing /oauth2/authorize redirect in this design — see
+// the design spec's "Revision note" for why.
 func OAuth2SessionInit(c *gin.Context) {
+	// The body is optional: the link-out flow posts nothing at all, and a
+	// malformed body simply degrades to the redirect mode. So a bind error
+	// is deliberately ignored rather than reported.
+	var req struct {
+		Format string `json:"format"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	rawCodeMode := req.Format == "code"
+
 	settings := system_setting.GetOAuth2Settings()
-	if !oauth2Configured(settings) {
+	configured := oauth2CredentialsConfigured(settings)
+	if !rawCodeMode {
+		configured = oauth2Configured(settings)
+	}
+	if !configured {
 		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
 		return
 	}
@@ -40,6 +71,11 @@ func OAuth2SessionInit(c *gin.Context) {
 	code, err := model.StoreAuthCode(userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization code"})
+		return
+	}
+
+	if rawCodeMode {
+		c.JSON(http.StatusOK, gin.H{"code": code})
 		return
 	}
 
