@@ -1,17 +1,18 @@
 package model
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
+
+const userCacheSchemaVersion = 1
 
 // UserBase struct remains the same as it represents the cached data structure
 type UserBase struct {
@@ -24,6 +25,7 @@ type UserBase struct {
 	Status           int    `json:"status"`
 	Username         string `json:"username"`
 	Setting          string `json:"setting"`
+	CacheSchema      int    `json:"-"`
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -65,34 +67,66 @@ func InvalidateUserCache(userId int) error {
 	return invalidateUserCache(userId)
 }
 
-// updateUserCache updates all user cache fields using hash
-func updateUserCache(user User) error {
+const writeUserCacheScript = `
+local preserveQuota = tonumber(ARGV[11]) == 1
+local complete = tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') == tonumber(ARGV[1])
+  and redis.call('HEXISTS', KEYS[1], 'Quota') == 1
+local quota = ARGV[6]
+if preserveQuota and complete then
+  quota = redis.call('HGET', KEYS[1], 'Quota')
+end
+redis.call('HSET', KEYS[1],
+  'Id', ARGV[1], 'Group', ARGV[2], 'OrganizationId', ARGV[3],
+  'OrganizationRole', ARGV[4], 'Email', ARGV[5], 'Quota', quota,
+  'Status', ARGV[7], 'Username', ARGV[8], 'Setting', ARGV[9],
+  'CacheSchema', ARGV[10])
+redis.call('EXPIRE', KEYS[1], ARGV[12])
+return 1`
+
+func writeUserCache(user User, preserveQuota bool) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-
-	return common.RedisHSetObj(
-		getUserCacheKey(user.Id),
-		user.ToBaseUser(),
-		time.Duration(common.RedisKeyCacheSeconds())*time.Second,
-	)
+	ttl := quotaCacheTTLSeconds()
+	preserve := 0
+	if preserveQuota {
+		preserve = 1
+	}
+	return common.RDB.Eval(context.Background(), writeUserCacheScript,
+		[]string{getUserCacheKey(user.Id)}, user.Id, user.Group,
+		user.OrganizationId, user.OrganizationRole, user.Email, user.Quota,
+		user.Status, user.Username, user.Setting, userCacheSchemaVersion,
+		preserve, ttl).Err()
 }
 
-// GetUserCache gets complete user cache from hash
-func GetUserCache(userId int) (userCache *UserBase, err error) {
-	var user *User
-	var fromDB bool
-	defer func() {
-		// Update Redis cache asynchronously on successful DB read
-		if shouldUpdateRedis(fromDB, err) && user != nil {
-			gopool.Go(func() {
-				if err := updateUserCache(*user); err != nil {
-					common.SysLog("failed to update user status cache: " + err.Error())
-				}
-			})
-		}
-	}()
+// updateUserCache refreshes metadata without replacing quota maintained by
+// atomic delta operations.
+func updateUserCache(user User) error {
+	return writeUserCache(user, true)
+}
 
+func populateUserCache(user User) error {
+	if !common.RedisEnabled {
+		return nil
+	}
+	if !common.BatchUpdateEnabled {
+		return writeUserCache(user, true)
+	}
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	if hasPendingBatchRecordLocked(BatchUpdateTypeUserQuota, user.Id) {
+		return fmt.Errorf("%w: user %d", ErrQuotaCachePending, user.Id)
+	}
+	return writeUserCache(user, true)
+}
+
+// hydrateUserCache resolves the user profile and, on a cache miss, publishes
+// the database snapshot to Redis. It reports ErrQuotaCachePending when batched
+// quota deltas have not reached the database yet, because republishing that
+// snapshot would resurrect quota the cache has already spent. The profile is
+// returned alongside that error so callers that do not need an authoritative
+// balance can still proceed. Use this only where the balance must be exact.
+func hydrateUserCache(userId int) (userCache *UserBase, err error) {
 	// Try getting from Redis first
 	userCache, err = cacheGetUserBase(userId)
 	if err == nil {
@@ -100,24 +134,37 @@ func GetUserCache(userId int) (userCache *UserBase, err error) {
 	}
 
 	// If Redis fails, get from DB
-	fromDB = true
-	user, err = GetUserById(userId, false)
+	user, err := GetUserById(userId, false)
 	if err != nil {
 		return nil, err // Return nil and error if DB lookup fails
 	}
 
-	// Create cache object from user data
-	userCache = &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+	if common.RedisEnabled {
+		// A read miss may be a transient Redis error rather than an absent hash.
+		// Preserve an already-complete cache balance so a stale DB snapshot cannot
+		// overwrite batched quota deltas that have not reached the database yet.
+		if cacheErr := populateUserCache(*user); cacheErr != nil {
+			if errors.Is(cacheErr, ErrQuotaCachePending) {
+				return user.ToBaseUser(), cacheErr
+			}
+			common.SysLog("failed to synchronously populate user cache: " + cacheErr.Error())
+		}
 	}
+	return user.ToBaseUser(), nil
+}
 
-	return userCache, nil
+// GetUserCache gets complete user cache from hash.
+// A pending quota batch blocks cache publication, not the read itself: callers
+// such as request authentication need identity, status and group, and failing
+// them would turn routine quota bookkeeping into 500s under concurrency. The
+// returned quota may lag the cache by the pending deltas, so spending paths
+// must reserve through TryReserveUserQuota instead of trusting this value.
+func GetUserCache(userId int) (*UserBase, error) {
+	userCache, err := hydrateUserCache(userId)
+	if errors.Is(err, ErrQuotaCachePending) {
+		return userCache, nil
+	}
+	return userCache, err
 }
 
 func cacheGetUserBase(userId int) (*UserBase, error) {
@@ -130,6 +177,9 @@ func cacheGetUserBase(userId int) (*UserBase, error) {
 	if err != nil {
 		return nil, err
 	}
+	if userCache.Id != userId || userCache.CacheSchema != userCacheSchemaVersion {
+		return nil, fmt.Errorf("user cache schema is stale")
+	}
 	return &userCache, nil
 }
 
@@ -138,7 +188,8 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-	return common.RedisHIncrBy(getUserCacheKey(userId), "Quota", delta)
+	_, err := cacheApplyUserQuotaDelta(userId, delta)
+	return err
 }
 
 func cacheDecrUserQuota(userId int, delta int64) error {
@@ -196,13 +247,6 @@ func updateUserStatusCache(userId int, status bool) error {
 		statusInt = common.UserStatusDisabled
 	}
 	return common.RedisHSetField(getUserCacheKey(userId), "Status", fmt.Sprintf("%d", statusInt))
-}
-
-func updateUserQuotaCache(userId int, quota int64) error {
-	if !common.RedisEnabled {
-		return nil
-	}
-	return common.RedisHSetField(getUserCacheKey(userId), "Quota", fmt.Sprintf("%d", quota))
 }
 
 func updateUserGroupCache(userId int, group string) error {

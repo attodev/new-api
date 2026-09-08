@@ -118,6 +118,10 @@ func UpdateMidjourneyTaskBulk() {
 
 			for _, responseItem := range responseItems {
 				task := taskM[responseItem.MjId]
+				if task == nil {
+					logger.LogWarn(ctx, fmt.Sprintf("Midjourney task response ignored: unknown mj_id=%s", responseItem.MjId))
+					continue
+				}
 
 				useTime := (time.Now().UnixNano() / int64(time.Millisecond)) - task.SubmitTime
 				// 100%
@@ -190,6 +194,7 @@ func UpdateMidjourneyTaskBulk() {
 						ChannelId: task.ChannelId,
 						ModelName: service.CovertMjpActionToModelName(task.Action),
 						Quota:     task.Quota,
+						NodeName:  task.NodeName,
 						Other: map[string]interface{}{
 							"task_id": task.MjId,
 							"reason":  "composition failed",

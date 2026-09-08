@@ -23,6 +23,9 @@ type Midjourney struct {
 	Quota       int    `json:"quota"`
 	Buttons     string `json:"buttons"`
 	Properties  string `json:"properties"`
+	// NodeName is the node that submitted the task; settlement/refund logs
+	// attribute usage here instead of whichever node polled it to completion.
+	NodeName string `json:"node_name,omitempty"`
 }
 
 // TaskQueryParams

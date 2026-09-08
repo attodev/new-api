@@ -759,3 +759,73 @@ func TestCalculateTextQuotaSummaryClampsBaseTokensWhenCacheCountsExceedPromptTok
 	// quota = 0 + 60*0.1 + 60*1.25 = 81
 	require.Equal(t, 81, summary.Quota)
 }
+
+// TestCalculateTextQuotaSummary_SaturatesOnOverflow reproduces a real bug:
+// this is the primary chat/completion billing calculation - used for
+// essentially every ordinary request - but its final
+// int(quotaCalculateDecimal.Round(0).IntPart()) conversion had no int32
+// saturation, unlike this same file's tiered path (composeTieredTextQuota,
+// which already routes through decimalToQuota) and this session's other
+// billing-overflow fixes (RecalculateTaskQuotaByTokens, relay_task.go's
+// recalcQuotaFromRatios). An oversized ModelRatio/GroupRatio/OtherRatios
+// product - a misconfigured custom model ratio, or a poisoned adaptor-
+// supplied ratio - would silently overflow the 32-bit quota DB column on
+// persistence instead of being clamped.
+func TestCalculateTextQuotaSummary_SaturatesOnOverflow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RelayFormat:     types.RelayFormatOpenAI,
+		OriginModelName: "gpt-4",
+		PriceData: types.PriceData{
+			ModelRatio:      1e10,
+			CompletionRatio: 1,
+			GroupRatioInfo: types.GroupRatioInfo{
+				GroupRatio: 1,
+			},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     1000,
+		CompletionTokens: 0,
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	require.Equal(t, math.MaxInt32, summary.Quota)
+}
+
+// TestCalculateTextQuotaSummary_SaturatesOnOverflow_UsePrice covers the
+// UsePrice (fixed-price) branch, which has the identical unguarded
+// conversion.
+func TestCalculateTextQuotaSummary_SaturatesOnOverflow_UsePrice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RelayFormat:     types.RelayFormatOpenAI,
+		OriginModelName: "gpt-4",
+		PriceData: types.PriceData{
+			UsePrice:   true,
+			ModelPrice: 1e10,
+			GroupRatioInfo: types.GroupRatioInfo{
+				GroupRatio: 1,
+			},
+		},
+		StartTime: time.Now(),
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     1000,
+		CompletionTokens: 0,
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+
+	require.Equal(t, math.MaxInt32, summary.Quota)
+}

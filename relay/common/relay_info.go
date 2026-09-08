@@ -139,6 +139,10 @@ type RelayInfo struct {
 	// BillingSource indicates whether this request is billed from wallet quota or subscription.
 	// "" or "wallet" => wallet; "subscription" => subscription
 	BillingSource string
+	// BillingOrganizationId freezes the organization charged for this request.
+	// Async tasks copy it into private data so later settlement/refund does not
+	// follow a user who has since left or moved organizations.
+	BillingOrganizationId int
 	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
 	SubscriptionId int
 	// SubscriptionPreConsumed is the amount pre-consumed on subscription item (quota units or 1)

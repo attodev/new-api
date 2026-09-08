@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -273,6 +276,48 @@ func TestRefundTaskQuota_DecrementsUserAndChannelUsedQuota(t *testing.T) {
 
 	assert.Equal(t, int64(0), getUserUsedQuota(t, userID), "user used_quota must be reduced by the refund")
 	assert.Equal(t, int64(0), getChannelUsedQuota(t, channelID), "channel used_quota must be reduced by the refund")
+}
+
+func TestRefundTaskQuotaUsesSnapshottedOrganizationAfterMembershipChange(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, channelID, chargedOrgID, currentOrgID = 16, 16, 16, 17
+	const chargedQuota = 200
+
+	seedOrganizationUser(t, userID, "moved-task-user", 800, chargedOrgID, model.OrganizationRoleMember)
+	seedOrganization(t, chargedOrgID, userID)
+	require.NoError(t, model.DB.Create(&model.Organization{
+		Id:          currentOrgID,
+		Name:        "current-task-org",
+		OwnerUserId: userID,
+		Status:      model.OrganizationStatusEnabled,
+		Quota:       1000,
+	}).Error)
+	seedChannel(t, channelID)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", chargedOrgID).Updates(map[string]any{
+		"quota":      800,
+		"used_quota": chargedQuota,
+	}).Error)
+	model.UpdateUserUsedQuotaAndRequestCount(userID, chargedQuota)
+	model.UpdateChannelUsedQuota(channelID, chargedQuota)
+
+	task := makeTask(userID, channelID, chargedQuota, 0, BillingSourceWallet, 0)
+	task.PrivateData.OrganizationId = chargedOrgID
+
+	// Membership changed after submission. Refund must still reverse the
+	// organization that funded the original task.
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", userID).Update("organization_id", currentOrgID).Error)
+
+	RefundTaskQuota(ctx, task, "task failed after organization move")
+
+	require.Equal(t, int64(1000), getUserQuota(t, userID))
+	chargedOrg := getOrganizationForBillingTest(t, chargedOrgID)
+	require.Equal(t, int64(1000), chargedOrg.Quota)
+	require.Zero(t, chargedOrg.UsedQuota)
+	currentOrg := getOrganizationForBillingTest(t, currentOrgID)
+	require.Equal(t, int64(1000), currentOrg.Quota)
+	require.Zero(t, currentOrg.UsedQuota)
 }
 
 func TestRefundTaskQuota_Subscription(t *testing.T) {
@@ -553,6 +598,63 @@ func TestRecalculateTaskQuota_FallsBackToCurrentNodeWhenUnset(t *testing.T) {
 	adminInfo, _ := other["admin_info"].(map[string]interface{})
 	require.NotNil(t, adminInfo)
 	assert.Equal(t, "node-fallback", adminInfo["node_name"])
+}
+
+// TestRecalculateTaskQuotaByTokens_SaturatesOnOverflow reproduces a real bug:
+// this is the live token-based task settlement path (called from
+// service/task_polling.go after every async task completion billed by
+// token count), but it computed actualQuota with a raw, unguarded
+// int(float64(...)) conversion instead of the saturating common.QuotaFromFloat
+// used elsewhere in this session's billing-overflow hardening
+// (62a545720/82db6c0dc) - an oversized token*ratio product could overflow the
+// 32-bit quota DB column on persistence, turning a large charge into a
+// negative one (a credit).
+func TestRecalculateTaskQuotaByTokens_SaturatesOnOverflow(t *testing.T) {
+	truncate(t)
+	ctx := context.Background()
+
+	const userID, tokenID, channelID = 17, 17, 17
+	const modelName = "task-overflow-test-model"
+
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(fmt.Sprintf(`{%q:1e7}`, modelName)))
+
+	seedUser(t, userID, 10000)
+	seedToken(t, tokenID, userID, "sk-recalc-overflow", 5000)
+	seedChannel(t, channelID)
+
+	task := makeTask(userID, channelID, 0, tokenID, BillingSourceWallet, 0)
+	task.Group = "default"
+	task.PrivateData.BillingContext.OriginModelName = modelName
+	require.NoError(t, model.DB.Create(task).Error)
+
+	// totalTokens=1000 * modelRatio=1e7 = 1e10, decisively over the 32-bit
+	// quota column's range (math.MaxInt32 ~= 2.1e9).
+	RecalculateTaskQuotaByTokens(ctx, task, 1000)
+
+	var reloaded model.Task
+	require.NoError(t, model.DB.First(&reloaded, task.ID).Error)
+	require.Equal(t, math.MaxInt32, reloaded.Quota,
+		"an oversized charge must saturate to math.MaxInt32, not pass the raw >32-bit product through to a column the database can't hold")
+}
+
+// TestOtherRatiosMultiplier_RejectsInvalidRatios reproduces a real bug: the
+// otherMultiplier loop in RecalculateTaskQuotaByTokens validated each
+// BillingContext.OtherRatios entry with a bespoke `r != 1.0 && r > 0` check
+// instead of the shared types.IsValidOtherRatio used everywhere else this
+// session's billing-overflow hardening touched (relay/relay_task.go,
+// types/price_data.go) - `r > 0` is true for +Inf, so a malformed +Inf ratio
+// left over in BillingContext would multiply straight through into
+// otherMultiplier and then into the settled quota, saturating it to
+// math.MaxInt32 instead of being discarded like every other invalid-ratio
+// consumer in the codebase does.
+func TestOtherRatiosMultiplier_RejectsInvalidRatios(t *testing.T) {
+	got := otherRatiosMultiplier(map[string]float64{"bad": math.Inf(1), "nan": math.NaN(), "zero": 0})
+	require.Equal(t, 1.0, got, "every entry is invalid, so the multiplier must fall back to a no-op 1.0")
+}
+
+func TestOtherRatiosMultiplier_AppliesValidRatiosAndDropsInvalidOnes(t *testing.T) {
+	got := otherRatiosMultiplier(map[string]float64{"double": 2.0, "bad": math.Inf(1), "noop": 1.0})
+	require.Equal(t, 2.0, got, "the valid ratio must still apply even when a sibling ratio in the same map is invalid")
 }
 
 // TestRecalculate_NegativeDelta_AdjustsUsageDown reproduces a real bug: on a

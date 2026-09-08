@@ -264,6 +264,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		FailReason:  "",
 		ChannelId:   c.GetInt("channel_id"),
 		Quota:       priceData.Quota,
+		NodeName:    common.NodeName,
 	}
 	err = midjourneyTask.Insert()
 	if err != nil {
@@ -577,6 +578,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		FailReason:  "",
 		ChannelId:   c.GetInt("channel_id"),
 		Quota:       priceData.Quota,
+		NodeName:    common.NodeName,
 	}
 	if midjResponse.Code == 3 {
 		// No available account instance

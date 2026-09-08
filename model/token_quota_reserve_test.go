@@ -1,12 +1,124 @@
 package model
 
 import (
+	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/require"
 )
+
+func useTokenQuotaMiniRedis(t *testing.T) *miniredis.Miniredis {
+	t.Helper()
+	server := miniredis.RunT(t)
+	oldRedisEnabled := common.RedisEnabled
+	oldRDB := common.RDB
+	oldSyncFrequency := common.SyncFrequency
+	common.RedisEnabled = true
+	common.SyncFrequency = 2
+	common.RDB = redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = common.RDB.Close()
+		common.RedisEnabled = oldRedisEnabled
+		common.RDB = oldRDB
+		common.SyncFrequency = oldSyncFrequency
+	})
+	return server
+}
+
+func TestTokenQuotaDeltaIsVisibleInCacheBeforeReturn(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 20)
+
+	_, err := GetTokenByKey(tok.Key, true)
+	require.NoError(t, err)
+	require.NoError(t, DecreaseTokenQuota(tok.Id, tok.Key, 7))
+
+	cached, err := cacheGetTokenByKey(tok.Key)
+	require.NoError(t, err)
+	require.Equal(t, 13, cached.RemainQuota)
+	require.Equal(t, 7, cached.UsedQuota)
+}
+
+func TestTokenQuotaMutationsRefreshCacheTTLWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	server := useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 20)
+
+	_, err := GetTokenByKey(tok.Key, true)
+	require.NoError(t, err)
+	server.FastForward(1500 * time.Millisecond)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.Greater(t, server.TTL(getTokenCacheKey(tok.Key)), time.Second)
+
+	server.FastForward(1500 * time.Millisecond)
+	require.NoError(t, DecreaseTokenQuota(tok.Id, tok.Key, 1))
+	require.Greater(t, server.TTL(getTokenCacheKey(tok.Key)), time.Second)
+
+	// The original TTL and the reservation-refreshed TTL have both elapsed.
+	// The delta refresh must keep the authoritative cache available while its
+	// database updates are still pending.
+	server.FastForward(time.Second)
+	_, err = GetTokenByKey(tok.Key, false)
+	require.NoError(t, err)
+	require.True(t, hasPendingBatchRecord(BatchUpdateTypeTokenQuota, tok.Id))
+}
+
+func TestTokenReserveFailsClosedWhenCacheMissingWithPendingBatch(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 9)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
+	_, err = hydrateTokenCache(tok.Key, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+
+	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	require.False(t, reserved)
+}
+
+func TestHasPendingBatchRecordIncludesInFlightDelta(t *testing.T) {
+	resetTokenQuotaBatchState(t)
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+	batchUpdateInFlight[BatchUpdateTypeTokenQuota][42] = -7
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+	require.True(t, hasPendingBatchRecord(BatchUpdateTypeTokenQuota, 42))
+}
+
+func resetTokenQuotaBatchState(t *testing.T) {
+	t.Helper()
+	oldBatchEnabled := common.BatchUpdateEnabled
+	common.BatchUpdateEnabled = false
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+	batchUpdateStores[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+	batchUpdateInFlight[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+	batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+	t.Cleanup(func() {
+		common.BatchUpdateEnabled = oldBatchEnabled
+		batchUpdateLocks[BatchUpdateTypeTokenQuota].Lock()
+		batchUpdateStores[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+		batchUpdateInFlight[BatchUpdateTypeTokenQuota] = make(map[int]int64)
+		batchUpdateLocks[BatchUpdateTypeTokenQuota].Unlock()
+	})
+}
 
 func insertTokenWithQuota(t *testing.T, remainQuota int) *Token {
 	t.Helper()
@@ -98,4 +210,64 @@ func TestTryDecreaseTokenQuota_ConcurrentRequestsCannotOverspend(t *testing.T) {
 	require.NoError(t, DB.First(&reloaded, tok.Id).Error)
 	require.Equal(t, 100-3*cost, reloaded.RemainQuota)
 	require.GreaterOrEqual(t, reloaded.RemainQuota, 0, "balance must never go negative under concurrency")
+}
+
+func TestRedisBatchReserveNeverFallsBackToStaleDatabaseBalance(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+
+	tok := insertTokenWithQuota(t, 9)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+
+	var beforeFlush Token
+	require.NoError(t, DB.First(&beforeFlush, tok.Id).Error)
+	require.Equal(t, 9, beforeFlush.RemainQuota, "batch delta must still be pending in the database")
+
+	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 3, false)
+	require.NoError(t, err)
+	require.False(t, reserved, "stale database balance must not authorize a second spend")
+
+	cached, err := cacheGetTokenByKey(tok.Key)
+	require.NoError(t, err)
+	require.Equal(t, 2, cached.RemainQuota)
+	require.Equal(t, 7, cached.UsedQuota)
+
+	batchUpdate()
+	var afterFlush Token
+	require.NoError(t, DB.First(&afterFlush, tok.Id).Error)
+	require.Equal(t, 2, afterFlush.RemainQuota)
+	require.Equal(t, 7, afterFlush.UsedQuota)
+}
+
+func TestGetTokenByKeyServesDatabaseSnapshotWhileBatchPending(t *testing.T) {
+	truncateTables(t)
+	resetTokenQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	tok := insertTokenWithQuota(t, 9)
+
+	reserved, err := TryReserveTokenQuota(tok.Id, tok.Key, 7, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	require.NoError(t, common.RDB.Del(context.Background(), getTokenCacheKey(tok.Key)).Err())
+
+	// Authentication only needs the token's identity and status. A pending
+	// quota batch must not turn a healthy database read into a 500.
+	cached, err := GetTokenByKey(tok.Key, false)
+	require.NoError(t, err)
+	require.Equal(t, tok.Id, cached.Id)
+	require.Equal(t, common.TokenStatusEnabled, cached.Status)
+
+	_, err = cacheGetTokenByKey(tok.Key)
+	require.Error(t, err, "a stale database snapshot must not be published")
+
+	// Spending stays fail-closed.
+	reserved, err = TryReserveTokenQuota(tok.Id, tok.Key, 1, false)
+	require.ErrorIs(t, err, ErrQuotaCachePending)
+	require.False(t, reserved)
 }

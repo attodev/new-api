@@ -21,11 +21,13 @@ const (
 )
 
 var batchUpdateStores []map[int]int64
+var batchUpdateInFlight []map[int]int64
 var batchUpdateLocks []sync.Mutex
 
 func init() {
 	for i := 0; i < BatchUpdateTypeCount; i++ {
 		batchUpdateStores = append(batchUpdateStores, make(map[int]int64))
+		batchUpdateInFlight = append(batchUpdateInFlight, make(map[int]int64))
 		batchUpdateLocks = append(batchUpdateLocks, sync.Mutex{})
 	}
 }
@@ -42,11 +44,27 @@ func InitBatchUpdater() {
 func addNewRecord(type_ int, id int, value int64) {
 	batchUpdateLocks[type_].Lock()
 	defer batchUpdateLocks[type_].Unlock()
+	addNewRecordLocked(type_, id, value)
+}
+
+func addNewRecordLocked(type_ int, id int, value int64) {
 	if _, ok := batchUpdateStores[type_][id]; !ok {
 		batchUpdateStores[type_][id] = value
 	} else {
 		batchUpdateStores[type_][id] += value
 	}
+}
+
+func hasPendingBatchRecord(type_ int, id int) bool {
+	batchUpdateLocks[type_].Lock()
+	defer batchUpdateLocks[type_].Unlock()
+	return hasPendingBatchRecordLocked(type_, id)
+}
+
+func hasPendingBatchRecordLocked(type_ int, id int) bool {
+	_, queued := batchUpdateStores[type_][id]
+	_, inFlight := batchUpdateInFlight[type_][id]
+	return queued || inFlight
 }
 
 func batchUpdate() {
@@ -71,19 +89,23 @@ func batchUpdate() {
 		batchUpdateLocks[i].Lock()
 		store := batchUpdateStores[i]
 		batchUpdateStores[i] = make(map[int]int64)
+		batchUpdateInFlight[i] = store
 		batchUpdateLocks[i].Unlock()
 		// TODO: maybe we can combine updates with same key?
 		for key, value := range store {
+			var retry bool
 			switch i {
 			case BatchUpdateTypeUserQuota:
 				err := increaseUserQuota(key, value)
 				if err != nil {
 					common.SysLog("failed to batch update user quota: " + err.Error())
+					retry = true
 				}
 			case BatchUpdateTypeTokenQuota:
 				err := increaseTokenQuota(key, int(value))
 				if err != nil {
 					common.SysLog("failed to batch update token quota: " + err.Error())
+					retry = true
 				}
 			case BatchUpdateTypeUsedQuota:
 				updateUserUsedQuota(key, value)
@@ -92,7 +114,13 @@ func batchUpdate() {
 			case BatchUpdateTypeChannelUsedQuota:
 				updateChannelUsedQuota(key, int(value))
 			}
+			if retry {
+				addNewRecord(i, key, value)
+			}
 		}
+		batchUpdateLocks[i].Lock()
+		batchUpdateInFlight[i] = make(map[int]int64)
+		batchUpdateLocks[i].Unlock()
 	}
 	common.SysLog("batch update finished")
 }

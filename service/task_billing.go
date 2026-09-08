@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -119,7 +120,23 @@ func taskAdjustFunding(task *model.Task, delta int) error {
 		}
 		return nil
 	}
+	if task.PrivateData.OrganizationId > 0 {
+		return adjustWalletQuotaForOrganization(task.UserId, task.PrivateData.OrganizationId, int64(delta))
+	}
 	return AdjustWalletQuotaForUser(task.UserId, int64(delta))
+}
+
+func taskAdjustOrganizationUsedQuota(task *model.Task, delta int64) {
+	if delta == 0 {
+		return
+	}
+	if task.PrivateData.OrganizationId > 0 {
+		_ = model.UpdateOrganizationUsedQuota(task.PrivateData.OrganizationId, delta)
+		return
+	}
+	// Legacy tasks created before OrganizationId was snapshotted retain the
+	// previous best-effort behavior based on the user's current membership.
+	UpdateOrganizationUsedQuotaForUser(task.UserId, delta)
 }
 
 // taskAdjustTokenQuota delta > 0 delta < 0
@@ -195,6 +212,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	// quota above; without this, used_quota would never come back down and
 	// "total quota" (quota + used_quota) inflates further with every refund.
 	model.UpdateUserUsedQuota(task.UserId, int64(-quota))
+	taskAdjustOrganizationUsedQuota(task, int64(-quota))
 	model.UpdateChannelUsedQuota(task.ChannelId, -quota)
 
 	// 4.
@@ -216,6 +234,23 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 }
 
 // RecalculateTaskQuota
+// otherRatiosMultiplier folds a task's OtherRatios into a single multiplier,
+// discarding any entry types.IsValidOtherRatio rejects (NaN, +Inf, <= 0) -
+// matching the validation used for the same map elsewhere in the billing
+// path (relay/relay_task.go, types/price_data.go) instead of the bespoke
+// `r > 0` check this used to have, which let +Inf through to poison the
+// settled quota.
+func otherRatiosMultiplier(ratios map[string]float64) float64 {
+	multiplier := 1.0
+	for _, r := range ratios {
+		if r == 1.0 || !types.IsValidOtherRatio(r) {
+			continue
+		}
+		multiplier *= r
+	}
+	return multiplier
+}
+
 // actualQuota (task.Quota)
 // reason "token" "adaptor"
 func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int, reason string) {
@@ -259,7 +294,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	// UpdateUserUsedQuota (not ...AndRequestCount) since submission time
 	// already counted this request once.
 	model.UpdateUserUsedQuota(task.UserId, int64(quotaDelta))
-	UpdateOrganizationUsedQuotaForUser(task.UserId, int64(quotaDelta))
+	taskAdjustOrganizationUsedQuota(task, int64(quotaDelta))
 	model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
 
 	var logType int
@@ -330,15 +365,11 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	// OtherRatios
 	otherMultiplier := 1.0
 	if bc := task.PrivateData.BillingContext; bc != nil {
-		for _, r := range bc.OtherRatios {
-			if r != 1.0 && r > 0 {
-				otherMultiplier *= r
-			}
-		}
+		otherMultiplier = otherRatiosMultiplier(bc.OtherRatios)
 	}
 
 	// : totalTokens * modelRatio * groupRatio * otherMultiplier
-	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
+	actualQuota := common.QuotaFromFloat(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
 
 	reason := fmt.Sprintf("token recalc: tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason)

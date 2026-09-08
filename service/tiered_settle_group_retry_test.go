@@ -6,8 +6,24 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type recordingBillingSettler struct {
+	preConsumedQuota int
+	reserveTargets   []int
+}
+
+func (r *recordingBillingSettler) Settle(int) error         { return nil }
+func (r *recordingBillingSettler) Refund(*gin.Context)      {}
+func (r *recordingBillingSettler) NeedsRefund() bool        { return false }
+func (r *recordingBillingSettler) GetPreConsumedQuota() int { return r.preConsumedQuota }
+func (r *recordingBillingSettler) Reserve(target int) error {
+	r.reserveTargets = append(r.reserveTargets, target)
+	r.preConsumedQuota = target
+	return nil
+}
 
 // TestRefreshTieredBillingGroup_SyncsSnapshotToCurrentGroupRatio reproduces a
 // real bug: an auto-group retry can move a request from one group to a
@@ -62,4 +78,51 @@ func TestPrepareTieredBillingForSelectedGroup_NoOpWhenNotTiered(t *testing.T) {
 	apiErr := PrepareTieredBillingForSelectedGroup(nil, relayInfo)
 	require.Nil(t, apiErr)
 	require.Equal(t, types.PriceData{}, relayInfo.PriceData)
+}
+
+func TestPrepareTieredBillingForSelectedGroupClearsFreeModelAfterPaidRetry(t *testing.T) {
+	billing := &recordingBillingSettler{preConsumedQuota: 50_000}
+	relayInfo := &relaycommon.RelayInfo{
+		Billing:               billing,
+		FinalPreConsumedQuota: 50_000,
+		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
+			BillingMode:               "tiered_expr",
+			ExprString:                `tier("base", p)`,
+			ExprHash:                  billingexpr.ExprHashString(`tier("base", p)`),
+			GroupRatio:                0.10,
+			EstimatedQuotaBeforeGroup: 500_000,
+			EstimatedQuotaAfterGroup:  50_000,
+		},
+		PriceData: types.PriceData{
+			FreeModel:      true,
+			GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 0.20},
+		},
+	}
+
+	require.Nil(t, PrepareTieredBillingForSelectedGroup(nil, relayInfo))
+	require.False(t, relayInfo.PriceData.FreeModel)
+	require.Equal(t, []int{100_000}, billing.reserveTargets)
+	require.Equal(t, 100_000, relayInfo.FinalPreConsumedQuota)
+}
+
+func TestPrepareTieredBillingForSelectedGroupPaidToFreeKeepsFreeModelFalse(t *testing.T) {
+	billing := &recordingBillingSettler{preConsumedQuota: 50_000}
+	relayInfo := &relaycommon.RelayInfo{
+		Billing:               billing,
+		FinalPreConsumedQuota: 50_000,
+		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
+			BillingMode:               "tiered_expr",
+			ExprString:                `tier("base", p)`,
+			ExprHash:                  billingexpr.ExprHashString(`tier("base", p)`),
+			GroupRatio:                0.10,
+			EstimatedQuotaBeforeGroup: 500_000,
+			EstimatedQuotaAfterGroup:  50_000,
+		},
+		PriceData: types.PriceData{GroupRatioInfo: types.GroupRatioInfo{GroupRatio: 0}},
+	}
+
+	require.Nil(t, PrepareTieredBillingForSelectedGroup(nil, relayInfo))
+	require.False(t, relayInfo.PriceData.FreeModel)
+	require.Empty(t, billing.reserveTargets)
+	require.Equal(t, 50_000, relayInfo.FinalPreConsumedQuota)
 }

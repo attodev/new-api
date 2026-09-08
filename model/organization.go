@@ -103,6 +103,21 @@ func DecreaseOrganizationQuota(organizationId int, quota int64) error {
 		Update("quota", gorm.Expr("quota - ?", quota)).Error
 }
 
+// TryReserveOrganizationQuota atomically deducts a shared organization wallet
+// only when the full amount is available.
+func TryReserveOrganizationQuota(organizationId int, quota int64) (bool, error) {
+	if quota < 0 {
+		return false, errors.New("quota cannot be negative")
+	}
+	if organizationId <= 0 || quota == 0 {
+		return true, nil
+	}
+	result := DB.Model(&Organization{}).
+		Where("id = ? AND quota >= ?", organizationId, quota).
+		Update("quota", gorm.Expr("quota - ?", quota))
+	return result.RowsAffected == 1, result.Error
+}
+
 func UpdateOrganizationUsedQuota(organizationId int, quota int64) error {
 	if organizationId <= 0 || quota == 0 {
 		return nil

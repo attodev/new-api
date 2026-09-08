@@ -128,9 +128,16 @@ func PrepareTieredBillingForSelectedGroup(c *gin.Context, relayInfo *relaycommon
 	if err != nil {
 		return types.NewErrorWithStatusCode(err, types.ErrorCodeModelPriceError, 400, types.ErrOptionWithSkipRetry())
 	}
-	if snap == nil || snap.GroupRatio == 0 {
+	if snap == nil {
 		return nil
 	}
+	if snap.GroupRatio == 0 {
+		return nil
+	}
+
+	// A paid retry must clear a FreeModel flag captured from the initial free
+	// group so downstream task and settlement paths keep the billing session.
+	relayInfo.PriceData.FreeModel = false
 
 	if relayInfo.Billing == nil {
 		return PreConsumeBilling(c, snap.EstimatedQuotaAfterGroup, relayInfo)

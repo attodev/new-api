@@ -454,6 +454,20 @@ type Thinking struct {
 	Display string `json:"display,omitempty"`
 }
 
+// NormalizeAdaptiveDisplay makes adaptive thinking return a visible summary.
+// Anthropic defaults display to "omitted" from Opus 4.7 onwards: the response
+// then carries empty thinking blocks with valid signatures while the thinking
+// tokens are still billed, so relayed clients lose the reasoning they paid for.
+// Opus 4.6 defaulted to the summary, and that is what clients of this gateway
+// expect. An explicit client value always wins, and non-adaptive thinking is
+// left alone because display applies only to adaptive mode.
+func (c *Thinking) NormalizeAdaptiveDisplay() {
+	if c == nil || c.Type != "adaptive" || c.Display != "" {
+		return
+	}
+	c.Display = "summarized"
+}
+
 func (c *Thinking) GetBudgetTokens() int {
 	if c.BudgetTokens == nil {
 		return 0

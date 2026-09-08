@@ -103,6 +103,7 @@ type TaskPrivateData struct {
 	// /
 	BillingSource  string              `json:"billing_source,omitempty"`  // "wallet" "subscription"
 	SubscriptionId int                 `json:"subscription_id,omitempty"` // ID
+	OrganizationId int                 `json:"organization_id,omitempty"` // organization charged when the task was submitted
 	TokenId        int                 `json:"token_id,omitempty"`        // ID
 	NodeName       string              `json:"node_name,omitempty"`       // node that submitted the task; settlement logs attribute usage here instead of whichever node polled it to completion
 	BillingContext *TaskBillingContext `json:"billing_context,omitempty"`
@@ -173,6 +174,7 @@ type SyncTaskQueryParams struct {
 func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) *Task {
 	properties := Properties{}
 	privateData := TaskPrivateData{}
+	privateData.OrganizationId = relayInfo.BillingOrganizationId
 	if relayInfo != nil && relayInfo.ChannelMeta != nil {
 		if relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeGemini ||
 			relayInfo.ChannelMeta.ChannelType == constant.ChannelTypeVertexAi {

@@ -32,11 +32,19 @@ type PriceData struct {
 	GroupRatioInfo       GroupRatioInfo
 }
 
+// IsValidOtherRatio reports whether ratio is safe to multiply into a quota:
+// finite and strictly positive. NaN and +Inf both compare false against
+// "<= 0" (a NaN comparison is always false; +Inf is > 0), so a bare
+// "ratio <= 0" guard alone lets both through to poison every downstream
+// quota multiplication. Exported so callers that must build a whole
+// OtherRatios map at once (rather than adding one key via AddOtherRatio)
+// can apply the same validation before storing it.
+func IsValidOtherRatio(ratio float64) bool {
+	return ratio > 0 && !math.IsInf(ratio, 1)
+}
+
 func (p *PriceData) AddOtherRatio(key string, ratio float64) {
-	// NaN and +Inf both compare false against "<= 0" (a NaN comparison is
-	// always false; +Inf is > 0), so a bare "ratio <= 0" guard lets both
-	// through to poison every downstream quota multiplication.
-	if !(ratio > 0) || math.IsInf(ratio, 1) {
+	if !IsValidOtherRatio(ratio) {
 		return
 	}
 	if p.OtherRatios == nil {

@@ -21,6 +21,68 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// applyClaudeThinkingSettings adapts the thinking-related fields of an
+// Anthropic-native request: it expands the "-high"/"-thinking" model suffixes
+// into the thinking configuration each model family accepts, and normalizes
+// adaptive display so a relayed client still receives the reasoning it is
+// billed for. It reports whether request.Model was adapted, so the caller can
+// keep the upstream model name in sync.
+func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName string) (modelAdapted bool) {
+	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
+		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
+		request.Model = baseModel
+		request.Thinking = &dto.Thinking{
+			Type: "adaptive",
+		}
+		request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
+		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
+			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
+			request.Temperature = nil
+			request.TopP = nil
+			request.TopK = nil
+		} else {
+			request.Temperature = common.GetPointer[float64](1.0)
+		}
+		modelAdapted = true
+	} else if model_setting.GetClaudeSettings().ThinkingAdapterEnabled &&
+		strings.HasSuffix(request.Model, "-thinking") {
+		if request.Thinking == nil {
+			baseModel := strings.TrimSuffix(request.Model, "-thinking")
+			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
+				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
+				request.Thinking = &dto.Thinking{Type: "adaptive"}
+				request.OutputConfig = json.RawMessage(`{"effort":"high"}`)
+				request.Temperature = nil
+				request.TopP = nil
+				request.TopK = nil
+			} else {
+				// BudgetTokens 1024
+				if request.MaxTokens == nil || *request.MaxTokens < 1280 {
+					request.MaxTokens = common.GetPointer[uint](1280)
+				}
+
+				// BudgetTokens max_tokens 80%
+				request.Thinking = &dto.Thinking{
+					Type:         "enabled",
+					BudgetTokens: common.GetPointer[int](int(float64(*request.MaxTokens) * model_setting.GetClaudeSettings().ThinkingAdapterBudgetTokensPercentage)),
+				}
+				// TODO:
+				// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
+				request.Temperature = common.GetPointer[float64](1.0)
+			}
+		}
+		if !model_setting.ShouldPreserveThinkingSuffix(originModelName) {
+			request.Model = strings.TrimSuffix(request.Model, "-thinking")
+		}
+		modelAdapted = true
+	}
+
+	// Covers adaptive thinking the client asked for directly, which no branch
+	// above touches: without this, Opus 4.7+ returns empty thinking blocks.
+	request.Thinking.NormalizeAdaptiveDisplay()
+	return modelAdapted
+}
+
 func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 
 	info.InitChannelMeta(c)
@@ -52,54 +114,7 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		request.MaxTokens = &defaultMaxTokens
 	}
 
-	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
-		request.Model = baseModel
-		request.Thinking = &dto.Thinking{
-			Type: "adaptive",
-		}
-		request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
-		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400
-			// and defaults display to "omitted"; restore the 4.6 visible summary.
-			request.Thinking.Display = "summarized"
-			request.Temperature = nil
-			request.TopP = nil
-			request.TopK = nil
-		} else {
-			request.Temperature = common.GetPointer[float64](1.0)
-		}
-		info.UpstreamModelName = request.Model
-	} else if model_setting.GetClaudeSettings().ThinkingAdapterEnabled &&
-		strings.HasSuffix(request.Model, "-thinking") {
-		if request.Thinking == nil {
-			baseModel := strings.TrimSuffix(request.Model, "-thinking")
-			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
-				request.Thinking = &dto.Thinking{Type: "adaptive", Display: "summarized"}
-				request.OutputConfig = json.RawMessage(`{"effort":"high"}`)
-				request.Temperature = nil
-				request.TopP = nil
-				request.TopK = nil
-			} else {
-				// BudgetTokens 1024
-				if request.MaxTokens == nil || *request.MaxTokens < 1280 {
-					request.MaxTokens = common.GetPointer[uint](1280)
-				}
-
-				// BudgetTokens max_tokens 80%
-				request.Thinking = &dto.Thinking{
-					Type:         "enabled",
-					BudgetTokens: common.GetPointer[int](int(float64(*request.MaxTokens) * model_setting.GetClaudeSettings().ThinkingAdapterBudgetTokensPercentage)),
-				}
-				// TODO:
-				// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
-				request.Temperature = common.GetPointer[float64](1.0)
-			}
-		}
-		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) {
-			request.Model = strings.TrimSuffix(request.Model, "-thinking")
-		}
+	if applyClaudeThinkingSettings(request, info.OriginModelName) {
 		info.UpstreamModelName = request.Model
 	}
 

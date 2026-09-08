@@ -678,6 +678,12 @@ func OpenaiImageStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp 
 				}
 			}
 		}
+		// Unlike StreamScannerHandler (used by the chat/completion streaming
+		// path), this loop writes directly to c.Writer with no deadline of its
+		// own - without this, a stalled client (TCP window never drains) can
+		// block this write forever, leaking the goroutine and the held
+		// upstream connection.
+		helper.ExtendWriteDeadline(c)
 		if _, err := c.Writer.Write(append([]byte(line), '\n')); err != nil {
 			if info != nil && info.StreamStatus != nil {
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, err)
@@ -716,9 +722,6 @@ func isOpenAIImageStreamErrorEvent(eventName string, data []byte) bool {
 	if strings.EqualFold(strings.TrimSpace(eventName), "error") {
 		return true
 	}
-	if !json.Valid(data) {
-		return false
-	}
 	var payload struct {
 		Type  string          `json:"type"`
 		Error json.RawMessage `json:"error"`
@@ -727,11 +730,12 @@ func isOpenAIImageStreamErrorEvent(eventName string, data []byte) bool {
 		return false
 	}
 	payloadType := strings.ToLower(strings.TrimSpace(payload.Type))
-	return payloadType == "error" || payloadType == "upstream_error" || len(payload.Error) > 0
+	hasError := len(payload.Error) > 0 && string(payload.Error) != "null"
+	return payloadType == "error" || payloadType == "upstream_error" || hasError
 }
 
 func extractOpenAIImageStreamErrorMessage(data []byte) string {
-	if len(data) == 0 || !json.Valid(data) {
+	if len(data) == 0 {
 		return "upstream image stream returned error event"
 	}
 	var payload struct {
@@ -744,7 +748,7 @@ func extractOpenAIImageStreamErrorMessage(data []byte) string {
 	if msg := strings.TrimSpace(payload.Message); msg != "" {
 		return msg
 	}
-	if len(payload.Error) > 0 {
+	if len(payload.Error) > 0 && string(payload.Error) != "null" {
 		var nested struct {
 			Message string `json:"message"`
 		}

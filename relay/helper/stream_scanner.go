@@ -26,6 +26,12 @@ const (
 	InitialScannerBufferSize    = 64 << 10 // 64KB (64*1024)
 	DefaultMaxScannerBufferSize = 64 << 20 // 64MB (64*1024*1024) default SSE buffer size
 	DefaultPingInterval         = 10 * time.Second
+	// streamWriteTimeout bounds a single blocked write to a slow client so
+	// cleanup's unconditional wg.Wait() can always finish. Without it, a
+	// slow-but-connected client (full TCP receive window, connection not
+	// actually closed so c.Request.Context() never fires) could hang the
+	// handler forever.
+	streamWriteTimeout = 30 * time.Second
 )
 
 func getScannerBufferSize() int {
@@ -43,6 +49,16 @@ func NewStreamScanner(reader io.Reader) *bufio.Scanner {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, InitialScannerBufferSize), getScannerBufferSize())
 	return scanner
+}
+
+// ExtendWriteDeadline pushes the connection write deadline forward before
+// each stream write. Best-effort: writers that don't support deadlines
+// (e.g. httptest recorders) are silently ignored.
+func ExtendWriteDeadline(c *gin.Context) {
+	if c == nil || c.Writer == nil {
+		return
+	}
+	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(streamWriteTimeout))
 }
 
 // copyCodexSSEHeaders forwards Codex turn-state response headers onto the
@@ -169,6 +185,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 					gopool.Go(func() {
 						writeMutex.Lock()
 						defer writeMutex.Unlock()
+						ExtendWriteDeadline(c)
 						done <- PingData(c)
 					})
 
@@ -219,6 +236,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		for data := range dataChan {
 			sr.reset()
 			writeMutex.Lock()
+			ExtendWriteDeadline(c)
 			dataHandler(data, sr)
 			writeMutex.Unlock()
 			if sr.IsStopped() {

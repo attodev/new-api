@@ -72,6 +72,7 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 		OriginModelName: "test-model",
 		IsPlayground:    true,
 		ForcePreConsume: true,
+		ChannelMeta:     &relaycommon.ChannelMeta{ChannelId: 1},
 	}
 
 	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
@@ -83,6 +84,41 @@ func TestOrganizationWalletBillingPreConsumesMemberLimitAndOrganizationWallet(t 
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, int64(975), org.Quota)
 	require.Equal(t, int64(0), org.UsedQuota)
+	require.Equal(t, 1, relayInfo.BillingOrganizationId)
+	task := model.InitTask("", relayInfo)
+	require.Equal(t, 1, task.PrivateData.OrganizationId)
+}
+
+func TestOrganizationWalletFundingPinsOrganizationAcrossMembershipChange(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner-one", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 3, "owner-two", 1000, 2, model.OrganizationRoleOwner)
+	seedOrganization(t, 1, 1)
+	second := &model.Organization{Id: 2, Name: "org-two", OwnerUserId: 3, Status: model.OrganizationStatusEnabled, Quota: 1000}
+	require.NoError(t, model.DB.Create(second).Error)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.NoError(t, funding.PreConsume(25))
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 2).Update("organization_id", 2).Error)
+	require.NoError(t, funding.Refund())
+
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 1).Quota)
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 2).Quota)
+}
+
+func TestOrganizationWalletFundingRollsBackMemberWhenOrganizationInsufficient(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 10).Error)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.ErrorIs(t, funding.PreConsume(25), ErrInsufficientWalletQuota)
+	require.Equal(t, int64(100), getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(10), getOrganizationForBillingTest(t, 1).Quota)
 }
 
 func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWallet(t *testing.T) {
@@ -108,6 +144,36 @@ func TestOrganizationWalletBillingSettlesRefundToMemberLimitAndOrganizationWalle
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, int64(990), org.Quota)
 	require.Equal(t, int64(0), org.UsedQuota)
+}
+
+func TestOrganizationWalletBillingReserveIncreasesRetryPreConsume(t *testing.T) {
+	truncate(t)
+
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:          2,
+		OriginModelName: "test-model",
+		IsPlayground:    true,
+		ForcePreConsume: true,
+	}
+
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.NoError(t, session.Reserve(40))
+
+	require.Equal(t, 40, session.GetPreConsumedQuota())
+	require.Equal(t, int64(60), getUserQuotaForBillingTest(t, 2))
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, int64(960), org.Quota)
+
+	session.Refund(newOrganizationBillingContext())
+	require.Eventually(t, func() bool {
+		org = getOrganizationForBillingTest(t, 1)
+		return getUserQuotaForBillingTest(t, 2) == 100 && org.Quota == 1000
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestOrganizationWalletBillingOwnerRequestUsesOrganizationWallet(t *testing.T) {

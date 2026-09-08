@@ -19,6 +19,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -194,11 +195,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 6. OtherRatios
 	if !common.StringsContains(constant.TaskPricePatches, modelName) {
-		for _, ra := range info.PriceData.OtherRatios {
-			if ra != 1.0 {
-				info.PriceData.Quota = int(float64(info.PriceData.Quota) * ra)
-			}
-		}
+		info.PriceData.Quota = applyOtherRatiosToQuota(info.PriceData.Quota, info.PriceData.OtherRatios)
 	}
 
 	// 7. — info.Billing
@@ -242,9 +239,21 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// 11. OtherRatios
 	finalQuota := info.PriceData.Quota
 	if adjustedRatios := adaptor.AdjustBillingOnSubmit(info, taskData); len(adjustedRatios) > 0 {
+		// Unlike AddOtherRatio (used for the pre-consume estimate earlier in
+		// this same flow), this replaces the whole map wholesale with
+		// whatever the adaptor computed from the upstream's actual response
+		// (duration, resolution) - validate it the same way before it can
+		// reach the quota multiplication below or get read back by any other
+		// consumer of info.PriceData.OtherRatios (settlement, logging).
+		validRatios := make(map[string]float64, len(adjustedRatios))
+		for key, ratio := range adjustedRatios {
+			if types.IsValidOtherRatio(ratio) {
+				validRatios[key] = ratio
+			}
+		}
 		// ratios quota
-		finalQuota = recalcQuotaFromRatios(info, adjustedRatios)
-		info.PriceData.OtherRatios = adjustedRatios
+		finalQuota = recalcQuotaFromRatios(info, validRatios)
+		info.PriceData.OtherRatios = validRatios
 		info.PriceData.Quota = finalQuota
 	}
 
@@ -260,21 +269,39 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 // : baseQuota × ∏(ratio) — baseQuota OtherRatios
 func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float64) int {
 	// PriceData OtherRatios
-	baseQuota := info.PriceData.Quota
+	baseQuota := float64(info.PriceData.Quota)
 	// OtherRatios
 	for _, ra := range info.PriceData.OtherRatios {
-		if ra != 1.0 && ra > 0 {
-			baseQuota = int(float64(baseQuota) / ra)
+		if ra == 1.0 || !types.IsValidOtherRatio(ra) {
+			continue
 		}
+		baseQuota /= ra
 	}
 	// ratios
-	result := float64(baseQuota)
+	// Self-defending against an invalid ratio (NaN/+Inf/non-positive) even
+	// though the current caller already filters - a money-handling function
+	// shouldn't rely solely on its caller's discipline.
+	result := baseQuota
 	for _, ra := range ratios {
-		if ra != 1.0 {
-			result *= ra
+		if ra == 1.0 || !types.IsValidOtherRatio(ra) {
+			continue
 		}
+		result *= ra
 	}
-	return int(result)
+	return common.QuotaFromFloat(result)
+}
+
+// applyOtherRatiosToQuota multiplies quota by every ratio in the map,
+// saturating the result to the quota column's range instead of overflowing.
+func applyOtherRatiosToQuota(quota int, ratios map[string]float64) int {
+	result := float64(quota)
+	for _, ra := range ratios {
+		if ra == 1.0 {
+			continue
+		}
+		result *= ra
+	}
+	return common.QuotaFromFloat(result)
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
