@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -14,6 +15,14 @@ const (
 	oauth2SessionTokenPrefix = "oauth2:session_token:"
 	oauth2TokenTTL           = 24 * time.Hour
 	oauth2CodeTTL            = 120 * time.Second
+
+	// oauth2TokenSentinelId marks a Token as never a real DB row. It must be
+	// positive: cacheGetTokenByKey() (model/token_cache.go) treats any
+	// Id <= 0 read back from the cache hash as an incomplete/corrupt write
+	// and discards it, which would make this token unreadable. MaxInt32 is
+	// far above any realistic auto-increment id, so collision is not a
+	// practical concern.
+	oauth2TokenSentinelId = math.MaxInt32
 )
 
 var ErrOAuth2CodeInvalid = errors.New("oauth2 code invalid or expired")
@@ -62,7 +71,7 @@ func IssueOAuth2Token(userId int, group string, clientId string) (*Token, error)
 
 	now := common.GetTimestamp()
 	token := Token{
-		Id:             -1, // never a real DB row; sentinel so it can't collide with a real Token.Id
+		Id:             oauth2TokenSentinelId, // never a real DB row; sentinel so it can't collide with a real Token.Id
 		UserId:         userId,
 		Key:            key,
 		Status:         common.TokenStatusEnabled,
@@ -98,7 +107,7 @@ func RevokeOAuth2Token(userId int) error {
 		}
 		return err
 	}
-	if err := cacheDeleteToken(rawKey); err != nil {
+	if err := invalidateTokenCacheForMutation(rawKey); err != nil {
 		return err
 	}
 	return common.RedisDel(oauth2SessionTokenPrefix + strconv.Itoa(userId))
