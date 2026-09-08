@@ -91,9 +91,14 @@ func OAuth2SessionInit(c *gin.Context) {
 
 // OAuth2Token exchanges a single-use authorization code for an access
 // token. Called server-to-server by the external app's backend.
+//
+// Gated on credentials alone, not on oauth2Configured: this endpoint never
+// reads RedirectURI, and a unified-UI deployment leaves it empty because
+// nothing navigates to it. Requiring one here would hand out codes from
+// session-init that could never be exchanged.
 func OAuth2Token(c *gin.Context) {
 	settings := system_setting.GetOAuth2Settings()
-	if !oauth2Configured(settings) {
+	if !oauth2CredentialsConfigured(settings) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
 		return
 	}

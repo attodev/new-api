@@ -360,3 +360,56 @@ func TestOAuth2SessionInit_RedirectModeStillRequiresRedirectURI(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, recorder.Code)
 }
+
+// A unified-UI deployment configures credentials and leaves RedirectURI empty,
+// because nothing ever navigates to it. The code exchange has to work in that
+// state or raw-code mode is decorative: session-init hands out a code that
+// /oauth2/token then refuses.
+//
+// Neither endpoint reads RedirectURI -- only the redirect-URL construction in
+// session-init does -- so requiring one here gated the whole flow on a value it
+// never used. Caught by running the two services against each other; each
+// endpoint looked correct on its own.
+func TestOAuth2Token_WorksWithoutRedirectURI(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	setupOAuth2ProviderTestDB(t)
+	system_setting.GetOAuth2Settings().RedirectURI = ""
+
+	code, err := model.StoreAuthCode(7)
+	require.NoError(t, err)
+
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", code)
+	form.Set("client_id", "openwebui")
+	form.Set("client_secret", "test-secret")
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/oauth2/token", strings.NewReader(form.Encode()))
+	ctx.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	OAuth2Token(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+	require.Contains(t, recorder.Body.String(), "access_token")
+}
+
+func TestOAuth2UserInfo_WorksWithoutRedirectURI(t *testing.T) {
+	setupOAuth2ProviderTest(t)
+	setupOAuth2ProviderTestDB(t)
+	system_setting.GetOAuth2Settings().RedirectURI = ""
+
+	token, err := model.IssueOAuth2Token(7, "default", "openwebui")
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/oauth2/userinfo", nil)
+	ctx.Request.Header.Set("Authorization", "Bearer sk-"+token.Key)
+
+	OAuth2UserInfo(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+	require.Contains(t, recorder.Body.String(), `"sub":"7"`)
+}
