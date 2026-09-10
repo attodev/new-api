@@ -19,6 +19,27 @@ const (
 
 var ErrQuotaCachePending = errors.New("quota cache unavailable while database updates are pending")
 
+// refreshTTLScript pushes a cache entry's expiry back to the quota cache TTL --
+// but only when that would LENGTHEN it.
+//
+// The unconditional EXPIRE this replaces was right for what the token cache
+// normally holds: a short-lived snapshot of a database row, re-readable at any
+// time, whose TTL exists to bound staleness. It was wrong for the one entry that
+// has no row behind it. IssueOAuth2Token stores the relay token in Redis and
+// nowhere else, with a 24-hour TTL that IS the session's lifetime; refreshing
+// that to 60 seconds ended the session a minute after the user's last request,
+// after which hydrateTokenCache fell through to a table with no matching row and
+// answered 401 until the user signed in again.
+//
+// A TTL of -1 (no expiry) is left alone: it already outlives anything this would
+// set. -2 (key gone) cannot occur here -- every caller has just read a field off
+// the same key.
+const refreshTTLScript = `
+local ttl = redis.call('TTL', KEYS[1])
+if ttl >= 0 and ttl < tonumber(ARGV[4]) then
+  redis.call('EXPIRE', KEYS[1], ARGV[4])
+end`
+
 const userQuotaReserveScript = `
 if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or tonumber(redis.call('HGET', KEYS[1], 'CacheSchema') or '0') ~= tonumber(ARGV[3])
@@ -48,8 +69,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'RemainQuota') == 0
   or redis.call('HEXISTS', KEYS[1], 'UsedQuota') == 0 then
   return -1
-end
-redis.call('EXPIRE', KEYS[1], ARGV[4])
+end` + refreshTTLScript + `
 local remain = tonumber(redis.call('HGET', KEYS[1], 'RemainQuota'))
 if remain == nil or remain < tonumber(ARGV[1]) then
   return 0
@@ -64,8 +84,7 @@ if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
   or redis.call('HEXISTS', KEYS[1], 'RemainQuota') == 0
   or redis.call('HEXISTS', KEYS[1], 'UsedQuota') == 0 then
   return -1
-end
-redis.call('EXPIRE', KEYS[1], ARGV[4])
+end` + refreshTTLScript + `
 redis.call('HINCRBY', KEYS[1], 'RemainQuota', tonumber(ARGV[1]))
 redis.call('HINCRBY', KEYS[1], 'UsedQuota', -tonumber(ARGV[1]))
 redis.call('HSET', KEYS[1], 'AccessedTime', ARGV[3])
