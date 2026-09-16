@@ -688,15 +688,16 @@ export function ModelPricingEditorPanel({
   }, [editData, laneEnabled, lanePrices, pricingMode, promptPrice, t])
 
   const handleSubmit = (values: ModelPricingFormValues) => {
-    if (
-      pricingMode === 'per-token' &&
-      toNumberOrNull(promptPrice) === null &&
-      laneConfigs.some(
-        ({ key }) => laneEnabled[key] && hasValue(lanePrices[key])
-      )
-    ) {
+    if (pricingMode === 'per-token' && toNumberOrNull(promptPrice) === null) {
       form.setError('ratio', {
-        message: t('Input price is required before saving dependent prices.'),
+        message: t('Input price is required for per-token billing.'),
+      })
+      return
+    }
+
+    if (pricingMode === 'per-request' && !hasValue(values.price)) {
+      form.setError('price', {
+        message: t('Fixed price is required for per-request billing.'),
       })
       return
     }
