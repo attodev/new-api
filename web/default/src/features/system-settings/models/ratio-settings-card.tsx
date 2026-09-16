@@ -342,7 +342,7 @@ export function RatioSettingsCard({
   })
 
   useEffect(() => {
-    modelNormalizedDefaults.current = {
+    const nextNormalized = {
       ModelPrice: normalizeJsonString(modelDefaults.ModelPrice),
       ModelRatio: normalizeJsonString(modelDefaults.ModelRatio),
       CacheRatio: normalizeJsonString(modelDefaults.CacheRatio),
@@ -357,6 +357,20 @@ export function RatioSettingsCard({
       BillingMode: normalizeJsonString(modelDefaults.BillingMode),
       BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
     }
+
+    // `modelDefaults` is a fresh object on every parent re-render even when
+    // the underlying settings haven't changed (see section-registry.tsx's
+    // getModelDefaults). Resetting on every such re-render would silently
+    // discard any unsaved edits in the form, so only reset when the actual
+    // values differ from what's already reflected in the form.
+    const unchanged = (
+      Object.keys(nextNormalized) as (keyof typeof nextNormalized)[]
+    ).every((key) => nextNormalized[key] === modelNormalizedDefaults.current[key])
+    if (unchanged) {
+      return
+    }
+
+    modelNormalizedDefaults.current = nextNormalized
 
     modelForm.reset({
       ...modelDefaults,
@@ -376,7 +390,7 @@ export function RatioSettingsCard({
   }, [modelDefaults, modelForm])
 
   useEffect(() => {
-    groupNormalizedDefaults.current = {
+    const nextNormalized = {
       GroupRatio: normalizeJsonString(groupDefaults.GroupRatio),
       TopupGroupRatio: normalizeJsonString(groupDefaults.TopupGroupRatio),
       UserUsableGroups: normalizeJsonString(groupDefaults.UserUsableGroups),
@@ -389,6 +403,18 @@ export function RatioSettingsCard({
       ModelDiscount: normalizeJsonString(groupDefaults.ModelDiscount),
       VendorDiscount: normalizeJsonString(groupDefaults.VendorDiscount),
     }
+
+    // Same reasoning as the model-form effect above: `groupDefaults` is a
+    // new object on every parent re-render even when nothing changed, so
+    // only reset when the values actually differ.
+    const unchanged = (
+      Object.keys(nextNormalized) as (keyof typeof nextNormalized)[]
+    ).every((key) => nextNormalized[key] === groupNormalizedDefaults.current[key])
+    if (unchanged) {
+      return
+    }
+
+    groupNormalizedDefaults.current = nextNormalized
 
     groupForm.reset({
       ...groupDefaults,
