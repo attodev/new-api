@@ -677,13 +677,16 @@ func UpdateOrganizationUser(c *gin.Context) {
 }
 
 func AssignOrganizationUser(c *gin.Context) {
+	// Root names the target with ?organization_id=; anyone else must be owner/admin of their
+	// own organisation -- the same rule the list/import routes in this file use
+	// (resolveOrganizationAdminTarget). Root is no longer refused for being outside the org.
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
+		return
+	}
 	actor, err := getOrganizationActor(c)
 	if err != nil {
 		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
 		return
 	}
 
@@ -715,12 +718,12 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgOrgInvalidRole)
 		return
 	}
-	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
+	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) && actor.Role != common.RoleRootUser {
 		common.ApiErrorI18n(c, i18n.MsgOrgOnlyOwnerCanAssignOwner)
 		return
 	}
 
-	if err := model.AssignUserToOrganizationWithBillingLifecycle(target.Id, actor.OrganizationId, req.OrganizationRole); err != nil {
+	if err := model.AssignUserToOrganizationWithBillingLifecycle(target.Id, organizationId, req.OrganizationRole); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -731,13 +734,10 @@ func AssignOrganizationUser(c *gin.Context) {
 }
 
 func RemoveOrganizationUserMembership(c *gin.Context) {
-	actor, err := getOrganizationActor(c)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorI18n(c, i18n.MsgOrgAdminRequired)
+	// Same rule as AssignOrganizationUser: root picks the organisation with ?organization_id=,
+	// owners/admins act on their own organisation.
+	organizationId, ok := resolveOrganizationAdminTarget(c)
+	if !ok {
 		return
 	}
 
@@ -755,7 +755,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgOrgGlobalAdminUnmanageable)
 		return
 	}
-	if target.OrganizationId != actor.OrganizationId {
+	if target.OrganizationId != organizationId {
 		common.ApiErrorI18n(c, i18n.MsgOrgUserNotInOrg)
 		return
 	}
