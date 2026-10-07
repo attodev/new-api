@@ -1,6 +1,6 @@
 # Open WebUI 로그인 연동 — 내장 OIDC 제공자 (기존 oauth2 제공자의 표준 OIDC 확장)
 
-> 상태: 설계 승인 (2026-10-07)
+> 상태: 설계 승인 (2026-10-07) · 구현 반영 수정 (2026-10-07)
 > 요구사항 출처: "Open WebUI 연동 요구사항 — NewAPI JWT 변환 · 내장 OIDC 서버" 5~10절 (Open WebUI main `8bd8b4f`, v0.11.4 기준)
 > 선행 스펙: `2026-10-07-openwebui-relay-jwt-design.md` (relay, 구현 완료)
 > 대체하는 스펙: `2026-08-16-oauth2-provider-design.md` (브로커 방식, 방법 A)
@@ -77,6 +77,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 - 저장 값: `{user_id, client_id, redirect_uri, nonce, scope, code_challenge, code_challenge_method, auth_time}`.
 - 저장소: `pkg/cachex.HybridCache[string]`(네임스페이스 `oauth2:code:v2`, 값은 `common.Marshal` JSON). Redis가 있으면 노드 간 공유, 없으면 메모리(단일 노드 전제).
 - 교환 시 `client_id`·`redirect_uri`가 발급 시 값과 문자 단위로 같아야 한다. `code_challenge`가 저장돼 있으면 `code_verifier` 필수이고 `base64url(SHA256(code_verifier)) == code_challenge`여야 한다. 저장돼 있지 않은데 `code_verifier`가 오면 무시한다.
+- 검증 실패는 code를 소모하지 않는다(공격자가 남의 code를 태울 수 없음). 성공 시 삭제는 `DeleteMany`의 결과로 승자를 가린다. Redis는 UNLINK 반환값, 메모리는 존재 여부를 돌려주므로 동시 교환 중 정확히 한 요청만 성공한다.
 
 ### 2.3 token 응답
 
@@ -106,18 +107,18 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | `app_url` | 신규 | Open WebUI `WEBUI_URL`. Playground 링크 대상 |
 | `post_logout_redirect_uri` | 신규, 선택 | Open WebUI `WEBUI_AUTH_SIGNOUT_REDIRECT_URL` |
 | `open_in_new_window`, `replace_playground` | 기존 | Playground 링크 동작 |
-| `signing_current`, `signing_previous` | 신규, 내부 | 3절. `GetOptions` 응답에서 명시적으로 제외 |
+| (서명 키) | 신규, 내부 | 옵션 `OIDCSigningCurrentKey` / `OIDCSigningPreviousKey`. `oauth2.*` 네임스페이스 밖(점 없음)이라 `GlobalConfig`로 라우팅되지 않고, `Key` 접미사 규칙과 명시적 제외로 `GetOptions`에서 숨겨지며 `UpdateOption`은 쓰기를 거부한다. 3절 |
 
 클라이언트는 이 하나로 고정이다. 동적 등록·다중 클라이언트는 범위 밖.
 
 ## 3. 서명 키 보관과 교체
 
-- **생성**: `oauth2.enabled`가 켜진 상태에서 키가 처음 필요할 때 2048비트 RSA 키를 만들어 옵션 `oauth2.signing_current`에 JSON `{kid, private_pem, created_at}`으로 저장한다. 옵션 테이블은 세 DB 모두에서 동작하고 이미 비밀을 담고 있으므로 새 테이블을 두지 않는다. 동시 생성 경쟁은 프로세스 내 `sync.Mutex` + 저장 전 재조회로 막는다(다중 노드에서 두 노드가 동시에 만들면 나중 저장이 이기고, 먼저 저장한 노드는 옵션 갱신 이벤트로 다시 읽는다).
+- **생성**: `oauth2.enabled`가 켜진 상태에서 키가 처음 필요할 때 2048비트 RSA 키를 만들어 옵션 `OIDCSigningCurrentKey`에 JSON `{kid, private_pem, created_at, rotated_at}`으로 저장한다. 옵션 테이블은 세 DB 모두에서 동작하고 이미 비밀을 담고 있으므로 새 테이블을 두지 않는다. 동시 생성 경쟁은 프로세스 내 `sync.Mutex` + 저장 전 재조회로 막는다(다중 노드에서 두 노드가 동시에 만들면 나중 저장이 이기고, 먼저 저장한 노드는 옵션 갱신 이벤트로 다시 읽는다).
 - **kid**: 공개키 DER(PKIX)의 SHA-256 앞 16바이트를 base64url(패딩 없음)로 인코딩. 결정적이라 재시작·노드 간에 같다.
-- **메모리 캐시**: 파싱된 `*rsa.PrivateKey`와 kid를 프로세스에 들고 있다. `handleConfigUpdate`가 `oauth2.signing_*` 키를 받으면 캐시를 비워 다음 요청에서 다시 읽는다. 다중 노드는 옵션 테이블을 공유하므로 같은 키를 쓴다.
-- **교체**: `POST /api/oauth2/rotate-signing-key`(RootAuth). 현재 키를 `signing_previous`로 내리고 새 키를 `signing_current`로 올린다. JWKS는 두 키를 모두 게시한다. `signing_previous`는 교체 후 **24시간**이 지나면 JWKS에서 빠지고 옵션에서 삭제된다(id_token 수명 1시간이므로 충분). 이미 `signing_previous`가 있는 상태에서 다시 교체하면 가장 오래된 키가 버려진다.
+- **메모리 캐시**: 파싱된 `*rsa.PrivateKey`와 kid를 프로세스에 들고 있고, 옵션 문자열이 바뀌면(주기적 옵션 동기화로 다른 노드의 쓰기가 들어오면) 다시 파싱한다. 다중 노드 첫 기동에서 두 노드가 동시에 키를 만들면 마지막 DB 쓰기가 이기고, 진 노드가 그 사이 발급한 토큰은 검증되지 않는다(수용).
+- **교체**: `POST /api/oauth2/rotate-signing-key`(RootAuth). 새 키를 먼저 생성한 뒤 현재 키를 `OIDCSigningPreviousKey`로 내리고(`rotated_at` 기록) 새 키를 `OIDCSigningCurrentKey`로 올린다. 전체가 하나의 잠금 안에서 일어나 JWKS가 중간 상태를 노출하지 않는다. 이전 키는 교체 후 **24시간**이 지나면 JWKS에서 빠지고 옵션 값이 비워진다(id_token 수명 1시간이므로 충분). 이미 이전 키가 있는 상태에서 다시 교체하면 가장 오래된 키가 버려진다.
 - **검증 대상**: id_token 발급은 항상 현재 키. end-session의 `id_token_hint` 검증은 현재·이전 키 모두로 시도하고 만료는 허용한다.
-- **응답 노출 금지**: `GetOptions`는 `oauth2.signing_current`·`oauth2.signing_previous`를 이름으로 걸러 돌려주지 않는다. 관리자 화면에는 현재 `kid`와 생성 시각만 `GET /api/oauth2/signing-key-status`(RootAuth)로 보여준다.
+- **응답 노출 금지**: `GetOptions`는 두 키 옵션을 이름으로 걸러 돌려주지 않고, `UpdateOption`은 두 이름에 대한 쓰기를 거부한다. 관리자 화면에는 현재·이전 `kid`와 생성 시각만 `GET /api/oauth2/signing-key-status`(RootAuth)로 보여준다.
 
 **패키지 배치** — `service/oidc/`:
 
@@ -135,9 +136,9 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 
 프런트 라우트 `web/default/src/routes/oauth2/authorize.tsx`(인증 가드 밖, 로그인 레이아웃).
 
-1. 페이지가 열리면 쿼리 문자열의 `response_type, client_id, redirect_uri, scope, state, nonce, code_challenge, code_challenge_method`를 그대로 담아 `POST /api/oauth2/authorize`를 호출한다.
+1. 페이지가 열리면 쿼리 문자열의 `response_type, client_id, redirect_uri, scope, state, nonce, code_challenge, code_challenge_method`를 **원문 그대로**(`URLSearchParams`로 읽음. 라우터의 기본 검색 파서는 값을 JSON으로 해석해 숫자 `state`를 깨뜨리므로 쓰지 않는다) 담아 `POST /api/oauth2/authorize`를 호출한다.
 2. 응답 처리
-   - **401**(`UserAuth`의 미로그인 응답) → `/sign-in?redirect=<현재 경로+쿼리 전체를 인코딩>`으로 이동. 기존 로그인 화면이 성공 후 `redirect`로 돌아오므로 추가 작업 없음. 돌아오면 1부터 다시.
+   - **401**(`UserAuth`의 미로그인 응답) → `/sign-in?redirect=<현재 경로+쿼리 전체를 인코딩>`으로 이동. 로그인 화면은 `redirect`가 쿼리를 포함한 같은 출처 경로일 때 `new URL(target, origin)`으로 해석해 origin이 같은 경우에만 전체 내비게이션으로 돌아온다(문자열 휴리스틱 금지 — 탭·개행 우회로 오픈 리다이렉트가 된다). 돌아오면 1부터 다시.
    - **`success:false`** → 아래 표의 `error` 코드별 동작.
    - **`success:true`** → `window.location.replace(data.redirect_url)`.
 3. 서버 검증 순서(`controller.OAuth2Authorize`):
@@ -155,7 +156,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | `invalid_client`, `invalid_redirect_uri` | Open WebUI로 돌려보내지 않는다(주소를 믿을 수 없음). NewAPI 페이지에 "요청이 올바르지 않습니다. 관리자에게 문의하세요" 표시 |
 | `unsupported_response_type`, `invalid_scope`, `invalid_request` | `redirect_uri?error=<코드>&state=…`로 이동(표준 오류 응답). 서버가 `redirect_url`에 오류 쿼리를 담아 준다 |
 | `access_denied` | 위와 같이 `redirect_uri?error=access_denied&state=…` |
-| `email_required` | 페이지에 "Open WebUI를 쓰려면 이메일을 등록하세요" + "프로필로 이동" 버튼(`/profile?redirect=<현재 경로+쿼리>`). 등록 후 돌아오면 다시 시도 |
+| `email_required` | 페이지에 "Open WebUI를 쓰려면 이메일을 등록하세요" + "프로필로 이동" 버튼(`/profile`). 이메일을 등록한 뒤 Open WebUI를 다시 열면 자동 리다이렉트가 흐름을 다시 시작한다 |
 
 `OAUTH_AUTO_REDIRECT` 시나리오: Open WebUI를 열자마자 authorize가 호출된다. NewAPI 로그인 상태면 페이지가 잠깐 보이고 Open WebUI로 돌아간다. 아니면 NewAPI 로그인 화면 → 로그인 → authorize → Open WebUI.
 
@@ -189,7 +190,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 
 서버(`POST /api/oauth2/logout`, 본문에 세 파라미터):
 
-1. `id_token_hint`가 있으면 현재·이전 키로 서명을 확인하고 `iss`·`aud`를 검사한다. 만료는 허용. **서명이 틀리면** 세션을 건드리지 않고 `{redirect_url: "/"}`를 돌려준다(아무나 이 주소로 남의 세션을 끊지 못하게).
+1. 본문은 64KiB로 제한한다. `id_token_hint`가 있으면 현재·이전 키로 서명을 확인하고 `iss`·`aud`를 검사한다. 만료는 허용. **서명이 틀리면** 세션을 건드리지 않고 `{redirect_url: "/"}`를 돌려준다(아무나 이 주소로 남의 세션을 끊지 못하게).
 2. 검증을 통과했거나 `id_token_hint`가 없으면 세션을 지운다(`session.Clear()` + `Save()`). 센티널 토큰 폐기 훅은 삭제되므로 남는 것은 세션 정리뿐이다.
 3. `post_logout_redirect_uri`가 설정의 `post_logout_redirect_uri`와 정확히 같을 때만 그곳(`state`가 있으면 `?state=`를 붙임)으로. 다르거나 비어 있으면 `/sign-in`.
 4. 페이지는 `window.location.replace(redirect_url)`.
@@ -198,7 +199,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 
 | 상황 | 상태 | `error` |
 | --- | --- | --- |
-| 클라이언트 인증 실패(basic·post 모두 시도 후) | 401 + `WWW-Authenticate: Basic realm="oauth2"` | `invalid_client` |
+| 클라이언트 인증 실패(basic → post 순으로 시도) | 401 + `WWW-Authenticate: Basic realm="oauth2"` | `invalid_client` |
 | `grant_type != authorization_code` | 400 | `unsupported_grant_type` |
 | code 없음·만료·재사용, `redirect_uri` 불일치, `code_verifier` 불일치·누락 | 400 | `invalid_grant` |
 | 설정 꺼짐 | 404 | `oauth2 is not enabled` |

@@ -1,3 +1,5 @@
+> **Superseded (2026-10-07).** The broker-style flow described here (`/oauth2/session-init`, Redis-only relay token) was replaced by the standard OIDC provider in `2026-10-07-openwebui-oidc-provider-design.md`. Open WebUI now needs no custom callback route. Kept for history.
+
 # OAuth2 Provider for External App Integration — Design
 
 ## Context
