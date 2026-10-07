@@ -571,6 +571,24 @@ func UpdateOption(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
+	case "oauth2.enabled":
+		if option.Value == "true" {
+			s := system_setting.GetOAuth2Settings()
+			if s.ClientId == "" || len(s.ClientSecret) < 16 || !system_setting.IsAbsoluteHTTPURL(s.RedirectURI) {
+				common.ApiErrorI18n(c, i18n.MsgOptionOAuth2ConfigMissing)
+				return
+			}
+		}
+	case "oauth2.client_secret":
+		if v := option.Value.(string); v != "" && len(v) < 16 {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2SecretTooShort)
+			return
+		}
+	case "oauth2.redirect_uri", "oauth2.app_url", "oauth2.post_logout_redirect_uri":
+		if v := strings.TrimSpace(option.Value.(string)); v != "" && !system_setting.IsAbsoluteHTTPURL(v) {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2InvalidURL)
+			return
+		}
 	case "LinuxDOOAuthEnabled":
 		if option.Value == "true" && common.LinuxDOClientId == "" {
 			c.JSON(http.StatusOK, gin.H{

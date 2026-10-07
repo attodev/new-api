@@ -122,6 +122,7 @@ func GetStatus(c *gin.Context) {
 		"oauth2_enabled":            system_setting.GetOAuth2Settings().Enabled,
 		"oauth2_open_in_new_window": system_setting.GetOAuth2Settings().OpenInNewWindow,
 		"oauth2_replace_playground": system_setting.GetOAuth2Settings().ReplacePlayground,
+		"oauth2_app_url":            system_setting.GetOAuth2Settings().AppUrl,
 	}
 
 	if cs.ApiInfoEnabled {

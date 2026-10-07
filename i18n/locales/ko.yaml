@@ -598,3 +598,10 @@ option.openwebui_relay_config_missing: "Open WebUI relay를 활성화하려면 �
 option.openwebui_service_key_invalid: "Open WebUI 서비스 키가 활성화된 토큰과 일치하지 않습니다"
 option.openwebui_secret_too_short: "Open WebUI JWT 비밀은 32자 이상이어야 합니다"
 option.openwebui_cannot_clear_while_enabled: "서비스 키나 JWT 비밀을 비우려면 먼저 Open WebUI relay를 비활성화하세요"
+
+# Built-in OIDC provider (Open WebUI login)
+option.oauth2_config_missing: "외부 앱 접근을 활성화하려면 먼저 클라이언트 ID, 16자 이상의 클라이언트 시크릿, 절대 경로 Redirect URI를 설정해 주세요"
+option.oauth2_invalid_url: "절대 경로 http(s) URL이어야 합니다"
+option.oauth2_secret_too_short: "클라이언트 시크릿은 16자 이상이어야 합니다"
+oidc.email_required: "외부 앱에 로그인하려면 먼저 프로필에서 이메일을 등록해 주세요"
+oidc.invalid_request: "로그인 요청이 올바르지 않습니다. 관리자에게 문의해 주세요"

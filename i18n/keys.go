@@ -717,3 +717,12 @@ const (
 
 	MsgOptionOpenWebUICannotClearWhileEnabled = "option.openwebui_cannot_clear_while_enabled"
 )
+
+// Built-in OIDC provider (Open WebUI login)
+const (
+	MsgOptionOAuth2ConfigMissing  = "option.oauth2_config_missing"
+	MsgOptionOAuth2InvalidURL     = "option.oauth2_invalid_url"
+	MsgOptionOAuth2SecretTooShort = "option.oauth2_secret_too_short"
+	MsgOIDCEmailRequired          = "oidc.email_required"
+	MsgOIDCInvalidRequest         = "oidc.invalid_request"
+)

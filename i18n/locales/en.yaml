@@ -594,3 +594,10 @@ option.openwebui_relay_config_missing: "Cannot enable the Open WebUI relay, plea
 option.openwebui_service_key_invalid: "The Open WebUI service key does not match an enabled token"
 option.openwebui_secret_too_short: "The Open WebUI JWT secret must be at least 32 characters"
 option.openwebui_cannot_clear_while_enabled: "Disable the Open WebUI relay before clearing its service key or JWT secret"
+
+# Built-in OIDC provider (Open WebUI login)
+option.oauth2_config_missing: "Cannot enable external app access, please set the client ID, a client secret of at least 16 characters and an absolute redirect URI first"
+option.oauth2_invalid_url: "Must be an absolute http(s) URL"
+option.oauth2_secret_too_short: "The client secret must be at least 16 characters"
+oidc.email_required: "Register an email address in your profile before signing in to the external app"
+oidc.invalid_request: "The sign-in request is not valid, please contact your administrator"

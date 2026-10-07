@@ -33,3 +33,26 @@ func TestOAuth2Settings_UpdateViaConfigMap(t *testing.T) {
 	require.True(t, s.OpenInNewWindow)
 	require.True(t, s.ReplacePlayground)
 }
+
+func TestOAuth2Settings_HasAppUrlAndPostLogoutFields(t *testing.T) {
+	original := *GetOAuth2Settings()
+	t.Cleanup(func() { *GetOAuth2Settings() = original })
+
+	cfg := config.GlobalConfig.Get("oauth2")
+	require.NotNil(t, cfg)
+	require.NoError(t, config.UpdateConfigFromMap(cfg, map[string]string{
+		"app_url":                  "https://chat.example.com",
+		"post_logout_redirect_uri": "https://chat.example.com/bye",
+	}))
+	require.Equal(t, "https://chat.example.com", GetOAuth2Settings().AppUrl)
+	require.Equal(t, "https://chat.example.com/bye", GetOAuth2Settings().PostLogoutRedirectURI)
+}
+
+func TestIsAbsoluteHTTPURL(t *testing.T) {
+	require.True(t, IsAbsoluteHTTPURL("https://chat.example.com/oauth/oidc/login/callback"))
+	require.True(t, IsAbsoluteHTTPURL("http://localhost:8080"))
+	require.False(t, IsAbsoluteHTTPURL(""))
+	require.False(t, IsAbsoluteHTTPURL("chat.example.com"))
+	require.False(t, IsAbsoluteHTTPURL("ftp://x"))
+	require.False(t, IsAbsoluteHTTPURL("https://"))
+}
