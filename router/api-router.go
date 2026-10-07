@@ -225,6 +225,15 @@ func SetApiRouter(router *gin.Engine) {
 			adminRoute.DELETE("/wallet/auto-recharge/presets/:id", controller.DeleteWalletAutoRechargePreset)
 		}
 
+		openWebUIRoute := apiRouter.Group("/openwebui")
+		openWebUIRoute.Use(middleware.AdminAuth())
+		{
+			openWebUIRoute.GET("/relay-status", controller.GetOpenWebUIRelayStatus)
+			openWebUIRoute.GET("/links", controller.GetOpenWebUILink)
+			openWebUIRoute.POST("/links", controller.CreateOpenWebUILink)
+			openWebUIRoute.DELETE("/links/:id", controller.DeleteOpenWebUILink)
+		}
+
 		organizationsRoute := apiRouter.Group("/organizations")
 		organizationsRoute.Use(middleware.RootAuth())
 		{
