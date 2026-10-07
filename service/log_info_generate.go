@@ -33,6 +33,26 @@ func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other
 	}
 }
 
+// appendOpenWebUIInfo records which Open WebUI user (JWT sub) and, for
+// background work, which task a request was attributed to, or that it was
+// an unsigned service-key request. Keys are prefixed owui_ so they are easy
+// to find in the log detail view and to count for the "unsigned requests"
+// operational metric.
+func appendOpenWebUIInfo(ctx *gin.Context, other map[string]interface{}) {
+	if ctx == nil || other == nil {
+		return
+	}
+	if sub := common.GetContextKeyString(ctx, constant.ContextKeyOpenWebUISub); sub != "" {
+		other["owui_sub"] = sub
+		if task := common.GetContextKeyString(ctx, constant.ContextKeyOpenWebUITask); task != "" {
+			other["owui_task"] = task
+		}
+	}
+	if common.GetContextKeyBool(ctx, constant.ContextKeyOpenWebUIUnsigned) {
+		other["owui_unsigned"] = true
+	}
+}
+
 // appendTimingBreakdown splits total request latency into the portion spent
 // waiting on the model provider (llm_ms) vs. everything new-api itself adds
 // (gateway_ms = e2e_ms - llm_ms). e2e_ms spans from the earliest gateway
@@ -129,6 +149,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 
 	other["admin_info"] = adminInfo
 	appendRequestPath(ctx, relayInfo, other)
+	appendOpenWebUIInfo(ctx, other)
 	appendRequestConversionChain(relayInfo, other)
 	appendFinalRequestFormat(relayInfo, other)
 	appendBillingInfo(relayInfo, other)
