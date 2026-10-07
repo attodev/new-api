@@ -29,6 +29,7 @@ type JWTConfig struct {
 
 var (
 	ErrJWTEmptySecret  = errors.New("openwebui: jwt secret not configured")
+	ErrJWTEmptyIssuer  = errors.New("openwebui: jwt issuer not configured")
 	ErrJWTMalformed    = errors.New("openwebui: jwt malformed")
 	ErrJWTBadSignature = errors.New("openwebui: jwt signature or algorithm invalid")
 	ErrJWTExpired      = errors.New("openwebui: jwt expired")
@@ -40,11 +41,16 @@ var (
 
 // VerifyUserJWT validates raw against cfg.Secret and, on a signature
 // failure only, against cfg.PreviousSecret (zero-downtime rotation).
-// Only HS256 is accepted; exp is required; iss must match; leeway applies to
+// Only HS256 is accepted; exp is required; cfg.Issuer must be configured
+// (an empty issuer is refused, since jwt/v5 would otherwise skip the check)
+// and iss must match it; leeway applies to
 // exp and iat; aud and jti are not required (Open WebUI does not send them).
 func VerifyUserJWT(raw string, cfg JWTConfig) (*UserClaims, error) {
 	if cfg.Secret == "" {
 		return nil, ErrJWTEmptySecret
+	}
+	if cfg.Issuer == "" {
+		return nil, ErrJWTEmptyIssuer
 	}
 	claims, err := parseWithSecret(raw, cfg, cfg.Secret)
 	if errors.Is(err, ErrJWTBadSignature) && cfg.PreviousSecret != "" {

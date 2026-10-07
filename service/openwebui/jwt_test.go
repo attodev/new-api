@@ -160,3 +160,13 @@ func TestVerifyUserJWT_AudiencePresentIsIgnored(t *testing.T) {
 	_, err := VerifyUserJWT(raw, testConfig())
 	require.NoError(t, err)
 }
+
+func TestVerifyUserJWT_EmptyIssuerRejected(t *testing.T) {
+	cfg := testConfig()
+	cfg.Issuer = ""
+	claims := baseClaims(time.Now())
+	claims.Issuer = "anything"
+	raw := signHS256(t, testSecret, claims)
+	_, err := VerifyUserJWT(raw, cfg)
+	require.ErrorIs(t, err, ErrJWTEmptyIssuer)
+}
