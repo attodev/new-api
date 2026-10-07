@@ -125,7 +125,8 @@ func IssueCode(ac AuthCode) (string, error) {
 
 // ConsumeCode validates the binding and deletes the code only on success, so
 // an attacker guessing the client_secret or verifier cannot burn a victim's
-// code; the code still expires after CodeTTL.
+// code; the code still expires after CodeTTL. The delete result decides the
+// winner among concurrent exchanges.
 func ConsumeCode(code, clientId, redirectURI, codeVerifier string) (*AuthCode, error) {
 	if code == "" {
 		return nil, ErrInvalidGrant
@@ -146,8 +147,14 @@ func ConsumeCode(code, clientId, redirectURI, codeVerifier string) (*AuthCode, e
 		!VerifyPKCE(ac.CodeChallenge, ac.CodeChallengeMethod, codeVerifier) {
 		return nil, ErrInvalidGrant
 	}
-	if _, err := codes().DeleteMany([]string{code}); err != nil {
+	// Only the caller whose delete actually removed the key wins, so two
+	// concurrent exchanges of the same code cannot both succeed.
+	res, err := codes().DeleteMany([]string{code})
+	if err != nil {
 		return nil, err
+	}
+	if !res[codes().FullKey(code)] {
+		return nil, ErrInvalidGrant
 	}
 	return &ac, nil
 }

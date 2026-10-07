@@ -3,6 +3,7 @@ package oidc
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -93,4 +94,36 @@ func TestAccessTokenStore(t *testing.T) {
 	_, found, err = LookupAccessToken(raw)
 	require.NoError(t, err)
 	require.False(t, found)
+}
+
+func TestConsumeCode_ConcurrentExchangesYieldOneWinner(t *testing.T) {
+	setupOIDCTestDB(t)
+	ResetStoresForTest()
+	code, err := IssueCode(AuthCode{UserId: 7, ClientId: "openwebui", RedirectURI: "https://chat.example.com/cb", Scope: "openid"})
+	require.NoError(t, err)
+
+	const n = 10
+	errs := make([]error, n)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, errs[i] = ConsumeCode(code, "openwebui", "https://chat.example.com/cb", "")
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	winners := 0
+	for _, e := range errs {
+		if e == nil {
+			winners++
+		} else {
+			require.ErrorIs(t, e, ErrInvalidGrant)
+		}
+	}
+	require.Equal(t, 1, winners)
 }
