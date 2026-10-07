@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -25,17 +24,6 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { AuthLayout } from '@/features/auth/auth-layout'
 import { authorizeOidc, type OidcAuthorizeParams } from '@/features/oidc/api'
-
-const searchSchema = z.object({
-  response_type: z.string().optional(),
-  client_id: z.string().optional(),
-  redirect_uri: z.string().optional(),
-  scope: z.string().optional(),
-  state: z.string().optional(),
-  nonce: z.string().optional(),
-  code_challenge: z.string().optional(),
-  code_challenge_method: z.string().optional(),
-})
 
 type Phase =
   | { kind: 'working' }
@@ -53,15 +41,26 @@ type Phase =
 function OidcAuthorizePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const search = Route.useSearch()
   const [phase, setPhase] = useState<Phase>({ kind: 'working' })
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { status, body } = await authorizeOidc(
-        search as OidcAuthorizeParams
-      )
+      // Read the raw query: the router JSON-parses search values, which
+      // would turn numeric/boolean-looking client_id/state/nonce into
+      // non-strings and change what the server sees.
+      const qs = new URLSearchParams(window.location.search)
+      const params: OidcAuthorizeParams = {
+        response_type: qs.get('response_type') ?? undefined,
+        client_id: qs.get('client_id') ?? undefined,
+        redirect_uri: qs.get('redirect_uri') ?? undefined,
+        scope: qs.get('scope') ?? undefined,
+        state: qs.get('state') ?? undefined,
+        nonce: qs.get('nonce') ?? undefined,
+        code_challenge: qs.get('code_challenge') ?? undefined,
+        code_challenge_method: qs.get('code_challenge_method') ?? undefined,
+      }
+      const { status, body } = await authorizeOidc(params)
       if (cancelled) return
 
       if (status === 401) {
@@ -141,6 +140,7 @@ function OidcAuthorizePage() {
 }
 
 export const Route = createFileRoute('/oauth2/authorize')({
-  validateSearch: searchSchema,
+  // Permissive on purpose: the page reads window.location.search itself.
+  validateSearch: (search: Record<string, unknown>) => search,
   component: OidcAuthorizePage,
 })

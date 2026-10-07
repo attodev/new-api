@@ -17,19 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect } from 'react'
-import { z } from 'zod'
 import { createFileRoute } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { AuthLayout } from '@/features/auth/auth-layout'
-import { logoutOidc } from '@/features/oidc/api'
-
-const searchSchema = z.object({
-  id_token_hint: z.string().optional(),
-  post_logout_redirect_uri: z.string().optional(),
-  state: z.string().optional(),
-})
+import { logoutOidc, type OidcLogoutParams } from '@/features/oidc/api'
 
 /**
  * OIDC end_session_endpoint as a page: the same-origin API call below
@@ -39,14 +32,21 @@ const searchSchema = z.object({
  */
 function OidcLogoutPage() {
   const { t } = useTranslation()
-  const search = Route.useSearch()
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       let target = '/sign-in'
       try {
-        const res = await logoutOidc(search)
+        // Raw query, not Route.useSearch(): the router JSON-parses values.
+        const qs = new URLSearchParams(window.location.search)
+        const params: OidcLogoutParams = {
+          id_token_hint: qs.get('id_token_hint') ?? undefined,
+          post_logout_redirect_uri:
+            qs.get('post_logout_redirect_uri') ?? undefined,
+          state: qs.get('state') ?? undefined,
+        }
+        const res = await logoutOidc(params)
         if (res?.data?.redirect_url) target = res.data.redirect_url
       } catch {
         /* fall back to /sign-in */
@@ -74,6 +74,7 @@ function OidcLogoutPage() {
 }
 
 export const Route = createFileRoute('/oauth2/logout')({
-  validateSearch: searchSchema,
+  // Permissive on purpose: the page reads window.location.search itself.
+  validateSearch: (search: Record<string, unknown>) => search,
   component: OidcLogoutPage,
 })

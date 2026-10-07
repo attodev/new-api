@@ -41,8 +41,8 @@ export type OidcAuthorizeResponse = {
  * /oauth2/authorize from Open WebUI (a cross-site navigation that carries
  * no SameSite=Strict session cookie); this XHR is same-origin, so the
  * cookie is sent and the server can tell whether the user is logged in.
- * A 401 means "not logged in" and is handled by the page, so the global
- * 401 toast/reset is suppressed.
+ * A 401 means "not logged in" and is handled by the page, so only the global
+ * 401 toast is suppressed (the interceptor still resets the auth store).
  */
 export async function authorizeOidc(
   params: OidcAuthorizeParams

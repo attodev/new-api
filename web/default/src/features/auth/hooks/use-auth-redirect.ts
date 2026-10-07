@@ -21,6 +21,7 @@ import i18n from 'i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { getSelf } from '@/lib/api'
 import type { User } from '@/features/users/types'
+import { isSameOriginPathWithQuery } from '../lib/redirect-target'
 import { saveUserId } from '../lib/storage'
 
 function getSavedLanguage(user: User): string | undefined {
@@ -87,6 +88,10 @@ export function useAuthRedirect() {
 
     // Navigate to target page
     const targetPath = redirectTo || '/dashboard'
+    if (isSameOriginPathWithQuery(targetPath)) {
+      window.location.replace(targetPath)
+      return
+    }
     navigate({ to: targetPath, replace: true })
   }
 
