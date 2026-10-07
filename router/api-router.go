@@ -237,6 +237,9 @@ func SetApiRouter(router *gin.Engine) {
 		oidcRoute := apiRouter.Group("/oauth2")
 		{
 			oidcRoute.POST("/authorize", middleware.UserAuth(), controller.OAuth2Authorize)
+			oidcRoute.POST("/logout", controller.OAuth2Logout)
+			oidcRoute.POST("/rotate-signing-key", middleware.RootAuth(), controller.OAuth2RotateSigningKey)
+			oidcRoute.GET("/signing-key-status", middleware.RootAuth(), controller.OAuth2SigningKeyStatus)
 		}
 
 		organizationsRoute := apiRouter.Group("/organizations")

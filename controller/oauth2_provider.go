@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/service/oidc"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -265,4 +267,85 @@ func OAuth2UserInfo(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, oidc.BuildClaims(user, oidc.LookupOrganizationName(user.OrganizationId)).UserInfo())
+}
+
+type oauth2LogoutRequest struct {
+	IDTokenHint           string `json:"id_token_hint"`
+	PostLogoutRedirectURI string `json:"post_logout_redirect_uri"`
+	State                 string `json:"state"`
+}
+
+// OAuth2Logout is the same-origin API behind the SPA page /oauth2/logout
+// (the OIDC end_session_endpoint). A verifiable id_token_hint, or no hint at
+// all, ends the new-api session; a hint that fails verification is ignored
+// so this URL cannot be used to log strangers out.
+func OAuth2Logout(c *gin.Context) {
+	var req oauth2LogoutRequest
+	_ = common.DecodeJson(c.Request.Body, &req) // an empty body is a plain logout
+	settings := system_setting.GetOAuth2Settings()
+
+	if strings.TrimSpace(req.IDTokenHint) != "" {
+		if _, err := oidc.VerifyIDTokenHint(req.IDTokenHint, settings.ClientId); err != nil {
+			logger.LogWarn(c, "oidc: end-session ignored: id_token_hint failed verification ip="+c.ClientIP())
+			common.ApiSuccess(c, gin.H{"redirect_url": "/"})
+			return
+		}
+	}
+
+	session := sessions.Default(c)
+	session.Clear()
+	if err := session.Save(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	redirectURL := "/sign-in"
+	if settings.PostLogoutRedirectURI != "" && req.PostLogoutRedirectURI == settings.PostLogoutRedirectURI {
+		redirectURL = settings.PostLogoutRedirectURI
+		if req.State != "" {
+			redirectURL = appendQuery(redirectURL, url.Values{"state": {req.State}})
+		}
+	}
+	common.ApiSuccess(c, gin.H{"redirect_url": redirectURL})
+}
+
+func signingKeyStatusPayload() (gin.H, error) {
+	keys, err := oidc.VerificationKeys()
+	if err != nil {
+		return nil, err
+	}
+	payload := gin.H{
+		"current":  gin.H{"kid": keys[0].Kid, "created_at": keys[0].CreatedAt},
+		"previous": nil,
+	}
+	if len(keys) > 1 {
+		payload["previous"] = gin.H{"kid": keys[1].Kid, "created_at": keys[1].CreatedAt}
+	}
+	return payload, nil
+}
+
+// OAuth2SigningKeyStatus shows the admin which keys are published. Root only.
+func OAuth2SigningKeyStatus(c *gin.Context) {
+	payload, err := signingKeyStatusPayload()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, payload)
+}
+
+// OAuth2RotateSigningKey installs a new signing key; the old one stays in the
+// JWKS for oidc.PreviousKeyRetention. Root only.
+func OAuth2RotateSigningKey(c *gin.Context) {
+	if _, err := oidc.RotateKey(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	logger.LogInfo(c, "oidc: signing key rotated by user "+strconv.Itoa(c.GetInt("id")))
+	payload, err := signingKeyStatusPayload()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, payload)
 }
