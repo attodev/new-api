@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { z } from 'zod'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
-import { isSameOriginPathWithQuery } from '@/features/auth/lib/redirect-target'
+import { resolveSameOriginRedirect } from '@/features/auth/lib/redirect-target'
 import { SignIn } from '@/features/auth/sign-in'
 
 const searchSchema = z.object({
@@ -36,12 +36,12 @@ export const Route = createFileRoute('/(auth)/sign-in')({
     if (auth.user) {
       // 优先使用 redirect 参数（用户之前想去的地方）
       // 否则跳转到 dashboard
-      if (isSameOriginPathWithQuery(search?.redirect)) {
+      const resolved = resolveSameOriginRedirect(search?.redirect)
+      if (resolved && search?.redirect?.includes('?')) {
         // Query-bearing targets (e.g. /oauth2/authorize?...) need a full
-        // same-origin navigation; `to` would treat the query as path text.
-        throw redirect({
-          href: new URL(search.redirect!, window.location.origin).href,
-        })
+        // same-origin navigation to the RESOLVED value; `to` would treat
+        // the query as path text.
+        throw redirect({ href: window.location.origin + resolved })
       }
       throw redirect({ to: search?.redirect || '/dashboard' })
     }
