@@ -125,10 +125,18 @@ export function UserOpenWebUILinkSection({ userId }: { userId: number }) {
       ) : link ? (
         <div className='flex flex-col gap-3'>
           <div>
-            <Label className='text-muted-foreground text-xs'>
+            <Label
+              htmlFor='owui-linked-sub'
+              className='text-muted-foreground text-xs'
+            >
               {t('Open WebUI user id (sub)')}
             </Label>
-            <Input value={link.sub} disabled className='mt-1 font-mono' />
+            <Input
+              id='owui-linked-sub'
+              value={link.sub}
+              disabled
+              className='mt-1 font-mono'
+            />
           </div>
           <div className='text-muted-foreground grid grid-cols-2 gap-2 text-xs'>
             <span>
@@ -171,11 +179,15 @@ export function UserOpenWebUILinkSection({ userId }: { userId: number }) {
         </div>
       ) : (
         <div className='flex flex-col gap-2'>
-          <Label className='text-muted-foreground text-xs'>
+          <Label
+            htmlFor='owui-sub-input'
+            className='text-muted-foreground text-xs'
+          >
             {t('Open WebUI user id (sub)')}
           </Label>
           <div className='flex gap-2'>
             <Input
+              id='owui-sub-input'
               value={sub}
               onChange={(e) => setSub(e.target.value)}
               placeholder={t(

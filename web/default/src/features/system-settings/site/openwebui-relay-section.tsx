@@ -21,9 +21,11 @@ import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -57,18 +59,29 @@ import { useUpdateOption } from '../hooks/use-update-option'
  * is configured (from /api/openwebui/relay-status) and only sends a value
  * when the admin types one.
  */
+// Messages are functions so they are translated when validation runs, not
+// once at module load (before the UI language is known).
+const secretRule = z
+  .string()
+  .refine((v) => v.trim() === '' || v.trim().length >= 32, {
+    error: () => i18next.t('JWT secret must be at least 32 characters'),
+  })
+const leewayError = {
+  error: () => i18next.t('Enter a whole number between 0 and 600'),
+}
+
 const relaySchema = z.object({
   openwebui: z.object({
     relay_enabled: z.boolean(),
     service_api_key: z.string(),
-    jwt_secret: z.string().refine((v) => v === '' || v.length >= 32, {
-      message: 'JWT secret must be at least 32 characters',
-    }),
-    jwt_previous_secret: z.string().refine((v) => v === '' || v.length >= 32, {
-      message: 'JWT secret must be at least 32 characters',
-    }),
+    jwt_secret: secretRule,
+    jwt_previous_secret: secretRule,
     jwt_issuer: z.string().min(1),
-    jwt_leeway_seconds: z.number().int().min(0).max(600),
+    jwt_leeway_seconds: z
+      .number(leewayError)
+      .int(leewayError)
+      .min(0, leewayError)
+      .max(600, leewayError),
     allow_unsigned_requests: z.boolean(),
   }),
 })
@@ -99,9 +112,9 @@ const buildFormDefaults = (d: FlatRelayDefaults): RelayFormValues => ({
 
 const normalizeFormValues = (v: RelayFormValues): FlatRelayDefaults => ({
   'openwebui.relay_enabled': v.openwebui.relay_enabled,
-  'openwebui.service_api_key': v.openwebui.service_api_key,
-  'openwebui.jwt_secret': v.openwebui.jwt_secret,
-  'openwebui.jwt_previous_secret': v.openwebui.jwt_previous_secret,
+  'openwebui.service_api_key': v.openwebui.service_api_key.trim(),
+  'openwebui.jwt_secret': v.openwebui.jwt_secret.trim(),
+  'openwebui.jwt_previous_secret': v.openwebui.jwt_previous_secret.trim(),
   'openwebui.jwt_issuer': v.openwebui.jwt_issuer,
   'openwebui.jwt_leeway_seconds': v.openwebui.jwt_leeway_seconds,
   'openwebui.allow_unsigned_requests': v.openwebui.allow_unsigned_requests,
@@ -185,13 +198,18 @@ export function OpenWebUIRelaySection(props: OpenWebUIRelaySectionProps) {
     }
 
     for (const key of changedKeys) {
-      const result = await updateOption.mutateAsync({
-        key,
-        value: normalized[key],
-      })
-      if (!result.success) {
-        // useUpdateOption already toasted the backend message; stop here so
-        // relay_enabled is not attempted after a failed secret save.
+      try {
+        const result = await updateOption.mutateAsync({
+          key,
+          value: normalized[key],
+        })
+        if (!result.success) {
+          // useUpdateOption already toasted the backend message; stop here so
+          // relay_enabled is not attempted after a failed secret save.
+          return
+        }
+      } catch {
+        // Network/HTTP failure: useUpdateOption's onError already toasted.
         return
       }
     }
@@ -208,6 +226,24 @@ export function OpenWebUIRelaySection(props: OpenWebUIRelaySectionProps) {
     baselineSerializedRef.current = JSON.stringify(nextBaseline)
     form.reset(buildFormDefaults(nextBaseline))
     queryClient.invalidateQueries({ queryKey: ['openwebui-relay-status'] })
+  }
+
+  // An empty field means "keep", so clearing the previous secret after a
+  // rotation needs an explicit action. The service key and current secret
+  // have no clear button: the backend refuses to clear them while enabled.
+  const clearPreviousSecret = async () => {
+    try {
+      const result = await updateOption.mutateAsync({
+        key: 'openwebui.jwt_previous_secret',
+        value: '',
+      })
+      if (!result.success) return
+    } catch {
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['openwebui-relay-status'] })
+    form.setValue('openwebui.jwt_previous_secret', '')
+    toast.success(t('Previous JWT secret cleared'))
   }
 
   return (
@@ -317,21 +353,34 @@ export function OpenWebUIRelaySection(props: OpenWebUIRelaySectionProps) {
                     configured={status?.jwt_previous_secret_configured}
                   />
                 </FormLabel>
-                <FormControl>
-                  <Input
-                    type='password'
-                    autoComplete='new-password'
-                    placeholder={t('Leave empty to keep the current value')}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value)}
-                    name={field.name}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
-                </FormControl>
+                <div className='flex gap-2'>
+                  <FormControl>
+                    <Input
+                      type='password'
+                      autoComplete='new-password'
+                      placeholder={t('Leave empty to keep the current value')}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={clearPreviousSecret}
+                    disabled={
+                      !status?.jwt_previous_secret_configured ||
+                      updateOption.isPending
+                    }
+                  >
+                    {t('Clear')}
+                  </Button>
+                </div>
                 <FormDescription>
                   {t(
-                    'Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then clear this field via the relay-status API or by saving a new rotation.'
+                    'Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then press Clear once every Open WebUI instance uses the new secret.'
                   )}
                 </FormDescription>
                 <FormMessage />
