@@ -117,6 +117,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 - **kid**: 공개키 DER(PKIX)의 SHA-256 앞 16바이트를 base64url(패딩 없음)로 인코딩. 결정적이라 재시작·노드 간에 같다.
 - **메모리 캐시**: 파싱된 `*rsa.PrivateKey`와 kid를 프로세스에 들고 있고, 옵션 문자열이 바뀌면(주기적 옵션 동기화로 다른 노드의 쓰기가 들어오면) 다시 파싱한다. 다중 노드 첫 기동에서 두 노드가 동시에 키를 만들면 마지막 DB 쓰기가 이기고, 진 노드가 그 사이 발급한 토큰은 검증되지 않는다(수용).
 - **교체**: `POST /api/oauth2/rotate-signing-key`(RootAuth). 새 키를 먼저 생성한 뒤 현재 키를 `OIDCSigningPreviousKey`로 내리고(`rotated_at` 기록) 새 키를 `OIDCSigningCurrentKey`로 올린다. 전체가 하나의 잠금 안에서 일어나 JWKS가 중간 상태를 노출하지 않는다. 이전 키는 교체 후 **24시간**이 지나면 JWKS에서 빠지고 옵션 값이 비워진다(id_token 수명 1시간이므로 충분). 이미 이전 키가 있는 상태에서 다시 교체하면 가장 오래된 키가 버려진다.
+- **전파 창**: 교체 직후 JWKS 응답은 `max-age=300`으로 캐시될 수 있고, 다른 노드는 다음 옵션 동기화(`SYNC_FREQUENCY`, 기본 60초)에 새 키를 받는다. Authlib는 서명 검증 실패 시 JWKS를 한 번 다시 받아오므로 보통 복구되지만, 캐싱 프록시 뒤에서는 로그인이 잠깐 실패할 수 있다. 교체는 사용량이 적은 시간에 한다.
 - **검증 대상**: id_token 발급은 항상 현재 키. end-session의 `id_token_hint` 검증은 현재·이전 키 모두로 시도하고 만료는 허용한다.
 - **응답 노출 금지**: `GetOptions`는 두 키 옵션을 이름으로 걸러 돌려주지 않고, `UpdateOption`은 두 이름에 대한 쓰기를 거부한다. 관리자 화면에는 현재·이전 `kid`와 생성 시각만 `GET /api/oauth2/signing-key-status`(RootAuth)로 보여준다.
 
