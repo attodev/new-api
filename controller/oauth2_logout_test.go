@@ -221,3 +221,27 @@ func TestOIDC_SigningKeyStatusAndRotate(t *testing.T) {
 	require.NotContains(t, rec.Body.String(), "PRIVATE KEY")
 	require.NotContains(t, rec.Body.String(), "private_pem")
 }
+
+// A valid hint for ANOTHER user must not silently log out whoever opens the
+// link (RP-Initiated Logout §2): it needs the logged-in user's confirmation.
+func TestOIDC_Logout_HintForAnotherUserNeedsConfirmation(t *testing.T) {
+	env := setupOIDCProviderTest(t)
+	registerLogoutRoutes(env)
+	ck := env.login(t, "7")
+	hint := mintIDToken(t, 8, time.Now())
+
+	res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye"})
+	env.requireNeedsConfirmation(t, ck, res, cookies)
+
+	res, cookies = env.postLogout(t, ck, map[string]any{"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye", "confirmed": true})
+	require.Equal(t, "https://chat.example.com/bye", redirectOf(res))
+	require.Nil(t, env.whoami(t, cookies))
+
+	// No session user at all: a valid hint alone does not count either.
+	res, cookies = env.postLogout(t, nil, map[string]any{"id_token_hint": mintIDToken(t, 7, time.Now())})
+	require.Equal(t, true, res["data"].(map[string]any)["needs_confirmation"])
+	require.Nil(t, res["data"].(map[string]any)["redirect_url"])
+	for _, c := range cookies {
+		require.NotEqual(t, "session", c.Name)
+	}
+}

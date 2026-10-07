@@ -42,7 +42,11 @@ func TestOIDC_FullCodeFlow_Redis(t *testing.T) {
 	require.Equal(t, true, res["success"], res)
 	code := redirectURL(t, res).Query().Get("code")
 	require.Len(t, code, 48)
-	require.NotEmpty(t, mr.Keys(), "the code must be stored in Redis")
+	hasCodeKey := false
+	for _, k := range mr.Keys() {
+		hasCodeKey = hasCodeKey || strings.HasPrefix(k, "oauth2:code:v2")
+	}
+	require.True(t, hasCodeKey, "the code must be stored in Redis: %v", mr.Keys())
 
 	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {oidcTestRedirect}, "code_verifier": {verifier}}
 	status, tok, _ := env.token(t, form, true)

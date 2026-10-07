@@ -291,11 +291,13 @@ type oauth2LogoutRequest struct {
 
 // OAuth2Logout is the same-origin API behind the SPA page /oauth2/logout
 // (the OIDC end_session_endpoint). It ends the new-api session only when
-// the request carries an id_token_hint that verifies against our keys, or
-// when the user confirmed on the page (confirmed=true). Otherwise (no hint,
-// a hint that fails verification, or the provider is off) it answers
-// needs_confirmation and leaves the session alone, so a bare link to this
-// URL cannot sign anyone out. A provider that is off never touches the
+// the request carries an id_token_hint that verifies against our keys AND
+// names the user logged in to this session, or when the user confirmed on
+// the page (confirmed=true). Otherwise (no hint, a hint that fails
+// verification, a hint for another user or no session user, or the
+// provider is off) it answers needs_confirmation and leaves the session
+// alone, so a link to this URL, even one carrying someone's real id_token,
+// cannot sign anyone out without a click (RP-Initiated Logout §2). A provider that is off never touches the
 // signing keys. After a logout the browser goes to the registered
 // post_logout_redirect_uri (exact match, with state) or else /sign-in.
 func OAuth2Logout(c *gin.Context) {
@@ -304,12 +306,17 @@ func OAuth2Logout(c *gin.Context) {
 	_ = common.DecodeJson(c.Request.Body, &req)                            // an empty body is an unconfirmed logout
 	settings := system_setting.GetOAuth2Settings()
 
+	session := sessions.Default(c)
 	hintValid := false
 	if oauth2CredentialsConfigured(settings) && strings.TrimSpace(req.IDTokenHint) != "" {
-		if _, err := oidc.VerifyIDTokenHint(req.IDTokenHint, settings.ClientId); err == nil {
-			hintValid = true
-		} else {
+		claims, err := oidc.VerifyIDTokenHint(req.IDTokenHint, settings.ClientId)
+		switch {
+		case err != nil:
 			logger.LogWarn(c, "oidc: end-session: id_token_hint failed verification ip="+c.ClientIP())
+		case !hintNamesSessionUser(claims.Subject, session.Get("id")):
+			logger.LogWarn(c, "oidc: end-session: id_token_hint is not for the session user ip="+c.ClientIP())
+		default:
+			hintValid = true
 		}
 	}
 	if !hintValid && !req.Confirmed {
@@ -317,7 +324,6 @@ func OAuth2Logout(c *gin.Context) {
 		return
 	}
 
-	session := sessions.Default(c)
 	session.Clear()
 	if err := session.Save(); err != nil {
 		common.ApiError(c, err)
@@ -332,6 +338,13 @@ func OAuth2Logout(c *gin.Context) {
 		}
 	}
 	common.ApiSuccess(c, gin.H{"redirect_url": redirectURL})
+}
+
+// hintNamesSessionUser reports whether an id_token subject is the user held
+// in the session. No session user never matches.
+func hintNamesSessionUser(subject string, sessionId any) bool {
+	id, ok := sessionId.(int)
+	return ok && id > 0 && subject == strconv.Itoa(id)
 }
 
 func signingKeyStatusPayload() (gin.H, error) {
