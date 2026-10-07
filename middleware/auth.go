@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/openwebui"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -370,6 +371,21 @@ func TokenAuth() func(c *gin.Context) {
 				return
 			}
 			logger.LogDebug(c, "Client IP %s passed the token IP restrictions check", clientIp)
+		}
+
+		// Open WebUI relay: the shared service key arrived. Swap in the token of
+		// the person identified by X-OpenWebUI-User-Jwt (or keep the service
+		// token for an allowed unsigned request). IP limits above were checked
+		// against the service token on purpose; the substituted token's own IP
+		// list is not consulted.
+		if openwebui.IsServiceKey(key) {
+			substituted, rejectErr := openwebui.Resolve(c, token)
+			if rejectErr != nil {
+				abortWithOpenAiMessage(c, rejectErr.Status, common.TranslateMessage(c, rejectErr.MessageKey))
+				return
+			}
+			token = substituted
+			c.Set("id", token.UserId)
 		}
 
 		userCache, err := model.GetUserCache(token.UserId)
