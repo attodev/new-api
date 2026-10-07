@@ -4825,6 +4825,22 @@
     "Allow requests without a user JWT": "사용자 JWT 없는 요청 허용",
     "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.": "Open WebUI의 일부 음성 경로는 JWT 없이 서비스 키만 보냅니다. 켜면 서비스 토큰 자체로 청구하고 미서명으로 기록합니다. 끄면 401로 거부합니다. JWT가 있는데 잘못된 경우는 항상 거부합니다.",
     "Configured": "설정됨",
-    "Not configured": "설정되지 않음"
+    "Not configured": "설정되지 않음",
+    "Open WebUI Link": "Open WebUI 연결",
+    "Requests from Open WebUI are billed to this user once their Open WebUI account (sub) is linked. Linking happens automatically by email on the first request; use this when it did not.": "Open WebUI 계정(sub)이 연결되면 Open WebUI에서 온 요청이 이 사용자에게 청구됩니다. 첫 요청 때 이메일로 자동 연결되며, 자동 연결이 되지 않았을 때 여기서 연결합니다.",
+    "Open WebUI user id (sub)": "Open WebUI 사용자 ID(sub)",
+    "Linked by": "연결 방식",
+    "Automatic (email)": "자동(이메일)",
+    "Linked at": "연결 일시",
+    "Not created yet": "아직 생성되지 않음",
+    "Unlink": "연결 해제",
+    "Unlink Open WebUI account?": "Open WebUI 계정 연결을 해제할까요?",
+    "The next request from this Open WebUI account will try to auto-link by email again. The openwebui tokens are kept so usage history stays intact.": "이 Open WebUI 계정의 다음 요청에서 이메일 자동 연결을 다시 시도합니다. 사용 기록을 유지하기 위해 openwebui 토큰은 삭제하지 않습니다.",
+    "Paste the sub from the server log or Open WebUI admin page": "서버 로그나 Open WebUI 관리자 화면의 sub 값을 붙여 넣으세요",
+    "Link": "연결",
+    "Open WebUI account linked": "Open WebUI 계정을 연결했습니다",
+    "Failed to link Open WebUI account": "Open WebUI 계정 연결에 실패했습니다",
+    "Open WebUI account unlinked": "Open WebUI 계정 연결을 해제했습니다",
+    "Failed to unlink Open WebUI account": "Open WebUI 계정 연결 해제에 실패했습니다"
   }
 }

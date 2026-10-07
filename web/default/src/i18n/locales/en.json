@@ -4825,6 +4825,22 @@
     "Allow requests without a user JWT": "Allow requests without a user JWT",
     "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.": "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.",
     "Configured": "Configured",
-    "Not configured": "Not configured"
+    "Not configured": "Not configured",
+    "Open WebUI Link": "Open WebUI Link",
+    "Requests from Open WebUI are billed to this user once their Open WebUI account (sub) is linked. Linking happens automatically by email on the first request; use this when it did not.": "Requests from Open WebUI are billed to this user once their Open WebUI account (sub) is linked. Linking happens automatically by email on the first request; use this when it did not.",
+    "Open WebUI user id (sub)": "Open WebUI user id (sub)",
+    "Linked by": "Linked by",
+    "Automatic (email)": "Automatic (email)",
+    "Linked at": "Linked at",
+    "Not created yet": "Not created yet",
+    "Unlink": "Unlink",
+    "Unlink Open WebUI account?": "Unlink Open WebUI account?",
+    "The next request from this Open WebUI account will try to auto-link by email again. The openwebui tokens are kept so usage history stays intact.": "The next request from this Open WebUI account will try to auto-link by email again. The openwebui tokens are kept so usage history stays intact.",
+    "Paste the sub from the server log or Open WebUI admin page": "Paste the sub from the server log or Open WebUI admin page",
+    "Link": "Link",
+    "Open WebUI account linked": "Open WebUI account linked",
+    "Failed to link Open WebUI account": "Failed to link Open WebUI account",
+    "Open WebUI account unlinked": "Open WebUI account unlinked",
+    "Failed to unlink Open WebUI account": "Failed to unlink Open WebUI account"
   }
 }

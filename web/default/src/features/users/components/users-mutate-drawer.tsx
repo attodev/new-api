@@ -72,6 +72,7 @@ import {
   transformUserToFormDefaults,
 } from '../lib'
 import { type User } from '../types'
+import { UserOpenWebUILinkSection } from './user-openwebui-link-section'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -415,6 +416,11 @@ export function UsersMutateDrawer({
                     )}
                   />
                 </SideDrawerSection>
+              )}
+
+              {/* Open WebUI relay link (admin-managed) */}
+              {isUpdate && currentRow && (
+                <UserOpenWebUILinkSection userId={currentRow.id} />
               )}
 
               {/* Binding Information (Read-only) */}

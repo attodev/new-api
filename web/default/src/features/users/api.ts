@@ -27,6 +27,7 @@ import type {
   ManageUserQuotaPayload,
   ApiResponse,
   ImportResult,
+  OpenWebUILink,
 } from './types'
 
 // ============================================================================
@@ -226,4 +227,30 @@ export async function importUsers(file: File): Promise<ImportResult> {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return res.data.data as ImportResult
+}
+
+// ============================================================================
+// Open WebUI relay link (admin)
+// ============================================================================
+
+export async function getOpenWebUILink(
+  userId: number
+): Promise<ApiResponse<OpenWebUILink | null>> {
+  const res = await api.get(`/api/openwebui/links?user_id=${userId}`)
+  return res.data
+}
+
+export async function createOpenWebUILink(
+  userId: number,
+  sub: string
+): Promise<ApiResponse<OpenWebUILink>> {
+  const res = await api.post('/api/openwebui/links', { user_id: userId, sub })
+  return res.data
+}
+
+export async function deleteOpenWebUILink(
+  id: number
+): Promise<ApiResponse<null>> {
+  const res = await api.delete(`/api/openwebui/links/${id}`)
+  return res.data
 }

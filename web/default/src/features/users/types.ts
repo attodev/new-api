@@ -143,3 +143,23 @@ export interface ImportResult {
   skipped_usernames: string[]
   errors: string[]
 }
+
+// ============================================================================
+// Open WebUI relay link
+// ============================================================================
+
+export type OpenWebUITokenStatus = {
+  name: string
+  exists: boolean
+  status: number
+}
+
+export type OpenWebUILink = {
+  id: number
+  sub: string
+  user_id: number
+  email: string
+  linked_by: 'auto' | 'admin'
+  created_at: number
+  tokens: OpenWebUITokenStatus[]
+}
