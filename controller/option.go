@@ -587,13 +587,17 @@ func UpdateOption(c *gin.Context) {
 				return
 			}
 		}
+	case "oauth2.client_id":
+		option.Value = strings.TrimSpace(option.Value.(string))
 	case "oauth2.client_secret":
+		option.Value = strings.TrimSpace(option.Value.(string))
 		if v := option.Value.(string); v != "" && len(v) < 16 {
 			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2SecretTooShort)
 			return
 		}
 	case "oauth2.redirect_uri", "oauth2.app_url", "oauth2.post_logout_redirect_uri":
-		if v := strings.TrimSpace(option.Value.(string)); v != "" && !system_setting.IsAbsoluteHTTPURL(v) {
+		option.Value = strings.TrimSpace(option.Value.(string))
+		if v := option.Value.(string); v != "" && !system_setting.IsAbsoluteHTTPURL(v) {
 			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2InvalidURL)
 			return
 		}

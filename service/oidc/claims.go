@@ -31,7 +31,10 @@ func BuildClaims(user *model.User, orgName string) Claims {
 	if user.Role >= common.RoleAdminUser {
 		role = "admin"
 	}
-	groups := []string{user.Group}
+	groups := []string{}
+	if user.Group != "" {
+		groups = append(groups, user.Group)
+	}
 	if orgName != "" {
 		groups = append(groups, orgName)
 	}

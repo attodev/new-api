@@ -412,3 +412,23 @@ func TestOIDC_UserInfo_Failures(t *testing.T) {
 	_, found, _ := oidc.LookupAccessToken(access)
 	require.False(t, found, "token revoked once the user is found disabled")
 }
+
+// RFC 6749 §2.3.1: client_secret_basic credentials are form-urlencoded
+// before being base64-encoded, so the server must decode them.
+func TestOIDC_Token_BasicAuthCredentialsAreFormDecoded(t *testing.T) {
+	env := setupOIDCProviderTest(t)
+	const secret = "s3cr+t/=:@#&!%16chars"
+	system_setting.GetOAuth2Settings().ClientSecret = secret
+	ck := env.login(t, "7")
+	_, res := env.authorize(t, ck, "7", baseAuthorizeParams(""))
+	code := redirectURL(t, res).Query().Get("code")
+	require.NotEmpty(t, code)
+
+	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {oidcTestRedirect}}
+	req := httptest.NewRequest(http.MethodPost, "/oauth2/token", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(url.QueryEscape(oidcTestClientId), url.QueryEscape(secret))
+	rec := httptest.NewRecorder()
+	env.engine.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}

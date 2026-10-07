@@ -255,10 +255,18 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 		// SDK's popups/redirects aren't blocked in some browsers. The "-allow-popups" variant keeps
 		// popups this app opens (e.g. OAuth) working.
 		c.Header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
-		if common.GetTheme() == "classic" {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.ClassicIndexPage)
-		} else {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.DefaultIndexPage)
-		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", spaIndexPage(c.Request.URL.Path, common.GetTheme(), assets))
 	})
+}
+
+// spaIndexPage picks the SPA shell for a NoRoute request path.
+func spaIndexPage(path, theme string, assets ThemeAssets) []byte {
+	// The OIDC pages exist only in the default frontend, so serve its shell for them under any theme.
+	if path == "/oauth2/authorize" || path == "/oauth2/logout" {
+		return assets.DefaultIndexPage
+	}
+	if theme == "classic" {
+		return assets.ClassicIndexPage
+	}
+	return assets.DefaultIndexPage
 }

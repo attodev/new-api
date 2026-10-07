@@ -45,7 +45,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | `POST /oauth2/token` | `client_secret_basic` 또는 `client_secret_post` | code 교환(2.3) |
 | `GET /oauth2/userinfo` | `Bearer <access_token>` | 5절 클레임 |
 | `GET /oauth2/logout` | SPA | end-session 페이지(6절). discovery의 `end_session_endpoint` |
-| `POST /api/oauth2/logout` | 세션(있으면) | SPA가 부름. `id_token_hint` 검증 후 세션 삭제, `{redirect_url}` 반환 |
+| `POST /api/oauth2/logout` | 세션(있으면) | SPA가 부름. 검증된 `id_token_hint` 또는 사용자 확인(`confirmed`)이 있을 때만 세션 삭제, `{redirect_url}` 반환. 아니면 `{redirect_url: null, needs_confirmation: true}` |
 | `POST /api/oauth2/rotate-signing-key` | `RootAuth` | 서명 키 교체(3절) |
 
 ### 2.1 discovery 문서
@@ -188,12 +188,13 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 
 `GET /oauth2/logout?id_token_hint=…&post_logout_redirect_uri=…&state=…`는 SPA 페이지다. Open WebUI에서 온 최상위 GET에는 Strict 쿠키가 실리지 않으므로, 페이지가 같은 출처 `POST /api/oauth2/logout`을 호출해 세션을 확실히 지운다.
 
-서버(`POST /api/oauth2/logout`, 본문에 세 파라미터):
+서버(`POST /api/oauth2/logout`, 본문에 세 파라미터 + 페이지가 붙이는 `confirmed`):
 
-1. 본문은 64KiB로 제한한다. `id_token_hint`가 있으면 현재·이전 키로 서명을 확인하고 `iss`·`aud`를 검사한다. 만료는 허용. **서명이 틀리면** 세션을 건드리지 않고 `{redirect_url: "/"}`를 돌려준다(아무나 이 주소로 남의 세션을 끊지 못하게).
-2. 검증을 통과했거나 `id_token_hint`가 없으면 세션을 지운다(`session.Clear()` + `Save()`). 센티널 토큰 폐기 훅은 삭제되므로 남는 것은 세션 정리뿐이다.
-3. `post_logout_redirect_uri`가 설정의 `post_logout_redirect_uri`와 정확히 같을 때만 그곳(`state`가 있으면 `?state=`를 붙임)으로. 다르거나 비어 있으면 `/sign-in`.
-4. 페이지는 `window.location.replace(redirect_url)`.
+1. 본문은 64KiB로 제한한다. 공급자가 켜져 있고 `id_token_hint`가 있으면 현재·이전 키로 서명을 확인하고 `iss`·`aud`를 검사한다. 만료는 허용. 공급자가 꺼져 있으면 키를 건드리지 않는다(검증도, 키 생성도 하지 않음).
+2. 검증을 통과했거나 `confirmed: true`면 세션을 지운다(`session.Clear()` + `Save()`). 센티널 토큰 폐기 훅은 삭제되므로 남는 것은 세션 정리뿐이다.
+3. 그 밖(hint 없음, 서명 틀림, 공급자 꺼짐)에는 세션을 건드리지 않고 `{redirect_url: null, needs_confirmation: true}`를 돌려준다(OIDC RP-Initiated Logout §2: 유효한 hint가 없으면 사용자에게 묻는다. 아무나 이 주소로 남의 세션을 끊지 못하게). 서명이 틀린 hint만 Warn 로그.
+4. 로그아웃했으면 `post_logout_redirect_uri`가 설정의 `post_logout_redirect_uri`와 정확히 같을 때만 그곳(`state`가 있으면 `?state=`를 붙임)으로. 다르거나 비어 있으면 `/sign-in`.
+5. 페이지는 `redirect_url`이 오면 `auth.reset()` 후 `window.location.replace(redirect_url)`. `needs_confirmation`이면 확인 화면을 보여 주고, "로그아웃"은 `confirmed: true`로 다시 요청, "로그인 유지"는 `/`로 보낸다.
 
 ### 6.2 token 엔드포인트 오류 (RFC 6749 `{"error","error_description"}`)
 
@@ -204,7 +205,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | code 없음·만료·재사용, `redirect_uri` 불일치, `code_verifier` 불일치·누락 | 400 | `invalid_grant` |
 | 설정 꺼짐 | 404 | `oauth2 is not enabled` |
 
-`error_description`에 code·secret·verifier 값은 넣지 않는다. 클라이언트 인증은 `client_secret_basic`을 먼저 보고, 없으면 form의 `client_id`·`client_secret`을 본다. 비교는 `subtle.ConstantTimeCompare`.
+`error_description`에 code·secret·verifier 값은 넣지 않는다. 클라이언트 인증은 `client_secret_basic`을 먼저 보고(RFC 6749 §2.3.1에 따라 id·secret을 form-urldecode, 디코딩 실패 시 원문), 없으면 form의 `client_id`·`client_secret`을 본다. 비교는 `subtle.ConstantTimeCompare`.
 
 ### 6.3 userinfo 오류
 

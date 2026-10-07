@@ -3,6 +3,7 @@ package controller
 import (
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -89,11 +90,11 @@ func OAuth2Authorize(c *gin.Context) {
 	ip := c.ClientIP()
 
 	hardReject := func(code string) {
-		logger.LogWarn(c, "oidc: authorize rejected ("+code+") client_id="+req.ClientId+" ip="+ip)
+		logger.LogWarn(c, fmt.Sprintf("oidc: authorize rejected (%s) client_id=%q ip=%s", code, req.ClientId, ip))
 		c.JSON(http.StatusOK, gin.H{"success": false, "error": code, "message": common.TranslateMessage(c, i18n.MsgOIDCInvalidRequest)})
 	}
 	redirectReject := func(code string) {
-		logger.LogWarn(c, "oidc: authorize rejected ("+code+") client_id="+req.ClientId+" ip="+ip)
+		logger.LogWarn(c, fmt.Sprintf("oidc: authorize rejected (%s) client_id=%q ip=%s", code, req.ClientId, ip))
 		q := url.Values{"error": {code}}
 		if req.State != "" {
 			q.Set("state", req.State)
@@ -136,7 +137,7 @@ func OAuth2Authorize(c *gin.Context) {
 		return
 	}
 	if strings.TrimSpace(user.Email) == "" {
-		logger.LogWarn(c, "oidc: authorize rejected (email_required) user="+user.Username)
+		logger.LogWarn(c, fmt.Sprintf("oidc: authorize rejected (email_required) user=%q", user.Username))
 		c.JSON(http.StatusOK, gin.H{"success": false, "error": "email_required", "message": common.TranslateMessage(c, i18n.MsgOIDCEmailRequired)})
 		return
 	}
@@ -168,11 +169,20 @@ func tokenError(c *gin.Context, status int, code, description string) {
 }
 
 // clientCredentials reads client_secret_basic first, then client_secret_post.
+// RFC 6749 §2.3.1: basic credentials are form-urlencoded before base64, so
+// both halves are decoded; a value that is not valid encoding is used as-is.
 func clientCredentials(c *gin.Context) (string, string) {
 	if id, secret, ok := c.Request.BasicAuth(); ok {
-		return id, secret
+		return formDecodeOrRaw(id), formDecodeOrRaw(secret)
 	}
 	return c.PostForm("client_id"), c.PostForm("client_secret")
+}
+
+func formDecodeOrRaw(v string) string {
+	if decoded, err := url.QueryUnescape(v); err == nil {
+		return decoded
+	}
+	return v
 }
 
 // OAuth2Token exchanges an authorization code for an access token and id_token.
@@ -185,7 +195,7 @@ func OAuth2Token(c *gin.Context) {
 	}
 	clientId, clientSecret := clientCredentials(c)
 	if clientId != settings.ClientId || subtle.ConstantTimeCompare([]byte(clientSecret), []byte(settings.ClientSecret)) != 1 {
-		logger.LogWarn(c, "oidc: token rejected (invalid_client) client_id="+clientId+" ip="+c.ClientIP())
+		logger.LogWarn(c, fmt.Sprintf("oidc: token rejected (invalid_client) client_id=%q ip=%s", clientId, c.ClientIP()))
 		tokenError(c, http.StatusUnauthorized, "invalid_client", "client authentication failed")
 		return
 	}
@@ -196,7 +206,7 @@ func OAuth2Token(c *gin.Context) {
 	ac, err := oidc.ConsumeCode(c.PostForm("code"), clientId, c.PostForm("redirect_uri"), c.PostForm("code_verifier"))
 	if err != nil {
 		if errors.Is(err, oidc.ErrInvalidGrant) {
-			logger.LogWarn(c, "oidc: token rejected (invalid_grant) client_id="+clientId+" ip="+c.ClientIP())
+			logger.LogWarn(c, fmt.Sprintf("oidc: token rejected (invalid_grant) client_id=%q ip=%s", clientId, c.ClientIP()))
 			tokenError(c, http.StatusBadRequest, "invalid_grant", "authorization code is invalid, expired or already used")
 			return
 		}
@@ -273,24 +283,38 @@ type oauth2LogoutRequest struct {
 	IDTokenHint           string `json:"id_token_hint"`
 	PostLogoutRedirectURI string `json:"post_logout_redirect_uri"`
 	State                 string `json:"state"`
+	// Confirmed is set by the SPA page after the user explicitly agreed to
+	// sign out of new-api (RP-Initiated Logout §2: without a valid hint the
+	// OP must ask the End-User before logging them out).
+	Confirmed bool `json:"confirmed"`
 }
 
 // OAuth2Logout is the same-origin API behind the SPA page /oauth2/logout
-// (the OIDC end_session_endpoint). A verifiable id_token_hint, or no hint at
-// all, ends the new-api session; a hint that fails verification is ignored
-// so this URL cannot be used to log strangers out.
+// (the OIDC end_session_endpoint). It ends the new-api session only when
+// the request carries an id_token_hint that verifies against our keys, or
+// when the user confirmed on the page (confirmed=true). Otherwise (no hint,
+// a hint that fails verification, or the provider is off) it answers
+// needs_confirmation and leaves the session alone, so a bare link to this
+// URL cannot sign anyone out. A provider that is off never touches the
+// signing keys. After a logout the browser goes to the registered
+// post_logout_redirect_uri (exact match, with state) or else /sign-in.
 func OAuth2Logout(c *gin.Context) {
 	var req oauth2LogoutRequest
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10) // unauthenticated endpoint
-	_ = common.DecodeJson(c.Request.Body, &req)                            // an empty body is a plain logout
+	_ = common.DecodeJson(c.Request.Body, &req)                            // an empty body is an unconfirmed logout
 	settings := system_setting.GetOAuth2Settings()
 
-	if strings.TrimSpace(req.IDTokenHint) != "" {
-		if _, err := oidc.VerifyIDTokenHint(req.IDTokenHint, settings.ClientId); err != nil {
-			logger.LogWarn(c, "oidc: end-session ignored: id_token_hint failed verification ip="+c.ClientIP())
-			common.ApiSuccess(c, gin.H{"redirect_url": "/"})
-			return
+	hintValid := false
+	if oauth2CredentialsConfigured(settings) && strings.TrimSpace(req.IDTokenHint) != "" {
+		if _, err := oidc.VerifyIDTokenHint(req.IDTokenHint, settings.ClientId); err == nil {
+			hintValid = true
+		} else {
+			logger.LogWarn(c, "oidc: end-session: id_token_hint failed verification ip="+c.ClientIP())
 		}
+	}
+	if !hintValid && !req.Confirmed {
+		common.ApiSuccess(c, gin.H{"redirect_url": nil, "needs_confirmation": true})
+		return
 	}
 
 	session := sessions.Default(c)

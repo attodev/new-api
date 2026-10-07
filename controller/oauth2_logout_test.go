@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/oidc"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func registerLogoutRoutes(env *oidcTestEnv) {
 	root.GET("/signing-key-status", OAuth2SigningKeyStatus)
 }
 
-func (e *oidcTestEnv) postLogout(t *testing.T, ck *http.Cookie, body map[string]string) (map[string]any, []*http.Cookie) {
+func (e *oidcTestEnv) postLogout(t *testing.T, ck *http.Cookie, body map[string]any) (map[string]any, []*http.Cookie) {
 	t.Helper()
 	raw, err := common.Marshal(body)
 	require.NoError(t, err)
@@ -79,7 +80,7 @@ func TestOIDC_Logout_ClearsSessionAndHonoursRegisteredRedirect(t *testing.T) {
 	require.Equal(t, float64(7), env.whoami(t, []*http.Cookie{ck}))
 
 	hint := mintIDToken(t, 7, time.Now().Add(-5*time.Hour)) // expired hints are fine
-	res, cookies := env.postLogout(t, ck, map[string]string{
+	res, cookies := env.postLogout(t, ck, map[string]any{
 		"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye", "state": "s1",
 	})
 	require.Equal(t, true, res["success"])
@@ -91,31 +92,90 @@ func TestOIDC_Logout_UnregisteredRedirectFallsBackToSignIn(t *testing.T) {
 	env := setupOIDCProviderTest(t)
 	registerLogoutRoutes(env)
 	ck := env.login(t, "7")
-	res, cookies := env.postLogout(t, ck, map[string]string{
+	res, cookies := env.postLogout(t, ck, map[string]any{
 		"id_token_hint": mintIDToken(t, 7, time.Now()), "post_logout_redirect_uri": "https://evil.example.com/",
 	})
 	require.Equal(t, "/sign-in", redirectOf(res))
 	require.Nil(t, env.whoami(t, cookies))
 
-	// No hint at all: still logs out the current session.
+	// No hint, but the user confirmed on the page: logs out the current session.
 	ck = env.login(t, "7")
-	res, cookies = env.postLogout(t, ck, map[string]string{})
+	res, cookies = env.postLogout(t, ck, map[string]any{"confirmed": true})
 	require.Equal(t, "/sign-in", redirectOf(res))
 	require.Nil(t, env.whoami(t, cookies))
+}
+
+// requireNeedsConfirmation asserts the end-session answer that asks the page
+// to confirm, and that the session survived it.
+func (e *oidcTestEnv) requireNeedsConfirmation(t *testing.T, ck *http.Cookie, res map[string]any, cookies []*http.Cookie) {
+	t.Helper()
+	require.Equal(t, true, res["success"], res)
+	data := res["data"].(map[string]any)
+	require.Equal(t, true, data["needs_confirmation"])
+	v, present := data["redirect_url"]
+	require.True(t, present, "redirect_url must be present (null)")
+	require.Nil(t, v)
+	for _, c := range cookies {
+		require.NotEqual(t, "session", c.Name, "an unconfirmed logout must not touch the session cookie")
+	}
+	// Response cookies first, original last: a cleared cookie would win.
+	all := append(append([]*http.Cookie{}, cookies...), ck)
+	require.Equal(t, float64(7), e.whoami(t, all), "an unconfirmed logout must not end the session")
+}
+
+func TestOIDC_Logout_NoHintNeedsConfirmation(t *testing.T) {
+	env := setupOIDCProviderTest(t)
+	registerLogoutRoutes(env)
+
+	ck := env.login(t, "7")
+	res, cookies := env.postLogout(t, ck, map[string]any{"post_logout_redirect_uri": "https://chat.example.com/bye"})
+	env.requireNeedsConfirmation(t, ck, res, cookies)
+
+	res, cookies = env.postLogout(t, ck, map[string]any{"post_logout_redirect_uri": "https://chat.example.com/bye", "state": "s2", "confirmed": true})
+	require.Equal(t, "https://chat.example.com/bye?state=s2", redirectOf(res))
+	require.Nil(t, env.whoami(t, cookies))
+}
+
+func TestOIDC_Logout_ForgedHintConfirmedLogsOut(t *testing.T) {
+	env := setupOIDCProviderTest(t)
+	registerLogoutRoutes(env)
+	ck := env.login(t, "7")
+	res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": "not.a.token", "confirmed": true})
+	require.Equal(t, "/sign-in", redirectOf(res))
+	require.Nil(t, env.whoami(t, cookies))
+}
+
+func TestOIDC_Logout_ProviderDisabledNeverCreatesKey(t *testing.T) {
+	env := setupOIDCProviderTest(t)
+	registerLogoutRoutes(env)
+	system_setting.GetOAuth2Settings().Enabled = false
+	oidc.ResetKeyCacheForTest()
+
+	ck := env.login(t, "7")
+	for _, hint := range []string{"", "not.a.token", "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiI3In0.c2ln"} {
+		res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye"})
+		env.requireNeedsConfirmation(t, ck, res, cookies)
+	}
+	_, hasKey := common.OptionMap[oidc.OptionSigningKeyCurrent]
+	require.False(t, hasKey, "end-session must not create a signing key while the provider is off")
+	var n int64
+	require.NoError(t, model.DB.Model(&model.Option{}).Where(&model.Option{Key: oidc.OptionSigningKeyCurrent}).Count(&n).Error)
+	require.Zero(t, n)
+
+	// Confirmed still logs out, and still creates no key.
+	res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": "not.a.token", "confirmed": true})
+	require.Equal(t, "/sign-in", redirectOf(res))
+	require.Nil(t, env.whoami(t, cookies))
+	_, hasKey = common.OptionMap[oidc.OptionSigningKeyCurrent]
+	require.False(t, hasKey)
 }
 
 func TestOIDC_Logout_BadHintLeavesSessionAlone(t *testing.T) {
 	env := setupOIDCProviderTest(t)
 	registerLogoutRoutes(env)
 	ck := env.login(t, "7")
-	res, cookies := env.postLogout(t, ck, map[string]string{"id_token_hint": "not.a.token", "post_logout_redirect_uri": "https://chat.example.com/bye"})
-	require.Equal(t, "/", redirectOf(res))
-	for _, c := range cookies {
-		require.NotEqual(t, "session", c.Name, "forged hint must not touch the session cookie")
-	}
-	// Response cookies first, original last: a cleared cookie would win.
-	all := append(append([]*http.Cookie{}, cookies...), ck)
-	require.Equal(t, float64(7), env.whoami(t, all), "forged hint must not end the session")
+	res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": "not.a.token", "post_logout_redirect_uri": "https://chat.example.com/bye"})
+	env.requireNeedsConfirmation(t, ck, res, cookies)
 }
 
 func TestOIDC_Logout_HintSignedByPreviousKey(t *testing.T) {
@@ -125,7 +185,7 @@ func TestOIDC_Logout_HintSignedByPreviousKey(t *testing.T) {
 	_, err := oidc.RotateKey()
 	require.NoError(t, err)
 	ck := env.login(t, "7")
-	res, cookies := env.postLogout(t, ck, map[string]string{"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye"})
+	res, cookies := env.postLogout(t, ck, map[string]any{"id_token_hint": hint, "post_logout_redirect_uri": "https://chat.example.com/bye"})
 	require.Equal(t, "https://chat.example.com/bye", redirectOf(res))
 	require.Nil(t, env.whoami(t, cookies))
 }

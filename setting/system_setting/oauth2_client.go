@@ -39,11 +39,13 @@ func GetOAuth2Settings() *OAuth2Settings {
 	return &defaultOAuth2Settings
 }
 
-// IsAbsoluteHTTPURL reports whether raw is an absolute http(s) URL with a host.
+// IsAbsoluteHTTPURL reports whether raw is an absolute http(s) URL with a
+// host name and no fragment (RFC 6749 §3.1.2 forbids fragments in redirect
+// URIs; the same rule is applied to every registered URL).
 func IsAbsoluteHTTPURL(raw string) bool {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return false
 	}
-	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.Fragment == ""
 }

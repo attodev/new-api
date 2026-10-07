@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/static"
 )
@@ -50,16 +51,33 @@ type themeAwareFileSystem struct {
 	classicFS static.ServeFileSystem
 }
 
+// defaultBundlePrefix is where the default frontend's build output lives. The
+// classic theme still serves the default shell for /oauth2/authorize and
+// /oauth2/logout (see router.spaIndexPage), so its bundle must stay
+// reachable; the classic build has no /static/ directory of its own.
+const defaultBundlePrefix = "/static/"
+
+func (t *themeAwareFileSystem) classicFallsBack(path string) bool {
+	return strings.HasPrefix(path, defaultBundlePrefix)
+}
+
 func (t *themeAwareFileSystem) Exists(prefix string, path string) bool {
 	if GetTheme() == "classic" {
-		return t.classicFS.Exists(prefix, path)
+		if t.classicFS.Exists(prefix, path) {
+			return true
+		}
+		return t.classicFallsBack(path) && t.defaultFS.Exists(prefix, path)
 	}
 	return t.defaultFS.Exists(prefix, path)
 }
 
 func (t *themeAwareFileSystem) Open(name string) (http.File, error) {
 	if GetTheme() == "classic" {
-		return t.classicFS.Open(name)
+		f, err := t.classicFS.Open(name)
+		if err != nil && t.classicFallsBack(name) {
+			return t.defaultFS.Open(name)
+		}
+		return f, err
 	}
 	return t.defaultFS.Open(name)
 }

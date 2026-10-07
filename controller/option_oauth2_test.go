@@ -90,3 +90,20 @@ func TestUpdateOption_OAuth2_OptionalURLs(t *testing.T) {
 	}
 	require.Equal(t, "https://chat.example.com", system_setting.GetOAuth2Settings().AppUrl)
 }
+
+func TestUpdateOption_OAuth2_TrimsWhitespace(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "  openwebui \t"), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_secret", " "+strings.Repeat("s", 16)+" "), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.redirect_uri", "  https://chat.example.com/cb  "), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.app_url", " https://chat.example.com "), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.post_logout_redirect_uri", "\thttps://chat.example.com/bye\n"), `"success":true`)
+
+	s := system_setting.GetOAuth2Settings()
+	require.Equal(t, "openwebui", s.ClientId)
+	require.Equal(t, strings.Repeat("s", 16), s.ClientSecret)
+	require.Equal(t, "https://chat.example.com/cb", s.RedirectURI)
+	require.Equal(t, "https://chat.example.com", s.AppUrl)
+	require.Equal(t, "https://chat.example.com/bye", s.PostLogoutRedirectURI)
+	require.Equal(t, "https://chat.example.com/cb", common.OptionMap["oauth2.redirect_uri"])
+}

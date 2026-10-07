@@ -37,3 +37,22 @@ func TestBuildAssetETags(t *testing.T) {
 		t.Fatal("changed content did not invalidate the ETag")
 	}
 }
+
+func TestSPAIndexPage_OIDCPagesAlwaysUseDefaultTheme(t *testing.T) {
+	assets := ThemeAssets{DefaultIndexPage: []byte("default"), ClassicIndexPage: []byte("classic")}
+	cases := []struct {
+		path, theme, want string
+	}{
+		{"/oauth2/authorize", "classic", "default"},
+		{"/oauth2/logout", "classic", "default"},
+		{"/oauth2/authorize", "default", "default"},
+		{"/oauth2/authorize/x", "classic", "classic"},
+		{"/console", "classic", "classic"},
+		{"/console", "default", "default"},
+	}
+	for _, tc := range cases {
+		if got := string(spaIndexPage(tc.path, tc.theme, assets)); got != tc.want {
+			t.Errorf("spaIndexPage(%q, %q) = %q, want %q", tc.path, tc.theme, got, tc.want)
+		}
+	}
+}

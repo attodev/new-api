@@ -55,4 +55,6 @@ func TestIsAbsoluteHTTPURL(t *testing.T) {
 	require.False(t, IsAbsoluteHTTPURL("chat.example.com"))
 	require.False(t, IsAbsoluteHTTPURL("ftp://x"))
 	require.False(t, IsAbsoluteHTTPURL("https://"))
+	require.False(t, IsAbsoluteHTTPURL("http://:8080"), "port without a host")
+	require.False(t, IsAbsoluteHTTPURL("https://chat.example.com/cb#x"), "RFC 6749 §3.1.2: no fragment")
 }

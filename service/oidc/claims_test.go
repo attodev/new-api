@@ -29,6 +29,13 @@ func TestBuildClaims_UserAndAdminGroupsAndNames(t *testing.T) {
 	require.Equal(t, []string{"admin"}, BuildClaims(root, "").Roles)
 }
 
+func TestBuildClaims_SkipsEmptyGroup(t *testing.T) {
+	user := &model.User{Id: 7, Username: "alice", Email: "a@example.com", Role: common.RoleCommonUser, Group: ""}
+	require.Equal(t, []string{}, BuildClaims(user, "").Groups)
+	require.Equal(t, []string{"Acme"}, BuildClaims(user, "Acme").Groups)
+	require.NotNil(t, BuildClaims(user, "").UserInfo()["groups"], "groups marshals as [] not null")
+}
+
 func TestClaims_UserInfoMap(t *testing.T) {
 	c := BuildClaims(&model.User{Id: 7, Username: "alice", Email: "a@example.com", Role: common.RoleCommonUser, Group: "default"}, "")
 	m := c.UserInfo()
