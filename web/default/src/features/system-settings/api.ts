@@ -28,6 +28,7 @@ import type {
   UpdateOptionResponse,
   UpstreamChannelsResponse,
   UpstreamRatiosResponse,
+  OidcSigningKeyStatus,
 } from './types'
 
 export async function getSystemOptions() {
@@ -100,5 +101,23 @@ export async function getOpenWebUIRelayStatus() {
     message?: string
     data?: OpenWebUIRelayStatus
   }>('/api/openwebui/relay-status')
+  return res.data
+}
+
+export async function getOidcSigningKeyStatus() {
+  const res = await api.get<{
+    success: boolean
+    message?: string
+    data?: OidcSigningKeyStatus
+  }>('/api/oauth2/signing-key-status')
+  return res.data
+}
+
+export async function rotateOidcSigningKey() {
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data?: OidcSigningKeyStatus
+  }>('/api/oauth2/rotate-signing-key')
   return res.data
 }

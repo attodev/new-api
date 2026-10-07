@@ -20,7 +20,6 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { getCachedStatus, isSidebarModuleEnabled } from '@/lib/nav-modules'
 import { Main } from '@/components/layout'
 import { Playground } from '@/features/playground'
-import { getOpenInChatAppUrl } from '@/features/playground/api'
 
 export const Route = createFileRoute('/_authenticated/playground/')({
   beforeLoad: async ({ preload }) => {
@@ -47,19 +46,16 @@ export const Route = createFileRoute('/_authenticated/playground/')({
     const replacePlayground = Boolean(status?.oauth2_replace_playground)
     if (!oauth2Enabled || !replacePlayground) return
 
-    let redirectUrl: string
-    try {
-      redirectUrl = await getOpenInChatAppUrl()
-    } catch {
-      return
-    }
+    const appUrl =
+      typeof status?.oauth2_app_url === 'string' ? status.oauth2_app_url : ''
+    if (!appUrl) return
 
     const openInNewWindow = Boolean(status?.oauth2_open_in_new_window)
     if (openInNewWindow) {
-      window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+      window.open(appUrl, '_blank', 'noopener,noreferrer')
       throw redirect({ to: '/dashboard' })
     }
-    window.location.href = redirectUrl
+    window.location.href = appUrl
     // Block rendering while the browser navigates away, so the old
     // playground UI never flashes on screen in the meantime.
     return new Promise<never>(() => {})

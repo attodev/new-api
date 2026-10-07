@@ -132,6 +132,7 @@ export interface SystemStatus {
     oauth2_enabled?: boolean
     oauth2_open_in_new_window?: boolean
     oauth2_replace_playground?: boolean
+    oauth2_app_url?: string
     [key: string]: unknown
   }
   // Allow direct access to common properties
@@ -178,6 +179,7 @@ export interface SystemStatus {
   oauth2_enabled?: boolean
   oauth2_open_in_new_window?: boolean
   oauth2_replace_playground?: boolean
+  oauth2_app_url?: string
   [key: string]: unknown
 }
 

@@ -16,12 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -33,7 +35,13 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { SettingsForm, SettingsSwitchContent, SettingsSwitchItem } from '../components/settings-form-layout'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { getOidcSigningKeyStatus, rotateOidcSigningKey } from '../api'
+import {
+  SettingsForm,
+  SettingsSwitchContent,
+  SettingsSwitchItem,
+} from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
@@ -52,6 +60,8 @@ const oauth2Schema = z.object({
     client_id: z.string(),
     client_secret: z.string(),
     redirect_uri: z.string(),
+    app_url: z.string(),
+    post_logout_redirect_uri: z.string(),
     open_in_new_window: z.boolean(),
     replace_playground: z.boolean(),
   }),
@@ -64,6 +74,8 @@ type FlatOauth2Defaults = {
   'oauth2.client_id': string
   'oauth2.client_secret': string
   'oauth2.redirect_uri': string
+  'oauth2.app_url': string
+  'oauth2.post_logout_redirect_uri': string
   'oauth2.open_in_new_window': boolean
   'oauth2.replace_playground': boolean
 }
@@ -74,6 +86,8 @@ const buildFormDefaults = (defaults: FlatOauth2Defaults): Oauth2FormValues => ({
     client_id: defaults['oauth2.client_id'] ?? '',
     client_secret: defaults['oauth2.client_secret'] ?? '',
     redirect_uri: defaults['oauth2.redirect_uri'] ?? '',
+    app_url: defaults['oauth2.app_url'] ?? '',
+    post_logout_redirect_uri: defaults['oauth2.post_logout_redirect_uri'] ?? '',
     open_in_new_window: defaults['oauth2.open_in_new_window'],
     replace_playground: defaults['oauth2.replace_playground'],
   },
@@ -84,6 +98,8 @@ const normalizeFormValues = (values: Oauth2FormValues): FlatOauth2Defaults => ({
   'oauth2.client_id': values.oauth2.client_id,
   'oauth2.client_secret': values.oauth2.client_secret,
   'oauth2.redirect_uri': values.oauth2.redirect_uri,
+  'oauth2.app_url': values.oauth2.app_url,
+  'oauth2.post_logout_redirect_uri': values.oauth2.post_logout_redirect_uri,
   'oauth2.open_in_new_window': values.oauth2.open_in_new_window,
   'oauth2.replace_playground': values.oauth2.replace_playground,
 })
@@ -160,7 +176,7 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
                   <FormLabel>{t('Enable External App Access')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Let an external chat app (e.g. OpenWebUI) sign in as new-api users. new-api acts as the identity provider for the external app — this is the reverse of signing new-api in via an external OAuth provider.'
+                      "Let Open WebUI sign in as new-api users through the built-in OpenID Connect provider. Point Open WebUI's OPENID_PROVIDER_URL at this server's /.well-known/openid-configuration."
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -231,9 +247,7 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
                 <FormLabel>{t('Redirect URI')}</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder={t(
-                      'https://your-chat-app.example.com/auth/newapi/callback'
-                    )}
+                    placeholder='https://chat.example.com/oauth/oidc/login/callback'
                     autoComplete='off'
                     value={field.value ?? ''}
                     onChange={(event) => field.onChange(event.target.value)}
@@ -244,7 +258,61 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
                 </FormControl>
                 <FormDescription>
                   {t(
-                    'The exact callback URL the external app registered for this integration'
+                    "Open WebUI's OPENID_REDIRECT_URI — must match exactly. Open WebUI's default is {WEBUI_URL}/oauth/oidc/login/callback."
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.app_url'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('App URL')}</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder='https://chat.example.com'
+                    autoComplete='off'
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Open WebUI\'s WEBUI_URL. The Playground "Open in Chat App" link opens this address; the app then signs in through new-api automatically.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.post_logout_redirect_uri'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Post-logout redirect URI')}</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder='https://chat.example.com'
+                    autoComplete='off'
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    "Open WebUI's WEBUI_AUTH_SIGNOUT_REDIRECT_URL. The only address the end-session endpoint will redirect to after logging out; leave empty to send users to the new-api sign-in page."
                   )}
                 </FormDescription>
                 <FormMessage />
@@ -297,8 +365,86 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
               </SettingsSwitchItem>
             )}
           />
+
+          <SigningKeyPanel />
         </SettingsForm>
       </Form>
     </SettingsSection>
+  )
+}
+
+function SigningKeyPanel() {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const statusQuery = useQuery({
+    queryKey: ['oidc-signing-key-status'],
+    queryFn: getOidcSigningKeyStatus,
+    staleTime: 60 * 1000,
+  })
+  const rotate = useMutation({
+    mutationFn: rotateOidcSigningKey,
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success(t('Signing key rotated'))
+        queryClient.invalidateQueries({ queryKey: ['oidc-signing-key-status'] })
+      } else {
+        toast.error(res.message || t('Failed to rotate signing key'))
+      }
+    },
+    onError: () => toast.error(t('Failed to rotate signing key')),
+  })
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const data = statusQuery.data?.data
+  const fmt = (ts: number) => new Date(ts * 1000).toLocaleString()
+
+  return (
+    <div className='flex flex-col gap-2 rounded-md border p-4'>
+      <h4 className='text-sm font-medium'>{t('ID token signing key')}</h4>
+      <p className='text-muted-foreground text-xs'>
+        {t(
+          'id_tokens are signed with RS256. Rotating installs a new key immediately; the previous key stays published for 24 hours so tokens signed with it keep verifying.'
+        )}
+      </p>
+      {data ? (
+        <div className='text-muted-foreground grid gap-1 font-mono text-xs'>
+          <span>
+            {t('Current')}: {data.current.kid} · {fmt(data.current.created_at)}
+          </span>
+          {data.previous && (
+            <span>
+              {t('Previous')}: {data.previous.kid} ·{' '}
+              {fmt(data.previous.created_at)}
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className='text-muted-foreground text-xs'>{t('Loading...')}</p>
+      )}
+      <div>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={() => setConfirmOpen(true)}
+          disabled={rotate.isPending || !data}
+        >
+          {t('Rotate signing key')}
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={t('Rotate the signing key?')}
+        desc={t(
+          'A new key will be used for all new id_tokens. Open WebUI picks it up from the JWKS endpoint automatically; existing sessions are not affected.'
+        )}
+        confirmText={t('Rotate')}
+        isLoading={rotate.isPending}
+        handleConfirm={() => {
+          rotate.mutate()
+          setConfirmOpen(false)
+        }}
+      />
+    </div>
   )
 }

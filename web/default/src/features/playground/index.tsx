@@ -18,17 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { ExternalLinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getUserModels, getUserGroups, getOpenInChatAppUrl } from './api'
+import { useStatus } from '@/hooks/use-status'
+import { Button } from '@/components/ui/button'
+import { getUserModels, getUserGroups } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
 import { usePlaygroundState, useChatHandler } from './hooks'
 import { createUserMessage, createLoadingAssistantMessage } from './lib'
 import type { Message as MessageType } from './types'
-import { Button } from '@/components/ui/button'
-import { ExternalLinkIcon } from 'lucide-react'
-import { useStatus } from '@/hooks/use-status'
 
 /**
  * Opens the external chat app per the admin's configured preference:
@@ -53,27 +53,28 @@ function openChatApp(redirectUrl: string, openInNewWindow: boolean) {
  */
 function PlaygroundReplacedByChatApp({
   openInNewWindow,
+  appUrl,
 }: {
   openInNewWindow: boolean
+  appUrl: string
 }) {
   const { t } = useTranslation()
-  const [failed, setFailed] = useState(false)
-
-  const goToChatApp = useCallback(async () => {
-    try {
-      const redirectUrl = await getOpenInChatAppUrl()
-      openChatApp(redirectUrl, openInNewWindow)
-    } catch {
-      setFailed(true)
-      toast.error(t('External chat app is not configured'))
-    }
-  }, [openInNewWindow])
 
   useEffect(() => {
-    if (!openInNewWindow) {
-      void goToChatApp()
+    if (!openInNewWindow && appUrl) {
+      openChatApp(appUrl, false)
     }
-  }, [openInNewWindow, goToChatApp])
+  }, [openInNewWindow, appUrl])
+
+  if (!appUrl) {
+    return (
+      <div className='flex size-full flex-col items-center justify-center gap-4'>
+        <p className='text-muted-foreground text-sm'>
+          {t('External chat app is not configured')}
+        </p>
+      </div>
+    )
+  }
 
   if (openInNewWindow) {
     return (
@@ -81,7 +82,7 @@ function PlaygroundReplacedByChatApp({
         <p className='text-muted-foreground text-sm'>
           {t('Playground has been replaced by the external chat app')}
         </p>
-        <Button onClick={goToChatApp}>
+        <Button onClick={() => openChatApp(appUrl, true)}>
           <ExternalLinkIcon className='mr-1 size-4' />
           {t('Open Chat App')}
         </Button>
@@ -92,9 +93,7 @@ function PlaygroundReplacedByChatApp({
   return (
     <div className='flex size-full flex-col items-center justify-center gap-4'>
       <p className='text-muted-foreground text-sm'>
-        {failed
-          ? t('External chat app is not configured')
-          : t('Redirecting to the external chat app...')}
+        {t('Redirecting to the external chat app...')}
       </p>
     </div>
   )
@@ -108,6 +107,8 @@ export function Playground() {
   const oauth2Enabled = Boolean(status?.oauth2_enabled)
   const openInNewWindow = Boolean(status?.oauth2_open_in_new_window)
   const replacePlayground = Boolean(status?.oauth2_replace_playground)
+  const appUrl =
+    typeof status?.oauth2_app_url === 'string' ? status.oauth2_app_url : ''
 
   const {
     config,
@@ -195,7 +196,12 @@ export function Playground() {
   }, [groupsData, setGroups, config.group, updateConfig])
 
   if (oauth2Enabled && replacePlayground) {
-    return <PlaygroundReplacedByChatApp openInNewWindow={openInNewWindow} />
+    return (
+      <PlaygroundReplacedByChatApp
+        openInNewWindow={openInNewWindow}
+        appUrl={appUrl}
+      />
+    )
   }
 
   const handleSendMessage = (text: string) => {
@@ -272,18 +278,17 @@ export function Playground() {
     updateMessages(newMessages)
   }
 
-  const handleOpenInChatApp = useCallback(async () => {
-    try {
-      const redirectUrl = await getOpenInChatAppUrl()
-      openChatApp(redirectUrl, openInNewWindow)
-    } catch {
+  const handleOpenInChatApp = useCallback(() => {
+    if (!appUrl) {
       toast.error(t('External chat app is not configured'))
+      return
     }
-  }, [t, openInNewWindow])
+    openChatApp(appUrl, openInNewWindow)
+  }, [t, appUrl, openInNewWindow])
 
   return (
     <div className='relative flex size-full flex-col overflow-hidden'>
-      {oauth2Enabled && (
+      {oauth2Enabled && appUrl && (
         <div className='flex items-center justify-end px-4 pt-2'>
           <Button variant='ghost' size='sm' onClick={handleOpenInChatApp}>
             <ExternalLinkIcon className='mr-1 size-4' />
