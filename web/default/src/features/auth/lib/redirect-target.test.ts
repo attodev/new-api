@@ -18,10 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import {
-  isSameOriginPathWithQuery,
-  resolveSameOriginRedirect,
-} from './redirect-target'
+import { resolveSameOriginRedirect } from './redirect-target'
 
 const ORIGIN = 'https://gw.example.com'
 const resolve = (t: string | undefined) => resolveSameOriginRedirect(t, ORIGIN)
@@ -70,17 +67,5 @@ describe('resolveSameOriginRedirect', () => {
     assert.equal(resolve(undefined), null)
     assert.equal(resolve(''), null)
     assert.equal(resolve('dashboard'), null)
-  })
-})
-
-describe('isSameOriginPathWithQuery', () => {
-  test('requires a safe target that contains a query', () => {
-    assert.equal(
-      isSameOriginPathWithQuery('/oauth2/authorize?state=1', ORIGIN),
-      true
-    )
-    assert.equal(isSameOriginPathWithQuery('/dashboard', ORIGIN), false)
-    assert.equal(isSameOriginPathWithQuery('/\t/evil.com?a', ORIGIN), false)
-    assert.equal(isSameOriginPathWithQuery('//evil.com?a', ORIGIN), false)
   })
 })

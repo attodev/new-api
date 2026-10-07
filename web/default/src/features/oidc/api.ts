@@ -68,12 +68,24 @@ export type OidcLogoutParams = {
   id_token_hint?: string
   post_logout_redirect_uri?: string
   state?: string
+  /** The user confirmed on the page; needed when no valid hint is sent. */
+  confirmed?: boolean
+}
+
+export type OidcLogoutResponse = {
+  success: boolean
+  data?: {
+    /** Set only when the server ended the session. */
+    redirect_url: string | null
+    /** The server did not log out and wants the user to confirm. */
+    needs_confirmation?: boolean
+  }
 }
 
 export async function logoutOidc(
   params: OidcLogoutParams
-): Promise<{ success: boolean; data?: { redirect_url: string } }> {
-  const res = await api.post('/api/oauth2/logout', params, {
+): Promise<OidcLogoutResponse> {
+  const res = await api.post<OidcLogoutResponse>('/api/oauth2/logout', params, {
     skipErrorHandler: true,
     skipBusinessError: true,
   })

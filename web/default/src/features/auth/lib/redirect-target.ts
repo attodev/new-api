@@ -45,18 +45,3 @@ export function resolveSameOriginRedirect(
   if (url.pathname.startsWith('//')) return null
   return url.pathname + url.search + url.hash
 }
-
-/**
- * True when the target is a safe same-origin path that carries its own query
- * string (TanStack Router would treat a `?` inside `to` as path text, so such
- * targets are followed with a full navigation to the resolved value).
- */
-export function isSameOriginPathWithQuery(
-  target: string | undefined | null,
-  origin?: string
-): boolean {
-  return (
-    resolveSameOriginRedirect(target, origin) !== null &&
-    (target as string).includes('?')
-  )
-}

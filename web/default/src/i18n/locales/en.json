@@ -4864,6 +4864,9 @@
     "A new key will be used for all new id_tokens. Open WebUI picks it up from the JWKS endpoint automatically; existing sessions are not affected.": "A new key will be used for all new id_tokens. Open WebUI picks it up from the JWKS endpoint automatically; existing sessions are not affected.",
     "Rotate": "Rotate",
     "Signing key rotated": "Signing key rotated",
-    "Failed to rotate signing key": "Failed to rotate signing key"
+    "Failed to rotate signing key": "Failed to rotate signing key",
+    "Sign out of new-api?": "Sign out of new-api?",
+    "The external app asked to end your session here. Confirm to sign out of this account too.": "The external app asked to end your session here. Confirm to sign out of this account too.",
+    "Stay signed in": "Stay signed in"
   }
 }

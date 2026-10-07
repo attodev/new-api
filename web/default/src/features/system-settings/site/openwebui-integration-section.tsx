@@ -137,9 +137,19 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
 
   const onSubmit = async (values: Oauth2FormValues) => {
     const normalized = normalizeFormValues(values)
+    // Enabling is validated against the stored client settings, so save it
+    // after them; disabling goes first so the provider is never live with
+    // half-saved settings.
+    const enabledFirst = !normalized['oauth2.enabled']
     const changedKeys = (
       Object.keys(normalized) as Array<keyof FlatOauth2Defaults>
-    ).filter((key) => normalized[key] !== baselineRef.current[key])
+    )
+      .filter((key) => normalized[key] !== baselineRef.current[key])
+      .sort((a, b) => {
+        if (a === 'oauth2.enabled') return enabledFirst ? -1 : 1
+        if (b === 'oauth2.enabled') return enabledFirst ? 1 : -1
+        return 0
+      })
 
     if (changedKeys.length === 0) {
       toast.info(t('No changes to save'))
@@ -147,10 +157,20 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
     }
 
     for (const key of changedKeys) {
-      await updateOption.mutateAsync({
-        key,
-        value: normalized[key],
-      })
+      try {
+        const result = await updateOption.mutateAsync({
+          key,
+          value: normalized[key],
+        })
+        if (!result.success) {
+          // useUpdateOption already toasted the backend message; keep the
+          // baseline so the unsaved fields still count as changes.
+          return
+        }
+      } catch {
+        // Network/HTTP failure: useUpdateOption's onError already toasted.
+        return
+      }
     }
 
     baselineRef.current = normalized
