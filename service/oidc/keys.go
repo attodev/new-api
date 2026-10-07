@@ -22,9 +22,10 @@ import (
 
 const (
 	// Option names deliberately contain no "." (so they are not routed into
-	// config.GlobalConfig) and end in "Key" (so controller.GetOptions hides them).
-	OptionSigningKeyCurrent  = "OIDCSigningKeyCurrent"
-	OptionSigningKeyPrevious = "OIDCSigningKeyPrevious"
+	// config.GlobalConfig) and END in "Key" (so the suffix filter in
+	// controller.GetOptions hides them; it also excludes them by name).
+	OptionSigningKeyCurrent  = "OIDCSigningCurrentKey"
+	OptionSigningKeyPrevious = "OIDCSigningPreviousKey"
 
 	// PreviousKeyRetention is how long a retired key stays in the JWKS so
 	// id_tokens (1 h lifetime) and id_token_hints signed with it still verify.
@@ -123,12 +124,9 @@ func saveStoredKey(name string, s storedSigningKey) error {
 	return model.UpdateOption(name, string(raw))
 }
 
-// CurrentKey returns the active signing key, generating and persisting one on
-// first use. Safe for concurrent callers within a process; across nodes the
-// options table is the source of truth and a later writer simply wins.
-func CurrentKey() (*SigningKey, error) {
-	keyMu.Lock()
-	defer keyMu.Unlock()
+// currentKeyLocked loads the current key, generating and persisting one on
+// first use. Caller must hold keyMu.
+func currentKeyLocked() (*SigningKey, error) {
 	key, _, err := loadKeyLocked(OptionSigningKeyCurrent)
 	if err != nil {
 		return nil, err
@@ -136,14 +134,17 @@ func CurrentKey() (*SigningKey, error) {
 	if key != nil {
 		return key, nil
 	}
-	s, key, err := newStoredKey()
+	s, _, err := newStoredKey()
 	if err != nil {
 		return nil, err
 	}
 	if err := saveStoredKey(OptionSigningKeyCurrent, s); err != nil {
 		return nil, err
 	}
-	// Re-read so the cache reflects exactly what was stored (another node may have won).
+	// Re-read so the cache reflects exactly what was stored. This sees this
+	// process's own OptionMap write; multi-node first-boot races are resolved
+	// by the periodic option sync (last DB writer wins, and tokens already
+	// issued by the losing node stop verifying).
 	key, _, err = loadKeyLocked(OptionSigningKeyCurrent)
 	if err != nil {
 		return nil, err
@@ -152,6 +153,14 @@ func CurrentKey() (*SigningKey, error) {
 		return nil, errors.New("oidc: signing key vanished after save")
 	}
 	return key, nil
+}
+
+// CurrentKey returns the active signing key, generating and persisting one on
+// first use. Safe for concurrent callers within a process.
+func CurrentKey() (*SigningKey, error) {
+	keyMu.Lock()
+	defer keyMu.Unlock()
+	return currentKeyLocked()
 }
 
 // previousKeyLocked returns the previous key if it exists and is still within
@@ -181,14 +190,16 @@ func previousKeyLocked() (*SigningKey, error) {
 }
 
 // VerificationKeys returns the keys a token may currently be signed with:
-// the current key first, then the still-retained previous key.
+// the current key first, then the still-retained previous key. current and
+// previous are read under one lock so a concurrent rotation cannot yield a
+// set containing only the old key.
 func VerificationKeys() ([]*SigningKey, error) {
-	cur, err := CurrentKey()
+	keyMu.Lock()
+	defer keyMu.Unlock()
+	cur, err := currentKeyLocked()
 	if err != nil {
 		return nil, err
 	}
-	keyMu.Lock()
-	defer keyMu.Unlock()
 	prev, err := previousKeyLocked()
 	if err != nil {
 		return nil, err
@@ -202,22 +213,24 @@ func VerificationKeys() ([]*SigningKey, error) {
 
 // RotateKey demotes the current key to previous (stamping RotatedAt) and
 // installs a freshly generated current key. Any older previous key is dropped.
+// The whole operation holds keyMu; the new key is generated before anything is
+// written so a failure leaves no half-state.
 func RotateKey() (*SigningKey, error) {
-	if _, err := CurrentKey(); err != nil {
-		return nil, err
-	}
 	keyMu.Lock()
 	defer keyMu.Unlock()
+	if _, err := currentKeyLocked(); err != nil {
+		return nil, err
+	}
 	_, curStored, err := loadKeyLocked(OptionSigningKeyCurrent)
+	if err != nil {
+		return nil, err
+	}
+	s, key, err := newStoredKey()
 	if err != nil {
 		return nil, err
 	}
 	curStored.RotatedAt = common.GetTimestamp()
 	if err := saveStoredKey(OptionSigningKeyPrevious, curStored); err != nil {
-		return nil, err
-	}
-	s, key, err := newStoredKey()
-	if err != nil {
 		return nil, err
 	}
 	if err := saveStoredKey(OptionSigningKeyCurrent, s); err != nil {

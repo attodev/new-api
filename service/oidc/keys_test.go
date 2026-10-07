@@ -2,8 +2,8 @@ package oidc
 
 import (
 	"strings"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -169,5 +169,55 @@ func TestVerificationKeys_NoPreviousKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 	require.Equal(t, cur.Kid, keys[0].Kid)
-	_ = time.Second
+}
+
+func TestVerificationKeys_RecentRotationKeepsPreviousDespiteOldCreatedAt(t *testing.T) {
+	setupOIDCTestDB(t)
+	old, err := CurrentKey()
+	require.NoError(t, err)
+	rotated, err := RotateKey()
+	require.NoError(t, err)
+
+	// The previous key was created long ago but rotated just now: retention
+	// counts from RotatedAt, so it must still be published.
+	stored := readStoredKey(t, OptionSigningKeyPrevious)
+	stored.CreatedAt = common.GetTimestamp() - int64(PreviousKeyRetention.Seconds()) - 3600
+	stored.RotatedAt = common.GetTimestamp()
+	writeStoredKey(t, OptionSigningKeyPrevious, stored)
+	ResetKeyCacheForTest()
+
+	keys, err := VerificationKeys()
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	require.Equal(t, rotated.Kid, keys[0].Kid)
+	require.Equal(t, old.Kid, keys[1].Kid)
+}
+
+func TestCurrentKey_ConcurrentFirstUseCreatesOneKey(t *testing.T) {
+	setupOIDCTestDB(t)
+
+	const n = 10
+	kids := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			k, err := CurrentKey()
+			errs[i] = err
+			if err == nil {
+				kids[i] = k.Kid
+			}
+		}(i)
+	}
+	wg.Wait()
+	for i := 0; i < n; i++ {
+		require.NoError(t, errs[i])
+		require.Equal(t, kids[0], kids[i])
+	}
+
+	var count int64
+	require.NoError(t, model.DB.Model(&model.Option{}).Where("`key` = ?", OptionSigningKeyCurrent).Count(&count).Error)
+	require.Equal(t, int64(1), count)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service/oidc"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -96,6 +97,9 @@ func GetOptions(c *gin.Context) {
 	optionValues := make(map[string]string)
 	common.OptionMapRWMutex.Lock()
 	for k, v := range common.OptionMap {
+		if k == oidc.OptionSigningKeyCurrent || k == oidc.OptionSigningKeyPrevious {
+			continue
+		}
 		value := common.Interface2String(v)
 		isSensitiveKey := strings.HasSuffix(k, "Token") ||
 			strings.HasSuffix(k, "Secret") ||
@@ -481,6 +485,10 @@ func UpdateOption(c *gin.Context) {
 		return
 	}
 	if _, isTossOption := tossAtomicOptionKeys[option.Key]; isTossOption {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if option.Key == oidc.OptionSigningKeyCurrent || option.Key == oidc.OptionSigningKeyPrevious {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
