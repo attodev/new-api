@@ -18,6 +18,8 @@ import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
+import { Route as Oauth2LogoutRouteImport } from './routes/oauth2/logout'
+import { Route as Oauth2AuthorizeRouteImport } from './routes/oauth2/authorize'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as ConsoleTopupRouteImport } from './routes/console/topup'
 import { Route as ConsoleLogRouteImport } from './routes/console/log'
@@ -116,6 +118,16 @@ const PricingIndexRoute = PricingIndexRouteImport.update({
 const AboutIndexRoute = AboutIndexRouteImport.update({
   id: '/about/',
   path: '/about/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Oauth2LogoutRoute = Oauth2LogoutRouteImport.update({
+  id: '/oauth2/logout',
+  path: '/oauth2/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Oauth2AuthorizeRoute = Oauth2AuthorizeRouteImport.update({
+  id: '/oauth2/authorize',
+  path: '/oauth2/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthProviderRoute = OauthProviderRouteImport.update({
@@ -455,6 +467,8 @@ export interface FileRoutesByFullPath {
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -519,6 +533,8 @@ export interface FileRoutesByTo {
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about': typeof AboutIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -587,6 +603,8 @@ export interface FileRoutesById {
   '/console/log': typeof ConsoleLogRoute
   '/console/topup': typeof ConsoleTopupRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -654,6 +672,8 @@ export interface FileRouteTypes {
     | '/console/log'
     | '/console/topup'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -718,6 +738,8 @@ export interface FileRouteTypes {
     | '/console/log'
     | '/console/topup'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about'
     | '/pricing'
     | '/rankings'
@@ -785,6 +807,8 @@ export interface FileRouteTypes {
     | '/console/log'
     | '/console/topup'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -844,6 +868,8 @@ export interface RootRouteChildren {
   ConsoleLogRoute: typeof ConsoleLogRoute
   ConsoleTopupRoute: typeof ConsoleTopupRoute
   OauthProviderRoute: typeof OauthProviderRoute
+  Oauth2AuthorizeRoute: typeof Oauth2AuthorizeRoute
+  Oauth2LogoutRoute: typeof Oauth2LogoutRoute
   AboutIndexRoute: typeof AboutIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -914,6 +940,20 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about/'
       preLoaderRoute: typeof AboutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth2/logout': {
+      id: '/oauth2/logout'
+      path: '/oauth2/logout'
+      fullPath: '/oauth2/logout'
+      preLoaderRoute: typeof Oauth2LogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth2/authorize': {
+      id: '/oauth2/authorize'
+      path: '/oauth2/authorize'
+      fullPath: '/oauth2/authorize'
+      preLoaderRoute: typeof Oauth2AuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/$provider': {
@@ -1471,6 +1511,8 @@ const rootRouteChildren: RootRouteChildren = {
   ConsoleLogRoute: ConsoleLogRoute,
   ConsoleTopupRoute: ConsoleTopupRoute,
   OauthProviderRoute: OauthProviderRoute,
+  Oauth2AuthorizeRoute: Oauth2AuthorizeRoute,
+  Oauth2LogoutRoute: Oauth2LogoutRoute,
   AboutIndexRoute: AboutIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

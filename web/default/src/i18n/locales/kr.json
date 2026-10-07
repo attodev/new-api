@@ -4844,6 +4844,14 @@
     "Open WebUI account linked": "Open WebUI 계정을 연결했습니다",
     "Failed to link Open WebUI account": "Open WebUI 계정 연결에 실패했습니다",
     "Open WebUI account unlinked": "Open WebUI 계정 연결을 해제했습니다",
-    "Failed to unlink Open WebUI account": "Open WebUI 계정 연결 해제에 실패했습니다"
+    "Failed to unlink Open WebUI account": "Open WebUI 계정 연결 해제에 실패했습니다",
+    "Signing you in to the external app...": "외부 앱에 로그인하는 중...",
+    "Email address required": "이메일 주소가 필요합니다",
+    "The external app needs your email address. Register one in your profile, then open the external app again.": "외부 앱은 이메일 주소가 필요합니다. 프로필에서 이메일을 등록한 뒤 외부 앱을 다시 열어 주세요.",
+    "Go to profile": "프로필로 이동",
+    "Sign-in request rejected": "로그인 요청이 거부되었습니다",
+    "The sign-in request is not valid, please contact your administrator": "로그인 요청이 올바르지 않습니다. 관리자에게 문의해 주세요",
+    "Back to home": "홈으로",
+    "Signing you out...": "로그아웃하는 중..."
   }
 }

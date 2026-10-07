@@ -4844,6 +4844,14 @@
     "Open WebUI account linked": "Open WebUI account linked",
     "Failed to link Open WebUI account": "Failed to link Open WebUI account",
     "Open WebUI account unlinked": "Open WebUI account unlinked",
-    "Failed to unlink Open WebUI account": "Failed to unlink Open WebUI account"
+    "Failed to unlink Open WebUI account": "Failed to unlink Open WebUI account",
+    "Signing you in to the external app...": "Signing you in to the external app...",
+    "Email address required": "Email address required",
+    "The external app needs your email address. Register one in your profile, then open the external app again.": "The external app needs your email address. Register one in your profile, then open the external app again.",
+    "Go to profile": "Go to profile",
+    "Sign-in request rejected": "Sign-in request rejected",
+    "The sign-in request is not valid, please contact your administrator": "The sign-in request is not valid, please contact your administrator",
+    "Back to home": "Back to home",
+    "Signing you out...": "Signing you out..."
   }
 }
