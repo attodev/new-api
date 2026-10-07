@@ -40,7 +40,7 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | --- | --- | --- |
 | `GET /.well-known/openid-configuration` | 없음 | discovery 문서(2.1) |
 | `GET /oauth2/jwks` | 없음 | 현재 키 + 교체 중인 이전 키의 공개키(JWK, `kid`, `use:"sig"`, `alg:"RS256"`) |
-| `GET /oauth2/authorize` | SPA | 4절. 백엔드에 등록하지 않음(`NoRoute` → SPA) |
+| `GET /oauth2/authorize` | SPA | 4절. 백엔드에 등록하지 않음(`NoRoute` → SPA). 이 경로와 `/oauth2/logout`은 테마가 classic이어도 기본 테마 `index.html`을 서빙한다(classic 프런트에는 해당 라우트가 없음) |
 | `POST /api/oauth2/authorize` | 세션(`UserAuth`) | 파라미터 검증 → code 발급 → `{success, data:{redirect_url}}` 또는 `{success:false, error, message}` |
 | `POST /oauth2/token` | `client_secret_basic` 또는 `client_secret_post` | code 교환(2.3) |
 | `GET /oauth2/userinfo` | `Bearer <access_token>` | 5절 클레임 |
@@ -177,7 +177,8 @@ issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`.
 | `groups` | `[user.Group]`, 조직 소속이면 `[user.Group, org.Name]` | ✓ | — |
 
 - `roles`는 항상 넣는다. Open WebUI가 역할 관리를 끄면 무시되고, 켜면 관리자가 자동 반영된다(`OAUTH_ADMIN_ROLES=admin`, `OAUTH_ALLOWED_ROLES=user,admin` 기본값과 일치). 특정 사용자 차단 용도의 역할 값은 범위 밖.
-- `groups`의 조직 이름은 `Organization.Name`(unique). `OrganizationId == 0`이면 그룹 하나만.
+- `groups`의 조직 이름은 `Organization.Name`(unique). `OrganizationId == 0`이면 그룹 하나만. 빈 그룹 문자열은 넣지 않는다.
+- `email_verified: true`는 이메일이 인증 코드·관리자·OAuth 경로로만 들어온다는 뜻이지 유일성 보장이 아니다(`users.email`에 unique 제약 없음). Open WebUI의 `OAUTH_MERGE_ACCOUNTS_BY_EMAIL`은 전환 기간 외에는 켜지 않는다.
 - `scope`: `openid` 필수. `email`·`profile`은 받아들이되 항상 전부 돌려준다(클라이언트 하나뿐).
 - 클레임 이름은 모두 Open WebUI 기본값이라 `OAUTH_*_CLAIM` 설정이 필요 없다.
 - userinfo의 `sub`는 id_token과 같다(둘 다 위 함수).
@@ -218,7 +219,7 @@ authorize 거부(사유·client_id·IP), token 거부(사유·client_id·IP), en
 ### 6.5 설정 저장 검증 (`controller/option.go`)
 
 - `oauth2.enabled=true`: `client_id` 비어 있지 않음, `client_secret` 16자 이상, `redirect_uri` 절대 URL(`http`/`https`). 아니면 기존 `MsgOptionOAuth2ConfigMissing` 계열 메시지로 거부(새 키 `option.oauth2_config_missing`).
-- `oauth2.redirect_uri`, `oauth2.app_url`, `oauth2.post_logout_redirect_uri`: 비어 있거나 절대 URL.
+- `oauth2.redirect_uri`, `oauth2.app_url`, `oauth2.post_logout_redirect_uri`: 비어 있거나 절대 URL(호스트 필수, `#fragment` 금지 — RFC 6749 §3.1.2). 문자열 값은 앞뒤 공백을 제거해 저장한다.
 - `oauth2.client_secret`: 비어 있거나 16자 이상.
 - 기존 `oauth2Configured()`의 "unified UI는 redirect_uri 없이도 됨" 분기는 브로커 흐름과 함께 삭제한다.
 
@@ -239,7 +240,7 @@ authorize 거부(사유·client_id·IP), token 거부(사유·client_id·IP), en
 ## 8. 테스트
 
 - **`service/oidc` 단위**: 키 생성·kid 결정성·JWKS 두 키 게시·교체 뒤 이전 키로 검증 가능·24시간 경과 정리; code 1회성·만료·`client_id`/`redirect_uri` 바인딩·PKCE S256 일치/불일치/누락; id_token 클레임·`kid`·`nonce` 전달; access_token 만료; 클레임 변환(roles admin/user, groups 조직 포함·미포함, name 대체, 이메일 소문자).
-- **컨트롤러 통합**(SQLite 인메모리 + miniredis, 그리고 Redis 꺼진 메모리 모드 한 번): discovery 필드; authorize 성공·미로그인 401·`redirect_uri` 불일치·이메일 없음·비활성·PKCE 방식 오류; token 교환 성공(basic·post)·code 재사용 실패·잘못된 verifier·잘못된 secret·`redirect_uri` 불일치; userinfo 성공·만료 토큰·비활성 사용자; end-session 세션 삭제·등록되지 않은 `post_logout_redirect_uri` 무시·서명 틀린 hint 무시·만료된 hint 허용; 설정 꺼짐 404.
+- **컨트롤러 통합**(SQLite 인메모리; 기본은 Redis 꺼진 메모리 모드, 전체 code 흐름·동시 교환 단일 승자·토큰 저장소는 miniredis로도 한 번): discovery 필드; authorize 성공·미로그인 401·`redirect_uri` 불일치·이메일 없음·비활성·PKCE 방식 오류; token 교환 성공(basic·post)·code 재사용 실패·잘못된 verifier·잘못된 secret·`redirect_uri` 불일치; userinfo 성공·만료 토큰·비활성 사용자; end-session 세션 삭제·등록되지 않은 `post_logout_redirect_uri` 무시·서명 틀린 hint 무시·만료된 hint 허용; 설정 꺼짐 404.
 - **옵션 검증**: `enabled` 켜기 조건, URL 형식, secret 길이.
 - **프런트**: authorize 페이지의 세 분기(로그인 이동·거부 표시·리다이렉트)와 logout 페이지, Playground 링크. 타입체크 + 브라우저 확인.
 - **스테이징**: 요구사항 문서 11.2절 체크리스트 전체. 특히 "Open WebUI에서 로그아웃하면 NewAPI 세션도 끝난다"와 "서명 키 교체 뒤 기존 사용자 정상 로그인".
