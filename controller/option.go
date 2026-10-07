@@ -522,6 +522,34 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "openwebui.relay_enabled":
+		if option.Value == "true" {
+			s := system_setting.GetOpenWebUISettings()
+			if s.ServiceApiKey == "" || len(s.JwtSecret) < 32 {
+				common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUIRelayConfigMissing)
+				return
+			}
+		}
+	case "openwebui.service_api_key":
+		normalized := system_setting.NormalizeOpenWebUIServiceKey(option.Value.(string))
+		if normalized != "" {
+			if _, err := model.ValidateUserToken(normalized); err != nil {
+				common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUIServiceKeyInvalid)
+				return
+			}
+		}
+		option.Value = normalized
+	case "openwebui.jwt_secret", "openwebui.jwt_previous_secret":
+		if v := option.Value.(string); v != "" && len(v) < 32 {
+			common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUISecretTooShort)
+			return
+		}
+	case "openwebui.jwt_issuer":
+		// An empty issuer would disable the iss check; keep the setting non-empty.
+		if strings.TrimSpace(option.Value.(string)) == "" {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
 	case "LinuxDOOAuthEnabled":
 		if option.Value == "true" && common.LinuxDOClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
