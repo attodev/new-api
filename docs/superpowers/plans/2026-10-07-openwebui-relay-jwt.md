@@ -1544,7 +1544,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: everything from Tasks 1, 3, 4, 5; `model.ValidateUserToken`, `model.ErrDatabase`; `i18n` keys; `logger.LogWarn`, `logger.LogInfo`
-- Produces: `openwebui.HeaderUserJWT = "X-OpenWebUI-User-Jwt"`, `openwebui.HeaderTask = "X-Task"`
+- Produces: `openwebui.DefaultIssuer = "open-webui"`, `openwebui.HeaderUserJWT = "X-OpenWebUI-User-Jwt"`, `openwebui.HeaderTask = "X-Task"`
 - Produces: `openwebui.IsServiceKey(key string) bool`
 - Produces: `openwebui.RejectError{Status int; MessageKey string; LogReason string}` (implements `error`)
 - Produces: `openwebui.Resolve(c *gin.Context, serviceToken *model.Token) (*model.Token, *RejectError)`
@@ -1712,6 +1712,14 @@ func TestResolve_EmptySecretRejects(t *testing.T) {
 	require.Contains(t, rej.LogReason, "misconfigured")
 }
 
+func TestResolve_EmptyIssuerSettingFallsBackToDefault(t *testing.T) {
+	svc := setupResolveTest(t)
+	system_setting.GetOpenWebUISettings().JwtIssuer = ""
+	c := newRelayContext(t, map[string]string{HeaderUserJWT: userJWT(t, testSecret, "owui-7", "alice@example.com")})
+	_, rej := Resolve(c, svc)
+	require.Nil(t, rej, "iss=open-webui must still verify when the setting is blank")
+}
+
 func TestResolve_UnlinkedUserGets403WithoutLeakingIdentity(t *testing.T) {
 	svc := setupResolveTest(t)
 	c := newRelayContext(t, map[string]string{HeaderUserJWT: userJWT(t, testSecret, "owui-x", "nobody@example.com")})
@@ -1818,6 +1826,8 @@ import (
 )
 
 const (
+	// DefaultIssuer is the iss claim Open WebUI's _mint_forward_user_jwt() sets.
+	DefaultIssuer = "open-webui"
 	// HeaderUserJWT carries the per-request HS256 identity minted by Open WebUI.
 	HeaderUserJWT = "X-OpenWebUI-User-Jwt"
 	// HeaderTask is Open WebUI's connection-header template "{{TASK}}": empty
@@ -1873,10 +1883,16 @@ func Resolve(c *gin.Context, serviceToken *model.Token) (*model.Token, *RejectEr
 		return nil, reject(c, http.StatusUnauthorized, i18n.MsgOpenWebUIAuthFailed, "misconfigured: empty_secret")
 	}
 
+	// An empty issuer would disable jwt/v5's iss check entirely, so fall
+	// back to the value Open WebUI always sends.
+	issuer := s.JwtIssuer
+	if issuer == "" {
+		issuer = DefaultIssuer
+	}
 	claims, err := VerifyUserJWT(raw, JWTConfig{
 		Secret:         s.JwtSecret,
 		PreviousSecret: s.JwtPreviousSecret,
-		Issuer:         s.JwtIssuer,
+		Issuer:         issuer,
 		Leeway:         time.Duration(s.JwtLeewaySeconds) * time.Second,
 	})
 	if err != nil {
@@ -2512,6 +2528,17 @@ func TestUpdateOption_OpenWebUI_ServiceKeyMustBeEnabledToken(t *testing.T) {
 	require.Equal(t, "", system_setting.GetOpenWebUISettings().ServiceApiKey)
 }
 
+func TestUpdateOption_OpenWebUI_IssuerMustNotBeEmpty(t *testing.T) {
+	setupOpenWebUIOptionTest(t)
+	_, body := putOption(t, "openwebui.jwt_issuer", "   ")
+	require.Contains(t, body, `"success":false`)
+	require.Equal(t, "open-webui", system_setting.GetOpenWebUISettings().JwtIssuer)
+
+	_, body = putOption(t, "openwebui.jwt_issuer", "my-issuer")
+	require.Contains(t, body, `"success":true`)
+	require.Equal(t, "my-issuer", system_setting.GetOpenWebUISettings().JwtIssuer)
+}
+
 func TestUpdateOption_OpenWebUI_RelayEnabledRequiresConfig(t *testing.T) {
 	token := setupOpenWebUIOptionTest(t)
 
@@ -2566,7 +2593,15 @@ In `controller/option.go`, inside `UpdateOption`'s second `switch option.Key {` 
 			common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUISecretTooShort)
 			return
 		}
+	case "openwebui.jwt_issuer":
+		// An empty issuer would disable the iss check; keep the setting non-empty.
+		if strings.TrimSpace(option.Value.(string)) == "" {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
 ```
+
+(`strings` is already imported in `controller/option.go`.)
 
 `option.Value` is already a string at this point (`optionValueToString` ran above the switch), so the `.(string)` assertions are safe, matching the existing `case "GroupRatio":` usage.
 
