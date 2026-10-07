@@ -312,6 +312,7 @@ func migrateDB() error {
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
 		&PerfMetric{},
+		&OpenWebUILink{},
 	)
 	if err != nil {
 		return err
@@ -434,6 +435,7 @@ func migrateDBFast() error {
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 		{&PerfMetric{}, "PerfMetric"},
+		{&OpenWebUILink{}, "OpenWebUILink"},
 	}
 	// dynamically compute migration count to ensure errChan buffer is large enough
 	errChan := make(chan error, len(migrations))
