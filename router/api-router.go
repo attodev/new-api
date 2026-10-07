@@ -234,6 +234,11 @@ func SetApiRouter(router *gin.Engine) {
 			openWebUIRoute.DELETE("/links/:id", controller.DeleteOpenWebUILink)
 		}
 
+		oidcRoute := apiRouter.Group("/oauth2")
+		{
+			oidcRoute.POST("/authorize", middleware.UserAuth(), controller.OAuth2Authorize)
+		}
+
 		organizationsRoute := apiRouter.Group("/organizations")
 		organizationsRoute.Use(middleware.RootAuth())
 		{

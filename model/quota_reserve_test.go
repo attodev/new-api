@@ -6,22 +6,35 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/require"
 )
+
+func setupQuotaTestRedis(t *testing.T) {
+	t.Helper()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+
+	originalRDB := common.RDB
+	originalEnabled := common.RedisEnabled
+	common.RDB = redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	common.RedisEnabled = true
+	t.Cleanup(func() {
+		common.RDB = originalRDB
+		common.RedisEnabled = originalEnabled
+	})
+}
 
 // The token cache normally holds a 60-second snapshot of a database row, so both
 // quota scripts refresh its TTL on every use -- a snapshot that ages out is always
 // re-readable from the row behind it.
 //
-// The OAuth2 relay token has no row behind it. Redis IS its storage, deliberately
-// written with a 24-hour TTL (IssueOAuth2Token), and refreshing that down to the
-// quota cache's 60 seconds does not shorten a cache entry, it shortens the session:
-// sixty seconds after the user's last request the hash expires, hydrateTokenCache
-// falls through to a table with no matching row, and every call after that is 401
-// until the user signs in again. Observed as the model list silently emptying on a
-// reload, which a sign-out and sign-in "fixed".
-func TestTokenQuotaScriptsDoNotShortenTheOAuth2TokenTTL(t *testing.T) {
-	setupOAuth2TestRedis(t)
+// A cache entry whose TTL is its lifetime (no row behind it) must not have that
+// lifetime cut down to the quota cache's 60 seconds just because it was used.
+func TestTokenQuotaScriptsDoNotShortenALongTTL(t *testing.T) {
+	setupQuotaTestRedis(t)
 	ctx := context.Background()
 
 	for _, tc := range []struct {
@@ -44,17 +57,17 @@ func TestTokenQuotaScriptsDoNotShortenTheOAuth2TokenTTL(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			token, err := IssueOAuth2Token(3, "default", "openwebui")
-			require.NoError(t, err)
+			token := &Token{Id: 4321, Key: "long-lived-token-key-" + tc.name, RemainQuota: 500}
 			cacheKey := getTokenCacheKey(token.Key)
-
-			require.Greater(t, common.RDB.TTL(ctx, cacheKey).Val(), 23*time.Hour,
-				"precondition: the freshly issued token holds its full session TTL")
+			require.NoError(t, common.RDB.HSet(ctx, cacheKey, map[string]interface{}{
+				"Id": token.Id, "RemainQuota": token.RemainQuota, "UsedQuota": 0,
+			}).Err())
+			require.NoError(t, common.RDB.Expire(ctx, cacheKey, 24*time.Hour).Err())
 
 			require.NoError(t, tc.call(token))
 
 			require.Greater(t, common.RDB.TTL(ctx, cacheKey).Val(), 23*time.Hour,
-				"using the token must not cut its session down to the quota cache TTL")
+				"using the entry must not cut its lifetime down to the quota cache TTL")
 		})
 	}
 }
@@ -64,7 +77,7 @@ func TestTokenQuotaScriptsDoNotShortenTheOAuth2TokenTTL(t *testing.T) {
 // on use, or a busy token would fall out of cache every 60 seconds and re-read the
 // row it is meant to be caching.
 func TestTokenQuotaScriptsStillExtendAShortTTL(t *testing.T) {
-	setupOAuth2TestRedis(t)
+	setupQuotaTestRedis(t)
 	ctx := context.Background()
 
 	token := Token{

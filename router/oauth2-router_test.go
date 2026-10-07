@@ -18,7 +18,9 @@ func TestSetOAuth2Router_RegistersExpectedRoutes(t *testing.T) {
 		paths[r.Method+" "+r.Path] = r.Handler
 	}
 
-	require.Contains(t, paths, "POST /oauth2/session-init")
+	require.Contains(t, paths, "GET /.well-known/openid-configuration")
+	require.Contains(t, paths, "GET /oauth2/jwks")
 	require.Contains(t, paths, "POST /oauth2/token")
 	require.Contains(t, paths, "GET /oauth2/userinfo")
+	require.NotContains(t, paths, "POST /oauth2/session-init")
 }

@@ -2,181 +2,267 @@ package controller
 
 import (
 	"crypto/subtle"
+	"errors"
 	"net/http"
-	"strconv"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service/oidc"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// oauth2CredentialsConfigured reports whether the client credentials are
-// usable. An admin can flip settings.Enabled to true without filling in
-// client_id/client_secret (they default to ""), which would otherwise let an
-// empty client_secret from a caller match an empty configured one. From the
-// caller's perspective, an unconfigured feature must look identical to a
-// disabled one.
+// oauth2CredentialsConfigured reports whether the provider is on and has a
+// usable client registration. From a caller's perspective an unconfigured
+// provider must look identical to a disabled one.
 func oauth2CredentialsConfigured(settings *system_setting.OAuth2Settings) bool {
 	return settings.Enabled && settings.ClientId != "" && settings.ClientSecret != ""
 }
 
-// oauth2Configured additionally requires a redirect target. Only the
-// browser-redirect flow needs one; the unified UI receives a raw code and
-// navigates nowhere.
-func oauth2Configured(settings *system_setting.OAuth2Settings) bool {
-	return oauth2CredentialsConfigured(settings) && settings.RedirectURI != ""
+func oauth2NotEnabled(c *gin.Context) {
+	c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
 }
 
-// OAuth2SessionInit is called from new-api's own frontend (same-origin,
-// authenticated via the normal session cookie through middleware.UserAuth()).
-// It mints a short-lived, single-use authorization code and answers in one of
-// two modes, selected by an optional {"format": "code"} JSON body:
-//
-//   - format == "code": the raw code is returned as {"code": "..."}. This is
-//     what the unified UI — served from this same origin — uses: it hands the
-//     code to its own backend over fetch rather than navigating anywhere, so
-//     no RedirectURI need be configured. Keeping the code out of a URL also
-//     keeps it out of anything shareable or unfurlable.
-//   - anything else (including no body at all, which is what the link-out
-//     flow posts): a ready-to-navigate URL pointing at the external app's
-//     callback is returned as {"redirect_url": "..."}. This mode does require
-//     a configured RedirectURI.
-//
-// There is no browser-facing /oauth2/authorize redirect in this design — see
-// the design spec's "Revision note" for why.
-func OAuth2SessionInit(c *gin.Context) {
-	// The body is optional: the link-out flow posts nothing at all, and a
-	// malformed body simply degrades to the redirect mode. So a bind error
-	// is deliberately ignored rather than reported.
-	var req struct {
-		Format string `json:"format"`
+// OAuth2Discovery serves /.well-known/openid-configuration.
+func OAuth2Discovery(c *gin.Context) {
+	if !oauth2CredentialsConfigured(system_setting.GetOAuth2Settings()) {
+		oauth2NotEnabled(c)
+		return
 	}
-	_ = c.ShouldBindJSON(&req)
-	rawCodeMode := req.Format == "code"
+	c.JSON(http.StatusOK, oidc.DiscoveryDocument())
+}
 
+// OAuth2JWKS serves the signing public keys.
+func OAuth2JWKS(c *gin.Context) {
+	if !oauth2CredentialsConfigured(system_setting.GetOAuth2Settings()) {
+		oauth2NotEnabled(c)
+		return
+	}
+	jwks, err := oidc.JWKS()
+	if err != nil {
+		logger.LogError(c, "oidc: jwks: "+err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=300")
+	c.JSON(http.StatusOK, jwks)
+}
+
+type oauth2AuthorizeRequest struct {
+	ResponseType        string `json:"response_type"`
+	ClientId            string `json:"client_id"`
+	RedirectURI         string `json:"redirect_uri"`
+	Scope               string `json:"scope"`
+	State               string `json:"state"`
+	Nonce               string `json:"nonce"`
+	CodeChallenge       string `json:"code_challenge"`
+	CodeChallengeMethod string `json:"code_challenge_method"`
+}
+
+func appendQuery(base string, values url.Values) string {
+	sep := "?"
+	if strings.Contains(base, "?") {
+		sep = "&"
+	}
+	return base + sep + values.Encode()
+}
+
+// OAuth2Authorize is the same-origin API the SPA page /oauth2/authorize calls.
+// It runs behind UserAuth, so an unauthenticated browser gets 401 and the page
+// sends it to /sign-in. No consent screen: the only client is first-party.
+func OAuth2Authorize(c *gin.Context) {
+	var req oauth2AuthorizeRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": "invalid_request", "message": common.TranslateMessage(c, i18n.MsgOIDCInvalidRequest)})
+		return
+	}
 	settings := system_setting.GetOAuth2Settings()
-	configured := oauth2CredentialsConfigured(settings)
-	if !rawCodeMode {
-		configured = oauth2Configured(settings)
+	ip := c.ClientIP()
+
+	hardReject := func(code string) {
+		logger.LogWarn(c, "oidc: authorize rejected ("+code+") client_id="+req.ClientId+" ip="+ip)
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": code, "message": common.TranslateMessage(c, i18n.MsgOIDCInvalidRequest)})
 	}
-	if !configured {
-		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
+	redirectReject := func(code string) {
+		logger.LogWarn(c, "oidc: authorize rejected ("+code+") client_id="+req.ClientId+" ip="+ip)
+		q := url.Values{"error": {code}}
+		if req.State != "" {
+			q.Set("state", req.State)
+		}
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": code, "data": gin.H{"redirect_url": appendQuery(req.RedirectURI, q)}})
+	}
+
+	if !oauth2CredentialsConfigured(settings) || req.ClientId != settings.ClientId {
+		hardReject("invalid_client")
+		return
+	}
+	if req.RedirectURI == "" || req.RedirectURI != settings.RedirectURI {
+		hardReject("invalid_redirect_uri")
+		return
+	}
+	if req.ResponseType != "code" {
+		redirectReject("unsupported_response_type")
+		return
+	}
+	if !common.StringsContains(strings.Fields(req.Scope), "openid") {
+		redirectReject("invalid_scope")
+		return
+	}
+	if req.CodeChallenge != "" && req.CodeChallengeMethod != "S256" {
+		redirectReject("invalid_request")
 		return
 	}
 
-	userId := c.GetInt("id")
-	code, err := model.StoreAuthCode(userId)
+	user, err := model.GetUserById(c.GetInt("id"), false)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate authorization code"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			redirectReject("access_denied")
+			return
+		}
+		common.ApiError(c, err)
+		return
+	}
+	if user.Status != common.UserStatusEnabled {
+		redirectReject("access_denied")
+		return
+	}
+	if strings.TrimSpace(user.Email) == "" {
+		logger.LogWarn(c, "oidc: authorize rejected (email_required) user="+user.Username)
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": "email_required", "message": common.TranslateMessage(c, i18n.MsgOIDCEmailRequired)})
 		return
 	}
 
-	if rawCodeMode {
-		c.JSON(http.StatusOK, gin.H{"code": code})
-		return
-	}
-
-	state, err := common.GenerateKey()
+	code, err := oidc.IssueCode(oidc.AuthCode{
+		UserId: user.Id, ClientId: req.ClientId, RedirectURI: req.RedirectURI,
+		Nonce: req.Nonce, Scope: req.Scope,
+		CodeChallenge: req.CodeChallenge, CodeChallengeMethod: req.CodeChallengeMethod,
+		AuthTime: common.GetTimestamp(),
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state"})
+		common.ApiError(c, err)
 		return
 	}
-
-	redirectURL := settings.RedirectURI + "?code=" + code + "&state=" + state
-	c.JSON(http.StatusOK, gin.H{"redirect_url": redirectURL})
+	q := url.Values{"code": {code}}
+	if req.State != "" {
+		q.Set("state", req.State)
+	}
+	common.ApiSuccess(c, gin.H{"redirect_url": appendQuery(req.RedirectURI, q)})
 }
 
-// OAuth2Token exchanges a single-use authorization code for an access
-// token. Called server-to-server by the external app's backend.
-//
-// Gated on credentials alone, not on oauth2Configured: this endpoint never
-// reads RedirectURI, and a unified-UI deployment leaves it empty because
-// nothing navigates to it. Requiring one here would hand out codes from
-// session-init that could never be exchanged.
+func tokenError(c *gin.Context, status int, code, description string) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	if status == http.StatusUnauthorized {
+		c.Header("WWW-Authenticate", `Basic realm="oauth2"`)
+	}
+	c.JSON(status, gin.H{"error": code, "error_description": description})
+}
+
+// clientCredentials reads client_secret_basic first, then client_secret_post.
+func clientCredentials(c *gin.Context) (string, string) {
+	if id, secret, ok := c.Request.BasicAuth(); ok {
+		return id, secret
+	}
+	return c.PostForm("client_id"), c.PostForm("client_secret")
+}
+
+// OAuth2Token exchanges an authorization code for an access token and id_token.
+// Called server-to-server by Open WebUI.
 func OAuth2Token(c *gin.Context) {
 	settings := system_setting.GetOAuth2Settings()
 	if !oauth2CredentialsConfigured(settings) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
+		oauth2NotEnabled(c)
 		return
 	}
-
+	clientId, clientSecret := clientCredentials(c)
+	if clientId != settings.ClientId || subtle.ConstantTimeCompare([]byte(clientSecret), []byte(settings.ClientSecret)) != 1 {
+		logger.LogWarn(c, "oidc: token rejected (invalid_client) client_id="+clientId+" ip="+c.ClientIP())
+		tokenError(c, http.StatusUnauthorized, "invalid_client", "client authentication failed")
+		return
+	}
 	if c.PostForm("grant_type") != "authorization_code" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported_grant_type"})
+		tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "only authorization_code is supported")
 		return
 	}
-
-	clientId := c.PostForm("client_id")
-	clientSecret := c.PostForm("client_secret")
-	if clientId != settings.ClientId ||
-		subtle.ConstantTimeCompare([]byte(clientSecret), []byte(settings.ClientSecret)) != 1 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_client"})
-		return
-	}
-
-	code := c.PostForm("code")
-	userId, err := model.ConsumeAuthCode(code)
+	ac, err := oidc.ConsumeCode(c.PostForm("code"), clientId, c.PostForm("redirect_uri"), c.PostForm("code_verifier"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant"})
+		if errors.Is(err, oidc.ErrInvalidGrant) {
+			logger.LogWarn(c, "oidc: token rejected (invalid_grant) client_id="+clientId+" ip="+c.ClientIP())
+			tokenError(c, http.StatusBadRequest, "invalid_grant", "authorization code is invalid, expired or already used")
+			return
+		}
+		logger.LogError(c, "oidc: token: "+err.Error())
+		tokenError(c, http.StatusInternalServerError, "server_error", "temporary failure")
 		return
 	}
-
-	userCache, err := model.GetUserCache(userId)
+	user, err := model.GetUserById(ac.UserId, false)
+	if err != nil || user.Status != common.UserStatusEnabled {
+		tokenError(c, http.StatusBadRequest, "invalid_grant", "user is not available")
+		return
+	}
+	claims := oidc.BuildClaims(user, oidc.LookupOrganizationName(user.OrganizationId))
+	idToken, err := oidc.SignIDToken(claims, clientId, ac.Nonce, ac.AuthTime, time.Now())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+		logger.LogError(c, "oidc: sign id_token: "+err.Error())
+		tokenError(c, http.StatusInternalServerError, "server_error", "temporary failure")
 		return
 	}
-
-	token, err := model.IssueOAuth2Token(userId, userCache.Group, clientId)
+	access, err := oidc.IssueAccessToken(oidc.AccessToken{UserId: user.Id, ClientId: clientId, Scope: ac.Scope})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue token"})
+		logger.LogError(c, "oidc: issue access token: "+err.Error())
+		tokenError(c, http.StatusInternalServerError, "server_error", "temporary failure")
 		return
 	}
-
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
 	c.JSON(http.StatusOK, gin.H{
-		"access_token": "sk-" + token.Key,
+		"access_token": access,
 		"token_type":   "Bearer",
-		"expires_in":   86400,
+		"expires_in":   int(oidc.AccessTokenTTL.Seconds()),
+		"id_token":     idToken,
+		"scope":        ac.Scope,
 	})
 }
 
-// OAuth2UserInfo resolves an access token issued by OAuth2Token back to
-// the underlying new-api user's identity. Called server-to-server.
+func userinfoUnauthorized(c *gin.Context) {
+	c.Header("WWW-Authenticate", `Bearer error="invalid_token"`)
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+}
+
+// OAuth2UserInfo resolves an access token to the user's claims.
 func OAuth2UserInfo(c *gin.Context) {
-	settings := system_setting.GetOAuth2Settings()
-	if !settings.Enabled {
-		c.JSON(http.StatusNotFound, gin.H{"error": "oauth2 is not enabled"})
+	if !oauth2CredentialsConfigured(system_setting.GetOAuth2Settings()) {
+		oauth2NotEnabled(c)
 		return
 	}
-
-	bearer := c.Request.Header.Get("Authorization")
-	key := strings.TrimPrefix(bearer, "Bearer ")
-	key = strings.TrimPrefix(key, "sk-")
-
-	token, err := model.ValidateUserToken(key)
+	bearer := strings.TrimSpace(c.GetHeader("Authorization"))
+	raw := ""
+	if len(bearer) > 7 && strings.EqualFold(bearer[:7], "Bearer ") {
+		raw = strings.TrimSpace(bearer[7:])
+	}
+	at, found, err := oidc.LookupAccessToken(raw)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+		logger.LogError(c, "oidc: userinfo lookup: "+err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
 		return
 	}
-
-	expectedName := "oauth2-" + settings.ClientId
-	if token.Name != expectedName {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+	if !found {
+		userinfoUnauthorized(c)
 		return
 	}
-
-	userCache, err := model.GetUserCache(token.UserId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+	user, err := model.GetUserById(at.UserId, false)
+	if err != nil || user.Status != common.UserStatusEnabled {
+		oidc.RevokeAccessToken(raw)
+		userinfoUnauthorized(c)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"sub":      strconv.Itoa(token.UserId),
-		"email":    userCache.Email,
-		"name":     userCache.Username,
-		"is_admin": model.IsAdmin(token.UserId),
-	})
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, oidc.BuildClaims(user, oidc.LookupOrganizationName(user.OrganizationId)).UserInfo())
 }

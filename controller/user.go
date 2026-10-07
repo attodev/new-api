@@ -125,11 +125,6 @@ func setupLogin(user *model.User, c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
-	if userId, ok := session.Get("id").(int); ok {
-		if err := model.RevokeOAuth2Token(userId); err != nil {
-			common.SysError("failed to revoke OAuth2 token on logout for user " + strconv.Itoa(userId) + ": " + err.Error())
-		}
-	}
 	session.Clear()
 	err := session.Save()
 	if err != nil {

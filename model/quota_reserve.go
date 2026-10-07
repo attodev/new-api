@@ -24,12 +24,9 @@ var ErrQuotaCachePending = errors.New("quota cache unavailable while database up
 //
 // The unconditional EXPIRE this replaces was right for what the token cache
 // normally holds: a short-lived snapshot of a database row, re-readable at any
-// time, whose TTL exists to bound staleness. It was wrong for the one entry that
-// has no row behind it. IssueOAuth2Token stores the relay token in Redis and
-// nowhere else, with a 24-hour TTL that IS the session's lifetime; refreshing
-// that to 60 seconds ended the session a minute after the user's last request,
-// after which hydrateTokenCache fell through to a table with no matching row and
-// answered 401 until the user signed in again.
+// time, whose TTL exists to bound staleness. It was wrong for cache entries
+// that have no row behind them and whose TTL IS their lifetime; refreshing
+// such an entry down to 60 seconds ended it a minute after the last request.
 //
 // A TTL of -1 (no expiry) is left alone: it already outlives anything this would
 // set. -2 (key gone) cannot occur here -- every caller has just read a field off
