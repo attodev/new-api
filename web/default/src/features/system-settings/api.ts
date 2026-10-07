@@ -21,6 +21,7 @@ import type {
   ConfirmPaymentComplianceResponse,
   DeleteLogsResponse,
   FetchUpstreamRatiosRequest,
+  OpenWebUIRelayStatus,
   SystemOptionsResponse,
   TossOptionsUpdateRequest,
   UpdateOptionRequest,
@@ -90,5 +91,14 @@ export async function sendTestEmail(to: string) {
     { to },
     { skipErrorHandler: true }
   )
+  return res.data
+}
+
+export async function getOpenWebUIRelayStatus() {
+  const res = await api.get<{
+    success: boolean
+    message?: string
+    data?: OpenWebUIRelayStatus
+  }>('/api/openwebui/relay-status')
   return res.data
 }

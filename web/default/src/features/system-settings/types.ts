@@ -89,6 +89,28 @@ export type SiteSettings = {
   'oauth2.redirect_uri': string
   'oauth2.open_in_new_window': boolean
   'oauth2.replace_playground': boolean
+  /**
+   * Open WebUI relay: Open WebUI calls new-api with one shared service key
+   * plus a signed per-request user JWT; new-api bills the identified user.
+   * The three secrets are write-only (hidden from GET /api/option/).
+   */
+  'openwebui.relay_enabled': boolean
+  'openwebui.service_api_key': string
+  'openwebui.jwt_secret': string
+  'openwebui.jwt_previous_secret': string
+  'openwebui.jwt_issuer': string
+  'openwebui.jwt_leeway_seconds': number
+  'openwebui.allow_unsigned_requests': boolean
+}
+
+export type OpenWebUIRelayStatus = {
+  relay_enabled: boolean
+  service_key_configured: boolean
+  jwt_secret_configured: boolean
+  jwt_previous_secret_configured: boolean
+  jwt_issuer: string
+  jwt_leeway_seconds: number
+  allow_unsigned_requests: boolean
 }
 
 export type AuthSettings = {

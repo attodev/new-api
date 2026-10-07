@@ -43,6 +43,13 @@ const defaultSiteSettings: SiteSettings = {
   'oauth2.redirect_uri': '',
   'oauth2.open_in_new_window': false,
   'oauth2.replace_playground': false,
+  'openwebui.relay_enabled': false,
+  'openwebui.service_api_key': '',
+  'openwebui.jwt_secret': '',
+  'openwebui.jwt_previous_secret': '',
+  'openwebui.jwt_issuer': 'open-webui',
+  'openwebui.jwt_leeway_seconds': 60,
+  'openwebui.allow_unsigned_requests': true,
 }
 
 export function SiteSettings() {

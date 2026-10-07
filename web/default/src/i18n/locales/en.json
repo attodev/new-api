@@ -4807,6 +4807,24 @@
     "Replace the complete Toss configuration?": "Replace the complete Toss configuration?",
     "Blank credential fields will permanently clear the stored credentials.": "Blank credential fields will permanently clear the stored credentials.",
     "All Toss payment modes will remain disabled until maintenance finishes.": "All Toss payment modes will remain disabled until maintenance finishes.",
-    "Stored secret keys are never shown; re-enter every secret you intend to keep.": "Stored secret keys are never shown; re-enter every secret you intend to keep."
+    "Stored secret keys are never shown; re-enter every secret you intend to keep.": "Stored secret keys are never shown; re-enter every secret you intend to keep.",
+    "OpenWebUI Relay": "OpenWebUI Relay",
+    "Enable Open WebUI relay": "Enable Open WebUI relay",
+    "Bill requests that arrive with the service key to the Open WebUI user identified by the signed X-OpenWebUI-User-Jwt header. Requires the service key and a JWT secret below.": "Bill requests that arrive with the service key to the Open WebUI user identified by the signed X-OpenWebUI-User-Jwt header. Requires the service key and a JWT secret below.",
+    "Service key": "Service key",
+    "Leave empty to keep the current value": "Leave empty to keep the current value",
+    "The key of an enabled token that Open WebUI uses as OPENAI_API_KEYS. Paste it with or without the sk- prefix. IP limits on that token restrict where Open WebUI may call from.": "The key of an enabled token that Open WebUI uses as OPENAI_API_KEYS. Paste it with or without the sk- prefix. IP limits on that token restrict where Open WebUI may call from.",
+    "JWT secret": "JWT secret",
+    "Must equal Open WebUI's FORWARD_USER_INFO_HEADER_JWT_SECRET (32+ random characters).": "Must equal Open WebUI's FORWARD_USER_INFO_HEADER_JWT_SECRET (32+ random characters).",
+    "Previous JWT secret": "Previous JWT secret",
+    "Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then clear this field via the relay-status API or by saving a new rotation.": "Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then clear this field via the relay-status API or by saving a new rotation.",
+    "JWT issuer": "JWT issuer",
+    "Expected iss claim. Open WebUI always sends open-webui.": "Expected iss claim. Open WebUI always sends open-webui.",
+    "Clock skew allowance (seconds)": "Clock skew allowance (seconds)",
+    "Applied to exp and iat. Open WebUI JWTs live 300 seconds by default; 60 is a safe start.": "Applied to exp and iat. Open WebUI JWTs live 300 seconds by default; 60 is a safe start.",
+    "Allow requests without a user JWT": "Allow requests without a user JWT",
+    "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.": "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.",
+    "Configured": "Configured",
+    "Not configured": "Not configured"
   }
 }

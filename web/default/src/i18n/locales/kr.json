@@ -4807,6 +4807,24 @@
     "Replace the complete Toss configuration?": "토스 전체 설정을 교체할까요?",
     "Blank credential fields will permanently clear the stored credentials.": "비어 있는 인증 정보 필드는 저장된 인증 정보를 영구적으로 삭제합니다.",
     "All Toss payment modes will remain disabled until maintenance finishes.": "유지보수가 끝날 때까지 모든 토스 결제 모드는 비활성화 상태로 유지됩니다.",
-    "Stored secret keys are never shown; re-enter every secret you intend to keep.": "저장된 시크릿 키는 표시되지 않습니다. 유지할 모든 시크릿을 다시 입력하세요."
+    "Stored secret keys are never shown; re-enter every secret you intend to keep.": "저장된 시크릿 키는 표시되지 않습니다. 유지할 모든 시크릿을 다시 입력하세요.",
+    "OpenWebUI Relay": "OpenWebUI Relay",
+    "Enable Open WebUI relay": "Open WebUI relay 활성화",
+    "Bill requests that arrive with the service key to the Open WebUI user identified by the signed X-OpenWebUI-User-Jwt header. Requires the service key and a JWT secret below.": "서비스 키로 들어온 요청을 서명된 X-OpenWebUI-User-Jwt 헤더가 가리키는 Open WebUI 사용자에게 청구합니다. 아래 서비스 키와 JWT 비밀이 필요합니다.",
+    "Service key": "서비스 키",
+    "Leave empty to keep the current value": "비워 두면 현재 값을 유지합니다",
+    "The key of an enabled token that Open WebUI uses as OPENAI_API_KEYS. Paste it with or without the sk- prefix. IP limits on that token restrict where Open WebUI may call from.": "Open WebUI가 OPENAI_API_KEYS로 쓰는 활성 토큰의 키입니다. sk- 접두사가 있어도 됩니다. 이 토큰의 IP 제한이 Open WebUI가 호출할 수 있는 위치를 제한합니다.",
+    "JWT secret": "JWT 비밀",
+    "Must equal Open WebUI's FORWARD_USER_INFO_HEADER_JWT_SECRET (32+ random characters).": "Open WebUI의 FORWARD_USER_INFO_HEADER_JWT_SECRET과 같아야 합니다(32자 이상 무작위).",
+    "Previous JWT secret": "이전 JWT 비밀",
+    "Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then clear this field via the relay-status API or by saving a new rotation.": "교체 중에 현재 비밀과 함께 허용됩니다. 구 비밀을 여기로 옮기고 위에 새 비밀을 넣은 뒤 Open WebUI를 재시작하세요. 안정되면 relay-status API나 새 교체 저장으로 이 값을 비웁니다.",
+    "JWT issuer": "JWT 발급자",
+    "Expected iss claim. Open WebUI always sends open-webui.": "기대하는 iss 클레임입니다. Open WebUI는 항상 open-webui를 보냅니다.",
+    "Clock skew allowance (seconds)": "시계 오차 허용(초)",
+    "Applied to exp and iat. Open WebUI JWTs live 300 seconds by default; 60 is a safe start.": "exp와 iat에 적용됩니다. Open WebUI JWT 수명은 기본 300초이며 60으로 시작하면 안전합니다.",
+    "Allow requests without a user JWT": "사용자 JWT 없는 요청 허용",
+    "Some Open WebUI audio routes send the service key without a JWT. On: bill them to the service token itself (logged as unsigned). Off: reject them with 401. A present but invalid JWT is always rejected.": "Open WebUI의 일부 음성 경로는 JWT 없이 서비스 키만 보냅니다. 켜면 서비스 토큰 자체로 청구하고 미서명으로 기록합니다. 끄면 401로 거부합니다. JWT가 있는데 잘못된 경우는 항상 거부합니다.",
+    "Configured": "설정됨",
+    "Not configured": "설정되지 않음"
   }
 }

@@ -29,6 +29,7 @@ import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
 import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 import { OpenWebUIOAuth2Section } from './openwebui-integration-section'
+import { OpenWebUIRelaySection } from './openwebui-relay-section'
 
 const SITE_SECTIONS = [
   {
@@ -103,6 +104,26 @@ const SITE_SECTIONS = [
           'oauth2.redirect_uri': settings['oauth2.redirect_uri'],
           'oauth2.open_in_new_window': settings['oauth2.open_in_new_window'],
           'oauth2.replace_playground': settings['oauth2.replace_playground'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'openwebui-relay',
+    titleKey: 'OpenWebUI Relay',
+    build: (settings: SiteSettings) => (
+      <OpenWebUIRelaySection
+        defaultValues={{
+          'openwebui.relay_enabled': settings['openwebui.relay_enabled'],
+          'openwebui.service_api_key': settings['openwebui.service_api_key'],
+          'openwebui.jwt_secret': settings['openwebui.jwt_secret'],
+          'openwebui.jwt_previous_secret':
+            settings['openwebui.jwt_previous_secret'],
+          'openwebui.jwt_issuer': settings['openwebui.jwt_issuer'],
+          'openwebui.jwt_leeway_seconds':
+            settings['openwebui.jwt_leeway_seconds'],
+          'openwebui.allow_unsigned_requests':
+            settings['openwebui.allow_unsigned_requests'],
         }}
       />
     ),
