@@ -110,7 +110,11 @@ func TestOIDC_Logout_BadHintLeavesSessionAlone(t *testing.T) {
 	ck := env.login(t, "7")
 	res, cookies := env.postLogout(t, ck, map[string]string{"id_token_hint": "not.a.token", "post_logout_redirect_uri": "https://chat.example.com/bye"})
 	require.Equal(t, "/", redirectOf(res))
-	all := append([]*http.Cookie{ck}, cookies...)
+	for _, c := range cookies {
+		require.NotEqual(t, "session", c.Name, "forged hint must not touch the session cookie")
+	}
+	// Response cookies first, original last: a cleared cookie would win.
+	all := append(append([]*http.Cookie{}, cookies...), ck)
 	require.Equal(t, float64(7), env.whoami(t, all), "forged hint must not end the session")
 }
 

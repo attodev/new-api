@@ -281,7 +281,8 @@ type oauth2LogoutRequest struct {
 // so this URL cannot be used to log strangers out.
 func OAuth2Logout(c *gin.Context) {
 	var req oauth2LogoutRequest
-	_ = common.DecodeJson(c.Request.Body, &req) // an empty body is a plain logout
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10) // unauthenticated endpoint
+	_ = common.DecodeJson(c.Request.Body, &req)                            // an empty body is a plain logout
 	settings := system_setting.GetOAuth2Settings()
 
 	if strings.TrimSpace(req.IDTokenHint) != "" {
