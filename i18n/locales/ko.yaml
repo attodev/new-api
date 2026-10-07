@@ -587,3 +587,13 @@ subscription.group_reverted: "사용자 그룹이 {{.Group}}(으)로 복원될 �
 
 # 모델 동기화 메시지
 model_sync.fetch_upstream_failed: "업스트림 모델 가져오기에 실패했습니다: {{.Error}}"
+
+# Open WebUI relay integration
+openwebui.auth_failed: "Open WebUI 인증에 실패했습니다. 관리자에게 문의해 주세요"
+openwebui.not_linked: "Open WebUI 계정이 new-api 계정에 연결되어 있지 않습니다"
+openwebui.link_conflict: "이 Open WebUI 계정 또는 new-api 사용자는 이미 연결되어 있습니다"
+openwebui.link_not_found: "Open WebUI 연결을 찾을 수 없습니다"
+openwebui.sub_required: "Open WebUI 사용자 ID(sub)가 필요합니다"
+option.openwebui_relay_config_missing: "Open WebUI relay를 활성화하려면 먼저 서비스 키와 32자 이상의 JWT 비밀을 설정해 주세요"
+option.openwebui_service_key_invalid: "Open WebUI 서비스 키가 활성화된 토큰과 일치하지 않습니다"
+option.openwebui_secret_too_short: "Open WebUI JWT 비밀은 32자 이상이어야 합니다"

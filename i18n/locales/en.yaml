@@ -583,3 +583,13 @@ org.invalid_role: "invalid organization role"
 org.only_owner_can_assign_owner: "only the organization owner can assign the owner role"
 org.user_not_in_org: "user does not belong to your organization"
 org.owner_cannot_be_removed: "organization owner cannot be removed"
+
+# Open WebUI relay integration
+openwebui.auth_failed: "Open WebUI authentication failed, please contact your administrator"
+openwebui.not_linked: "Your Open WebUI account is not linked to a new-api account"
+openwebui.link_conflict: "This Open WebUI account or new-api user is already linked"
+openwebui.link_not_found: "Open WebUI link not found"
+openwebui.sub_required: "Open WebUI user id (sub) is required"
+option.openwebui_relay_config_missing: "Cannot enable the Open WebUI relay, please set the service key and a JWT secret of at least 32 characters first"
+option.openwebui_service_key_invalid: "The Open WebUI service key does not match an enabled token"
+option.openwebui_secret_too_short: "The Open WebUI JWT secret must be at least 32 characters"

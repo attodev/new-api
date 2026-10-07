@@ -702,3 +702,16 @@ const (
 	MsgOrgUserNotInOrg            = "org.user_not_in_org"
 	MsgOrgOwnerCannotBeRemoved    = "org.owner_cannot_be_removed"
 )
+
+// Open WebUI relay integration
+const (
+	MsgOpenWebUIAuthFailed   = "openwebui.auth_failed"
+	MsgOpenWebUINotLinked    = "openwebui.not_linked"
+	MsgOpenWebUILinkConflict = "openwebui.link_conflict"
+	MsgOpenWebUILinkNotFound = "openwebui.link_not_found"
+	MsgOpenWebUISubRequired  = "openwebui.sub_required"
+
+	MsgOptionOpenWebUIRelayConfigMissing = "option.openwebui_relay_config_missing"
+	MsgOptionOpenWebUIServiceKeyInvalid  = "option.openwebui_service_key_invalid"
+	MsgOptionOpenWebUISecretTooShort     = "option.openwebui_secret_too_short"
+)

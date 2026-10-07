@@ -71,4 +71,10 @@ const (
 	// ContextKeyLanguage stores the user's language preference for i18n
 	ContextKeyLanguage ContextKey = "language"
 	ContextKeyIsStream ContextKey = "is_stream"
+
+	/* Open WebUI relay keys (set by service/openwebui.Resolve) */
+	ContextKeyOpenWebUISub        ContextKey = "openwebui_sub"
+	ContextKeyOpenWebUITask       ContextKey = "openwebui_task"
+	ContextKeyOpenWebUIAttributed ContextKey = "openwebui_attributed"
+	ContextKeyOpenWebUIUnsigned   ContextKey = "openwebui_unsigned"
 )
