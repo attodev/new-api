@@ -1012,8 +1012,9 @@ func setupServiceTestDB(t *testing.T) {
 
 func createTestUser(t *testing.T, id int, username, email string) {
 	t.Helper()
+	// users.aff_code has a unique index, so every fixture user needs its own.
 	require.NoError(t, model.DB.Create(&model.User{
-		Id: id, Username: username, Password: "secret-pass", Email: email,
+		Id: id, Username: username, Password: "secret-pass", Email: email, AffCode: "aff-" + username,
 		Status: common.UserStatusEnabled, Role: common.RoleCommonUser, Group: "default",
 	}).Error)
 }
@@ -2021,8 +2022,9 @@ func setupOpenWebUIMiddlewareTest(t *testing.T) (*gin.Engine, owuiFixture) {
 	model.DB = db
 
 	mkUser := func(id int, name, email string, status int) {
+		// users.aff_code has a unique index, so every fixture user needs its own.
 		require.NoError(t, db.Create(&model.User{
-			Id: id, Username: name, Password: "secret-pass", Email: email,
+			Id: id, Username: name, Password: "secret-pass", Email: email, AffCode: "aff-" + name,
 			Status: status, Role: common.RoleCommonUser, Group: "default",
 		}).Error)
 	}
@@ -2441,7 +2443,7 @@ func setupOpenWebUIOptionTest(t *testing.T) *model.Token {
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Option{}))
 	model.DB = db
-	require.NoError(t, db.Create(&model.User{Id: 1, Username: "svc", Password: "secret-pass", Status: common.UserStatusEnabled}).Error)
+	require.NoError(t, db.Create(&model.User{Id: 1, Username: "svc", Password: "secret-pass", AffCode: "aff-svc", Status: common.UserStatusEnabled}).Error)
 	token, err := model.CreateOpenWebUIToken(1, "openwebui-service")
 	require.NoError(t, err)
 
@@ -2641,9 +2643,10 @@ func setupOpenWebUILinkControllerTest(t *testing.T) *gin.Engine {
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.OpenWebUILink{}))
 	model.DB = db
 	for _, u := range []model.User{
-		{Id: 7, Username: "alice", Password: "secret-pass", Email: "alice@example.com", Status: common.UserStatusEnabled, Role: common.RoleCommonUser},
-		{Id: 8, Username: "bob", Password: "secret-pass", Email: "bob@example.com", Status: common.UserStatusEnabled, Role: common.RoleCommonUser},
-		{Id: 100, Username: "root", Password: "secret-pass", Status: common.UserStatusEnabled, Role: common.RoleRootUser},
+		// users.aff_code has a unique index, so every fixture user needs its own.
+		{Id: 7, Username: "alice", Password: "secret-pass", Email: "alice@example.com", AffCode: "aff-alice", Status: common.UserStatusEnabled, Role: common.RoleCommonUser},
+		{Id: 8, Username: "bob", Password: "secret-pass", Email: "bob@example.com", AffCode: "aff-bob", Status: common.UserStatusEnabled, Role: common.RoleCommonUser},
+		{Id: 100, Username: "root", Password: "secret-pass", AffCode: "aff-root", Status: common.UserStatusEnabled, Role: common.RoleRootUser},
 	} {
 		require.NoError(t, db.Create(&u).Error)
 	}
