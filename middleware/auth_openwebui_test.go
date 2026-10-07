@@ -32,6 +32,7 @@ type owuiEcho struct {
 	Id         int    `json:"id"`
 	TokenId    int    `json:"token_id"`
 	TokenName  string `json:"token_name"`
+	TokenKey   string `json:"token_key"`
 	Sub        string `json:"sub"`
 	Task       string `json:"task"`
 	Attributed bool   `json:"attributed"`
@@ -98,6 +99,7 @@ func setupOpenWebUIMiddlewareTest(t *testing.T) (*gin.Engine, owuiFixture) {
 			Id:         c.GetInt("id"),
 			TokenId:    c.GetInt("token_id"),
 			TokenName:  c.GetString("token_name"),
+			TokenKey:   c.GetString("token_key"),
 			Sub:        openwebui.GetSub(c),
 			Task:       openwebui.GetTask(c),
 			Attributed: openwebui.IsAttributed(c),
