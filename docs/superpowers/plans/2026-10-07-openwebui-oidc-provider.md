@@ -19,7 +19,7 @@ Spec: `docs/superpowers/specs/2026-10-07-openwebui-oidc-provider-design.md`
 - Backend i18n: every new key in BOTH `i18n/locales/en.yaml` and `ko.yaml`. Frontend: every new `t('...')` string in BOTH `web/default/src/i18n/locales/en.json` (value = key) and `kr.json`.
 - Issuer = `strings.TrimRight(system_setting.ServerAddress, "/")`. Only client = `oauth2.client_id`. `redirect_uri` and `post_logout_redirect_uri` must match the configured values character for character.
 - Authorization code: 48 chars, TTL 120 s, single use, bound to `client_id`, `redirect_uri`, PKCE `S256`. access_token: opaque 48 chars, TTL 3600 s, userinfo only. id_token: RS256 with `kid`, `exp = iat + 3600`.
-- Signing key option names are `OIDCSigningKeyCurrent` / `OIDCSigningKeyPrevious` (no dot → not routed into `config.GlobalConfig`; suffix `Key` → hidden by `controller.GetOptions`). Previous key is published in JWKS for 24 h after rotation, then deleted.
+- Signing key option names are `OIDCSigningCurrentKey` / `OIDCSigningPreviousKey` (no dot → not routed into `config.GlobalConfig`; suffix `Key` → hidden by `controller.GetOptions`, and `GetOptions`/`UpdateOption` additionally exclude the two names explicitly). Previous key is published in JWKS for 24 h after rotation, then deleted.
 - Error/log hygiene: never log or return code, client_secret, code_verifier or access_token values. Token endpoint errors use RFC 6749 `{"error","error_description"}`.
 - Session cookie `SameSite=Strict` stays unchanged.
 - Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
@@ -349,7 +349,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `common.OptionMap` + `common.OptionMapRWMutex` (read), `model.UpdateOption(key, value string) error` (write), `common.Marshal/Unmarshal`, `common.GetTimestamp()`.
 - Produces:
-  - `const OptionSigningKeyCurrent = "OIDCSigningKeyCurrent"`, `const OptionSigningKeyPrevious = "OIDCSigningKeyPrevious"`, `const PreviousKeyRetention = 24 * time.Hour`
+  - `const OptionSigningKeyCurrent = "OIDCSigningCurrentKey"`, `const OptionSigningKeyPrevious = "OIDCSigningPreviousKey"`, `const PreviousKeyRetention = 24 * time.Hour`
   - `type SigningKey struct { Kid string; Private *rsa.PrivateKey; CreatedAt int64 }`
   - `func CurrentKey() (*SigningKey, error)` — loads or creates
   - `func VerificationKeys() ([]*SigningKey, error)` — current + non-expired previous
@@ -573,8 +573,8 @@ import (
 const (
 	// Option names deliberately contain no "." (so they are not routed into
 	// config.GlobalConfig) and end in "Key" (so controller.GetOptions hides them).
-	OptionSigningKeyCurrent  = "OIDCSigningKeyCurrent"
-	OptionSigningKeyPrevious = "OIDCSigningKeyPrevious"
+	OptionSigningKeyCurrent  = "OIDCSigningCurrentKey"
+	OptionSigningKeyPrevious = "OIDCSigningPreviousKey"
 
 	// PreviousKeyRetention is how long a retired key stays in the JWKS so
 	// id_tokens (1 h lifetime) and id_token_hints signed with it still verify.
@@ -3380,7 +3380,7 @@ Prepend to `docs/superpowers/specs/2026-08-16-oauth2-provider-design.md` and to 
 In `2026-10-07-openwebui-oidc-provider-design.md`:
 - §2.2: add "code 교환은 HybridCache의 GET → DEL 두 단계라 Redis에서 원자적이지 않다. 같은 code를 수 ms 안에 두 번 교환하면 둘 다 성공할 수 있다. Open WebUI는 code를 한 번만 교환하고 code는 120초 뒤 사라지므로 수용한다."
 - §4 `email_required` row: the profile button goes to `/profile` without a `redirect` parameter; after registering an email the user opens Open WebUI again (its auto-redirect restarts the flow).
-- §2.4: option names for keys are `OIDCSigningKeyCurrent` / `OIDCSigningKeyPrevious` (not `oauth2.signing_*`), hidden by the `Key` suffix rule; status via `GET /api/oauth2/signing-key-status`.
+- §2.4: option names for keys are `OIDCSigningCurrentKey` / `OIDCSigningPreviousKey` (not `oauth2.signing_*`), hidden by the `Key` suffix rule and by an explicit exclusion in `GetOptions`/`UpdateOption`; status via `GET /api/oauth2/signing-key-status`.
 - §6.2: the 401 `WWW-Authenticate` header value is `Basic realm="oauth2"`.
 - Add to §9 (범위 밖) nothing new; confirm §7 cleanup list matches what was deleted.
 
