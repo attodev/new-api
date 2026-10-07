@@ -113,6 +113,17 @@ func GetOpenWebUILink(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// Same role rule as the write endpoints; a dangling link (user deleted)
+	// stays visible so it can be removed.
+	if user, getErr := model.GetUserById(link.UserId, false); getErr == nil {
+		if !canManageTargetRole(c.GetInt("role"), user.Role) {
+			common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
+			return
+		}
+	} else if !errors.Is(getErr, gorm.ErrRecordNotFound) {
+		common.ApiError(c, getErr)
+		return
+	}
 	resp, err := buildOpenWebUILinkResponse(link)
 	if err != nil {
 		common.ApiError(c, err)

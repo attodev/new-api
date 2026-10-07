@@ -15,9 +15,15 @@ import (
 // sub entry explicitly, so the TTL only matters for out-of-band DB edits.
 const cacheTTL = 10 * time.Minute
 
+// missCacheTTL bounds how long a failed sub lookup (LinkError reason) is
+// remembered, so an unlinked Open WebUI user cannot make every request hit
+// the users table. Admin link/unlink clears the entry via InvalidateSub.
+const missCacheTTL = 30 * time.Second
+
 const (
 	subCacheNamespace      = "openwebui:sub:v1"
 	tokenKeyCacheNamespace = "openwebui:token_key:v1"
+	missCacheNamespace     = "openwebui:miss:v1"
 	cacheCapacity          = 10000
 )
 
@@ -25,6 +31,7 @@ var (
 	cacheMu           sync.Mutex
 	subCacheInst      *cachex.HybridCache[int]
 	tokenKeyCacheInst *cachex.HybridCache[string]
+	missCacheInst     *cachex.HybridCache[string]
 )
 
 func redisOn() bool {
@@ -67,19 +74,41 @@ func tokenKeyCache() *cachex.HybridCache[string] {
 	return tokenKeyCacheInst
 }
 
+// missCache maps Open WebUI sub → LinkError reason of the last failed lookup.
+func missCache() *cachex.HybridCache[string] {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	if missCacheInst == nil {
+		missCacheInst = cachex.NewHybridCache[string](cachex.HybridCacheConfig[string]{
+			Namespace:    cachex.Namespace(missCacheNamespace),
+			Redis:        common.RDB,
+			RedisEnabled: redisOn,
+			RedisCodec:   cachex.StringCodec{},
+			Memory: func() *hot.HotCache[string, string] {
+				return hot.NewHotCache[string, string](hot.LRU, cacheCapacity).WithTTL(missCacheTTL).WithJanitor().Build()
+			},
+		})
+	}
+	return missCacheInst
+}
+
 // InvalidateSub drops the cached mapping for sub. Called by the admin API
 // after linking or unlinking so the next relay request re-reads the table.
+// It also drops a remembered lookup failure so a fresh admin link takes
+// effect immediately.
 func InvalidateSub(sub string) {
 	if sub == "" {
 		return
 	}
 	_, _ = subCache().DeleteMany([]string{sub})
+	_, _ = missCache().DeleteMany([]string{sub})
 }
 
-// ResetCachesForTest discards both caches so tests start clean.
+// ResetCachesForTest discards all caches so tests start clean.
 func ResetCachesForTest() {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	subCacheInst = nil
 	tokenKeyCacheInst = nil
+	missCacheInst = nil
 }

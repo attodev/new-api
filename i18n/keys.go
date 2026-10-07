@@ -714,4 +714,6 @@ const (
 	MsgOptionOpenWebUIRelayConfigMissing = "option.openwebui_relay_config_missing"
 	MsgOptionOpenWebUIServiceKeyInvalid  = "option.openwebui_service_key_invalid"
 	MsgOptionOpenWebUISecretTooShort     = "option.openwebui_secret_too_short"
+
+	MsgOptionOpenWebUICannotClearWhileEnabled = "option.openwebui_cannot_clear_while_enabled"
 )

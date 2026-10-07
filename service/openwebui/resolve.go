@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,8 +36,10 @@ type RejectError struct {
 	LogReason  string
 }
 
+// Error deliberately omits LogReason (which may carry the sub or email) so
+// a RejectError that ends up in a generic error path never leaks identity.
 func (e *RejectError) Error() string {
-	return e.LogReason
+	return "openwebui: request rejected (" + strconv.Itoa(e.Status) + ")"
 }
 
 // IsServiceKey reports whether the parsed bearer key is the configured Open
@@ -66,7 +69,7 @@ func Resolve(c *gin.Context, serviceToken *model.Token) (*model.Token, *RejectEr
 			return nil, reject(c, http.StatusUnauthorized, i18n.MsgOpenWebUIAuthFailed, "unsigned_request_rejected")
 		}
 		SetUnsigned(c)
-		logger.LogInfo(c, fmt.Sprintf("openwebui: unsigned request billed to service token | path=%s", requestPath(c)))
+		logger.LogDebug(c, "openwebui: unsigned request billed to service token | path=%s", requestPath(c))
 		return serviceToken, nil
 	}
 
@@ -100,7 +103,7 @@ func Resolve(c *gin.Context, serviceToken *model.Token) (*model.Token, *RejectEr
 		return nil, reject(c, http.StatusInternalServerError, i18n.MsgDatabaseError, "link_lookup_error: "+err.Error())
 	}
 
-	task := strings.TrimSpace(c.GetHeader(HeaderTask))
+	task := normalizeTask(c.GetHeader(HeaderTask))
 	token, err := GetOrCreateUserToken(userId, TokenNameForTask(task))
 	if err != nil {
 		return nil, reject(c, http.StatusInternalServerError, i18n.MsgDatabaseError,
@@ -124,6 +127,23 @@ func Resolve(c *gin.Context, serviceToken *model.Token) (*model.Token, *RejectEr
 
 	SetIdentity(c, claims.Subject, task)
 	return validated, nil
+}
+
+// maxTaskLength caps the X-Task value kept in context and written to the
+// consume log; Open WebUI task names are short identifiers.
+const maxTaskLength = 64
+
+// normalizeTask trims the X-Task header, treats an unrendered "{{TASK}}"
+// template as ordinary chat, and truncates the rest to maxTaskLength.
+func normalizeTask(raw string) string {
+	task := strings.TrimSpace(raw)
+	if task == "{{TASK}}" {
+		return ""
+	}
+	if len(task) > maxTaskLength {
+		task = task[:maxTaskLength]
+	}
+	return task
 }
 
 func reject(c *gin.Context, status int, messageKey, logReason string) *RejectError {

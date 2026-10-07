@@ -150,6 +150,32 @@ func TestProcessHeaderOverride_PassthroughSkipsAcceptEncoding(t *testing.T) {
 	require.False(t, hasAcceptEncoding)
 }
 
+func TestProcessHeaderOverride_PassthroughSkipsOpenWebUIUserJWT(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Request.Header.Set("X-Trace-Id", "trace-123")
+	ctx.Request.Header.Set("X-OpenWebUI-User-Jwt", "header.payload.signature")
+
+	for _, rule := range []string{"*", "re:(?i)^x-"} {
+		info := &relaycommon.RelayInfo{
+			IsChannelTest: false,
+			ChannelMeta: &relaycommon.ChannelMeta{
+				HeadersOverride: map[string]any{rule: ""},
+			},
+		}
+
+		headers, err := processHeaderOverride(info, ctx)
+		require.NoError(t, err, rule)
+		require.Equal(t, "trace-123", headers["x-trace-id"], rule)
+		_, hasJWT := headers["x-openwebui-user-jwt"]
+		require.False(t, hasJWT, rule)
+	}
+}
+
 func TestProcessHeaderOverride_PassHeadersTemplateSetsRuntimeHeaders(t *testing.T) {
 	t.Parallel()
 

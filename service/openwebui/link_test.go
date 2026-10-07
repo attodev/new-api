@@ -132,3 +132,59 @@ func TestResolveUserId_Failures(t *testing.T) {
 func TestCacheTTLIsTenMinutes(t *testing.T) {
 	require.Equal(t, 10*time.Minute, cacheTTL)
 }
+
+func TestResolveUserId_PrivilegedUserNotAutoLinked(t *testing.T) {
+	setupServiceTestDB(t)
+	createTestUser(t, 7, "boss", "boss@example.com")
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 7).Update("role", common.RoleAdminUser).Error)
+	createTestUser(t, 8, "root", "root@example.com")
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 8).Update("role", common.RoleRootUser).Error)
+
+	for sub, email := range map[string]string{"owui-admin": "boss@example.com", "owui-root": "ROOT@example.com"} {
+		_, err := ResolveUserId(claimsFor(sub, email))
+		var linkErr *LinkError
+		require.True(t, errors.As(err, &linkErr), "got %v", err)
+		require.Equal(t, ReasonPrivilegedUser, linkErr.Reason)
+		_, err = model.GetOpenWebUILinkBySub(sub)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound, "no link row for a privileged user")
+	}
+}
+
+func TestResolveUserId_NegativeCacheSkipsDB(t *testing.T) {
+	setupServiceTestDB(t)
+	createTestUser(t, 7, "boss", "boss@example.com")
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 7).Update("role", common.RoleAdminUser).Error)
+
+	_, err := ResolveUserId(claimsFor("owui-admin", "boss@example.com"))
+	var linkErr *LinkError
+	require.True(t, errors.As(err, &linkErr))
+	require.Equal(t, ReasonPrivilegedUser, linkErr.Reason)
+
+	// Without the negative cache the DB would now answer no_user.
+	require.NoError(t, model.DB.Unscoped().Delete(&model.User{}, 7).Error)
+	_, err = ResolveUserId(claimsFor("owui-admin", "boss@example.com"))
+	require.True(t, errors.As(err, &linkErr))
+	require.Equal(t, ReasonPrivilegedUser, linkErr.Reason, "served from the negative cache")
+}
+
+func TestInvalidateSub_ClearsNegativeEntry(t *testing.T) {
+	setupServiceTestDB(t)
+	_, err := ResolveUserId(claimsFor("owui-late", "late@example.com"))
+	var linkErr *LinkError
+	require.True(t, errors.As(err, &linkErr))
+	require.Equal(t, ReasonNoUser, linkErr.Reason)
+
+	createTestUser(t, 7, "late", "late@example.com")
+	require.NoError(t, model.CreateOpenWebUILink(&model.OpenWebUILink{Sub: "owui-late", UserId: 7}))
+	_, err = ResolveUserId(claimsFor("owui-late", "late@example.com"))
+	require.True(t, errors.As(err, &linkErr), "still negatively cached")
+
+	InvalidateSub("owui-late")
+	userId, err := ResolveUserId(claimsFor("owui-late", "late@example.com"))
+	require.NoError(t, err)
+	require.Equal(t, 7, userId)
+}
+
+func TestMissCacheTTLIsThirtySeconds(t *testing.T) {
+	require.Equal(t, 30*time.Second, missCacheTTL)
+}

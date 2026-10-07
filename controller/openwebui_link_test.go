@@ -200,3 +200,19 @@ func TestOpenWebUILink_InvalidatesResolveCache(t *testing.T) {
 func itoa(i int) string { return strconv.Itoa(i) }
 
 func jwtRegistered(sub string) jwt.RegisteredClaims { return jwt.RegisteredClaims{Subject: sub} }
+
+func TestOpenWebUILink_GetEnforcesTargetRole(t *testing.T) {
+	engine := setupOpenWebUILinkControllerTest(t)
+	require.NoError(t, model.CreateOpenWebUILink(&model.OpenWebUILink{Sub: "owui-root", UserId: 100, LinkedBy: model.OpenWebUILinkedByAdmin}))
+
+	for _, path := range []string{"/api/openwebui/links?user_id=100", "/api/openwebui/links?sub=owui-root"} {
+		_, res := linkCall(t, engine, http.MethodGet, path, nil)
+		require.Equal(t, false, res["success"], path)
+		require.Nil(t, res["data"], path)
+	}
+
+	// A dangling link (user deleted) is still visible so it can be removed.
+	require.NoError(t, model.CreateOpenWebUILink(&model.OpenWebUILink{Sub: "owui-gone", UserId: 999, LinkedBy: model.OpenWebUILinkedByAdmin}))
+	_, res := linkCall(t, engine, http.MethodGet, "/api/openwebui/links?sub=owui-gone", nil)
+	require.Equal(t, true, res["success"], res["message"])
+}

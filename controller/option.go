@@ -529,19 +529,40 @@ func UpdateOption(c *gin.Context) {
 				common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUIRelayConfigMissing)
 				return
 			}
-		}
-	case "openwebui.service_api_key":
-		normalized := system_setting.NormalizeOpenWebUIServiceKey(option.Value.(string))
-		if normalized != "" {
-			if _, err := model.ValidateUserToken(normalized); err != nil {
+			// The service token may have been deleted or disabled since the
+			// key was saved; never enable the relay on a dead key.
+			if _, err := model.ValidateUserToken(s.ServiceApiKey); err != nil {
 				common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUIServiceKeyInvalid)
 				return
 			}
 		}
+	case "openwebui.service_api_key":
+		normalized := system_setting.NormalizeOpenWebUIServiceKey(option.Value.(string))
+		if normalized == "" {
+			if system_setting.GetOpenWebUISettings().RelayEnabled {
+				common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUICannotClearWhileEnabled)
+				return
+			}
+		} else if _, err := model.ValidateUserToken(normalized); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUIServiceKeyInvalid)
+			return
+		}
 		option.Value = normalized
 	case "openwebui.jwt_secret", "openwebui.jwt_previous_secret":
-		if v := option.Value.(string); v != "" && len(v) < 32 {
+		v := option.Value.(string)
+		if option.Key == "openwebui.jwt_secret" && strings.TrimSpace(v) == "" &&
+			system_setting.GetOpenWebUISettings().RelayEnabled {
+			common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUICannotClearWhileEnabled)
+			return
+		}
+		if v != "" && len(v) < 32 {
 			common.ApiErrorI18n(c, i18n.MsgOptionOpenWebUISecretTooShort)
+			return
+		}
+	case "openwebui.jwt_leeway_seconds":
+		leeway, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
+		if err != nil || leeway < 0 || leeway > 600 {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
 	case "openwebui.jwt_issuer":

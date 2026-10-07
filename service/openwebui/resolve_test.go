@@ -3,6 +3,7 @@ package openwebui
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -190,4 +191,38 @@ func TestResolve_DisabledUserTokenRejected(t *testing.T) {
 	require.NotNil(t, rej)
 	require.Equal(t, http.StatusUnauthorized, rej.Status)
 	require.Equal(t, i18n.MsgTokenInvalid, rej.MessageKey)
+}
+
+func TestResolve_RejectErrorStringIsGeneric(t *testing.T) {
+	svc := setupResolveTest(t)
+	c := newRelayContext(t, map[string]string{HeaderUserJWT: userJWT(t, testSecret, "owui-x", "nobody@example.com")})
+	_, rej := Resolve(c, svc)
+	require.NotNil(t, rej)
+	require.Equal(t, "openwebui: request rejected (403)", rej.Error())
+	require.NotContains(t, rej.Error(), "owui-x")
+	require.NotContains(t, rej.Error(), "nobody@example.com")
+}
+
+func TestResolve_UnrenderedTaskTemplateIsChat(t *testing.T) {
+	svc := setupResolveTest(t)
+	c := newRelayContext(t, map[string]string{
+		HeaderUserJWT: userJWT(t, testSecret, "owui-7", "alice@example.com"),
+		HeaderTask:    "{{TASK}}",
+	})
+	token, rej := Resolve(c, svc)
+	require.Nil(t, rej)
+	require.Equal(t, TokenNameChat, token.Name)
+	require.Equal(t, "", GetTask(c))
+}
+
+func TestResolve_TaskValueTruncatedTo64(t *testing.T) {
+	svc := setupResolveTest(t)
+	c := newRelayContext(t, map[string]string{
+		HeaderUserJWT: userJWT(t, testSecret, "owui-7", "alice@example.com"),
+		HeaderTask:    strings.Repeat("t", 200),
+	})
+	token, rej := Resolve(c, svc)
+	require.Nil(t, rej)
+	require.Equal(t, TokenNameTask, token.Name)
+	require.Equal(t, strings.Repeat("t", 64), GetTask(c))
 }
