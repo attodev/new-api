@@ -108,13 +108,19 @@ type GeneralOpenAIRequest struct {
 	SearchMode             json.RawMessage `json:"search_mode,omitempty"`
 	// Minimax
 	ReasoningSplit json.RawMessage `json:"reasoning_split,omitempty"`
+
+	// KeepThinkingBudget is set by a channel adaptor that has already decided
+	// thinking_budget by channel/model mapping; MarshalJSON then leaves the
+	// field alone instead of dropping it by model name.
+	KeepThinkingBudget bool `json:"-"`
 }
 
-// MarshalJSON drops thinking_budget for models that do not accept it. The
-// alias type has no methods, so marshaling it does not recurse back here.
+// MarshalJSON drops thinking_budget for models that do not accept it, unless
+// a channel adaptor already decided it (KeepThinkingBudget). The alias type
+// has no methods, so marshaling it does not recurse back here.
 func (r GeneralOpenAIRequest) MarshalJSON() ([]byte, error) {
 	type Alias GeneralOpenAIRequest
-	if !IsQwenThinkingBudgetModel(r.Model) {
+	if !r.KeepThinkingBudget && !IsQwenThinkingBudgetModel(r.Model) {
 		r.ThinkingBudget = nil
 	}
 	return common.Marshal((*Alias)(&r))

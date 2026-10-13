@@ -172,7 +172,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 
 	switch info.RelayMode {
 	default:
-		aliReq := requestOpenAI2Ali(*request, info.UpstreamModelName)
+		aliReq := requestOpenAI2Ali(*request, info.OriginModelName, info.UpstreamModelName)
 		return aliReq, nil
 	}
 }

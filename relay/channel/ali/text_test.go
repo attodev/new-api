@@ -1,6 +1,7 @@
 package ali
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
@@ -55,9 +56,40 @@ func TestRequestOpenAI2AliTopP(t *testing.T) {
 			got := requestOpenAI2Ali(dto.GeneralOpenAIRequest{
 				Model: "qwen-plus",
 				TopP:  tt.topP,
-			}, "qwen-plus")
+			}, "qwen-plus", "qwen-plus")
 
 			assert.Equal(t, tt.want, got.TopP)
+		})
+	}
+}
+
+// thinking_budget is kept when either the origin or the upstream name is
+// Qwen-like; an empty name falls back to request.Model.
+func TestRequestOpenAI2AliThinkingBudgetNames(t *testing.T) {
+	tests := []struct {
+		name     string
+		model    string
+		origin   string
+		upstream string
+		want     bool
+	}{
+		{"empty origin with qwen upstream", "my-deploy", "", "qwen3-max", true},
+		{"qwen origin with empty upstream", "my-deploy", "qwen3-max", "", true},
+		{"qwen origin with custom upstream", "my-deploy", "qwen3-max", "my-deploy", true},
+		{"custom origin with qwen upstream", "qwen3-max", "my-alias", "qwen3-max", true},
+		{"empty names fall back to qwen request model", "qwen-plus", "", "", true},
+		{"neither name qwen", "deepseek-v3", "deepseek-v3", "deepseek-v3", false},
+		{"empty names fall back to non-qwen request model", "deepseek-v3", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := requestOpenAI2Ali(dto.GeneralOpenAIRequest{
+				Model:          tt.model,
+				ThinkingBudget: json.RawMessage(`0`),
+			}, tt.origin, tt.upstream)
+
+			assert.Equal(t, tt.want, got.KeepThinkingBudget)
+			assert.Equal(t, tt.want, got.ThinkingBudget != nil)
 		})
 	}
 }
