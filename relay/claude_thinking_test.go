@@ -224,7 +224,7 @@ func TestApplyClaudeThinkingSettingsDisabledOnCannotDisableModels(t *testing.T) 
 	request = &dto.ClaudeRequest{Model: "claude-opus-5-5", Thinking: &dto.Thinking{Type: "disabled", BlockBinding: json.RawMessage(binding)}}
 	applyClaudeThinkingSettings(request, request.Model)
 	require.Equal(t, "adaptive", request.Thinking.Type)
-	require.Equal(t, "summarized", request.Thinking.Display)
+	require.Equal(t, "omitted", request.Thinking.Display, "the client asked for no thinking: no summaries")
 	require.JSONEq(t, binding, string(request.Thinking.BlockBinding))
 	require.JSONEq(t, `{"effort":"low"}`, string(request.OutputConfig))
 
@@ -233,6 +233,7 @@ func TestApplyClaudeThinkingSettingsDisabledOnCannotDisableModels(t *testing.T) 
 	request = &dto.ClaudeRequest{Model: "claude-fable-5-1", Thinking: &dto.Thinking{Type: "disabled"}, OutputConfig: json.RawMessage(`{"effort":"xhigh","format":{"type":"json_schema"}}`)}
 	applyClaudeThinkingSettings(request, request.Model)
 	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "omitted", request.Thinking.Display)
 	require.Empty(t, request.Thinking.BlockBinding)
 	require.JSONEq(t, `{"effort":"low","format":{"type":"json_schema"}}`, string(request.OutputConfig))
 

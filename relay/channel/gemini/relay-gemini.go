@@ -1067,16 +1067,17 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 	}
 
 	// Gemini's promptTokensDetails include the cached portion. Settlement
-	// bills base = prompt - cached - image (clamped at 0) plus
-	// cached*cacheRatio + image*imageRatio, so image tokens overlapping the
-	// cached portion would be double-counted (the clamp hides the negative
-	// base) and overcharge the user at the text rate. Cached tokens are
-	// already priced at the cache ratio; only the uncached remainder may carry
-	// the image ratio (the cached image portion is still billed, at the cache
-	// rate). Cap ImageTokens accordingly and return the capped-off amount to
-	// TextTokens so the details keep summing to PromptTokens.
+	// bills base = prompt - cached - image - audio (clamped at 0; audio only
+	// when the model has an audio input price) plus cached*cacheRatio +
+	// image*imageRatio + the audio price, so image tokens overlapping the
+	// cached or audio portions would be double-counted (the clamp hides the
+	// negative base) and overcharge the user. Cached tokens are already priced
+	// at the cache ratio and audio at its own price; only the remainder may
+	// carry the image ratio (a cached image portion is still billed, at the
+	// cache rate). Cap ImageTokens accordingly and return the capped-off amount
+	// to TextTokens so the details keep summing to PromptTokens.
 	if details := &usage.PromptTokensDetails; details.ImageTokens > 0 {
-		if maxImage := max(usage.PromptTokens-details.CachedTokens, 0); details.ImageTokens > maxImage {
+		if maxImage := max(usage.PromptTokens-details.CachedTokens-details.AudioTokens, 0); details.ImageTokens > maxImage {
 			details.ImageTokens = maxImage
 			details.TextTokens = max(details.TextTokens, usage.PromptTokens-details.AudioTokens-details.ImageTokens)
 		}

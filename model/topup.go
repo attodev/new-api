@@ -594,12 +594,20 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 	return nil
 }
 
+// ErrTopUpOrderNotPending is returned when a top-up order has already left the
+// pending state (settled by an earlier callback or an admin), so there is
+// nothing left to credit.
+var ErrTopUpOrderNotPending = errors.New("top-up order is not pending")
+
 // RechargeEpay settles a pending Epay order and credits its wallet target in
-// one transaction. A failed credit (for example a full wallet) rolls the status
-// change back so the order stays pending and the provider's retry can settle it.
-func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (int64, error) {
+// one transaction, returning the credited quota and the settled order. A failed
+// credit (for example a full wallet) rolls the status change back: the order
+// stays pending, the callback answers "fail" so Epay retries it, and an admin
+// ManualCompleteTopUp can settle it in the meantime. An order that is no longer
+// pending returns ErrTopUpOrderNotPending.
+func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (int64, *TopUp, error) {
 	if tradeNo == "" {
-		return 0, errors.New("payment order number not provided")
+		return 0, nil, errors.New("payment order number not provided")
 	}
 
 	var quota int64
@@ -620,7 +628,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
-			return errors.New("top-up order status error")
+			return ErrTopUpOrderNotPending
 		}
 
 		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
@@ -636,11 +644,11 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		return CreditTopUpTarget(tx, topUp, quota)
 	})
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("Online topup succeeded, quota: %v, amount: %f", logger.LogQuota(quota), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderEpay)
-	return quota, nil
+	return quota, topUp, nil
 }
 
 // topUpQueryWindowSeconds limits the time window for top-up record queries (seconds).

@@ -33,6 +33,7 @@
 | 6 | `3473f535a` | 없음 | 자동 충전 수용량 실패 로그가 실제 target(`organization`/`user` + id)을 기록 |
 | 7 | `70b14d049` | 없음 (1단계 Task 18 `66ee6b8f9` 의 보완) | Ali `thinking_budget` 을 클라이언트 모델명과 upstream 모델명 중 하나라도 Qwen 계열이면 유지 |
 | 8 | `338576ab2` | 없음 | 서버 시작 시 OpenAI codec(`o200k_base`, `cl100k_base`)을 백그라운드에서 미리 생성 |
+| 9 | 이 문서와 같은 커밋 (`fix(relay): cap Gemini image tokens by audio too, ...`) | 없음 | 최종 리뷰 수정: Gemini image 상한에 audio 포함, Epay 정산 실패 시 `fail` 응답으로 재시도, thinking 끄기 변환 시 `display:"omitted"`, 성공 로그에 정산된 주문 기록 |
 
 모든 커밋의 `Co-Authored-By` 는 `Claude Fable 5.1 <noreply@anthropic.com>` 다. Task 1 은 task
 리뷰 수정 라운드 1회(amend), Task 2, 4, 7 도 각각 1회가 있었고 위 해시는 최종 해시다.
@@ -64,8 +65,11 @@ capability 표 (adaptive 는 모두 yes 이며 effort/xhigh/max 허용 범위는
 "disable 불가" 모델에 "thinking 끄기" 요청이 오면(native `thinking.type:"disabled"`,
 OpenAI `reasoning_effort:"none"`, openrouter `effort:"none"`) Sonnet 5.5 는
 `{"type":"between_tools"}`(다른 thinking 필드 없음, 기존 effort 는 `high` 로 cap), 나머지
-disable 불가 모델은 adaptive + `output_config.effort:"low"` 로 바꾼다. disable 가능 모델은
-요청을 그대로 둔다.
+disable 불가 모델은 adaptive + `output_config.effort:"low"` 로 바꾼다. 이 adaptive 는
+클라이언트가 thinking 을 원하지 않았으므로 `display:"omitted"` 로 렌더링해 요약을 노출하지
+않는다(upstream 은 display 를 비워 두지만, 비워 두면 `NormalizeAdaptiveDisplay` 가
+`"summarized"` 로 채운다). 이 경로에서만 적용되고 block_binding 은 유지한다. enabled→adaptive
+변환 등 다른 경로는 그대로 `summarized` 다. disable 가능 모델은 요청을 그대로 둔다.
 
 경로별 매핑 (`RenderClaudeThinking(req, model, effort, budget)` 이 단일 지점이다. manual 가능
 모델에 budget 이 있으면 `{enabled, budget_tokens}`, 아니면 adaptive + `output_config.effort`):
@@ -92,8 +96,13 @@ success 변경, `CreditTopUpTarget` 을 한 transaction 에서 수행한다. cre
 지갑도 바뀌지 않는다. 이전에는 success 로 표시된 뒤 credit 만 실패해 success 인데 지급되지
 않은 주문이 생겼다. top-up 로그는 transaction 커밋 뒤 모델 쪽에서 한 번만 기록한다.
 
-주의: 컨트롤러가 provider 에 `success` 를 이미 응답하므로 Epay 는 이 주문을 재시도하지 않는다.
-pending 으로 남은 주문은 **관리자 `ManualCompleteTopUp` 으로만** 정산할 수 있다.
+응답은 정산 뒤에 정한다(`epayNotifyResponse`). 서명 검증 실패는 `fail`. 정산 성공, 이미 정산된
+주문(`model.ErrTopUpOrderNotPending`, 중복 콜백이나 관리자 수동 완료가 먼저 처리한 경우), 무시되는
+콜백(성공이 아닌 trade status, 없는 주문, 다른 provider 의 주문)은 `success` 로 확인 응답한다.
+그 밖의 정산 오류(예: 지갑이 가득 참)는 `fail` 을 응답하므로 **Epay 가 콜백을 재시도한다.**
+주문은 pending 으로 남아 있으므로 재시도 때 지갑 여유가 생겼으면 정산되고, 그 전에 **관리자
+`ManualCompleteTopUp`** 으로도 정산할 수 있다. `RechargeEpay` 는 정산된 `*TopUp` 을 돌려주고 성공
+로그는 이 값(상태 success, 실제 결제수단)을 기록한다.
 
 ### Task 3: task polling 의 2xx
 
@@ -114,15 +123,21 @@ modality 는 이 나머지에 들어간다). Google 이 text 계열 detail 을 �
 
 cached 와의 겹침: `promptTokensDetails` 는 cached 부분을 포함한다. 정산은
 `base = P - cached - image`(0 에서 clamp)에 `cached*cacheRatio + image*imageRatio` 를
-더하므로, cached 와 겹친 image 가 text 요율로 이중 과금될 수 있었다. 그래서 `ImageTokens`
-를 `max(PromptTokens - CachedTokens, 0)` 로 자른다. 예: P=2000, cached=1500, IMAGE=1089,
-TEXT=911 이면 `ImageTokens` = 500, `TextTokens` = 1500, 합 2000 이다
-(cached 가 2000 이면 image 0, cached 900 이면 자르지 않음). 이 경우 ImageRatio 1 의 quota 는 text +
-cached 만 있을 때와 같고(테스트 값 1075), ImageRatio 2 이면 500 개 image 만 2배가 되어
-1575 가 된다.
+더하고, audio 가격이 있는 모델(gemini-2.5-flash, 2.0-flash, robotics-er 는 내장 가격이 있다)은
+audio 도 base 에서 뺀 뒤 0 에서 clamp 한다. 그래서 cached 나 audio 와 겹친 image 가 이중 과금될 수
+있었다. `ImageTokens` 를 `max(PromptTokens - CachedTokens - AudioTokens, 0)` 로 자르고, 잘린
+만큼은 `TextTokens` 로 돌려 합이 P 가 되게 한다. 예 1: P=2000, cached=1500, IMAGE=1089,
+TEXT=911 이면 `ImageTokens` = 500, `TextTokens` = 1500, 합 2000 이다(cached 가 2000 이면 image 0,
+cached 900 이면 자르지 않음). 이 경우 ImageRatio 1 의 quota 는 text + cached 만 있을 때와
+같고(테스트 값 1075), ImageRatio 2 이면 500 개 image 만 2배가 되어 1575 가 된다.
+예 2 (audio): gemini-2.5-flash, ImageRatio 1, P=2000, cached=1000, TEXT=700, IMAGE=800,
+AUDIO=500 이면 `ImageTokens` = 500, `TextTokens` = 1000 이고 quota 는 image 를 귀속하지 않은 경우와
+같은 1200 이다. cap 이 cached 만 빼면 image 800 이 그대로 남아 base 가 clamp 된 채 800 이 더 과금되어
+1500 이 된다(`service/text_quota_test.go` 가 두 값을 모두 고정한다).
 
-**과금 변화**: ImageRatio 가 기본값 1 인 모델은 quota 가 바뀌지 않는다. Gemini 모델에 ImageRatio ≠ 1
-을 설정한 운영자는 이제 그 비율이 Gemini image prompt 토큰에 적용된다(이전에는 적용되지 않았다).
+**과금 변화**: image 가 cached/audio 와 겹치지 않는 요청에서 ImageRatio 가 기본값 1 인 모델은 quota 가
+바뀌지 않는다. cached/audio 와 겹치는 image 는 위 cap 으로 잘려 text 요율 이중 과금이 없다.
+Gemini 모델에 ImageRatio ≠ 1 을 설정한 운영자는 이제 그 비율이 Gemini image prompt 토큰에 적용된다(이전에는 적용되지 않았다).
 
 ### Task 5, 6: 자동 충전 preset / 로그
 
@@ -199,12 +214,15 @@ Go 1.27 toolchain):
   `reasoning_effort` 와 openrouter effort 의 `minimal`/`xhigh`/`max` 가 manual 불가 모델에서는
   이제 adaptive thinking 을 켠다(이전에는 무시). thinking 을 끌 수 없는 모델에서 "끄기" 요청은
   adaptive + low(또는 Sonnet 5.5 는 `between_tools`)가 되어 thinking 이 완전히 꺼지지 않는다.
-- Epay: credit 이 실패한 주문은 pending 으로 남고 Epay 가 재시도하지 않는다. 운영자는 지갑
-  여유를 확보한 뒤 관리자 화면의 수동 완료(`ManualCompleteTopUp`)로 정산해야 한다. 사용자는
-  결제했지만 잔액이 늘지 않은 상태로 보일 수 있다.
+이 adaptive 는 `display:"omitted"` 라 응답에 요약은 노출되지 않지만 thinking 토큰은 과금된다.
+- Epay (동작 변경): credit 이 실패한 주문은 pending 으로 남고 콜백은 `fail` 을 응답하므로 Epay 가
+  재시도한다(재시도 횟수와 간격은 Epay 설정에 따른다). 지갑 여유를 확보하면 다음 재시도가 정산하고,
+  그 전에 관리자 화면의 수동 완료(`ManualCompleteTopUp`)로도 정산할 수 있다. 사용자는 정산 전까지
+  결제했지만 잔액이 늘지 않은 상태로 보일 수 있다. 주문이 없거나 다른 provider 의 주문인 콜백은
+  재시도해도 소용없으므로 이전처럼 `success` 로 확인 응답한다.
 - Gemini: ImageRatio 를 기본값(1)이 아닌 값으로 설정한 Gemini 모델은 image prompt 토큰이 그
   비율로 과금된다(과금액 변화). ImageRatio 1 인 모델의 quota 는 변하지 않는다. cached 와 겹치는
-  image 는 cache 요율로 과금된다.
+  image 는 cache 요율로, audio 와 겹치는 image 는 audio 가격으로만 과금된다(cap `P - cached - audio`).
 - 자동 충전 preset: `threshold + 1회 충전량` 이 ceiling 을 넘는 threshold preset 은 생성/수정이
   거부된다. 이미 저장된 over-ceiling preset 은 그대로 남아 있고 실행 시 fail-closed 로 막힌다. 먼저
   수정이나 삭제로 정리한다.
@@ -227,8 +245,9 @@ Go 1.27 toolchain):
 - Task 3: `taskPollStatusAccepted` 가 `relay.taskSubmitStatusAccepted` 와 중복이다
   (import cycle 로 공유하지 못했다).
 - Task 4: 알 수 없는 modality 는 text 계열 detail 이 하나도 없을 때만 나머지(text)로 흡수되고
-  그렇지 않으면 무시된다. AUDIO 도 audio 가격이 설정되면 cached 와 겹치는 같은 위험이 있다(기존
-  동작). tool-use 와 cached 가 함께 있는 조합은 테스트가 없다.
+  그렇지 않으면 무시된다. AUDIO 가 cached 와 겹치는 위험(기존 동작)은 audio 를 이중으로 세지는
+  않으며 image cap 이 audio 를 반영하도록 최종 리뷰에서 고쳤다. tool-use 와 cached 가 함께 있는
+  조합은 테스트가 없다.
 - Task 5: 경계값(`MaxQuota - 충전량` 과 정확히 같은 threshold)의 accept 케이스 테스트가 없다.
 - Task 6: 조직 target 이 로그에 전달되는 호출부 연결은 코드를 읽어서만 확인했다(주입 가능한 DB
   실패 지점이 없어 handler 수준 테스트가 없다).

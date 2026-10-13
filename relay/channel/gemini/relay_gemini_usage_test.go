@@ -756,3 +756,30 @@ func TestBuildUsageFromGeminiMetadataCapsImageTokensToUncachedPrompt(t *testing.
 	require.Equal(t, 1089, usage.PromptTokensDetails.ImageTokens)
 	require.Equal(t, 911, usage.PromptTokensDetails.TextTokens)
 }
+
+// Settlement subtracts cached + image + audio from the base, so the image cap
+// must leave room for audio too: P=2000, cached=1000, AUDIO=500 leaves at most
+// 500 image tokens, and the rest returns to TextTokens so the details still sum
+// to PromptTokens.
+func TestBuildUsageFromGeminiMetadataCapsImageTokensByCachedAndAudio(t *testing.T) {
+	metadata := geminiModalityUsageMetadata(2000, []dto.GeminiPromptTokensDetails{
+		{Modality: "TEXT", TokenCount: 700},
+		{Modality: "IMAGE", TokenCount: 800},
+		{Modality: "AUDIO", TokenCount: 500},
+	}, nil, 0)
+	metadata.CachedContentTokenCount = 1000
+
+	usage := buildUsageFromGeminiMetadata(metadata, 0)
+	details := usage.PromptTokensDetails
+	require.Equal(t, 1000, details.CachedTokens)
+	require.Equal(t, 500, details.AudioTokens)
+	require.Equal(t, 500, details.ImageTokens)
+	require.Equal(t, 1000, details.TextTokens)
+	require.Equal(t, usage.PromptTokens, details.TextTokens+details.AudioTokens+details.ImageTokens)
+	require.LessOrEqual(t, details.CachedTokens+details.AudioTokens+details.ImageTokens, usage.PromptTokens)
+
+	// Cached + audio covering the whole prompt leaves no image tokens to price.
+	metadata.CachedContentTokenCount = 1600
+	usage = buildUsageFromGeminiMetadata(metadata, 0)
+	require.Equal(t, 0, usage.PromptTokensDetails.ImageTokens)
+}

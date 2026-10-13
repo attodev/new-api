@@ -659,16 +659,10 @@ func EpayNotify(c *gin.Context) {
 		return
 	}
 	verifyInfo, err := client.Verify(params)
-	if err == nil && verifyInfo.VerifyStatus {
-		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook signature verified trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))
-		_, err := c.Writer.Write([]byte("success"))
-		if err != nil {
-			logger.LogError(c.Request.Context(), fmt.Sprintf("Epay webhook response write failed trade_no=%s client_ip=%s error=%q", verifyInfo.ServiceTradeNo, c.ClientIP(), err.Error()))
-		}
-	} else {
-		_, err := c.Writer.Write([]byte("fail"))
-		if err != nil {
-			logger.LogError(c.Request.Context(), fmt.Sprintf("Epay webhook response write failed path=%q client_ip=%s error=%q", c.Request.RequestURI, c.ClientIP(), err.Error()))
+	if err != nil || !verifyInfo.VerifyStatus {
+		_, werr := c.Writer.Write([]byte("fail"))
+		if werr != nil {
+			logger.LogError(c.Request.Context(), fmt.Sprintf("Epay webhook response write failed path=%q client_ip=%s error=%q", c.Request.RequestURI, c.ClientIP(), werr.Error()))
 		}
 		if err != nil {
 			logger.LogWarn(c.Request.Context(), fmt.Sprintf("Epay webhook signature verification failed path=%q client_ip=%s verify_error=%q", c.Request.RequestURI, c.ClientIP(), err.Error()))
@@ -677,36 +671,66 @@ func EpayNotify(c *gin.Context) {
 		}
 		return
 	}
+	logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook signature verified trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))
 
-	if verifyInfo.TradeStatus == epay.StatusTradeSuccess {
-		LockOrder(verifyInfo.ServiceTradeNo)
-		defer UnlockOrder(verifyInfo.ServiceTradeNo)
-		topUp := model.GetTopUpByTradeNo(verifyInfo.ServiceTradeNo)
-		if topUp == nil {
-			logger.LogWarn(c.Request.Context(), fmt.Sprintf("Epay callback order not found trade_no=%s callback_type=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, c.ClientIP(), common.GetJsonString(verifyInfo)))
-			return
-		}
-		if topUp.PaymentProvider != model.PaymentProviderEpay {
-			logger.LogWarn(c.Request.Context(), fmt.Sprintf("Epay order provider mismatch trade_no=%s order_provider=%s callback_type=%s client_ip=%s", verifyInfo.ServiceTradeNo, topUp.PaymentProvider, verifyInfo.Type, c.ClientIP()))
-			return
-		}
-		if topUp.Status == common.TopUpStatusPending {
-			if topUp.PaymentMethod != verifyInfo.Type {
-				logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay actual payment method differs from order trade_no=%s order_payment_method=%s actual_type=%s client_ip=%s", verifyInfo.ServiceTradeNo, topUp.PaymentMethod, verifyInfo.Type, c.ClientIP()))
-			}
-			quotaToAdd, err := model.RechargeEpay(topUp.TradeNo, verifyInfo.Type, c.ClientIP())
-			if err != nil {
-				// The settlement transaction rolled back, so the order stays pending.
-				// "success" was already written to Epay above, so Epay will not retry;
-				// only an admin ManualCompleteTopUp can settle this order now.
-				logger.LogError(c.Request.Context(), fmt.Sprintf("Epay settle topup order failed trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s error=%q topup=%q", topUp.TradeNo, topUp.UserId, topUp.EffectiveTargetType(), topUp.EffectiveTargetId(), c.ClientIP(), err.Error(), common.GetJsonString(topUp)))
-				return
-			}
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay recharge succeeded trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q", topUp.TradeNo, topUp.UserId, c.ClientIP(), quotaToAdd, topUp.Money, common.GetJsonString(topUp)))
-		}
-	} else {
-		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook event ignored trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))
+	// The response is decided after settlement: a failed credit answers "fail"
+	// so Epay retries the callback, everything else is acknowledged.
+	settleErr := settleEpayNotify(c, verifyInfo)
+	if _, werr := c.Writer.Write([]byte(epayNotifyResponse(settleErr))); werr != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Epay webhook response write failed trade_no=%s client_ip=%s error=%q", verifyInfo.ServiceTradeNo, c.ClientIP(), werr.Error()))
 	}
+}
+
+// epayNotifyResponse maps a settlement outcome to the body Epay expects.
+// "success" acknowledges the callback (settled, already settled, or nothing to
+// settle); "fail" makes Epay retry it. An order that is no longer pending is
+// benign: a repeated callback or an admin ManualCompleteTopUp got there first.
+func epayNotifyResponse(settleErr error) string {
+	if settleErr == nil || errors.Is(settleErr, model.ErrTopUpOrderNotPending) {
+		return "success"
+	}
+	return "fail"
+}
+
+// settleEpayNotify settles the order a verified Epay callback refers to. It
+// returns an error only when settlement itself failed and should be retried;
+// callbacks that are ignored (non-success trade status, unknown order, other
+// provider) or already settled return nil.
+func settleEpayNotify(c *gin.Context, verifyInfo *epay.VerifyRes) error {
+	if verifyInfo.TradeStatus != epay.StatusTradeSuccess {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook event ignored trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))
+		return nil
+	}
+	LockOrder(verifyInfo.ServiceTradeNo)
+	defer UnlockOrder(verifyInfo.ServiceTradeNo)
+	topUp := model.GetTopUpByTradeNo(verifyInfo.ServiceTradeNo)
+	if topUp == nil {
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Epay callback order not found trade_no=%s callback_type=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, c.ClientIP(), common.GetJsonString(verifyInfo)))
+		return nil
+	}
+	if topUp.PaymentProvider != model.PaymentProviderEpay {
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("Epay order provider mismatch trade_no=%s order_provider=%s callback_type=%s client_ip=%s", verifyInfo.ServiceTradeNo, topUp.PaymentProvider, verifyInfo.Type, c.ClientIP()))
+		return nil
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		return nil
+	}
+	if topUp.PaymentMethod != verifyInfo.Type {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay actual payment method differs from order trade_no=%s order_payment_method=%s actual_type=%s client_ip=%s", verifyInfo.ServiceTradeNo, topUp.PaymentMethod, verifyInfo.Type, c.ClientIP()))
+	}
+	quotaToAdd, settled, err := model.RechargeEpay(topUp.TradeNo, verifyInfo.Type, c.ClientIP())
+	if err != nil {
+		if errors.Is(err, model.ErrTopUpOrderNotPending) {
+			return err
+		}
+		// The settlement transaction rolled back, so the order stays pending.
+		// "fail" is written to Epay, which will retry the callback; an admin
+		// ManualCompleteTopUp can also settle the pending order meanwhile.
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Epay settle topup order failed trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s error=%q topup=%q", topUp.TradeNo, topUp.UserId, topUp.EffectiveTargetType(), topUp.EffectiveTargetId(), c.ClientIP(), err.Error(), common.GetJsonString(topUp)))
+		return err
+	}
+	logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay recharge succeeded trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q", settled.TradeNo, settled.UserId, c.ClientIP(), quotaToAdd, settled.Money, common.GetJsonString(settled)))
+	return nil
 }
 
 func RequestAmount(c *gin.Context) {

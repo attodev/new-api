@@ -257,8 +257,10 @@ func AdaptClaudeClientThinking(req *dto.ClaudeRequest, model string) {
 // setting is between_tools get {type:"between_tools"}, which takes no other
 // thinking field, with any output_config.effort capped at high. The others
 // cannot turn thinking off at all and run adaptive thinking at low effort,
-// whatever effort the client sent; block_binding and display are kept. Models
-// that accept disabled thinking are left alone.
+// whatever effort the client sent; block_binding is kept. The client asked for
+// no thinking, so that adaptive thinking is rendered with display "omitted"
+// (upstream leaves display unset; NormalizeAdaptiveDisplay would otherwise
+// expose summaries). Models that accept disabled thinking are left alone.
 func renderClaudeThinkingOff(req *dto.ClaudeRequest, model string) {
 	supportsDisable, asBetweenTools := claudeDisableCapability(model)
 	if supportsDisable {
@@ -270,6 +272,7 @@ func renderClaudeThinkingOff(req *dto.ClaudeRequest, model string) {
 		return
 	}
 	req.Thinking = req.Thinking.WithAdaptive()
+	req.Thinking.Display = "omitted"
 	if effort := ClaudeEffort(model, "low"); effort != "" {
 		req.OutputConfig = withClaudeOutputConfigEffort(req.OutputConfig, effort)
 	}

@@ -203,6 +203,7 @@ func TestRequestOpenAI2ClaudeMessageReasoningEffortNone(t *testing.T) {
 	r := convertOpenAIToClaudeForTest(t, dto.GeneralOpenAIRequest{Model: "claude-opus-5-5", ReasoningEffort: "none"})
 	require.NotNil(t, r.Thinking)
 	require.Equal(t, "adaptive", r.Thinking.Type)
+	require.Equal(t, "omitted", r.Thinking.Display)
 	require.Equal(t, "low", r.GetEfforts())
 
 	r = convertOpenAIToClaudeForTest(t, dto.GeneralOpenAIRequest{Model: "claude-sonnet-5-5", ReasoningEffort: "none"})
