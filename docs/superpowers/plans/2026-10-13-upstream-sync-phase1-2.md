@@ -36,7 +36,7 @@
 ### Task 0: 베이스라인 기록
 
 **Files:**
-- Create: `docs/superpowers/plans/2026-10-13-upstream-sync-baseline.txt` (커밋하지 않음, 작업용)
+- Create: `.superpowers/sdd/2026-10-13-upstream-sync-phase1-2/baseline.txt` (커밋하지 않음, 작업용)
 
 - [ ] **Step 1: 현재 브랜치와 HEAD 확인**
 
@@ -54,7 +54,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 - [ ] **Step 3: 베이스라인 테스트 실행**
 
-Run: `go build ./... && go test ./relay/... ./dto/... ./service/... ./common/... ./setting/... ./model/... ./controller/... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' > docs/superpowers/plans/2026-10-13-upstream-sync-baseline.txt; grep -c FAIL docs/superpowers/plans/2026-10-13-upstream-sync-baseline.txt`
+Run: `go build ./... && go test ./relay/... ./dto/... ./service/... ./common/... ./setting/... ./model/... ./controller/... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' > .superpowers/sdd/2026-10-13-upstream-sync-phase1-2/baseline.txt; grep -c FAIL .superpowers/sdd/2026-10-13-upstream-sync-phase1-2/baseline.txt`
 Expected: 빌드 성공. FAIL 줄이 있으면 그 목록이 이후 Task의 허용 실패 집합이다. (`model`, `controller` 패키지는 SQLite 메모리 DB를 쓰므로 수 분 걸릴 수 있다.)
 
 ---
@@ -940,7 +940,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 - [ ] **Step 1: 전체 테스트**
 
-Run: `go build ./... && go vet ./... && go test ./... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' | sort > /tmp/after.txt; diff <(grep FAIL docs/superpowers/plans/2026-10-13-upstream-sync-baseline.txt | sort) <(grep FAIL /tmp/after.txt)`
+Run: `go build ./... && go vet ./... && go test ./... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' | sort > /tmp/after.txt; diff <(grep FAIL .superpowers/sdd/2026-10-13-upstream-sync-phase1-2/baseline.txt | sort) <(grep FAIL /tmp/after.txt)`
 Expected: diff 출력 없음 (베이스라인 이외의 새 FAIL 없음).
 
 - [ ] **Step 2: 기록 문서 작성**
@@ -1184,7 +1184,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 - [ ] **Step 1: 전체 테스트와 베이스라인 비교**
 
-Run: `go build ./... && go vet ./... && go test ./... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' | sort > /tmp/after2.txt; diff <(grep FAIL docs/superpowers/plans/2026-10-13-upstream-sync-baseline.txt | sort) <(grep FAIL /tmp/after2.txt); cd web/default && bun run typecheck && bun run build`
+Run: `go build ./... && go vet ./... && go test ./... -count=1 2>&1 | grep -E '^(--- FAIL|FAIL|ok)' | sort > /tmp/after2.txt; diff <(grep FAIL .superpowers/sdd/2026-10-13-upstream-sync-phase1-2/baseline.txt | sort) <(grep FAIL /tmp/after2.txt); cd web/default && bun run typecheck && bun run build`
 Expected: 새 FAIL 없음, 프론트 빌드 성공.
 
 - [ ] **Step 2: 기록 문서**
