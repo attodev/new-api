@@ -81,3 +81,10 @@ func TestCountCutsOnlyLongRuns(t *testing.T) {
 		assert.InEpsilon(t, exact, Count("gpt-5.6-sol", text), 0.005)
 	}
 }
+
+func TestWarmIsIdempotentAndLeavesCountWorking(t *testing.T) {
+	Warm()
+	Warm()
+	assert.Greater(t, Count("gpt-4o", "hello"), 0)
+	assert.Greater(t, Count("gpt-4", "hello"), 0)
+}

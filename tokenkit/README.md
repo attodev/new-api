@@ -56,6 +56,9 @@ func main() {
 	fmt.Println(tokenkit.Count("gpt-5.6-sol", prompt))
 	fmt.Println(tokenkit.Count("claude-opus-5-5", prompt))
 
+	// 服务启动时可以调用 Warm 提前构建 o200k 和 cl100k 两个 tiktoken 编码，避免第一次 GPT 计数时才构建；可重复调用
+	tokenkit.Warm()
+
 	// 只要估算，不跑 tokenizer，比如流式输出中途断开时补算 completion
 	fmt.Println(tokenkit.Estimate("gpt-5.6-sol", prompt))
 
