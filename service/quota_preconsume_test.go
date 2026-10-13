@@ -1,12 +1,18 @@
 package service
 
 import (
+	"math"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,4 +98,57 @@ func TestPreConsumeTokenQuota_UnlimitedTokenAlwaysSucceeds(t *testing.T) {
 	info := &relaycommon.RelayInfo{TokenId: tok.Id, TokenKey: tok.Key, TokenUnlimited: true}
 	err := PreConsumeTokenQuota(info, 500)
 	require.NoError(t, err)
+}
+
+// TestBillingSessionShouldTrustUsesTrustQuotaSetting pins the wallet trust
+// bypass to quota_setting.trust_quota_usd: both the wallet and any limited
+// token must strictly exceed the threshold, 0 (or an invalid runtime value)
+// disables the bypass, and organization wallets / subscriptions never bypass.
+func TestBillingSessionShouldTrustUsesTrustQuotaSetting(t *testing.T) {
+	previousTrust, previousUnit := operation_setting.GetQuotaSetting().TrustQuotaUSD, common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() {
+		operation_setting.GetQuotaSetting().TrustQuotaUSD = previousTrust
+		common.QuotaPerUnit = previousUnit
+	})
+
+	cases := []struct {
+		name        string
+		trustUSD    float64
+		wallet      int64
+		token       int
+		unlimited   bool
+		force       bool
+		funding     FundingSource
+		wantTrusted bool
+	}{
+		{"default 10 USD above threshold", 10, 5500000, 5500000, false, false, &WalletFunding{userId: 1}, true},
+		{"custom threshold", 20, 5500000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"zero disables bypass", 0, 5500000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"zero disables bypass for unlimited token", 0, 5500000, 0, true, false, &WalletFunding{userId: 1}, false},
+		{"wallet equals threshold", 10, 5000000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"token equals threshold", 10, 5500000, 5000000, false, false, &WalletFunding{userId: 1}, false},
+		{"fractional threshold exceeded", 10.5, 5250001, 5250001, false, false, &WalletFunding{userId: 1}, true},
+		{"fractional threshold equal", 10.5, 5250000, 5250001, false, false, &WalletFunding{userId: 1}, false},
+		{"unlimited token", 10, 5500000, 0, true, false, &WalletFunding{userId: 1}, true},
+		{"forced reservation", 10, 5500000, 5500000, false, true, &WalletFunding{userId: 1}, false},
+		{"NaN threshold", math.NaN(), 5500000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"Inf threshold", math.Inf(1), 5500000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"negative threshold", -1, 5500000, 5500000, false, false, &WalletFunding{userId: 1}, false},
+		{"organization wallet never bypasses", 10, 5500000, 5500000, false, false, &OrganizationWalletFunding{memberId: 1, organizationId: 1}, false},
+		{"subscription never bypasses", 10, 5500000, 5500000, false, false, &SubscriptionFunding{userId: 1, amount: 1}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			operation_setting.GetQuotaSetting().TrustQuotaUSD = tc.trustUSD
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			c.Set("token_quota", tc.token)
+			session := &BillingSession{
+				relayInfo: &relaycommon.RelayInfo{UserId: 1, UserQuota: tc.wallet, TokenUnlimited: tc.unlimited, ForcePreConsume: tc.force},
+				funding:   tc.funding,
+			}
+			assert.Equal(t, tc.wantTrusted, session.shouldTrust(c))
+		})
+	}
 }

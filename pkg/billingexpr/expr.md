@@ -157,9 +157,11 @@ On save, the expression is validated:
 When a request arrives and the model uses `tiered_expr` billing:
 1. Loads expression from `billing_setting.GetBillingExpr()`
 2. Builds `RequestInput` (headers + body) for `param()` / `header()` functions
-3. Runs expression with estimated tokens: `RunExprWithRequest(expr, {P, C}, requestInput)`
-4. Converts output to quota: `rawCost / 1,000,000 * QuotaPerUnit`
+3. Runs the expression with locally estimated input tokens (`P` and `Len`) and zero output tokens (`C=0`). Client output limits do not affect the reservation. If request token estimation is disabled, the estimated input is zero.
+4. Converts output to quota: `rawCost / 1,000,000 * QuotaPerUnit`, then multiplies this reservation by `quota_setting.pre_consume_multiplier` (default 1; any finite positive decimal). Every tiered leaf in this fork is token-priced, so the multiplier always applies. The multiplier does not change context-length tier selection or actual settlement. The snapshot records the multiplier (`PreConsumeMultiplier`); older snapshots with no multiplier retain a factor of 1.
 5. Creates `BillingSnapshot` (frozen state for settlement) and stores on `RelayInfo`
+
+Wallet trust bypass uses `quota_setting.trust_quota_usd` (default 10 USD; 0 disables bypass). Both the wallet and any limited API token must exceed the threshold. The wallet must still cover the estimated reservation before bypass is considered. Subscriptions, organization wallets, organization subscriptions and asynchronous tasks do not use this bypass. Legacy token-ratio pricing also reserves estimated input cost times the multiplier, without the former `PreConsumedQuota` floor or output-token estimate. Per-request (`ModelPrice`) and task usage pricing are unchanged.
 
 ### 4. Settlement (Actual Billing)
 

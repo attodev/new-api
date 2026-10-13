@@ -1144,6 +1144,9 @@ func UpdateOption(key string, value string) error {
 	if setting.IsTossOptionKey(key) || isInternalTossOptionKey(key) {
 		return fmt.Errorf("%w: use the atomic Toss option updater", ErrTossOptionValidation)
 	}
+	if err := operation_setting.ValidateQuotaOption(key, value); err != nil {
+		return err
+	}
 	// Save to database first
 	option := Option{
 		Key: key,
@@ -1172,9 +1175,12 @@ func UpdateOptionsBulk(values map[string]string) error {
 	if len(values) == 0 {
 		return nil
 	}
-	for key := range values {
+	for key, value := range values {
 		if setting.IsTossOptionKey(key) || isInternalTossOptionKey(key) {
 			return fmt.Errorf("%w: use the atomic Toss option updater", ErrTossOptionValidation)
+		}
+		if err := operation_setting.ValidateQuotaOption(key, value); err != nil {
+			return err
 		}
 	}
 	err := DB.Transaction(func(tx *gorm.DB) error {
