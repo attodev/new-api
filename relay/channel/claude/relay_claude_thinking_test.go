@@ -1,8 +1,10 @@
 package claude
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 
 	"github.com/gin-gonic/gin"
@@ -46,4 +48,19 @@ func TestRequestOpenAI2ClaudeMessageEnabledThinkingHasNoDisplay(t *testing.T) {
 	require.NotNil(t, claudeRequest.Thinking)
 	require.Equal(t, "enabled", claudeRequest.Thinking.Type)
 	require.Equal(t, "", claudeRequest.Thinking.Display)
+}
+
+func TestThinkingWithAdaptive(t *testing.T) {
+	binding := json.RawMessage(`{"prefix_mismatch_behavior":"drop_block"}`)
+
+	var nilThinking *dto.Thinking
+	got := nilThinking.WithAdaptive()
+	require.Equal(t, "adaptive", got.Type)
+	require.Empty(t, got.BlockBinding)
+
+	got = (&dto.Thinking{Type: "enabled", BudgetTokens: common.GetPointer(2048), Display: "omitted", BlockBinding: binding}).WithAdaptive()
+	require.Equal(t, "adaptive", got.Type)
+	require.Nil(t, got.BudgetTokens)
+	require.Equal(t, "omitted", got.Display)
+	require.JSONEq(t, string(binding), string(got.BlockBinding))
 }

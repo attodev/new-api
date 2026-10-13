@@ -31,9 +31,7 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
 		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
 		request.Model = baseModel
-		request.Thinking = &dto.Thinking{
-			Type: "adaptive",
-		}
+		request.Thinking = request.Thinking.WithAdaptive()
 		request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
 		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
 			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
@@ -50,7 +48,7 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 			baseModel := strings.TrimSuffix(request.Model, "-thinking")
 			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
 				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
-				request.Thinking = &dto.Thinking{Type: "adaptive"}
+				request.Thinking = request.Thinking.WithAdaptive()
 				request.OutputConfig = json.RawMessage(`{"effort":"high"}`)
 				request.Temperature = nil
 				request.TopP = nil

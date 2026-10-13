@@ -460,6 +460,17 @@ type Thinking struct {
 	BlockBinding json.RawMessage `json:"block_binding,omitempty"`
 }
 
+// WithAdaptive returns an adaptive Thinking that keeps the client's
+// block_binding and display; it never adds a block_binding the client did not send.
+func (c *Thinking) WithAdaptive() *Thinking {
+	out := &Thinking{Type: "adaptive"}
+	if c != nil {
+		out.BlockBinding = c.BlockBinding
+		out.Display = c.Display
+	}
+	return out
+}
+
 // NormalizeAdaptiveDisplay makes adaptive thinking return a visible summary.
 // Anthropic defaults display to "omitted" from Opus 4.7 onwards: the response
 // then carries empty thinking blocks with valid signatures while the thinking

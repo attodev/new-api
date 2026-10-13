@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
@@ -66,3 +67,24 @@ func TestApplyClaudeThinkingSettingsEffortSuffixIsSummarized(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+// The effort suffix re-renders thinking as adaptive; block_binding is a
+// conversation control the native client sent, so it must survive, and it must
+// never be invented when the client did not send one.
+func TestApplyClaudeThinkingSettingsEffortSuffixKeepsBlockBinding(t *testing.T) {
+	binding := `{"prefix_mismatch_behavior":"drop_block"}`
+	request := &dto.ClaudeRequest{
+		Model:    "claude-opus-4-7-high",
+		Thinking: &dto.Thinking{Type: "adaptive", BlockBinding: json.RawMessage(binding)},
+	}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-opus-4-7-high"))
+	require.Equal(t, "claude-opus-4-7", request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "summarized", request.Thinking.Display)
+	require.JSONEq(t, binding, string(request.Thinking.BlockBinding))
+
+	request = &dto.ClaudeRequest{Model: "claude-opus-4-7-high"}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-opus-4-7-high"))
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Empty(t, request.Thinking.BlockBinding)
+}
