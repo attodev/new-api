@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 // TestChatCompletionsRequestToResponsesRequestPreservesPenalties reproduces a
@@ -80,4 +81,38 @@ func TestChatToResponsesOmitsEmptyPromptCacheKey(t *testing.T) {
 	b, err := common.Marshal(out)
 	require.NoError(t, err)
 	assert.NotContains(t, string(b), "prompt_cache_key")
+}
+
+func TestChatToResponsesPreservesQwenThinkingBudget(t *testing.T) {
+	tests := []struct {
+		name   string
+		budget json.RawMessage
+		want   int64
+	}{
+		{name: "positive budget", budget: json.RawMessage(`128`), want: 128},
+		{name: "zero budget", budget: json.RawMessage(`0`), want: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &dto.GeneralOpenAIRequest{
+				Model:          "qwen-plus",
+				EnableThinking: json.RawMessage(`true`),
+				ThinkingBudget: tt.budget,
+				Messages:       []dto.Message{{Role: "user", Content: "hello"}},
+			}
+
+			got, err := ChatCompletionsRequestToResponsesRequest(req)
+			require.NoError(t, err)
+			assert.Equal(t, tt.budget, got.ThinkingBudget)
+
+			encoded, err := common.Marshal(got)
+			require.NoError(t, err)
+
+			assert.True(t, gjson.GetBytes(encoded, "enable_thinking").Bool())
+			value := gjson.GetBytes(encoded, "thinking_budget")
+			assert.True(t, value.Exists())
+			assert.Equal(t, tt.want, value.Int())
+		})
+	}
 }

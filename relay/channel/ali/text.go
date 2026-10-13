@@ -9,7 +9,15 @@ import (
 
 const EnableSearchModelSuffix = "-internet"
 
-func requestOpenAI2Ali(request dto.GeneralOpenAIRequest) *dto.GeneralOpenAIRequest {
+func requestOpenAI2Ali(request dto.GeneralOpenAIRequest, upstreamModelName string) *dto.GeneralOpenAIRequest {
+	modelName := upstreamModelName
+	if modelName == "" {
+		modelName = request.Model
+	}
+	if !dto.IsQwenThinkingBudgetModel(modelName) {
+		request.ThinkingBudget = nil
+	}
+
 	// A request that omits top_p is left untouched: reading it via
 	// lo.FromPtrOr(request.TopP, 0) treats "not set" the same as
 	// "explicitly 0" and would force near-greedy decoding the client never

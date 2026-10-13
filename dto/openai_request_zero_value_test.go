@@ -1,9 +1,11 @@
 package dto
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
@@ -81,6 +83,130 @@ func TestOpenAIResponsesRequestPreserveExplicitZeroValues(t *testing.T) {
 // "o" (e.g. "omni-moderation-latest"), silently mangling its system role
 // (and, in the adaptor, its temperature/max_tokens handling) as if it were
 // an o1/o3/o4 reasoning model.
+func TestGeneralOpenAIRequestPreserveQwenThinkingBudget(t *testing.T) {
+	raw := []byte(`{
+		"model":"qwen-plus",
+		"thinking_budget":0
+	}`)
+
+	var req GeneralOpenAIRequest
+	err := common.Unmarshal(raw, &req)
+	require.NoError(t, err)
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	value := gjson.GetBytes(encoded, "thinking_budget")
+	assert.True(t, value.Exists())
+	assert.Equal(t, int64(0), value.Int())
+}
+
+func TestGeneralOpenAIRequestPreserveQwQThinkingBudget(t *testing.T) {
+	req := GeneralOpenAIRequest{
+		Model:          "QwQ-32B",
+		ThinkingBudget: json.RawMessage(`128`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	value := gjson.GetBytes(encoded, "thinking_budget")
+	assert.True(t, value.Exists())
+	assert.Equal(t, int64(128), value.Int())
+}
+
+func TestGeneralOpenAIRequestDropsThinkingBudgetForNonQwenModel(t *testing.T) {
+	req := GeneralOpenAIRequest{
+		Model:          "gpt-4.1",
+		ThinkingBudget: json.RawMessage(`128`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	assert.False(t, gjson.GetBytes(encoded, "thinking_budget").Exists())
+}
+
+// The custom MarshalJSON must not change how the rest of the request is
+// encoded, and must work when marshaled through a pointer as well.
+func TestGeneralOpenAIRequestMarshalJSONKeepsOtherFields(t *testing.T) {
+	req := &GeneralOpenAIRequest{
+		Model:          "gpt-4.1",
+		ThinkingBudget: json.RawMessage(`128`),
+		EnableThinking: json.RawMessage(`true`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, "gpt-4.1", gjson.GetBytes(encoded, "model").String())
+	assert.True(t, gjson.GetBytes(encoded, "enable_thinking").Bool())
+	assert.False(t, gjson.GetBytes(encoded, "thinking_budget").Exists())
+	// the caller's struct is untouched (value receiver)
+	assert.Equal(t, json.RawMessage(`128`), req.ThinkingBudget)
+}
+
+func TestIsQwenThinkingBudgetModel(t *testing.T) {
+	tests := []struct {
+		model string
+		want  bool
+	}{
+		{model: "qwen-plus", want: true},
+		{model: "Qwen/Qwen3-235B-A22B-Thinking-2507", want: true},
+		{model: "qwq-32b", want: true},
+		{model: "provider/qwen-plus", want: true},
+		{model: "provider/qwq-32b", want: true},
+		{model: "gpt-4.1", want: false},
+		{model: "deepseek-r1", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsQwenThinkingBudgetModel(tt.model))
+		})
+	}
+}
+
+func TestOpenAIResponsesRequestPreserveQwenThinkingBudget(t *testing.T) {
+	req := OpenAIResponsesRequest{
+		Model:          "qwen-plus",
+		ThinkingBudget: json.RawMessage(`0`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	value := gjson.GetBytes(encoded, "thinking_budget")
+	assert.True(t, value.Exists())
+	assert.Equal(t, int64(0), value.Int())
+}
+
+func TestOpenAIResponsesRequestPreserveQwQThinkingBudget(t *testing.T) {
+	req := OpenAIResponsesRequest{
+		Model:          "provider/QwQ-32B",
+		ThinkingBudget: json.RawMessage(`128`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	value := gjson.GetBytes(encoded, "thinking_budget")
+	assert.True(t, value.Exists())
+	assert.Equal(t, int64(128), value.Int())
+}
+
+func TestOpenAIResponsesRequestDropsThinkingBudgetForNonQwenModel(t *testing.T) {
+	req := OpenAIResponsesRequest{
+		Model:          "gpt-4.1",
+		ThinkingBudget: json.RawMessage(`128`),
+	}
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+
+	assert.False(t, gjson.GetBytes(encoded, "thinking_budget").Exists())
+}
+
 func TestGeneralOpenAIRequestGetSystemRoleName(t *testing.T) {
 	tests := []struct {
 		name  string
