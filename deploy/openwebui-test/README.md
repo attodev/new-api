@@ -54,7 +54,7 @@ OIDC 는 **브라우저**와 **Open WebUI 서버**가 new-api 를 같은 주소�
 ```bash
 cd deploy/openwebui-test
 cp .env.example .env
-# .env 편집: PUBLIC_HOST, NEW_API_IMAGE, 비밀값(PG/REDIS/SESSION/CRYPTO/OIDC_CLIENT_SECRET/OWUI_JWT_SECRET/OWUI_SECRET_KEY), 계정 비밀번호
+# .env 편집: PUBLIC_HOST, NEW_API_IMAGE, 비밀값(PG/REDIS/SESSION/CRYPTO/OIDC_CLIENT_SECRET/OWUI_JWT_SECRET/OWUI_SECRET_KEY), 계정 비밀번호(8~20자)
 docker compose up -d new-api            # postgres, redis, new-api
 ./bootstrap.sh                          # 루트·서비스 토큰·옵션·테스트 사용자. OWUI_SERVICE_KEY 를 .env 에 기록
 docker compose up -d                    # open-webui 기동
@@ -108,6 +108,7 @@ new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI �
 
 | 증상 | 확인 |
 | --- | --- |
+| bootstrap: `Field validation for 'Password' failed on the 'min' tag` | new-api 계정 비밀번호는 8~20자, 사용자 이름은 최대 20자. `.env` 의 `NEW_API_SERVICE_PASSWORD` / `NEW_API_TEST_USERS` 를 고치고 다시 실행 |
 | Open WebUI 에 모델이 하나도 없음 | `docker compose logs new-api \| grep "openwebui: rejected"`. `link_failed: no_user` 면 이메일 불일치, `jwt_invalid` 면 `OWUI_JWT_SECRET` 불일치 |
 | "Continue with NewAPI" 를 눌러도 반응 없음 / discovery 오류 | Open WebUI 컨테이너에서 `wget -qO- http://PUBLIC_HOST:3000/.well-known/openid-configuration` 이 되는지. 안 되면 2절의 호스트 이름 문제 |
 | 로그인 뒤 Open WebUI 가 `invalid_client` / 콜백 오류 | `.env` 의 `OIDC_CLIENT_SECRET` 과 new-api `oauth2.client_secret` 이 다름 → `bootstrap.sh` 다시 실행 |
