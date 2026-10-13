@@ -11,7 +11,22 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 )
+
+// maxTokenQuota is the largest remain_quota a limited token may be given:
+// $1B worth of quota, capped at the wallet ceiling common.MaxQuota (ported
+// from upstream a073f74b3, whose wallet ceiling is MaxWalletQuota). It is
+// int64 so the comparison cannot overflow int on 32-bit builds.
+func maxTokenQuota() int64 {
+	quota, err := common.WalletQuotaFromDecimalStrict(
+		decimal.NewFromInt(1_000_000_000).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
+	)
+	if err != nil {
+		return common.MaxQuota
+	}
+	return quota
+}
 
 func buildMaskedTokenResponse(token *model.Token) *model.Token {
 	if token == nil {
@@ -179,8 +194,8 @@ func AddToken(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
 			return
 		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
-		if token.RemainQuota > maxQuotaValue {
+		maxQuotaValue := maxTokenQuota()
+		if int64(token.RemainQuota) > maxQuotaValue {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
 			return
 		}
@@ -262,8 +277,8 @@ func UpdateToken(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
 			return
 		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
-		if token.RemainQuota > maxQuotaValue {
+		maxQuotaValue := maxTokenQuota()
+		if int64(token.RemainQuota) > maxQuotaValue {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
 			return
 		}

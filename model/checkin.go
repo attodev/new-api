@@ -97,9 +97,12 @@ func userCheckinWithTransaction(checkin *Checkin, userId int, quotaAwarded int) 
 			return errors.New("check-in failed, please try again later")
 		}
 
-		if err := tx.Model(&User{}).Where("id = ?", userId).
-			Update("quota", gorm.Expr("quota + ?", quotaAwarded)).Error; err != nil {
-			return errors.New("check-in failed: quota update error")
+		// The reward is new quota, so it is credited through the atomic
+		// wallet-ceiling check; a rejection rolls the check-in row back.
+		if quotaAwarded > 0 {
+			if err := creditUserQuotaWithinCeiling(tx, userId, int64(quotaAwarded)); err != nil {
+				return checkinQuotaError(err)
+			}
 		}
 
 		return nil
@@ -124,12 +127,23 @@ func userCheckinWithoutTransaction(checkin *Checkin, userId int, quotaAwarded in
 		return nil, errors.New("check-in failed, please try again later")
 	}
 
-	if err := IncreaseUserQuota(userId, int64(quotaAwarded), true); err != nil {
-		DB.Delete(checkin)
-		return nil, errors.New("check-in failed: quota update error")
+	if quotaAwarded > 0 {
+		if err := GrantUserQuota(userId, int64(quotaAwarded)); err != nil {
+			DB.Delete(checkin)
+			return nil, checkinQuotaError(err)
+		}
 	}
 
 	return checkin, nil
+}
+
+// checkinQuotaError maps a failed reward credit to the user-facing error,
+// distinguishing a wallet already at common.MaxQuota from other failures.
+func checkinQuotaError(err error) error {
+	if errors.Is(err, ErrTopUpQuotaCapacityExceeded) {
+		return errors.New("check-in failed: wallet quota limit reached")
+	}
+	return errors.New("check-in failed: quota update error")
 }
 
 // GetUserCheckinStats

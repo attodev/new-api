@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 	waffo "github.com/waffo-com/waffo-go"
 	"github.com/waffo-com/waffo-go/config"
@@ -118,6 +119,9 @@ func RequestWaffoAmount(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectInvalidCreditedQuota(c, id, getWaffoCreditedQuota(req.Amount)) {
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTopupGetGroupFailed)
@@ -131,6 +135,25 @@ func RequestWaffoAmount(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
+}
+
+// normalizeWaffoTopUpAmount converts a request amount into the order Amount
+// that RechargeWaffo later multiplies by QuotaPerUnit.
+func normalizeWaffoTopUpAmount(reqAmount int64) int64 {
+	amount := reqAmount
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		amount = int64(float64(reqAmount) / common.QuotaPerUnit)
+		if amount < 1 {
+			amount = 1
+		}
+	}
+	return amount
+}
+
+// getWaffoCreditedQuota mirrors the quota RechargeWaffo credits for a request.
+func getWaffoCreditedQuota(reqAmount int64) decimal.Decimal {
+	return decimal.NewFromInt(normalizeWaffoTopUpAmount(reqAmount)).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit))
 }
 
 // RequestWaffoPay Waffo
@@ -156,6 +179,9 @@ func RequestWaffoPay(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectInvalidCreditedQuota(c, id, getWaffoCreditedQuota(req.Amount)) {
+		return
+	}
 	user, err := model.GetUserById(id, false)
 	if err != nil || user == nil {
 		common.ApiErrorI18n(c, i18n.MsgUserNotExists)
@@ -203,13 +229,7 @@ func RequestWaffoPay(c *gin.Context) {
 	paymentRequestId := merchantOrderId
 
 	// Token Amount/CNY RechargeWaffo
-	amount := req.Amount
-	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
-		amount = int64(float64(req.Amount) / common.QuotaPerUnit)
-		if amount < 1 {
-			amount = 1
-		}
-	}
+	amount := normalizeWaffoTopUpAmount(req.Amount)
 
 	topUp := &model.TopUp{
 		UserId:          id,

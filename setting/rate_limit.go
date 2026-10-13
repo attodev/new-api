@@ -1,13 +1,26 @@
 package setting
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 )
+
+// maxRateLimitDurationSeconds is the window (24h) the count bound below is
+// sized against: the token-bucket capacity is count*duration, and the bound
+// keeps that product inside int64 for any window up to a day. Longer windows
+// are handled by the saturating capacity guard in middleware.
+const maxRateLimitDurationSeconds = 24 * 60 * 60
+
+// maxModelRequestRateLimitCount bounds a group's request counts. Upstream
+// a073f74b3 relaxes this to math.MaxInt64/maxRateLimitDurationSeconds; this
+// fork keeps the int32 bound because common.InMemoryRateLimiter preallocates
+// a slice with capacity equal to the count, so a larger accepted value would
+// let one option save crash the process on the next request. int32 already
+// satisfies the int64 guarantee above with a wide margin.
+const maxModelRequestRateLimitCount = math.MaxInt32
 
 var ModelRequestRateLimitEnabled = false
 var ModelRequestRateLimitDurationMinutes = 1
@@ -20,7 +33,7 @@ func ModelRequestRateLimitGroup2JSONString() string {
 	ModelRequestRateLimitMutex.RLock()
 	defer ModelRequestRateLimitMutex.RUnlock()
 
-	jsonBytes, err := json.Marshal(ModelRequestRateLimitGroup)
+	jsonBytes, err := common.Marshal(ModelRequestRateLimitGroup)
 	if err != nil {
 		common.SysLog("error marshalling model ratio: " + err.Error())
 	}
@@ -32,7 +45,7 @@ func UpdateModelRequestRateLimitGroupByJSONString(jsonStr string) error {
 	defer ModelRequestRateLimitMutex.RUnlock()
 
 	ModelRequestRateLimitGroup = make(map[string][2]int)
-	return json.Unmarshal([]byte(jsonStr), &ModelRequestRateLimitGroup)
+	return common.Unmarshal([]byte(jsonStr), &ModelRequestRateLimitGroup)
 }
 
 func GetGroupRateLimit(group string) (totalCount, successCount int, found bool) {
@@ -52,7 +65,7 @@ func GetGroupRateLimit(group string) (totalCount, successCount int, found bool) 
 
 func CheckModelRequestRateLimitGroup(jsonStr string) error {
 	checkModelRequestRateLimitGroup := make(map[string][2]int)
-	err := json.Unmarshal([]byte(jsonStr), &checkModelRequestRateLimitGroup)
+	err := common.Unmarshal([]byte(jsonStr), &checkModelRequestRateLimitGroup)
 	if err != nil {
 		return err
 	}
@@ -60,8 +73,8 @@ func CheckModelRequestRateLimitGroup(jsonStr string) error {
 		if limits[0] < 0 || limits[1] < 1 {
 			return fmt.Errorf("group %s has negative rate limit values: [%d, %d]", group, limits[0], limits[1])
 		}
-		if limits[0] > math.MaxInt32 || limits[1] > math.MaxInt32 {
-			return fmt.Errorf("group %s [%d, %d] has max rate limits value 2147483647", group, limits[0], limits[1])
+		if int64(limits[0]) > maxModelRequestRateLimitCount || int64(limits[1]) > maxModelRequestRateLimitCount {
+			return fmt.Errorf("group %s [%d, %d] exceeds max rate limit %d", group, limits[0], limits[1], maxModelRequestRateLimitCount)
 		}
 	}
 

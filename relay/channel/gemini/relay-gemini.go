@@ -1327,9 +1327,98 @@ func handleFinalStream(c *gin.Context, info *relaycommon.RelayInfo, resp *dto.Ch
 	return nil
 }
 
+// geminiUsageMetadataHasTokens reports whether upstream sent any usage counts.
+func geminiUsageMetadataHasTokens(metadata dto.GeminiUsageMetadata) bool {
+	if metadata.PromptTokenCount != 0 ||
+		metadata.ToolUsePromptTokenCount != 0 ||
+		metadata.CandidatesTokenCount != 0 ||
+		metadata.TotalTokenCount != 0 ||
+		metadata.ThoughtsTokenCount != 0 ||
+		metadata.CachedContentTokenCount != 0 {
+		return true
+	}
+	for _, details := range [][]dto.GeminiPromptTokensDetails{metadata.PromptTokensDetails, metadata.ToolUsePromptTokensDetails, metadata.CandidatesTokensDetails} {
+		for _, detail := range details {
+			if detail.TokenCount != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// patchGeminiZeroCompletionUsage estimates completion tokens locally when
+// upstream reported usage without them (for example a function-call-only turn
+// or a stream cut before the final chunk). The reported prompt and cache
+// counts are kept; only the missing completion is estimated.
+func patchGeminiZeroCompletionUsage(c *gin.Context, info *relaycommon.RelayInfo, usage *dto.Usage, responseText string, imageCount int) {
+	if usage == nil || usage.CompletionTokens > 0 {
+		return
+	}
+	if responseText == "" && imageCount == 0 {
+		return
+	}
+	estimated := service.ResponseText2Usage(c, responseText, info.UpstreamModelName, usage.PromptTokens)
+	usage.CompletionTokens = estimated.CompletionTokens
+	if imageCount != 0 && usage.CompletionTokens == 0 {
+		usage.CompletionTokens = imageCount * 1400
+	}
+	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+}
+
+func geminiResponseInlineImageCount(response *dto.GeminiChatResponse) int {
+	if response == nil {
+		return 0
+	}
+	count := 0
+	for _, candidate := range response.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.InlineData != nil && part.InlineData.MimeType != "" {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+// buildUsageFromGeminiResponse maps a non-stream response's usageMetadata,
+// estimating whatever upstream left out.
+func buildUsageFromGeminiResponse(c *gin.Context, info *relaycommon.RelayInfo, response *dto.GeminiChatResponse) dto.Usage {
+	if geminiUsageMetadataHasTokens(response.UsageMetadata) {
+		usage := buildUsageFromGeminiMetadata(response.UsageMetadata, info.GetEstimatePromptTokens())
+		patchGeminiZeroCompletionUsage(c, info, &usage, geminiResponseUsageText(response), geminiResponseInlineImageCount(response))
+		return usage
+	}
+	return *service.ResponseText2Usage(c, geminiResponseUsageText(response), info.UpstreamModelName, info.GetEstimatePromptTokens())
+}
+
+// geminiResponseUsageText is the output text the completion-token fallback
+// estimates: text parts plus function call names and arguments.
+func geminiResponseUsageText(response *dto.GeminiChatResponse) string {
+	if response == nil {
+		return ""
+	}
+	var text strings.Builder
+	for _, candidate := range response.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.Text != "" {
+				text.WriteString(part.Text)
+			}
+			// Function calls are most of an agent turn's output.
+			if part.FunctionCall != nil {
+				text.WriteString(part.FunctionCall.FunctionName)
+				args, _ := common.Marshal(part.FunctionCall.Arguments)
+				text.Write(args)
+			}
+		}
+	}
+	return text.String()
+}
+
 func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response, callback func(data string, geminiResponse *dto.GeminiChatResponse) bool) (*dto.Usage, *types.NewAPIError) {
 	var usage = &dto.Usage{}
 	var imageCount int
+	hasUsageMetadata := false
 	responseText := strings.Builder{}
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
@@ -1348,15 +1437,14 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 				if part.InlineData != nil && part.InlineData.MimeType != "" {
 					imageCount++
 				}
-				if part.Text != "" {
-					responseText.WriteString(part.Text)
-				}
 			}
 		}
+		responseText.WriteString(geminiResponseUsageText(&geminiResponse))
 
-		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
+		if geminiUsageMetadataHasTokens(geminiResponse.UsageMetadata) {
 			mappedUsage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 			*usage = mappedUsage
+			hasUsageMetadata = true
 		}
 
 		if !callback(data, &geminiResponse) {
@@ -1364,18 +1452,20 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		}
 	})
 
-	if imageCount != 0 {
-		if usage.CompletionTokens == 0 {
-			usage.CompletionTokens = imageCount * 1400
-		}
-	}
-
-	if usage.CompletionTokens <= 0 {
+	if !hasUsageMetadata {
 		if info.ReceivedResponseCount > 0 {
 			usage = service.ResponseText2Usage(c, responseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		} else {
 			usage = &dto.Usage{}
 		}
+		if imageCount != 0 && usage.CompletionTokens == 0 {
+			usage.CompletionTokens = imageCount * 1400
+			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+			common.SetContextKey(c, constant.ContextKeyLocalCountTokens, true)
+		}
+	} else {
+		// Keep the reported prompt and cache counts; estimate only a missing completion.
+		patchGeminiZeroCompletionUsage(c, info, usage, responseText.String(), imageCount)
 	}
 
 	return usage, nil
@@ -1534,7 +1624,7 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 	}
 	fullTextResponse := responseGeminiChat2OpenAI(c, &geminiResponse)
 	fullTextResponse.Model = info.UpstreamModelName
-	usage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
+	usage := buildUsageFromGeminiResponse(c, info, &geminiResponse)
 
 	fullTextResponse.Usage = usage
 

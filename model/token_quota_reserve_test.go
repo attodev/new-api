@@ -271,3 +271,24 @@ func TestGetTokenByKeyServesDatabaseSnapshotWhileBatchPending(t *testing.T) {
 	require.ErrorIs(t, err, ErrQuotaCachePending)
 	require.False(t, reserved)
 }
+
+// GrantUserQuota writes the database first; a ceiling rejection must leave
+// the Redis balance untouched, and a successful grant must reach it.
+func TestGrantUserQuotaKeepsCacheConsistentWithCeiling(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	useTokenQuotaMiniRedis(t)
+	user := insertUserWithQuota(t, common.MaxQuota-1)
+	_, err := hydrateUserCache(user.Id)
+	require.NoError(t, err)
+
+	require.ErrorIs(t, GrantUserQuota(user.Id, 2), ErrTopUpQuotaCapacityExceeded)
+	cached, err := getUserQuotaCache(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, common.MaxQuota-1, cached)
+
+	require.NoError(t, GrantUserQuota(user.Id, 1))
+	cached, err = getUserQuotaCache(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, common.MaxQuota, cached)
+}

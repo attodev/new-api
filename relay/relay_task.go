@@ -136,6 +136,13 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 	return nil
 }
 
+// taskSubmitStatusAccepted reports whether an upstream status code counts as a
+// successful task submission. Any 2xx is accepted (e.g. 201 Created, 202
+// Accepted); other statuses fail with fail_to_fetch_task.
+func taskSubmitStatusAccepted(code int) bool {
+	return code >= http.StatusOK && code < http.StatusMultipleChoices
+}
+
 // RelayTaskSubmit task
 // → platform/adaptor → →
 // (EstimateBilling) → → →
@@ -217,7 +224,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	if err != nil {
 		return nil, service.TaskErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
-	if resp != nil && resp.StatusCode != http.StatusOK {
+	if resp != nil && !taskSubmitStatusAccepted(resp.StatusCode) {
 		responseBody, _ := io.ReadAll(resp.Body)
 		return nil, service.TaskErrorWrapper(fmt.Errorf("%s", string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -42,13 +43,13 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 		return types.NewErrorWithStatusCode(fmt.Errorf("pre-charge failed, user remaining quota: %s, required pre-charge quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(int64(preConsumedQuota))), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 
-	trustQuota := common.GetTrustQuota()
+	trustQuota := operation_setting.TrustQuota()
 
 	relayInfo.UserQuota = userQuota
-	if userQuota > int64(trustQuota) {
+	if trustQuota > 0 && float64(userQuota) > trustQuota {
 		if !relayInfo.TokenUnlimited {
 			tokenQuota := c.GetInt("token_quota")
-			if tokenQuota > trustQuota {
+			if float64(tokenQuota) > trustQuota {
 				preConsumedQuota = 0
 				logger.LogInfo(c, fmt.Sprintf("user %d quota %s and token %d quota %d sufficient, trusted, skipping pre-charge", relayInfo.UserId, logger.FormatQuota(userQuota), relayInfo.TokenId, tokenQuota))
 			}

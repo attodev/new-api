@@ -40,6 +40,9 @@ func RequestWaffoPancakeAmount(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectInvalidCreditedQuota(c, id, getWaffoPancakeCreditedQuota(req.Amount)) {
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTopupGetGroupFailed)
@@ -91,6 +94,13 @@ func normalizeWaffoPancakeTopUpAmount(amount int64) int64 {
 		return 1
 	}
 	return normalized
+}
+
+// getWaffoPancakeCreditedQuota mirrors the quota RechargeWaffoPancake credits
+// for a request: the normalized order Amount times QuotaPerUnit.
+func getWaffoPancakeCreditedQuota(reqAmount int64) decimal.Decimal {
+	return decimal.NewFromInt(normalizeWaffoPancakeTopUpAmount(reqAmount)).
+		Mul(decimal.NewFromFloat(common.QuotaPerUnit))
 }
 
 func formatWaffoPancakeAmount(payMoney float64) string {
@@ -371,6 +381,9 @@ func RequestWaffoPancakePay(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectInvalidCreditedQuota(c, id, getWaffoPancakeCreditedQuota(req.Amount)) {
+		return
+	}
 	user, err := model.GetUserById(id, false)
 	if err != nil || user == nil {
 		common.ApiErrorI18n(c, i18n.MsgUserNotExists)

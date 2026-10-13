@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/relay/channel/claude"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
@@ -29,14 +29,15 @@ import (
 // keep the upstream model name in sync.
 func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName string) (modelAdapted bool) {
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
+		(strings.HasPrefix(request.Model, "claude-opus-4-6") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-8")) {
 		request.Model = baseModel
-		request.Thinking = &dto.Thinking{
-			Type: "adaptive",
-		}
-		request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
-		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
+		request.Thinking = request.Thinking.WithAdaptive()
+		request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, effortLevel)
+		if strings.HasPrefix(request.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(request.Model, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400.
 			request.Temperature = nil
 			request.TopP = nil
 			request.TopK = nil
@@ -48,10 +49,11 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		strings.HasSuffix(request.Model, "-thinking") {
 		if request.Thinking == nil {
 			baseModel := strings.TrimSuffix(request.Model, "-thinking")
-			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
-				request.Thinking = &dto.Thinking{Type: "adaptive"}
-				request.OutputConfig = json.RawMessage(`{"effort":"high"}`)
+			if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
+				strings.HasPrefix(baseModel, "claude-opus-4-8") {
+				// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
+				request.Thinking = request.Thinking.WithAdaptive()
+				request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, "high")
 				request.Temperature = nil
 				request.TopP = nil
 				request.TopK = nil
@@ -76,6 +78,14 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		}
 		modelAdapted = true
 	}
+
+	// Send the model the effort it accepts, including one the client set in
+	// output_config itself. The request is never rejected for it.
+	thinkingType := ""
+	if request.Thinking != nil {
+		thinkingType = request.Thinking.Type
+	}
+	request.OutputConfig = claude.NormalizeClaudeOutputConfig(request.Model, thinkingType, request.OutputConfig)
 
 	// Covers adaptive thinking the client asked for directly, which no branch
 	// above touches: without this, Opus 4.7+ returns empty thinking blocks.
@@ -167,6 +177,7 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
 		info.UpstreamRequestBodySize = storage.Size()
+		info.UpstreamRequestGetBody = storage.NewReader
 		requestBody = common.ReaderOnly(storage)
 	} else {
 		convertedRequest, err := adaptor.ConvertClaudeRequest(c, info, request)
@@ -194,13 +205,14 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		}
 
 		logger.LogDebug(c, "requestBody: %s", jsonData)
-		body, size, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
+		body, size, getBody, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 		defer closer.Close()
 		jsonData = nil
 		info.UpstreamRequestBodySize = size
+		info.UpstreamRequestGetBody = getBody
 		requestBody = body
 	}
 

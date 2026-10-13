@@ -22,6 +22,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -1788,6 +1789,9 @@ func RequestTossAmount(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
 		return
 	}
+	if rejectInvalidCreditedQuota(c, id, decimal.NewFromInt(int64(quote.CreditQuota))) {
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": quote})
 }
 
@@ -1878,6 +1882,11 @@ func RequestTossPay(c *gin.Context) {
 	}
 	if chargedKRW <= 0 || quote.CreditQuota <= 0 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
+		return
+	}
+	// Both amount modes snapshot quote.CreditQuota into TopUp.Quota, which is
+	// exactly what settlement credits (model.CreditedQuotaForTossTopUp).
+	if rejectInvalidCreditedQuota(c, id, decimal.NewFromInt(int64(quote.CreditQuota))) {
 		return
 	}
 

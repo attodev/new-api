@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -309,7 +310,11 @@ func RequestPayPalPay(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
-	user, _ := model.GetUserById(id, false)
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		common.ApiErrorI18n(c, i18n.MsgUserNotExists)
+		return
+	}
 
 	reference := fmt.Sprintf("new-api-paypal-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	referenceId := "ppl_" + common.Sha1([]byte(reference))
@@ -317,6 +322,9 @@ func RequestPayPalPay(c *gin.Context) {
 	chargedMoney := getPayPalPayMoney(float64(req.Amount), user.Group)
 	if chargedMoney <= 0.01 {
 		common.ApiErrorI18n(c, i18n.MsgTopupAmountTooLow2)
+		return
+	}
+	if rejectInvalidCreditedQuota(c, id, getPayPalCreditedQuota(chargedMoney)) {
 		return
 	}
 
@@ -449,6 +457,12 @@ func PayPalCapture(c *gin.Context) {
 		// Don't block redirect — webhook will retry.
 	}
 	paypalRedirect(c, "/usage-logs")
+}
+
+// getPayPalCreditedQuota mirrors RechargePayPal, which credits the order's
+// Money (the charged amount from getPayPalPayMoney) times QuotaPerUnit.
+func getPayPalCreditedQuota(chargedMoney float64) decimal.Decimal {
+	return decimal.NewFromFloat(chargedMoney).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
 }
 
 func getPayPalPayMoney(amount float64, group string) float64 {
@@ -818,8 +832,15 @@ func RequestPayPalAmount(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
-	user, _ := model.GetUserById(id, false)
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		common.ApiErrorI18n(c, i18n.MsgUserNotExists)
+		return
+	}
 	money := getPayPalPayMoney(float64(req.Amount), user.Group)
+	if rejectInvalidCreditedQuota(c, id, getPayPalCreditedQuota(money)) {
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "success", "data": fmt.Sprintf("%.2f", money)})
 }
 

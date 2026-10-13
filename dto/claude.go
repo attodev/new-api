@@ -122,6 +122,9 @@ type ClaudeMessageSource struct {
 type ClaudeMessage struct {
 	Role    string `json:"role"`
 	Content any    `json:"content"`
+	// OutputConfig carries per-message output settings. An effort-only system
+	// message has empty content and sends its new level in output_config.effort.
+	OutputConfig json.RawMessage `json:"output_config,omitempty"`
 }
 
 func (c *ClaudeMessage) IsStringContent() bool {
@@ -220,6 +223,7 @@ type ClaudeRequest struct {
 	TopK              *int            `json:"top_k,omitempty"`
 	Stream            *bool           `json:"stream,omitempty"`
 	Tools             any             `json:"tools,omitempty"`
+	Safeguards        json.RawMessage `json:"safeguards,omitempty"`
 	ContextManagement json.RawMessage `json:"context_management,omitempty"`
 	OutputConfig      json.RawMessage `json:"output_config,omitempty"`
 	OutputFormat      json.RawMessage `json:"output_format,omitempty"`
@@ -312,9 +316,25 @@ func (c *ClaudeRequest) GetTokenCountMeta() *types.TokenCountMeta {
 					texts = append(texts, string(b))
 				}
 			case "tool_result":
-				if media.Content != nil {
-					b, _ := common.Marshal(media.Content)
-					texts = append(texts, string(b))
+				// Count tool output as the text the model reads; JSON-encoding it
+				// would escape newlines and quotes and count image base64 as text.
+				if media.IsStringContent() {
+					texts = append(texts, media.GetStringContent())
+					break
+				}
+				for _, part := range media.ParseMediaContent() {
+					if source := part.ToFileSource(); source != nil {
+						fileType := types.FileTypeFile
+						if part.Type == "image" {
+							fileType = types.FileTypeImage
+						}
+						fileMeta = append(fileMeta, &types.FileMeta{FileType: fileType, Source: source})
+					} else if part.Type == "text" {
+						texts = append(texts, part.GetText())
+					} else {
+						b, _ := common.Marshal(part)
+						texts = append(texts, string(b))
+					}
 				}
 			}
 		}
@@ -436,6 +456,18 @@ func ProcessTools(tools []any) ([]*Tool, []*ClaudeWebSearchTool) {
 			normalTools = append(normalTools, &t)
 		case ClaudeWebSearchTool:
 			webSearchTools = append(webSearchTools, &t)
+		case map[string]any:
+			// Tools decoded from client JSON arrive as maps.
+			toolType, _ := t["type"].(string)
+			if strings.HasPrefix(toolType, "web_search") {
+				if webSearchTool, err := common.Any2Type[ClaudeWebSearchTool](t); err == nil {
+					webSearchTools = append(webSearchTools, &webSearchTool)
+				}
+				continue
+			}
+			if normalTool, err := common.Any2Type[Tool](t); err == nil {
+				normalTools = append(normalTools, &normalTool)
+			}
 		default:
 			continue
 		}
@@ -452,6 +484,19 @@ type Thinking struct {
 	// the visible summary that was default on Opus 4.6; "omitted" (default on
 	// 4.7) suppresses it. Pass-through field from upstream Anthropic API.
 	Display string `json:"display,omitempty"`
+	// BlockBinding is passed through to upstream as-is. Copy it when rebuilding a Thinking value.
+	BlockBinding json.RawMessage `json:"block_binding,omitempty"`
+}
+
+// WithAdaptive returns an adaptive Thinking that keeps the client's
+// block_binding and display; it never adds a block_binding the client did not send.
+func (c *Thinking) WithAdaptive() *Thinking {
+	out := &Thinking{Type: "adaptive"}
+	if c != nil {
+		out.BlockBinding = c.BlockBinding
+		out.Display = c.Display
+	}
+	return out
 }
 
 // NormalizeAdaptiveDisplay makes adaptive thinking return a visible summary.

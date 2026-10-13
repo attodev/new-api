@@ -101,29 +101,36 @@ func buildClaudeFileMessage(c *gin.Context, file *dto.MessageFile) (*dto.ClaudeM
 	}
 }
 
+// functionParametersToInputSchema converts OpenAI function parameters into a
+// Claude input_schema, guaranteeing an object schema with properties so that
+// parameterless tools are still accepted upstream.
+func functionParametersToInputSchema(parameters any) map[string]any {
+	params, _ := parameters.(map[string]any)
+	schema := make(map[string]any, len(params)+2)
+	for key, value := range params {
+		schema[key] = value
+	}
+	if schema["type"] == nil {
+		schema["type"] = "object"
+	}
+	if schema["properties"] == nil {
+		schema["properties"] = map[string]any{}
+	}
+	return schema
+}
+
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
-		if params, ok := tool.Function.Parameters.(map[string]any); ok {
-			claudeTool := dto.Tool{
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-			}
-			claudeTool.InputSchema = make(map[string]interface{})
-			if params["type"] != nil {
-				claudeTool.InputSchema["type"] = params["type"].(string)
-			}
-			claudeTool.InputSchema["properties"] = params["properties"]
-			claudeTool.InputSchema["required"] = params["required"]
-			for s, a := range params {
-				if s == "type" || s == "properties" || s == "required" {
-					continue
-				}
-				claudeTool.InputSchema[s] = a
-			}
-			claudeTools = append(claudeTools, &claudeTool)
+		if _, ok := tool.Function.Parameters.(map[string]any); !ok && tool.Type != "function" {
+			continue
 		}
+		claudeTools = append(claudeTools, &dto.Tool{
+			Name:        tool.Function.Name,
+			Description: tool.Function.Description,
+			InputSchema: functionParametersToInputSchema(tool.Function.Parameters),
+		})
 	}
 
 	// Web search tool
@@ -182,7 +189,10 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		Model:         textRequest.Model,
 		StopSequences: nil,
 		Temperature:   textRequest.Temperature,
-		Tools:         claudeTools,
+	}
+	// Some Claude-compatible upstreams reject an empty "tools": [] array.
+	if len(claudeTools) > 0 {
+		claudeRequest.Tools = claudeTools
 	}
 	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
 		claudeRequest.MaxTokens = common.GetPointer(maxTokens)
@@ -211,14 +221,15 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	}
 
 	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(textRequest.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") || strings.HasPrefix(textRequest.Model, "claude-opus-4-7")) {
+		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") ||
+			strings.HasPrefix(textRequest.Model, "claude-opus-4-7") ||
+			strings.HasPrefix(textRequest.Model, "claude-opus-4-8")) {
 		claudeRequest.Model = baseModel
-		claudeRequest.Thinking = &dto.Thinking{
-			Type: "adaptive",
-		}
-		claudeRequest.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
-		if strings.HasPrefix(baseModel, "claude-opus-4-7") {
-			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
+		claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
+		claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(baseModel, effortLevel)
+		if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
+			strings.HasPrefix(baseModel, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400.
 			claudeRequest.Temperature = nil
 			claudeRequest.TopP = nil
 			claudeRequest.TopK = nil
@@ -230,10 +241,11 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		strings.HasSuffix(textRequest.Model, "-thinking") {
 
 		trimmedModel := strings.TrimSuffix(textRequest.Model, "-thinking")
-		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") {
-			// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
-			claudeRequest.Thinking = &dto.Thinking{Type: "adaptive"}
-			claudeRequest.OutputConfig = json.RawMessage(`{"effort":"high"}`)
+		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") ||
+			strings.HasPrefix(trimmedModel, "claude-opus-4-8") {
+			// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
+			claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
+			claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(trimmedModel, "high")
 			claudeRequest.Temperature = nil
 			claudeRequest.TopP = nil
 			claudeRequest.TopK = nil
@@ -648,6 +660,8 @@ type ClaudeResponseInfo struct {
 	Created      int64
 	Model        string
 	ResponseText strings.Builder
+	// ToolUseCount counts streamed tool_use blocks for the output-token fallback.
+	ToolUseCount int
 	Usage        *dto.Usage
 	Done         bool
 }
@@ -804,6 +818,9 @@ func FormatClaudeResponseInfo(claudeResponse *dto.ClaudeResponse, oaiResponse *d
 			if claudeResponse.Delta.Thinking != nil {
 				claudeInfo.ResponseText.WriteString(*claudeResponse.Delta.Thinking)
 			}
+			if claudeResponse.Delta.PartialJson != nil {
+				claudeInfo.ResponseText.WriteString(*claudeResponse.Delta.PartialJson)
+			}
 		}
 	} else if claudeResponse.Type == "message_delta" {
 		// usage
@@ -832,6 +849,11 @@ func FormatClaudeResponseInfo(claudeResponse *dto.ClaudeResponse, oaiResponse *d
 
 		claudeInfo.Done = true
 	} else if claudeResponse.Type == "content_block_start" {
+		// Tool calls are most of an agent turn's output; count them for usage fallback.
+		if block := claudeResponse.ContentBlock; block != nil && block.Type == "tool_use" {
+			claudeInfo.ResponseText.WriteString(block.Name)
+			claudeInfo.ToolUseCount++
+		}
 	} else {
 		return false
 	}
@@ -899,6 +921,9 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 		}
 		// —— message_start cache
 		fallback := service.ResponseText2Usage(c, claudeInfo.ResponseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+		// Each tool_use block costs about 40 output tokens beyond its name and JSON
+		// input (measured on Claude Haiku 4.5 and Sonnet 5 agent turns).
+		fallback.CompletionTokens += claudeInfo.ToolUseCount * 40
 		if claudeInfo.Usage.CompletionTokens == 0 ||
 			(!claudeInfo.Done && fallback.CompletionTokens > claudeInfo.Usage.CompletionTokens) {
 			claudeInfo.Usage.CompletionTokens = fallback.CompletionTokens

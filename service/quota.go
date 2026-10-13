@@ -29,8 +29,9 @@ type TokenDetails struct {
 	AudioTokens int
 }
 
-// decimalToQuota converts a decimal quota value to int with int32
-// saturation, the decimal-typed counterpart to common.QuotaFromFloat. Quota
+// decimalToQuota converts a decimal single-request quota value to int with
+// int32 (common.MaxRequestQuota) saturation, the decimal-typed counterpart to
+// common.QuotaFromFloat. Quota
 // products built from decimal.Decimal (audio, tool-call surcharge) must
 // clamp the same way: an oversized product must never wrap into a negative
 // charge.
@@ -284,11 +285,19 @@ func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData)
 	completionTokens := float64(usage.CompletionTokens)
 	promptCacheReadTokens := float64(usage.PromptTokensDetails.CachedTokens)
 
-	return int(math.Round((cost -
+	value := (cost -
 		totalPromptTokens*quotaPrice +
 		promptCacheReadTokens*(quotaPrice-promptCacheReadPrice) -
 		completionTokens*completionPrice) /
-		(promptCacheCreatePrice - quotaPrice)))
+		(promptCacheCreatePrice - quotaPrice)
+	// An out-of-range (or NaN/Inf) estimate means the upstream cost cannot be
+	// explained by cache creation; -1 tells the caller to ignore it instead of
+	// using an implementation-defined float->int conversion.
+	tokens, err := common.QuotaFromFloatStrict(math.Round(value))
+	if err != nil {
+		return -1
+	}
+	return tokens
 }
 
 func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent string) {

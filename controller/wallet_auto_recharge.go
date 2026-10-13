@@ -208,6 +208,21 @@ func resolveOrganizationWalletTarget(c *gin.Context) (walletRechargeTarget, bool
 	}, true
 }
 
+// validateWalletAutoRechargeCapacity rejects, before any card registration, a
+// policy whose charges the target wallet could not absorb. Each charge credits
+// model.WalletAutoRechargeCreditQuota(amount), the same conversion the charge
+// path snapshots into TopUp.Quota. A threshold policy is bounded by its
+// threshold; a scheduled policy charges regardless of balance, so its next
+// charge must fit into the wallet now. Settlement (CreditTopUpTarget) still
+// enforces the ceiling atomically for balances that grow afterwards.
+func validateWalletAutoRechargeCapacity(policyType string, target walletRechargeTarget, amount float64, thresholdQuota int64) error {
+	creditedQuota := model.WalletAutoRechargeCreditQuota(amount)
+	if policyType == model.WalletAutoRechargeTypeThreshold {
+		return model.ValidateWalletAutoRechargeThresholdCapacity(thresholdQuota, creditedQuota)
+	}
+	return model.ValidateTopUpTargetCapacity(target.TargetType, target.TargetId, creditedQuota)
+}
+
 func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletRechargeTarget) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -252,6 +267,10 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 	}
 	if preset.TermsFingerprint != req.PresetFingerprint {
 		common.ApiError(c, model.ErrWalletAutoRechargePresetChanged)
+		return
+	}
+	if err := validateWalletAutoRechargeCapacity(policyType, target, preset.Amount, preset.ThresholdQuota); err != nil {
+		common.ApiErrorMsg(c, topUpQuotaRejectionMessage(c, err))
 		return
 	}
 

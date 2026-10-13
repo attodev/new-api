@@ -145,9 +145,9 @@ func composeTieredTextQuota(relayInfo *relaycommon.RelayInfo, summary textQuotaS
 	}
 
 	// Saturate the final sum, not just the surcharge on its own: tieredQuota
-	// can already sit near the int32 bound, and a plain int addition of the
-	// surcharge on top could exceed what the (32-bit) quota columns can
-	// store instead of saturating.
+	// can already sit near the single-request bound (common.MaxRequestQuota),
+	// and a plain int addition of the surcharge on top could push the total
+	// past it instead of saturating.
 	if tieredResult != nil {
 		if snap := relayInfo.TieredBillingSnapshot; snap != nil {
 			return decimalToQuota(decimal.NewFromFloat(tieredResult.ActualQuotaBeforeGroup).
@@ -160,7 +160,32 @@ func composeTieredTextQuota(relayInfo *relaycommon.RelayInfo, summary textQuotaS
 	return decimalToQuota(decimal.NewFromInt(int64(tieredQuota)).Add(summary.ToolCallSurchargeQuota.Round(0)))
 }
 
+// normalizeCachedUsage copies cache counts that upstream reported under the
+// Responses (input_tokens_details) or DeepSeek (prompt_cache_hit_tokens) names
+// onto PromptTokensDetails, which settlement reads. It only fills fields that
+// are still zero, so canonical values are never overwritten.
+func normalizeCachedUsage(usage *dto.Usage) {
+	if usage == nil {
+		return
+	}
+	if details := usage.InputTokensDetails; details != nil {
+		if usage.PromptTokensDetails.CachedTokens == 0 && details.CachedTokens > 0 {
+			usage.PromptTokensDetails.CachedTokens = details.CachedTokens
+		}
+		if usage.PromptTokensDetails.CachedCreationTokens == 0 && details.CachedCreationTokens > 0 {
+			usage.PromptTokensDetails.CachedCreationTokens = details.CachedCreationTokens
+		}
+		if usage.PromptTokensDetails.CacheWriteTokens == 0 && details.CacheWriteTokens > 0 {
+			usage.PromptTokensDetails.CacheWriteTokens = details.CacheWriteTokens
+		}
+	}
+	if usage.PromptTokensDetails.CachedTokens == 0 && usage.PromptCacheHitTokens > 0 {
+		usage.PromptTokensDetails.CachedTokens = usage.PromptCacheHitTokens
+	}
+}
+
 func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage) textQuotaSummary {
+	normalizeCachedUsage(usage)
 	summary := textQuotaSummary{
 		ModelName:            relayInfo.OriginModelName,
 		TokenName:            ctx.GetString("token_name"),

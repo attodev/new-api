@@ -72,14 +72,15 @@ var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 // balances, and the quota-input UI can multiply a typed amount by QuotaPerUnit,
 // without any intermediate result losing integer precision.
 //
-// Enforced by request validation on the organization quota endpoints, and for
-// payments as an atomic upper bound in CreditTopUpTarget. Deliberately NOT
-// enforced on the generic quota increment helpers: those mostly serve refunds,
+// This is the wallet-domain ceiling (upstream's MaxWalletQuota); single-request
+// charges use the much smaller MaxRequestQuota (quota_math.go). Enforced by
+// request validation on the organization quota endpoints, redemption codes,
+// token budgets and ManageUser add_quota/override, and as an atomic upper bound
+// where new quota enters a user wallet (creditUserQuotaWithinCeiling: top-ups,
+// redemption, admin grants, user imports, check-in rewards). Deliberately NOT enforced on the accumulated
+// balance by the generic quota increment helpers: those mostly serve refunds,
 // and a refund that cannot be applied destroys quota the account already paid
-// for.
-//
-// Not yet enforced on the admin grant paths (ManageUser add_quota/override) --
-// see the note on increaseUserQuota in model/user.go.
+// for -- see the note on increaseUserQuota in model/user.go.
 const MaxQuota int64 = 500_000_000_000_000 // exactly $1B at the default QuotaPerUnit
 
 // general_setting.quota_display_type
@@ -171,6 +172,9 @@ var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
 var QuotaRemindThreshold int64 = 1000
+
+// PreConsumedQuota is retained for old option clients; token reservations now
+// use quota_setting.pre_consume_multiplier and the estimated input cost.
 var PreConsumedQuota = 500
 
 var RetryTimes = 0
@@ -192,6 +196,16 @@ var BatchUpdateEnabled = false
 var BatchUpdateInterval int
 
 var RelayTimeout int // unit is second
+
+// RelayResponseHeaderTimeout limits how long the relay transport waits for the
+// upstream response headers after the request has been fully written.
+// 0 disables it (previous behaviour: wait forever).
+//
+// Note this is NOT the same as RelayTimeout (http.Client.Timeout), which covers
+// the whole response read and therefore breaks legitimate long streaming calls.
+// ResponseHeaderTimeout only bounds the wait for the response headers; once the
+// headers arrive, streaming is unaffected.
+var RelayResponseHeaderTimeout int // unit is second
 
 var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int

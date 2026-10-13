@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/QuantumNous/new-api/dto"
@@ -66,3 +67,56 @@ func TestApplyClaudeThinkingSettingsEffortSuffixIsSummarized(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+// The effort suffix re-renders thinking as adaptive; block_binding is a
+// conversation control the native client sent, so it must survive, and it must
+// never be invented when the client did not send one.
+func TestApplyClaudeThinkingSettingsEffortSuffixKeepsBlockBinding(t *testing.T) {
+	binding := `{"prefix_mismatch_behavior":"drop_block"}`
+	request := &dto.ClaudeRequest{
+		Model:    "claude-opus-4-7-high",
+		Thinking: &dto.Thinking{Type: "adaptive", BlockBinding: json.RawMessage(binding)},
+	}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-opus-4-7-high"))
+	require.Equal(t, "claude-opus-4-7", request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "summarized", request.Thinking.Display)
+	require.JSONEq(t, binding, string(request.Thinking.BlockBinding))
+
+	request = &dto.ClaudeRequest{Model: "claude-opus-4-7-high"}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-opus-4-7-high"))
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Empty(t, request.Thinking.BlockBinding)
+}
+
+// The native path sends the model the effort it accepts: a client-sent
+// output_config.effort is lowered or removed, never rejected, and the other
+// output_config keys stay.
+func TestApplyClaudeThinkingSettingsNormalizesClientEffort(t *testing.T) {
+	cases := []struct {
+		name, model, thinking, in, want string
+	}{
+		{"opus-4-5 caps xhigh", "claude-opus-4-5", "", `{"effort":"xhigh"}`, `{"effort":"high"}`},
+		{"opus-4-6 xhigh to max", "claude-opus-4-6", "adaptive", `{"effort":"xhigh"}`, `{"effort":"max"}`},
+		{"sonnet-4-5 drops effort", "claude-sonnet-4-5", "", `{"effort":"high"}`, ``},
+		{"keeps other keys", "claude-sonnet-4-5", "", `{"effort":"high","format":{"type":"json_schema"}}`, `{"format":{"type":"json_schema"}}`},
+		{"accepted effort untouched", "claude-opus-4-7", "adaptive", `{"effort":"xhigh"}`, `{"effort":"xhigh"}`},
+		{"opus-5 off thinking caps to high", "claude-opus-5", "disabled", `{"effort":"max"}`, `{"effort":"high"}`},
+		{"unknown model untouched", "some-claude-proxy", "", `{"effort":"max"}`, `{"effort":"max"}`},
+		{"no effort key untouched", "claude-sonnet-4-5", "", `{"format":{"type":"json_schema"}}`, `{"format":{"type":"json_schema"}}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			request := &dto.ClaudeRequest{Model: c.model, OutputConfig: json.RawMessage(c.in)}
+			if c.thinking != "" {
+				request.Thinking = &dto.Thinking{Type: c.thinking}
+			}
+			applyClaudeThinkingSettings(request, c.model)
+			if c.want == "" {
+				require.Empty(t, request.OutputConfig)
+				return
+			}
+			require.JSONEq(t, c.want, string(request.OutputConfig))
+		})
+	}
+}

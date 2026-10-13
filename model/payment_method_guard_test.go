@@ -253,3 +253,93 @@ func TestExpireSubscriptionOrder_RejectsMismatchedPaymentProvider(t *testing.T) 
 	require.NotNil(t, order)
 	assert.Equal(t, common.TopUpStatusPending, order.Status)
 }
+
+// Ported from upstream 47ba9d2c6 (TestRechargeEpayEnforcesFinalWalletQuotaLimit).
+// This fork settles Epay in the controller, so the model-level equivalent is a
+// manually completed Epay order, which shares CreditTopUpTarget with every
+// provider's settlement path. The fork's ceiling is common.MaxQuota inclusive.
+func TestManualCompleteEpayTopUpEnforcesFinalWalletQuotaLimit(t *testing.T) {
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	testCases := []struct {
+		name         string
+		currentQuota int64
+		wantErr      bool
+		wantQuota    int64
+		wantStatus   string
+	}{
+		{
+			name:         "allows exact highest representable wallet balance",
+			currentQuota: common.MaxQuota - 1_000_000,
+			wantQuota:    common.MaxQuota,
+			wantStatus:   common.TopUpStatusSuccess,
+		},
+		{
+			name:         "rejects balance above the wallet ceiling",
+			currentQuota: common.MaxQuota - 1_000_000 + 1,
+			wantErr:      true,
+			wantQuota:    common.MaxQuota - 1_000_000 + 1,
+			wantStatus:   common.TopUpStatusPending,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			truncateTables(t)
+			insertUserForPaymentGuardTest(t, 506, tc.currentQuota)
+			insertTopUpForPaymentGuardTest(t, "EPAYTESTWALLETLIMIT", 506, PaymentProviderEpay)
+
+			err := ManualCompleteTopUp("EPAYTESTWALLETLIMIT", "127.0.0.1")
+			if tc.wantErr {
+				require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantQuota, getUserQuotaForPaymentGuardTest(t, 506))
+			assert.Equal(t, tc.wantStatus, getTopUpStatusForPaymentGuardTest(t, "EPAYTESTWALLETLIMIT"))
+		})
+	}
+}
+
+func TestValidateTopUpQuotaCapacityMatchesSettlementCeiling(t *testing.T) {
+	truncateTables(t)
+	insertUserForPaymentGuardTest(t, 507, common.MaxQuota-1_000_000)
+
+	require.NoError(t, ValidateTopUpQuotaCapacity(507, 1_000_000))
+	require.ErrorIs(t, ValidateTopUpQuotaCapacity(507, 1_000_001), ErrTopUpQuotaCapacityExceeded)
+	require.ErrorIs(t, ValidateTopUpQuotaCapacity(507, 0), ErrInvalidTopUpQuota)
+	require.ErrorIs(t, ValidateTopUpQuotaCapacity(507, -1), ErrInvalidTopUpQuota)
+	require.ErrorIs(t, ValidateTopUpQuotaCapacity(507, common.MaxQuota+1), ErrTopUpQuotaCapacityExceeded)
+	require.Error(t, ValidateTopUpQuotaCapacity(999_999, 1))
+}
+
+func TestValidateTopUpQuotaCapacityAllowsNegativeBalanceDebtRepayment(t *testing.T) {
+	truncateTables(t)
+	insertUserForPaymentGuardTest(t, 508, -10)
+
+	// A wallet in debt can absorb a full-ceiling credit only up to MaxQuota-(-10).
+	require.NoError(t, ValidateTopUpQuotaCapacity(508, common.MaxQuota))
+}
+
+func TestValidateOrganizationWalletCapacityReadsOrganizationQuota(t *testing.T) {
+	truncateTables(t)
+	insertUserForPaymentGuardTest(t, 509, common.MaxQuota)
+	require.NoError(t, DB.Create(&Organization{
+		Id:          609,
+		Name:        "capacity-org",
+		OwnerUserId: 509,
+		Quota:       common.MaxQuota - 1_000_000,
+		Status:      OrganizationStatusEnabled,
+	}).Error)
+
+	require.NoError(t, ValidateOrganizationWalletCapacity(609, 1_000_000))
+	require.ErrorIs(t, ValidateOrganizationWalletCapacity(609, 1_000_001), ErrTopUpQuotaCapacityExceeded)
+	require.ErrorIs(t, ValidateOrganizationWalletCapacity(609, 0), ErrInvalidTopUpQuota)
+	require.Error(t, ValidateOrganizationWalletCapacity(999_999, 1))
+
+	require.ErrorIs(t, ValidateTopUpTargetCapacity(TopUpTargetTypeOrganization, 609, 1_000_001), ErrTopUpQuotaCapacityExceeded)
+	require.NoError(t, ValidateTopUpTargetCapacity(TopUpTargetTypeOrganization, 609, 1_000_000))
+	require.ErrorIs(t, ValidateTopUpTargetCapacity(TopUpTargetTypeUser, 509, 1), ErrTopUpQuotaCapacityExceeded)
+}

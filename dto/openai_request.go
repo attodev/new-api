@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/types"
@@ -90,6 +91,7 @@ type GeneralOpenAIRequest struct {
 	// Ali Qwen Params
 	VlHighResolutionImages json.RawMessage `json:"vl_high_resolution_images,omitempty"`
 	EnableThinking         json.RawMessage `json:"enable_thinking,omitempty"`
+	ThinkingBudget         json.RawMessage `json:"thinking_budget,omitempty"`
 	ChatTemplateKwargs     json.RawMessage `json:"chat_template_kwargs,omitempty"`
 	EnableSearch           json.RawMessage `json:"enable_search,omitempty"`
 	// ollama Params
@@ -106,6 +108,16 @@ type GeneralOpenAIRequest struct {
 	SearchMode             json.RawMessage `json:"search_mode,omitempty"`
 	// Minimax
 	ReasoningSplit json.RawMessage `json:"reasoning_split,omitempty"`
+}
+
+// MarshalJSON drops thinking_budget for models that do not accept it. The
+// alias type has no methods, so marshaling it does not recurse back here.
+func (r GeneralOpenAIRequest) MarshalJSON() ([]byte, error) {
+	type Alias GeneralOpenAIRequest
+	if !IsQwenThinkingBudgetModel(r.Model) {
+		r.ThinkingBudget = nil
+	}
+	return common.Marshal((*Alias)(&r))
 }
 
 func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
@@ -173,24 +185,34 @@ func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
 				}
 			}
 		}
+		// Assistant tool calls replayed in agent loops are part of the prompt.
+		for _, toolCall := range message.ParseToolCalls() {
+			if len(toolCall.Custom) > 0 {
+				texts = append(texts, string(toolCall.Custom))
+				continue
+			}
+			texts = append(texts, toolCall.Function.Name, toolCall.Function.Arguments)
+		}
 	}
 
-	if r.Tools != nil {
-		openaiTools := r.Tools
-		for _, tool := range openaiTools {
-			tokenCountMeta.ToolsCount++
-			texts = append(texts, tool.Function.Name)
-			if tool.Function.Description != "" {
-				texts = append(texts, tool.Function.Description)
-			}
-			if tool.Function.Parameters != nil {
-				texts = append(texts, fmt.Sprintf("%v", tool.Function.Parameters))
-			}
+	for _, tool := range r.Tools {
+		tokenCountMeta.ToolsCount++
+		if len(tool.Custom) > 0 {
+			texts = append(texts, string(tool.Custom))
+			continue
 		}
-		//toolTokens := CountTokenInput(countStr, request.Model)
-		//tkm += 8
-		//tkm += toolTokens
+		texts = append(texts, tool.Function.Name)
+		if tool.Function.Description != "" {
+			texts = append(texts, tool.Function.Description)
+		}
+		if tool.Function.Parameters != nil {
+			parameters, _ := common.Marshal(tool.Function.Parameters)
+			texts = append(texts, string(parameters))
+		}
 	}
+	//toolTokens := CountTokenInput(countStr, request.Model)
+	//tkm += 8
+	//tkm += toolTokens
 	tokenCountMeta.CombineText = strings.Join(texts, "\n")
 	tokenCountMeta.Files = fileMeta
 	return &tokenCountMeta
@@ -219,16 +241,92 @@ func IsOpenAIReasoningOModel(modelName string) bool {
 		strings.HasPrefix(modelName, "o4")
 }
 
+// IsOpenAIGPT5Model identifies the GPT-5 family, independently of request capabilities.
 func IsOpenAIGPT5Model(modelName string) bool {
-	return strings.HasPrefix(modelName, "gpt-5")
+	return modelName == "gpt-5" || strings.HasPrefix(modelName, "gpt-5-") || strings.HasPrefix(modelName, "gpt-5.")
+}
+
+// OpenAIChatCapabilities describes independent Chat Completions compatibility rules.
+type OpenAIChatCapabilities struct {
+	UseMaxCompletionTokens bool
+	UseDeveloperRole       bool
+	SupportsTemperature    bool
+	SupportsTopP           bool
+	SupportsLogProbs       bool // Also governs top_logprobs.
+}
+
+// GetOpenAIChatCapabilities uses the mapped model and resolved reasoning effort.
+// Unrecognized models retain their parameters; future GPT generations do not
+// automatically inherit the restrictions of existing models.
+func GetOpenAIChatCapabilities(modelName, reasoningEffort string) OpenAIChatCapabilities {
+	capabilities := OpenAIChatCapabilities{
+		SupportsTemperature: true,
+		SupportsTopP:        true,
+		SupportsLogProbs:    true,
+	}
+	if IsOpenAIReasoningOModel(modelName) {
+		capabilities.UseMaxCompletionTokens = true
+		capabilities.UseDeveloperRole = !strings.HasPrefix(modelName, "o1-mini") && !strings.HasPrefix(modelName, "o1-preview")
+		capabilities.SupportsTemperature = false
+		return capabilities
+	}
+
+	isGPT5Model := IsOpenAIGPT5Model(modelName)
+	isGPT6SolLuna := isOpenAIModelSnapshot(modelName, "gpt-6-sol") || isOpenAIModelSnapshot(modelName, "gpt-6-luna")
+	if !isGPT5Model && !isGPT6SolLuna && !isOpenAIModelSnapshot(modelName, "gpt-6-astra") {
+		return capabilities
+	}
+	capabilities.UseMaxCompletionTokens = true
+	capabilities.UseDeveloperRole = true
+
+	// These standard GPT-5 models default to none and support sampling only
+	// without reasoning. Named variants (pro, codex, chat-latest, etc.) do not
+	// inherit this exception. GPT-6 Sol and Luna follow the same rule. GPT-6
+	// Astra never supports these parameters.
+	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2
+	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.4
+	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra
+	// https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-luna
+	supportsSampling := false
+	if reasoningEffort == "" || reasoningEffort == "none" {
+		supportsSampling = isGPT6SolLuna
+		for _, model := range []string{"gpt-5.1", "gpt-5.2", "gpt-5.4"} {
+			if isOpenAIModelSnapshot(modelName, model) {
+				supportsSampling = true
+				break
+			}
+		}
+	}
+	capabilities.SupportsTemperature = supportsSampling
+	capabilities.SupportsTopP = supportsSampling
+	capabilities.SupportsLogProbs = supportsSampling
+	return capabilities
+}
+
+func isOpenAIModelSnapshot(modelName, baseModel string) bool {
+	if modelName == baseModel {
+		return true
+	}
+	snapshot, ok := strings.CutPrefix(modelName, baseModel+"-")
+	if !ok {
+		return false
+	}
+	_, err := time.Parse(time.DateOnly, snapshot)
+	return err == nil
+}
+
+// IsQwenThinkingBudgetModel reports whether modelName is a Qwen/QwQ model,
+// the only families that accept the thinking_budget parameter.
+func IsQwenThinkingBudgetModel(modelName string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(modelName))
+	return strings.HasPrefix(normalized, "qwen") ||
+		strings.Contains(normalized, "/qwen") ||
+		strings.HasPrefix(normalized, "qwq") ||
+		strings.Contains(normalized, "/qwq")
 }
 
 func (r *GeneralOpenAIRequest) GetSystemRoleName() string {
-	if IsOpenAIReasoningOModel(r.Model) {
-		if !strings.HasPrefix(r.Model, "o1-mini") && !strings.HasPrefix(r.Model, "o1-preview") {
-			return "developer"
-		}
-	} else if IsOpenAIGPT5Model(r.Model) {
+	if GetOpenAIChatCapabilities(r.Model, r.ReasoningEffort).UseDeveloperRole {
 		return "developer"
 	}
 	return "system"
@@ -577,9 +675,9 @@ func (m *Message) ParseContent() []MediaContent {
 
 		case ContentTypeImageURL:
 			imageUrl := contentItem["image_url"]
-			temp := &MessageImageUrl{
-				Detail: "high",
-			}
+			// An omitted detail stays empty: upstream defaults it to auto, which
+			// costs more than high on gpt-5.5 and later.
+			temp := &MessageImageUrl{}
 			switch v := imageUrl.(type) {
 			case string:
 				temp.Url = v
@@ -879,8 +977,19 @@ type OpenAIResponsesRequest struct {
 	ClientMetadata json.RawMessage `json:"client_metadata,omitempty"`
 	// qwen
 	EnableThinking json.RawMessage `json:"enable_thinking,omitempty"`
+	ThinkingBudget json.RawMessage `json:"thinking_budget,omitempty"`
 	// perplexity
 	Preset json.RawMessage `json:"preset,omitempty"`
+}
+
+// MarshalJSON drops thinking_budget for models that do not accept it. The
+// alias type has no methods, so marshaling it does not recurse back here.
+func (r OpenAIResponsesRequest) MarshalJSON() ([]byte, error) {
+	type Alias OpenAIResponsesRequest
+	if !IsQwenThinkingBudgetModel(r.Model) {
+		r.ThinkingBudget = nil
+	}
+	return common.Marshal((*Alias)(&r))
 }
 
 func (r *OpenAIResponsesRequest) GetTokenCountMeta() *types.TokenCountMeta {
@@ -912,7 +1021,12 @@ func (r *OpenAIResponsesRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	if len(r.Instructions) > 0 {
-		texts = append(texts, string(r.Instructions))
+		var instructions string
+		if common.GetJsonType(r.Instructions) == "string" && common.Unmarshal(r.Instructions, &instructions) == nil {
+			texts = append(texts, instructions)
+		} else {
+			texts = append(texts, string(r.Instructions))
+		}
 	}
 
 	if len(r.Metadata) > 0 {
@@ -971,6 +1085,11 @@ type Input struct {
 	Type    string          `json:"type,omitempty"`
 	Role    string          `json:"role,omitempty"`
 	Content json.RawMessage `json:"content,omitempty"`
+	// Tool-call items replayed in agent loops.
+	Name      string          `json:"name,omitempty"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+	ToolInput json.RawMessage `json:"input,omitempty"`
+	Output    json.RawMessage `json:"output,omitempty"`
 }
 
 type MediaInput struct {
@@ -985,7 +1104,8 @@ type MediaInput struct {
 // Reference implementation mirrors Message.ParseContent:
 //   - input can be a string, treated as an input_text item
 //   - input can be an array of objects with a `type` field
-//     supported types: input_text, input_image, input_file
+//     supported types: input_text, output_text, input_image, input_file
+//   - tool-call items contribute their name, arguments or input, and output as input_text
 func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 	if r.Input == nil {
 		return nil
@@ -1010,15 +1130,28 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 		var inputs []Input
 		_ = common.Unmarshal(r.Input, &inputs)
 		for _, input := range inputs {
-			if common.GetJsonType(input.Content) == "string" {
+			content := input.Content
+			switch input.Type {
+			case "function_call":
+				content = input.Arguments
+			case "custom_tool_call":
+				content = input.ToolInput
+			case "function_call_output", "custom_tool_call_output", "local_shell_call_output":
+				content = input.Output
+			}
+			if input.Name != "" {
+				mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: input.Name})
+			}
+
+			if common.GetJsonType(content) == "string" {
 				var str string
-				_ = common.Unmarshal(input.Content, &str)
+				_ = common.Unmarshal(content, &str)
 				mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: str})
 			}
 
-			if common.GetJsonType(input.Content) == "array" {
+			if common.GetJsonType(content) == "array" {
 				var array []any
-				_ = common.Unmarshal(input.Content, &array)
+				_ = common.Unmarshal(content, &array)
 				for _, itemAny := range array {
 					// Already parsed MediaContent
 					if media, ok := itemAny.(MediaInput); ok {
@@ -1037,7 +1170,7 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 						continue
 					}
 					switch typeVal {
-					case "input_text":
+					case "input_text", "output_text":
 						text, _ := item["text"].(string)
 						mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: text})
 					case "input_image":

@@ -12,6 +12,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/tokenkit"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,9 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 
 	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
+	// started: the upstream emitted at least one parseable event, i.e. it began
+	// generating. failed: it reported an explicit failure (response.failed / error).
+	var started, failed bool
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 
@@ -89,10 +93,19 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			sr.Error(err)
 			return
 		}
+		started = true
 		sendResponsesStreamData(c, streamResponse, data)
 		switch streamResponse.Type {
-		case "response.completed":
+		case "response.completed", "response.done", "response.incomplete", "response.failed", "response.cancelled", "response.canceled":
+			// An explicit failure stays failed, but a failure (or incomplete /
+			// cancelled stop) that reports usage settles that usage.
+			if streamResponse.Type == "response.failed" {
+				failed = true
+			}
 			if streamResponse.Response != nil {
+				if responseTextBuilder.Len() == 0 {
+					responseTextBuilder.WriteString(service.ExtractOutputTextFromResponses(streamResponse.Response))
+				}
 				if streamResponse.Response.Usage != nil {
 					if streamResponse.Response.Usage.InputTokens != 0 {
 						usage.PromptTokens = streamResponse.Response.Usage.InputTokens
@@ -114,8 +127,14 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 					c.Set("image_generation_call_size", streamResponse.Response.GetSize())
 				}
 			}
-		case "response.output_text.delta":
+		case "response.output_text.delta",
+			"response.function_call_arguments.delta",
+			"response.reasoning_summary_text.delta",
+			"response.reasoning_text.delta",
+			"response.refusal.delta":
 			responseTextBuilder.WriteString(streamResponse.Delta)
+		case "error":
+			failed = true
 		case dto.ResponsesOutputTypeItemDone:
 			if streamResponse.Item != nil {
 				switch streamResponse.Item.Type {
@@ -135,12 +154,15 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		tempStr := responseTextBuilder.String()
 		if len(tempStr) > 0 {
 			// token
-			completionTokens := service.CountTextToken(tempStr, info.UpstreamModelName)
+			completionTokens := tokenkit.Count(info.UpstreamModelName, tempStr)
 			usage.CompletionTokens = completionTokens
 		}
 	}
 
-	if usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
+	// Bill the prompt when tokens were generated, or when the upstream started
+	// generating and did not report an explicit failure.
+	billsPrompt := usage.CompletionTokens != 0 || (started && !failed)
+	if usage.PromptTokens == 0 && billsPrompt {
 		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
 

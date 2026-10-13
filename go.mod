@@ -1,10 +1,11 @@
 module github.com/QuantumNous/new-api
 
 // +heroku goVersion go1.18
-go 1.25.1
+go 1.26
 
 require (
 	github.com/Calcium-Ion/go-epay v0.0.4
+	github.com/QuantumNous/new-api/tokenkit v0.0.0
 	github.com/abema/go-mp4 v1.4.1
 	github.com/andybalholm/brotli v1.1.1
 	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
@@ -45,7 +46,7 @@ require (
 	github.com/thanhpk/randstr v1.0.6
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
-	github.com/tiktoken-go/tokenizer v0.6.2
+	github.com/tiktoken-go/tokenizer v0.8.1 // indirect
 	github.com/waffo-com/waffo-go v1.3.1
 	github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 	golang.org/x/crypto v0.48.0
@@ -67,6 +68,7 @@ require (
 )
 
 require (
+	github.com/dlclark/regexp2/v2 v2.5.1 // indirect
 	github.com/richardlehane/mscfb v1.0.6 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
@@ -88,7 +90,6 @@ require (
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/expr-lang/expr v1.17.8
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
@@ -153,3 +154,5 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.40.1 // indirect
 )
+
+replace github.com/QuantumNous/new-api/tokenkit => ./tokenkit

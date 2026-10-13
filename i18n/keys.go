@@ -484,6 +484,9 @@ const (
 	MsgTopupWaffoPancakeNotFull   = "topup.waffo_pancake_not_full_configured"
 	MsgTopupCreatePlanFailed      = "topup.create_plan_failed"
 	MsgTopupFetchProductsFailed   = "topup.fetch_products_failed"
+	MsgTopupAmountExceedsMax      = "topup.amount_exceeds_max"
+	MsgTopupQuotaOutOfRange       = "topup.quota_out_of_range"
+	MsgTopupQuotaCapacityExceeded = "topup.quota_capacity_exceeded"
 )
 
 // Subscription payment messages

@@ -1307,9 +1307,8 @@ func calcSubscriptionBalanceQuota(priceAmount float64) (int64, error) {
 	}
 	quota := decimal.NewFromFloat(priceAmount).
 		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
-		Ceil().
-		IntPart()
-	return quota, nil
+		Ceil()
+	return common.WalletQuotaFromDecimalStrict(quota)
 }
 
 // PurchaseSubscriptionWithBalance creates a subscription by deducting the user's wallet quota.

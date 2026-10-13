@@ -55,7 +55,7 @@ func TestRequestOpenAI2AliTopP(t *testing.T) {
 			got := requestOpenAI2Ali(dto.GeneralOpenAIRequest{
 				Model: "qwen-plus",
 				TopP:  tt.topP,
-			})
+			}, "qwen-plus")
 
 			assert.Equal(t, tt.want, got.TopP)
 		})

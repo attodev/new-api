@@ -20,6 +20,7 @@ import type { ChangeEvent } from 'react'
 import * as z from 'zod'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import i18next from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -47,9 +48,8 @@ import { SettingsSection } from '../components/settings-section'
 import { useSettingsForm } from '../hooks/use-settings-form'
 import { useUpdateOption } from '../hooks/use-update-option'
 
-const quotaSchema = z.object({
+export const quotaSchema = z.object({
   QuotaForNewUser: z.coerce.number().min(0),
-  PreConsumedQuota: z.coerce.number().min(0),
   QuotaForInviter: z.coerce.number().min(0),
   QuotaForInvitee: z.coerce.number().min(0),
   TopUpLink: z.string(),
@@ -58,6 +58,20 @@ const quotaSchema = z.object({
   }),
   quota_setting: z.object({
     enable_free_model_pre_consume: z.boolean(),
+    trust_quota_usd: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce
+        .number({ error: () => i18next.t('Please enter a valid number') })
+        .min(0, {
+          error: () => i18next.t('Must be greater than or equal to 0'),
+        })
+    ),
+    pre_consume_multiplier: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce
+        .number({ error: () => i18next.t('Please enter a valid number') })
+        .positive({ error: () => i18next.t('Must be greater than 0') })
+    ),
   }),
 })
 
@@ -148,30 +162,6 @@ export function QuotaSettingsSection({
 
             <FormField
               control={form.control}
-              name='PreConsumedQuota'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Pre-Consumed Quota')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      value={field.value ?? ''}
-                      onChange={handleNumberChange(field.onChange)}
-                      name={field.name}
-                      onBlur={field.onBlur}
-                      ref={field.ref}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t('Quota consumed before charging users')}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name='QuotaForInviter'
               render={({ field }) => (
                 <FormItem>
@@ -243,6 +233,64 @@ export function QuotaSettingsSection({
                 )}
               />
             </SettingsFormGridItem>
+
+            <FormField
+              control={form.control}
+              name='quota_setting.trust_quota_usd'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Wallet pre-consume bypass threshold (USD)')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      step='any'
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Skip pre-consumption when the wallet balance and limited API key balance both exceed this amount. Set to 0 to always pre-consume. Subscriptions, organization wallets and asynchronous tasks always reserve quota.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='quota_setting.pre_consume_multiplier'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Input pre-consume multiplier')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      step='any'
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Reserve the estimated input cost multiplied by this value, without estimating output tokens. Defaults to 1; positive decimals such as 0.5 and 1.5 are supported. Final charges use actual usage. Per-request and task prices are unaffected.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

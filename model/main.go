@@ -209,14 +209,23 @@ func InitDB() (err error) {
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
 		if !common.IsMasterNode {
-			return nil
+			// Non-master nodes never migrate, so they must refuse to serve a
+			// schema the master has not widened yet.
+			return ensureUserQuotaColumns(DB, mainDatabaseType())
 		}
 		if common.UsingMySQL {
 			//_, _ = sqlDB.Exec("ALTER TABLE channels MODIFY model_mapping TEXT;") // TODO: delete this line when most users have upgraded
 		}
 		common.SysLog("database migration started")
-		err = migrateDB()
-		return err
+		if err = migrateDB(); err != nil {
+			return err
+		}
+		// Upstream runs this check before migrating because it never widens a
+		// legacy wallet automatically. This fork's AutoMigrate performs the
+		// int -> bigint widening itself (docs/quota-ceiling-and-bigint-migration.md),
+		// so the check verifies the migrated schema instead of blocking the
+		// migration that would fix it.
+		return ensureUserQuotaColumns(DB, mainDatabaseType())
 	} else {
 		common.FatalLog(err)
 	}
@@ -258,6 +267,66 @@ func InitLogDB() (err error) {
 		common.FatalLog(err)
 	}
 	return err
+}
+
+func mainDatabaseType() string {
+	switch {
+	case common.UsingPostgreSQL:
+		return common.DatabaseTypePostgreSQL
+	case common.UsingMySQL:
+		return common.DatabaseTypeMySQL
+	default:
+		return common.DatabaseTypeSQLite
+	}
+}
+
+var userQuotaColumns = []string{"quota", "used_quota", "aff_quota", "aff_history"}
+
+// ensureUserQuotaColumns refuses to run against a legacy 32-bit wallet
+// schema on MySQL/PostgreSQL: the quota columns hold values up to
+// common.MaxQuota, which a 32-bit column would reject (PostgreSQL) or
+// silently truncate (non-strict MySQL). SQLite INTEGER is always 64-bit.
+// Ported from upstream a073f74b3; SKIP_64BIT_QUOTA_SCHEMA_CHECK=true bypasses
+// it for operators who have verified the columns another way.
+func ensureUserQuotaColumns(db *gorm.DB, dbType string) error {
+	if common.GetEnvOrDefaultBool("SKIP_64BIT_QUOTA_SCHEMA_CHECK", false) {
+		common.SysLog("SKIP_64BIT_QUOTA_SCHEMA_CHECK=true; skipping user quota schema check")
+		return nil
+	}
+	if db == nil || dbType == common.DatabaseTypeSQLite {
+		return nil
+	}
+	if !db.Migrator().HasTable(&User{}) {
+		return nil
+	}
+	columnTypes, err := db.Migrator().ColumnTypes(&User{})
+	if err != nil {
+		return fmt.Errorf("failed to inspect users schema: %w", err)
+	}
+	for _, expected := range userQuotaColumns {
+		for _, actual := range columnTypes {
+			if !strings.EqualFold(actual.Name(), expected) {
+				continue
+			}
+			dataType := actual.DatabaseTypeName()
+			if !is64BitIntegerType(dbType, dataType) {
+				return fmt.Errorf("users.%s uses %s; 32-bit quota columns are not supported (migrate the column to bigint, or set SKIP_64BIT_QUOTA_SCHEMA_CHECK=true after verifying it)", expected, dataType)
+			}
+		}
+	}
+	return nil
+}
+
+func is64BitIntegerType(dbType string, dataType string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(dataType))
+	switch dbType {
+	case common.DatabaseTypeMySQL:
+		return normalized == "bigint" || normalized == "unsigned bigint" || normalized == "bigint unsigned"
+	case common.DatabaseTypePostgreSQL:
+		return normalized == "bigint" || normalized == "int8"
+	default:
+		return false
+	}
 }
 
 func migrateDB() error {

@@ -8,7 +8,7 @@ DEV_POSTGRES_DB = new-api
 DEV_POSTGRES_USER = root
 DEV_SQLITE_PATH ?= one-api.db
 
-.PHONY: all build-frontend build-frontend-classic build-all-frontends start-backend dev dev-api dev-api-rebuild dev-web dev-web-classic reset-setup
+.PHONY: all build-frontend build-frontend-classic build-all-frontends start-backend dev dev-api dev-api-rebuild dev-web dev-web-classic test reset-setup
 
 all: build-all-frontends start-backend
 
@@ -43,6 +43,15 @@ dev-web-classic:
 	@cd $(FRONTEND_CLASSIC_DIR) && bun install && bun run dev
 
 dev: dev-api dev-web
+
+# The main package embeds the ignored web dist output and is covered after a frontend build.
+test:
+	@echo "Testing root Go module..."
+	@root_module=$$(GOWORK=off go list -m); \
+		root_packages=$$(GOWORK=off go list -e ./... | grep -vxF "$$root_module"); \
+		GOWORK=off go test $$root_packages
+	@echo "Testing tokenkit Go module..."
+	@cd tokenkit && GOWORK=off go test ./...
 
 reset-setup:
 	@echo "Resetting local setup wizard state..."

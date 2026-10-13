@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -324,7 +325,9 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 		return false
 	}
 
-	trustQuota := common.GetTrustQuota()
+	// quota_setting.trust_quota_usd × QuotaPerUnit; 0 (or an invalid value)
+	// disables the bypass.
+	trustQuota := operation_setting.TrustQuota()
 	if trustQuota <= 0 {
 		return false
 	}
@@ -332,7 +335,7 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 	tokenTrusted := s.relayInfo.TokenUnlimited
 	if !tokenTrusted {
 		tokenQuota := c.GetInt("token_quota")
-		tokenTrusted = tokenQuota > trustQuota
+		tokenTrusted = float64(tokenQuota) > trustQuota
 	}
 	if !tokenTrusted {
 		return false
@@ -343,7 +346,7 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 		if _, ok := s.funding.(*OrganizationWalletFunding); ok {
 			return false
 		}
-		return s.relayInfo.UserQuota > int64(trustQuota)
+		return float64(s.relayInfo.UserQuota) > trustQuota
 	case BillingSourceSubscription:
 		// 1. PreConsumeUserSubscription amount>0
 		// 2. SubscriptionFunding.PreConsume s.amount

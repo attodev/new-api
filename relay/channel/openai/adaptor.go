@@ -319,41 +319,34 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 
 	}
-	isOModel := dto.IsOpenAIReasoningOModel(info.UpstreamModelName)
-	isGPT5Model := dto.IsOpenAIGPT5Model(info.UpstreamModelName)
-	if isOModel || isGPT5Model {
+	// Resolve the reasoning-effort suffix first: sampling support depends on the
+	// effort, and capabilities are keyed on the base model name.
+	if effort, baseModel := reasoning.ParseOpenAIReasoningEffortFromModelSuffix(info.UpstreamModelName); effort != "" &&
+		dto.GetOpenAIChatCapabilities(baseModel, "").UseMaxCompletionTokens {
+		request.ReasoningEffort = effort
+		info.UpstreamModelName = baseModel
+		request.Model = baseModel
+	}
+	caps := dto.GetOpenAIChatCapabilities(info.UpstreamModelName, request.ReasoningEffort)
+	if caps.UseMaxCompletionTokens {
+		info.ReasoningEffort = request.ReasoningEffort
 		if lo.FromPtrOr(request.MaxCompletionTokens, uint(0)) == 0 && lo.FromPtrOr(request.MaxTokens, uint(0)) != 0 {
 			request.MaxCompletionTokens = request.MaxTokens
 			request.MaxTokens = nil
 		}
-
-		if isOModel {
-			request.Temperature = nil
-		}
-
-		// gpt-5
-		if isGPT5Model {
-			request.Temperature = nil
-			request.TopP = nil
-			request.LogProbs = nil
-		}
-
-		effort, originModel := reasoning.ParseOpenAIReasoningEffortFromModelSuffix(info.UpstreamModelName)
-		if effort != "" {
-			request.ReasoningEffort = effort
-			info.UpstreamModelName = originModel
-			request.Model = originModel
-		}
-
-		info.ReasoningEffort = request.ReasoningEffort
-
-		// odevelopero1-mini
-		if !strings.HasPrefix(info.UpstreamModelName, "o1-mini") && !strings.HasPrefix(info.UpstreamModelName, "o1-preview") {
-			// Messagesystemdeveloper
-			if len(request.Messages) > 0 && request.Messages[0].Role == "system" {
-				request.Messages[0].Role = "developer"
-			}
-		}
+	}
+	if !caps.SupportsTemperature {
+		request.Temperature = nil
+	}
+	if !caps.SupportsTopP {
+		request.TopP = nil
+	}
+	if !caps.SupportsLogProbs {
+		request.LogProbs = nil
+		request.TopLogProbs = nil
+	}
+	if caps.UseDeveloperRole && len(request.Messages) > 0 && request.Messages[0].Role == "system" {
+		request.Messages[0].Role = "developer"
 	}
 
 	return request, nil
