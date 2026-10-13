@@ -3,6 +3,7 @@ package model
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/stretchr/testify/require"
 )
@@ -303,4 +304,71 @@ func TestListWalletAutoRechargePresetsFiltersDisabledAndSortsBySortOrder(t *test
 	require.Equal(t, "정렬 10 비활성", allPresets[0].Name)
 	require.Equal(t, "정렬 10", allPresets[1].Name)
 	require.Equal(t, first.Id, allPresets[2].Id)
+}
+
+func thresholdPresetRequestForCapacityTest(thresholdQuota int64) WalletAutoRechargePresetRequest {
+	return WalletAutoRechargePresetRequest{
+		Type:           WalletAutoRechargeTypeThreshold,
+		TargetScope:    WalletAutoRechargePresetTargetAll,
+		Name:           "capacity threshold",
+		Amount:         10000,
+		ThresholdQuota: thresholdQuota,
+		Enabled:        true,
+	}
+}
+
+func TestCreateWalletAutoRechargePresetRejectsThresholdWithNoRoomForCharge(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+	credited := WalletAutoRechargeCreditQuota(10000)
+	require.Positive(t, credited)
+
+	_, err := CreateWalletAutoRechargePreset(thresholdPresetRequestForCapacityTest(int64(common.MaxQuota)))
+	require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
+
+	_, err = CreateWalletAutoRechargePreset(thresholdPresetRequestForCapacityTest(int64(common.MaxQuota) - credited + 1))
+	require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
+
+	preset, err := CreateWalletAutoRechargePreset(thresholdPresetRequestForCapacityTest(int64(common.MaxQuota) - credited - 1))
+	require.NoError(t, err)
+	require.NotZero(t, preset.Id)
+
+	var count int64
+	require.NoError(t, DB.Model(&WalletAutoRechargePreset{}).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
+func TestUpdateWalletAutoRechargePresetRejectsThresholdWithNoRoomForCharge(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+	credited := WalletAutoRechargeCreditQuota(10000)
+
+	preset, err := CreateWalletAutoRechargePreset(thresholdPresetRequestForCapacityTest(500000))
+	require.NoError(t, err)
+
+	_, err = UpdateWalletAutoRechargePreset(preset.Id, thresholdPresetRequestForCapacityTest(int64(common.MaxQuota)))
+	require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
+
+	var stored WalletAutoRechargePreset
+	require.NoError(t, DB.First(&stored, preset.Id).Error)
+	require.EqualValues(t, 500000, stored.ThresholdQuota)
+
+	updated, err := UpdateWalletAutoRechargePreset(preset.Id, thresholdPresetRequestForCapacityTest(int64(common.MaxQuota)-credited-1))
+	require.NoError(t, err)
+	require.EqualValues(t, int64(common.MaxQuota)-credited-1, updated.ThresholdQuota)
+}
+
+func TestCreateWalletAutoRechargePresetScheduledIgnoresThresholdCapacity(t *testing.T) {
+	setupWalletAutoRechargePresetTestDB(t)
+
+	preset, err := CreateWalletAutoRechargePreset(WalletAutoRechargePresetRequest{
+		Type:           WalletAutoRechargeTypeScheduled,
+		TargetScope:    WalletAutoRechargePresetTargetAll,
+		Name:           "scheduled with stray threshold",
+		Amount:         10000,
+		ThresholdQuota: int64(common.MaxQuota),
+		IntervalUnit:   WalletAutoRechargeIntervalMonth,
+		IntervalValue:  1,
+		Enabled:        true,
+	})
+	require.NoError(t, err)
+	require.NotZero(t, preset.Id)
 }
