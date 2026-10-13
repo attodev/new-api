@@ -270,7 +270,7 @@ func requestWalletAutoRecharge(c *gin.Context, policyType string, target walletR
 		return
 	}
 	if err := validateWalletAutoRechargeCapacity(policyType, target, preset.Amount, preset.ThresholdQuota); err != nil {
-		common.ApiErrorMsg(c, topUpQuotaRejectionMessage(c, err))
+		common.ApiErrorMsg(c, topUpQuotaRejectionMessageForTarget(c, err, target.TargetType, target.TargetId))
 		return
 	}
 

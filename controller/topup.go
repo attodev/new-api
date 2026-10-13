@@ -354,10 +354,18 @@ func validateTopUpTargetCapacity(c *gin.Context, userId int, creditedQuota int64
 	return model.ValidateTopUpTargetCapacity(targetType, targetId, creditedQuota)
 }
 
-// topUpQuotaRejectionMessage translates a pre-payment rejection. Any error the
+// topUpQuotaRejectionMessage translates a pre-payment rejection for the wallet
+// target recorded on the gin context (see getTopUpTargetType). Any error the
 // validators do not classify (e.g. a database failure while reading the
 // wallet) fails closed with a generic message.
 func topUpQuotaRejectionMessage(c *gin.Context, err error) string {
+	return topUpQuotaRejectionMessageForTarget(c, err, getTopUpTargetType(c), getTopUpTargetId(c))
+}
+
+// topUpQuotaRejectionMessageForTarget is topUpQuotaRejectionMessage for callers
+// that know the wallet target explicitly (the auto-recharge path never marks
+// the gin context), so the fail-closed log names the right wallet.
+func topUpQuotaRejectionMessageForTarget(c *gin.Context, err error, targetType string, targetId int) string {
 	var quotaErr *topUpQuotaError
 	switch {
 	case errors.As(err, &quotaErr):
@@ -370,9 +378,13 @@ func topUpQuotaRejectionMessage(c *gin.Context, err error) string {
 	case errors.Is(err, model.ErrInvalidTopUpQuota):
 		return common.TranslateMessage(c, i18n.MsgTopupInvalidQuota)
 	default:
-		logger.LogError(c.Request.Context(), fmt.Sprintf("top-up capacity check failed user_id=%d target_type=%s target_id=%d error=%q", c.GetInt("id"), getTopUpTargetType(c), getTopUpTargetId(c), err.Error()))
+		logger.LogError(c.Request.Context(), topUpCapacityFailureLogLine(c.GetInt("id"), targetType, targetId, err))
 		return common.TranslateMessage(c, i18n.MsgPaymentCreateFailed)
 	}
+}
+
+func topUpCapacityFailureLogLine(userId int, targetType string, targetId int, err error) string {
+	return fmt.Sprintf("top-up capacity check failed user_id=%d target_type=%s target_id=%d error=%q", userId, targetType, targetId, err.Error())
 }
 
 // checkCreditedQuota validates a provider-computed credited quota and the

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
@@ -136,4 +137,12 @@ func TestRequestOrganizationWalletScheduledRechargeChecksOrganizationWallet(t *t
 
 	requireOrganizationApiError(t, res, i18n.Translate(i18n.LangEn, i18n.MsgTopupQuotaCapacityExceeded))
 	requireNoWalletAutoRechargePolicies(t)
+}
+
+func TestTopUpCapacityFailureLogLineNamesTheTarget(t *testing.T) {
+	line := topUpCapacityFailureLogLine(7, model.TopUpTargetTypeOrganization, 42, errors.New("db down"))
+	require.Equal(t, `top-up capacity check failed user_id=7 target_type=organization target_id=42 error="db down"`, line)
+
+	line = topUpCapacityFailureLogLine(7, model.TopUpTargetTypeUser, 7, errors.New("db down"))
+	require.Contains(t, line, "target_type=user target_id=7")
 }
