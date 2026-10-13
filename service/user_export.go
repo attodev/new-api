@@ -192,6 +192,10 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota value %q", lineNum, username, qs))
 				continue
 			}
+			if err := common.ValidateWalletQuota(int64(quota)); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota value %q: %v", lineNum, username, qs, err))
+				continue
+			}
 		}
 
 		// Parse aff_quota
@@ -201,6 +205,10 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 				affQuota = q
 			} else {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid aff_quota value %q", lineNum, username, qs))
+				continue
+			}
+			if err := common.ValidateWalletQuota(int64(affQuota)); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid aff_quota value %q: %v", lineNum, username, qs, err))
 				continue
 			}
 		}
@@ -246,15 +254,8 @@ func ImportUsersFromFile(f *excelize.File) (*ImportResult, error) {
 
 		// Override quota with imported value if it differs from the default applied by Insert().
 		if quota != 0 {
-			delta := quota - int(common.QuotaForNewUser)
-			if delta > 0 {
-				if err := model.IncreaseUserQuota(user.Id, int64(delta), true); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
-				}
-			} else if delta < 0 {
-				if err := model.DecreaseUserQuota(user.Id, -int64(delta), true); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
-				}
+			if err := setImportedUserQuota(user.Id, common.QuotaForNewUser, int64(quota)); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 			}
 		}
 

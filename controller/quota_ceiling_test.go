@@ -26,6 +26,16 @@ func setupQuotaCeilingControllerTestDB(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.Redemption{}))
 }
 
+var walletQuotaExceedsMessage = fmt.Sprintf("wallet quota exceeds %d", common.MaxQuota)
+
+const redemptionQuotaPositiveMessage = "redemption quota must be positive"
+
+func requireRejected(t *testing.T, response map[string]any, message string) {
+	t.Helper()
+	assert.Equal(t, false, response["success"])
+	assert.Equal(t, message, response["message"])
+}
+
 func performManageUserRequest(t *testing.T, body map[string]any) map[string]any {
 	t.Helper()
 	ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/api/user/manage", body, 1)
@@ -46,17 +56,17 @@ func TestManageUserQuotaRespectsWalletCeiling(t *testing.T) {
 	require.NoError(t, model.DB.Create(&user).Error)
 
 	response := performManageUserRequest(t, map[string]any{"id": user.Id, "action": "add_quota", "mode": "add", "value": 2})
-	assert.Equal(t, false, response["success"])
+	requireRejected(t, response, "top-up quota capacity exceeded: user quota capacity exceeded")
 
 	var updated model.User
 	require.NoError(t, model.DB.First(&updated, user.Id).Error)
 	assert.Equal(t, common.MaxQuota-1, updated.Quota)
 
 	response = performManageUserRequest(t, map[string]any{"id": user.Id, "action": "add_quota", "mode": "add", "value": common.MaxQuota + 1})
-	assert.Equal(t, false, response["success"])
+	requireRejected(t, response, walletQuotaExceedsMessage)
 
 	response = performManageUserRequest(t, map[string]any{"id": user.Id, "action": "add_quota", "mode": "override", "value": common.MaxQuota + 1})
-	assert.Equal(t, false, response["success"])
+	requireRejected(t, response, walletQuotaExceedsMessage)
 	require.NoError(t, model.DB.First(&updated, user.Id).Error)
 	assert.Equal(t, common.MaxQuota-1, updated.Quota)
 
@@ -109,9 +119,13 @@ func TestRedemptionHandlersRejectQuotaOutsideWalletRange(t *testing.T) {
 	setupQuotaCeilingControllerTestDB(t)
 	confirmPaymentComplianceForTest(t)
 
-	for _, quota := range []int64{0, -5, common.MaxQuota + 1} {
+	for quota, message := range map[int64]string{
+		0:                   redemptionQuotaPositiveMessage,
+		-5:                  redemptionQuotaPositiveMessage,
+		common.MaxQuota + 1: walletQuotaExceedsMessage,
+	} {
 		response := performRedemptionRequest(t, http.MethodPost, map[string]any{"name": "bad", "count": 1, "quota": quota}, AddRedemption)
-		assert.Equal(t, false, response["success"], "quota=%d", quota)
+		requireRejected(t, response, message)
 	}
 	var count int64
 	require.NoError(t, model.DB.Model(&model.Redemption{}).Count(&count).Error)
@@ -123,9 +137,9 @@ func TestRedemptionHandlersRejectQuotaOutsideWalletRange(t *testing.T) {
 	var stored model.Redemption
 	require.NoError(t, model.DB.First(&stored).Error)
 	response = performRedemptionRequest(t, http.MethodPut, map[string]any{"id": stored.Id, "name": "ok", "quota": common.MaxQuota + 1}, UpdateRedemption)
-	assert.Equal(t, false, response["success"])
+	requireRejected(t, response, walletQuotaExceedsMessage)
 	response = performRedemptionRequest(t, http.MethodPut, map[string]any{"id": stored.Id, "name": "ok", "quota": 0}, UpdateRedemption)
-	assert.Equal(t, false, response["success"])
+	requireRejected(t, response, redemptionQuotaPositiveMessage)
 
 	require.NoError(t, model.DB.First(&stored, stored.Id).Error)
 	assert.Equal(t, common.MaxQuota, int64(stored.Quota))

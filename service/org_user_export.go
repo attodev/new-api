@@ -20,13 +20,45 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 )
+
+// importedWalletQuota converts an imported USD balance to quota (truncated,
+// as before) and rejects a balance outside the wallet ceiling
+// common.MaxQuota instead of a bare float->int conversion.
+func importedWalletQuota(usd float64) (int64, error) {
+	if math.IsNaN(usd) || math.IsInf(usd, 0) {
+		return 0, fmt.Errorf("quota must be a finite number")
+	}
+	quota, err := common.WalletQuotaFromDecimalStrict(
+		decimal.NewFromFloat(usd).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).Truncate(0),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("quota exceeds the wallet limit %d", common.MaxQuota)
+	}
+	return quota, nil
+}
+
+// setImportedUserQuota moves a user's balance to target: an increase is new
+// quota and goes through the ceiling-checked GrantUserQuota, a decrease
+// through DecreaseUserQuota.
+func setImportedUserQuota(userId int, current int64, target int64) error {
+	delta := target - current
+	if delta > 0 {
+		return model.GrantUserQuota(userId, delta)
+	}
+	if delta < 0 {
+		return model.DecreaseUserQuota(userId, -delta, true)
+	}
+	return nil
+}
 
 // OrgExcelHeaders defines ordered columns for org user export/import.
 var OrgExcelHeaders = []string{
@@ -157,6 +189,19 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 
 		if userExists {
 			if existingUser.OrganizationId == organizationId {
+				// Validate the imported balance before touching the row, so an
+				// out-of-range quota rejects the whole row.
+				var importedQuota *int64
+				if qs := getCell(row, "quota"); qs != "" {
+					if usd, err := strconv.ParseFloat(qs, 64); err == nil {
+						quota, err := importedWalletQuota(usd)
+						if err != nil {
+							result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q: %v", lineNum, username, qs, err))
+							continue
+						}
+						importedQuota = &quota
+					}
+				}
 				updates := map[string]interface{}{}
 				if dn := getCell(row, "display_name"); dn != "" {
 					updates["display_name"] = dn
@@ -175,15 +220,9 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
 					continue
 				}
-				if qs := getCell(row, "quota"); qs != "" {
-					if usd, err := strconv.ParseFloat(qs, 64); err == nil {
-						newQuota := int(usd * common.QuotaPerUnit)
-						delta := newQuota - int(existingUser.Quota)
-						if delta > 0 {
-							_ = model.IncreaseUserQuota(existingUser.Id, int64(delta), true)
-						} else if delta < 0 {
-							_ = model.DecreaseUserQuota(existingUser.Id, -int64(delta), true)
-						}
+				if importedQuota != nil {
+					if err := setImportedUserQuota(existingUser.Id, existingUser.Quota, *importedQuota); err != nil {
+						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 					}
 				}
 				if err := model.InvalidateUserCache(existingUser.Id); err != nil {
@@ -217,12 +256,16 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 			continue
 		}
 
-		quota := 0
+		var quota int64
 		if qs := getCell(row, "quota"); qs != "" {
-			if usd, err := strconv.ParseFloat(qs, 64); err == nil {
-				quota = int(usd * common.QuotaPerUnit)
-			} else {
+			usd, err := strconv.ParseFloat(qs, 64)
+			if err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q", lineNum, username, qs))
+				continue
+			}
+			quota, err = importedWalletQuota(usd)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q: %v", lineNum, username, qs, err))
 				continue
 			}
 		}
@@ -257,15 +300,8 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 		}
 
 		if quota != 0 {
-			delta := quota - int(common.QuotaForNewUser)
-			if delta > 0 {
-				if err := model.IncreaseUserQuota(newUser.Id, int64(delta), true); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
-				}
-			} else if delta < 0 {
-				if err := model.DecreaseUserQuota(newUser.Id, -int64(delta), true); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
-				}
+			if err := setImportedUserQuota(newUser.Id, common.QuotaForNewUser, quota); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 			}
 		}
 

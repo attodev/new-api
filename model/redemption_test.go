@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -79,17 +80,20 @@ func TestRedemptionQuotaRejectsWalletOverflow(t *testing.T) {
 		Quota:       int(overCeiling),
 		CreatedTime: common.GetTimestamp(),
 	}
-	require.Error(t, redemption.Insert())
+	walletExceeds := fmt.Sprintf("wallet quota exceeds %d", common.MaxQuota)
+	require.EqualError(t, redemption.Insert(), walletExceeds)
 
 	redemption.Quota = 0
-	require.Error(t, redemption.Insert())
+	require.EqualError(t, redemption.Insert(), "redemption quota must be positive")
 	redemption.Quota = -1
-	require.Error(t, redemption.Insert())
+	require.EqualError(t, redemption.Insert(), "redemption quota must be positive")
 
 	redemption.Quota = 100
 	require.NoError(t, redemption.Insert())
 	redemption.Quota = int(overCeiling)
-	require.Error(t, redemption.Update())
+	require.EqualError(t, redemption.Update(), walletExceeds)
+	redemption.Quota = 0
+	require.EqualError(t, redemption.Update(), "redemption quota must be positive")
 
 	var stored Redemption
 	require.NoError(t, DB.First(&stored, redemption.Id).Error)

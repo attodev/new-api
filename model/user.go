@@ -988,18 +988,29 @@ func IncreaseUserQuota(id int, quota int64, db bool) (err error) {
 	return applyUserQuotaDelta(id, quota, db)
 }
 
-// GrantUserQuota credits newly issued quota (an admin grant) to a user
-// wallet. Unlike IncreaseUserQuota it enforces common.MaxQuota on the
-// resulting balance, atomically in the database UPDATE, and writes through
-// to the database even when batch updates are enabled so the rejection is
-// reported to the caller.
+// GrantUserQuota credits newly issued quota (an admin grant, an imported
+// balance, a check-in reward) to a user wallet. Unlike IncreaseUserQuota it
+// enforces common.MaxQuota on the resulting balance, atomically in the
+// database UPDATE, and writes through to the database even when batch updates
+// are enabled so the rejection is reported to the caller.
+//
+// A ceiling rejection is an expected outcome here, so the database is written
+// first and the Redis balance only follows a successful credit (upstream's
+// ordering for grants); refund paths keep applyUserQuotaDelta's
+// cache-then-compensate ordering.
 func GrantUserQuota(id int, quota int64) error {
 	if quota <= 0 {
 		return errors.New("quota must be positive")
 	}
-	return applyUserQuotaDeltaSync(id, quota, func() error {
-		return creditUserQuotaWithinCeiling(DB, id, quota)
-	})
+	if err := creditUserQuotaWithinCeiling(DB, id, quota); err != nil {
+		return err
+	}
+	if common.RedisEnabled {
+		if _, err := cacheApplyUserQuotaDelta(id, quota); err != nil {
+			common.SysLog("failed to update user quota cache after grant: " + err.Error())
+		}
+	}
+	return nil
 }
 
 // increaseUserQuota deliberately does NOT enforce common.MaxQuota on the
@@ -1008,8 +1019,9 @@ func GrantUserQuota(id int, quota int64) error {
 // that cannot be applied silently destroys quota the user already paid for --
 // strictly worse than the precision drift a ceiling here would prevent. The
 // ceiling is enforced where new quota enters instead: CreditTopUpTarget for
-// payments, Redeem for redemption codes and GrantUserQuota for admin grants
-// (all through creditUserQuotaWithinCeiling). IncreaseUserQuota only bounds a
+// payments, Redeem for redemption codes, GrantUserQuota for admin grants and
+// user imports, and the check-in reward (all through
+// creditUserQuotaWithinCeiling). IncreaseUserQuota only bounds a
 // single delta with common.ValidateWalletQuota.
 func increaseUserQuota(id int, quota int64) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error

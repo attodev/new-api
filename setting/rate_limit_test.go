@@ -10,9 +10,14 @@ import (
 
 func TestCheckModelRequestRateLimitGroupBounds(t *testing.T) {
 	require.NoError(t, CheckModelRequestRateLimitGroup(fmt.Sprintf(`{"vip":[%d,%d]}`, math.MaxInt32, math.MaxInt32)))
-	require.Error(t, CheckModelRequestRateLimitGroup(fmt.Sprintf(`{"vip":[%d,1]}`, int64(math.MaxInt32)+1)))
-	require.Error(t, CheckModelRequestRateLimitGroup(`{"vip":[-1,1]}`))
-	require.Error(t, CheckModelRequestRateLimitGroup(`{"vip":[1,0]}`))
+	require.EqualError(t,
+		CheckModelRequestRateLimitGroup(fmt.Sprintf(`{"vip":[%d,1]}`, int64(math.MaxInt32)+1)),
+		fmt.Sprintf("group vip [%d, 1] exceeds max rate limit %d", int64(math.MaxInt32)+1, math.MaxInt32))
+	require.EqualError(t,
+		CheckModelRequestRateLimitGroup(fmt.Sprintf(`{"vip":[1,%d]}`, int64(math.MaxInt32)+1)),
+		fmt.Sprintf("group vip [1, %d] exceeds max rate limit %d", int64(math.MaxInt32)+1, math.MaxInt32))
+	require.EqualError(t, CheckModelRequestRateLimitGroup(`{"vip":[-1,1]}`), "group vip has negative rate limit values: [-1, 1]")
+	require.EqualError(t, CheckModelRequestRateLimitGroup(`{"vip":[1,0]}`), "group vip has negative rate limit values: [1, 0]")
 	require.Error(t, CheckModelRequestRateLimitGroup(`not json`))
 }
 

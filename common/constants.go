@@ -77,7 +77,7 @@ var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 // request validation on the organization quota endpoints, redemption codes,
 // token budgets and ManageUser add_quota/override, and as an atomic upper bound
 // where new quota enters a user wallet (creditUserQuotaWithinCeiling: top-ups,
-// redemption, admin grants). Deliberately NOT enforced on the accumulated
+// redemption, admin grants, user imports, check-in rewards). Deliberately NOT enforced on the accumulated
 // balance by the generic quota increment helpers: those mostly serve refunds,
 // and a refund that cannot be applied destroys quota the account already paid
 // for -- see the note on increaseUserQuota in model/user.go.
