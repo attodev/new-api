@@ -1441,7 +1441,7 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		}
 		responseText.WriteString(geminiResponseUsageText(&geminiResponse))
 
-		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
+		if geminiUsageMetadataHasTokens(geminiResponse.UsageMetadata) {
 			mappedUsage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())
 			*usage = mappedUsage
 			hasUsageMetadata = true

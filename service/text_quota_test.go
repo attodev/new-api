@@ -517,7 +517,7 @@ func TestUsageSemanticEmptyModelPatternsAppliesToAll(t *testing.T) {
 		StartTime: time.Now(),
 	}
 	usage := &dto.Usage{
-		PromptTokens: 50000,
+		PromptTokens:        50000,
 		PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 10000},
 	}
 

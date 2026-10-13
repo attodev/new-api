@@ -295,8 +295,9 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, promptT
 	quotaBeforeGroup := rawCost / 1_000_000 * common.QuotaPerUnit
 	// Scale the reservation only, preserving the expression's context-length
 	// tier (chosen from the unscaled input) and leaving settlement unchanged.
-	// Every tiered leaf in this fork is token-priced, so the multiplier always
-	// applies here.
+	// This fork has no request-priced leaves, so the whole expression
+	// reservation (constant, param() and header() terms included) is scaled by
+	// the multiplier.
 	quotaBeforeGroup *= preConsumeMultiplier
 	preConsumedQuota, err := billingexpr.QuotaRoundStrict(quotaBeforeGroup * groupRatioInfo.GroupRatio)
 	if err != nil {

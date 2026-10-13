@@ -75,8 +75,16 @@ func CommonClaudeHeadersOperation(c *gin.Context, req *http.Header, info *relayc
 	// common headers operation
 	// A client may send several anthropic-beta lines; the API reads one
 	// comma-separated list, so forward all of them.
-	if values := c.Request.Header.Values("anthropic-beta"); len(values) > 0 {
-		req.Set("anthropic-beta", strings.Join(values, ","))
+	var betas []string
+	for _, value := range c.Request.Header.Values("anthropic-beta") {
+		for _, beta := range strings.Split(value, ",") {
+			if beta = strings.TrimSpace(beta); beta != "" {
+				betas = append(betas, beta)
+			}
+		}
+	}
+	if len(betas) > 0 {
+		req.Set("anthropic-beta", strings.Join(betas, ","))
 	}
 	model_setting.GetClaudeSettings().WriteHeaders(info.OriginModelName, req)
 }

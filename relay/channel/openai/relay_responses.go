@@ -96,7 +96,12 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		started = true
 		sendResponsesStreamData(c, streamResponse, data)
 		switch streamResponse.Type {
-		case "response.completed":
+		case "response.completed", "response.done", "response.incomplete", "response.failed", "response.cancelled", "response.canceled":
+			// An explicit failure stays failed, but a failure (or incomplete /
+			// cancelled stop) that reports usage settles that usage.
+			if streamResponse.Type == "response.failed" {
+				failed = true
+			}
 			if streamResponse.Response != nil {
 				if responseTextBuilder.Len() == 0 {
 					responseTextBuilder.WriteString(service.ExtractOutputTextFromResponses(streamResponse.Response))
@@ -128,7 +133,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			"response.reasoning_text.delta",
 			"response.refusal.delta":
 			responseTextBuilder.WriteString(streamResponse.Delta)
-		case "response.failed", "error":
+		case "error":
 			failed = true
 		case dto.ResponsesOutputTypeItemDone:
 			if streamResponse.Item != nil {
