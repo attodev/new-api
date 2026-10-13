@@ -139,7 +139,10 @@ def psql(sql):
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0: die(f"psql: {r.stderr.strip()}")
 
-# 5. 테스트 사용자 (관리자 생성 API 는 이메일을 저장하지 않으므로 psql 로 넣는다)
+# 5. 루트 이메일 (선택) + 테스트 사용자 (관리자 생성 API 는 이메일을 저장하지 않으므로 psql 로 넣는다)
+if E.get("NEW_API_ROOT_EMAIL"):
+    psql(f"update users set email = '{E['NEW_API_ROOT_EMAIL']}' where username = '{E['NEW_API_ROOT_USER']}';")
+    log(f"루트 이메일 설정: {E['NEW_API_ROOT_EMAIL']}")
 test_users = [u for u in E.get("NEW_API_TEST_USERS", "").split(",") if u.strip()]
 for spec in test_users:
     name, pw, email = (spec.split(":") + ["", ""])[:3]

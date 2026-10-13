@@ -96,6 +96,7 @@ new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI �
 - **이메일이 매핑의 열쇠다.** relay 는 처음 보는 Open WebUI 계정을 이메일로 new-api 사용자에 연결한다. new-api 의 관리자 "사용자 추가" API 는
   이메일을 저장하지 않아서 `bootstrap.sh` 는 테스트 사용자의 이메일을 psql 로 직접 넣는다. 운영에서는 이메일 인증 가입(SMTP) 또는 내장 OIDC 로
   만들어진 계정만 쓰고, Open WebUI 의 자체 가입(`ENABLE_SIGNUP`)은 꺼 둔다. 그렇지 않으면 남의 이메일로 Open WebUI 에 가입한 계정이 그 사람의 지갑에 먼저 연결될 수 있다.
+- 루트/관리자로 Open WebUI 에 로그인하려면 이메일이 있어야 한다. 이메일 서버 없이는 UI 로 넣을 수 없으니 `.env` 의 `NEW_API_ROOT_EMAIL` 로 bootstrap 이 psql 로 넣게 하거나 직접 `docker compose exec -T postgres psql -U newapi -d newapi -c "update users set email='admin@example.com' where username='root';"`.
 - 관리자·루트 계정은 자동 연결되지 않는다(`privileged_user`). 필요하면 사용자 편집 → "Open WebUI 연결" 에서 수동 연결한다. Open WebUI 사용자 id(`sub`) 는 거부 로그에 찍힌다.
 - 이메일이 없는 new-api 계정은 Open WebUI 로그인이 "이메일 주소가 필요합니다" 로 멈춘다. 프로필에서 이메일을 등록한 뒤 다시 연다.
 - `OWUI_SERVICE_KEY` 는 `bootstrap.sh` 가 채운다. 서비스 토큰을 재발급했다면 다시 `bootstrap.sh` → `docker compose up -d open-webui`.
