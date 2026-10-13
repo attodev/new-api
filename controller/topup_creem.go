@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -97,7 +98,16 @@ func (*CreemAdaptor) RequestPay(c *gin.Context, req *CreemPayRequest) {
 	}
 
 	id := c.GetInt("id")
-	user, _ := model.GetUserById(id, false)
+	// RechargeCreem credits the product quota (stored as the order Amount).
+	if message, rejected := checkCreditedQuota(c, id, decimal.NewFromInt(selectedProduct.Quota)); rejected {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": message})
+		return
+	}
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": common.TranslateMessage(c, i18n.MsgUserNotExists)})
+		return
+	}
 
 	// ID
 	reference := fmt.Sprintf("creem-api-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))

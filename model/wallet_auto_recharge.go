@@ -2468,6 +2468,12 @@ func walletAutoRechargeMoney(amountKRW float64) float64 {
 	return TossUSDEquivalent(decimal.NewFromFloat(amountKRW).Round(0).IntPart())
 }
 
+// WalletAutoRechargeCreditQuota is the quota a single charge of a policy or
+// preset Amount (KRW) credits, using the same conversion as the charge path.
+func WalletAutoRechargeCreditQuota(amount float64) int64 {
+	return walletAutoRechargeQuota(amount)
+}
+
 func walletAutoRechargeQuota(amount float64) int64 {
 	if amount <= 0 {
 		return 0

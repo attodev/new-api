@@ -115,6 +115,7 @@ var (
 	ErrTopUpNotFound                         = errors.New("topup not found")
 	ErrTopUpStatusInvalid                    = errors.New("topup status invalid")
 	ErrTopUpQuotaCapacityExceeded            = errors.New("top-up quota capacity exceeded")
+	ErrInvalidTopUpQuota                     = errors.New("invalid top-up quota")
 	ErrTossPaymentKeyConflict                = errors.New("toss payment key conflict")
 	ErrTossTopUpConfirmClaimLost             = errors.New("toss top-up confirm claim lost")
 	ErrTossTopUpLifecycleInactive            = errors.New("toss top-up charge lifecycle is inactive")
@@ -255,16 +256,88 @@ func (topUp *TopUp) EffectiveTargetId() int {
 	return topUp.UserId
 }
 
-func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int64) error {
-	if quota <= 0 {
-		return errors.New("invalid top-up quota")
+// topUpQuotaMaxCurrent returns the highest wallet balance that can still
+// absorb creditedQuota without passing common.MaxQuota. It is the single
+// predicate shared by the pre-payment capacity checks and the atomic settlement
+// UPDATE in CreditTopUpTarget, so a checkout that passes the pre-check is
+// rejected at settlement only if the balance grew in between.
+func topUpQuotaMaxCurrent(creditedQuota int64) (int64, error) {
+	if creditedQuota <= 0 {
+		return 0, ErrInvalidTopUpQuota
 	}
-	if quota > common.MaxQuota {
-		return fmt.Errorf("%w: top-up quota exceeds the quota ceiling", ErrTopUpQuotaCapacityExceeded)
+	if creditedQuota > common.MaxQuota {
+		return 0, fmt.Errorf("%w: top-up quota exceeds the quota ceiling", ErrTopUpQuotaCapacityExceeded)
 	}
 	// The quota columns are bigint; the binding ceiling is common.MaxQuota, which
 	// keeps balances exactly representable as JSON numbers in the browser.
-	maxCurrentQuota := common.MaxQuota - quota
+	return common.MaxQuota - creditedQuota, nil
+}
+
+// ValidateTopUpQuotaCapacity performs the user-facing pre-payment check for a
+// personal wallet. CreditTopUpTarget repeats the same invariant with an atomic
+// conditional UPDATE, because the balance can change after checkout creation.
+func ValidateTopUpQuotaCapacity(userId int, creditedQuota int64) error {
+	maxCurrentQuota, err := topUpQuotaMaxCurrent(creditedQuota)
+	if err != nil {
+		return err
+	}
+	var user User
+	if err := DB.Select("quota").Where("id = ?", userId).First(&user).Error; err != nil {
+		return err
+	}
+	if user.Quota > maxCurrentQuota {
+		return fmt.Errorf("%w: user quota capacity exceeded", ErrTopUpQuotaCapacityExceeded)
+	}
+	return nil
+}
+
+// ValidateOrganizationWalletCapacity is ValidateTopUpQuotaCapacity for an
+// organization wallet (organizations.quota).
+func ValidateOrganizationWalletCapacity(orgId int, creditedQuota int64) error {
+	maxCurrentQuota, err := topUpQuotaMaxCurrent(creditedQuota)
+	if err != nil {
+		return err
+	}
+	var org Organization
+	if err := DB.Select("quota").Where("id = ?", orgId).First(&org).Error; err != nil {
+		return err
+	}
+	if org.Quota > maxCurrentQuota {
+		return fmt.Errorf("%w: organization quota capacity exceeded", ErrTopUpQuotaCapacityExceeded)
+	}
+	return nil
+}
+
+// ValidateTopUpTargetCapacity checks the wallet a top-up would settle into,
+// mirroring TopUp.EffectiveTargetType: organization targets credit the
+// organization wallet, everything else credits the user wallet.
+func ValidateTopUpTargetCapacity(targetType string, targetId int, creditedQuota int64) error {
+	if targetType == TopUpTargetTypeOrganization {
+		return ValidateOrganizationWalletCapacity(targetId, creditedQuota)
+	}
+	return ValidateTopUpQuotaCapacity(targetId, creditedQuota)
+}
+
+// ValidateWalletAutoRechargeThresholdCapacity rejects a threshold auto-recharge
+// policy whose charge could never be credited. The policy charges only once
+// the balance is at or below thresholdQuota, so thresholdQuota plus one charge
+// must fit under the ceiling; the current balance is irrelevant.
+func ValidateWalletAutoRechargeThresholdCapacity(thresholdQuota int64, creditedQuota int64) error {
+	maxCurrentQuota, err := topUpQuotaMaxCurrent(creditedQuota)
+	if err != nil {
+		return err
+	}
+	if thresholdQuota > maxCurrentQuota {
+		return fmt.Errorf("%w: auto-recharge threshold leaves no room for a charge", ErrTopUpQuotaCapacityExceeded)
+	}
+	return nil
+}
+
+func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int64) error {
+	maxCurrentQuota, err := topUpQuotaMaxCurrent(quota)
+	if err != nil {
+		return err
+	}
 	switch topUp.EffectiveTargetType() {
 	case TopUpTargetTypeOrganization:
 		targetId := topUp.EffectiveTargetId()
@@ -788,7 +861,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			quotaToAdd = int(dAmount.Mul(dQuotaPerUnit).IntPart())
 		}
 		if quotaToAdd <= 0 {
-			return errors.New("invalid top-up quota")
+			return ErrInvalidTopUpQuota
 		}
 
 		// mark as complete
@@ -1992,7 +2065,7 @@ func rechargeToss(ctx context.Context, tradeNo string, paymentKey string, caller
 		topUp.ProviderAttempted = false
 		quotaToAdd = CreditedQuotaForTossTopUp(topUp)
 		if quotaToAdd <= 0 {
-			return errors.New("invalid top-up quota")
+			return ErrInvalidTopUpQuota
 		}
 		if err := CreditTopUpTarget(tx, topUp, int64(quotaToAdd)); err != nil {
 			return err
@@ -2093,7 +2166,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		quotaToAdd = int(dAmount.Mul(dQuotaPerUnit).IntPart())
 		if quotaToAdd <= 0 {
-			return errors.New("invalid top-up quota")
+			return ErrInvalidTopUpQuota
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -2154,7 +2227,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 
 		quotaToAdd = int(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart())
 		if quotaToAdd <= 0 {
-			return errors.New("invalid top-up quota")
+			return ErrInvalidTopUpQuota
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()

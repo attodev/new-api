@@ -409,6 +409,9 @@ topup.plan_price_empty: "Plan price cannot be empty"
 topup.waffo_pancake_not_full_configured: "Waffo Pancake is not fully configured, please complete gateway binding in payment settings"
 topup.create_plan_failed: "Failed to create plan product"
 topup.fetch_products_failed: "Failed to fetch product list"
+topup.amount_exceeds_max: "Top-up amount cannot exceed {{.Max}}"
+topup.quota_out_of_range: "Top-up quota exceeds the supported range"
+topup.quota_capacity_exceeded: "This top-up would exceed the maximum wallet balance"
 
 # Subscription payment messages
 subscription_payment.invalid_params: "Invalid parameters"

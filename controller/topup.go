@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -250,6 +251,160 @@ func getMinTopup() int64 {
 	return int64(minTopup)
 }
 
+// topUpQuotaError is a pre-payment top-up rejection carrying the i18n key
+// (and template args) shown to the user. Validation runs without a request
+// context, so translation happens when the rejection is written.
+type topUpQuotaError struct {
+	key  string
+	args map[string]any
+	err  error
+}
+
+func newTopUpQuotaError(key string, args map[string]any, err error) *topUpQuotaError {
+	return &topUpQuotaError{key: key, args: args, err: err}
+}
+
+func (e *topUpQuotaError) Error() string {
+	if e.err != nil {
+		return e.key + ": " + e.err.Error()
+	}
+	return e.key
+}
+
+func (e *topUpQuotaError) Unwrap() error {
+	return e.err
+}
+
+// getTopUpQuota mirrors the quota EpayNotify/RechargeWaffo/RechargeWaffoPancake
+// credit for a request amount: in token display mode the order stores whole
+// currency units (truncated), which settlement multiplies back by QuotaPerUnit.
+func getTopUpQuota(amount int64) (int64, error) {
+	quota := decimal.NewFromInt(amount)
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		quotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+		quota = decimal.NewFromInt(quota.Div(quotaPerUnit).IntPart()).Mul(quotaPerUnit)
+	} else {
+		quota = quota.Mul(decimal.NewFromFloat(common.QuotaPerUnit))
+	}
+	return validateCreditedQuota(quota)
+}
+
+// getMaxTopUpAmount is the largest request amount whose credited quota still
+// fits in common.MaxQuota, used to explain an out-of-range request.
+func getMaxTopUpAmount() int64 {
+	if common.QuotaPerUnit <= 0 {
+		return 0
+	}
+	quotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+	maxStoredAmount := decimal.NewFromInt(common.MaxQuota).
+		Div(quotaPerUnit).
+		Floor()
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		return maxStoredAmount.Add(decimal.NewFromInt(1)).
+			Mul(quotaPerUnit).
+			Ceil().
+			Sub(decimal.NewFromInt(1)).
+			IntPart()
+	}
+	return maxStoredAmount.IntPart()
+}
+
+// validateCreditedQuota converts the quota a settlement would credit exactly
+// as settlement does (truncating any fraction) and rejects values that cannot
+// be credited at all: non-positive, or above the common.MaxQuota ceiling.
+func validateCreditedQuota(quota decimal.Decimal) (int64, error) {
+	if quota.GreaterThan(decimal.NewFromInt(common.MaxQuota)) {
+		return 0, newTopUpQuotaError(i18n.MsgTopupQuotaOutOfRange, nil, model.ErrInvalidTopUpQuota)
+	}
+	value := quota.Truncate(0).IntPart()
+	if value <= 0 {
+		return 0, newTopUpQuotaError(i18n.MsgTopupInvalidQuota, nil, model.ErrInvalidTopUpQuota)
+	}
+	return value, nil
+}
+
+func validateTopUpQuota(amount int64) (int64, error) {
+	quota, err := getTopUpQuota(amount)
+	if err == nil {
+		return quota, nil
+	}
+	maxAmount := getMaxTopUpAmount()
+	if maxAmount > 0 && amount > maxAmount {
+		return 0, newTopUpQuotaError(i18n.MsgTopupAmountExceedsMax, map[string]any{"Max": maxAmount}, model.ErrInvalidTopUpQuota)
+	}
+	return 0, newTopUpQuotaError(i18n.MsgTopupInvalidQuota, nil, model.ErrInvalidTopUpQuota)
+}
+
+// validateTopUpTargetCapacity checks the wallet this request's order would
+// settle into. Organization wallet endpoints mark the request with an
+// organization target (prepareOrganizationTopUpTarget); every other request
+// credits the paying user's own wallet.
+func validateTopUpTargetCapacity(c *gin.Context, userId int, creditedQuota int64) error {
+	targetType := getTopUpTargetType(c)
+	targetId := userId
+	if targetType == model.TopUpTargetTypeOrganization {
+		targetId = getTopUpTargetId(c)
+	}
+	return model.ValidateTopUpTargetCapacity(targetType, targetId, creditedQuota)
+}
+
+// topUpQuotaRejectionMessage translates a pre-payment rejection. Any error the
+// validators do not classify (e.g. a database failure while reading the
+// wallet) fails closed with a generic message.
+func topUpQuotaRejectionMessage(c *gin.Context, err error) string {
+	var quotaErr *topUpQuotaError
+	switch {
+	case errors.As(err, &quotaErr):
+		if quotaErr.args != nil {
+			return common.TranslateMessage(c, quotaErr.key, quotaErr.args)
+		}
+		return common.TranslateMessage(c, quotaErr.key)
+	case errors.Is(err, model.ErrTopUpQuotaCapacityExceeded):
+		return common.TranslateMessage(c, i18n.MsgTopupQuotaCapacityExceeded)
+	case errors.Is(err, model.ErrInvalidTopUpQuota):
+		return common.TranslateMessage(c, i18n.MsgTopupInvalidQuota)
+	default:
+		logger.LogError(c.Request.Context(), fmt.Sprintf("top-up capacity check failed user_id=%d target_type=%s target_id=%d error=%q", c.GetInt("id"), getTopUpTargetType(c), getTopUpTargetId(c), err.Error()))
+		return common.TranslateMessage(c, i18n.MsgPaymentCreateFailed)
+	}
+}
+
+// checkCreditedQuota validates a provider-computed credited quota and the
+// target wallet's remaining capacity, returning the user-facing rejection
+// message when the order must not be created.
+func checkCreditedQuota(c *gin.Context, userId int, quota decimal.Decimal) (string, bool) {
+	creditedQuota, err := validateCreditedQuota(quota)
+	if err == nil {
+		err = validateTopUpTargetCapacity(c, userId, creditedQuota)
+	}
+	if err != nil {
+		return topUpQuotaRejectionMessage(c, err), true
+	}
+	return "", false
+}
+
+func rejectInvalidCreditedQuota(c *gin.Context, userId int, quota decimal.Decimal) bool {
+	if message, rejected := checkCreditedQuota(c, userId, quota); rejected {
+		common.ApiErrorMsg(c, message)
+		return true
+	}
+	return false
+}
+
+// rejectInvalidTopUpQuota guards providers whose settlement credits
+// Amount * QuotaPerUnit (Epay, Waffo, Waffo Pancake).
+func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
+	creditedQuota, err := validateTopUpQuota(amount)
+	if err == nil {
+		err = validateTopUpTargetCapacity(c, userId, creditedQuota)
+	}
+	if err != nil {
+		common.ApiErrorMsg(c, topUpQuotaRejectionMessage(c, err))
+		return true
+	}
+	return false
+}
+
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
@@ -265,8 +420,11 @@ func RequestEpay(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": err.Error()})
 		return
 	}
-
 	id := c.GetInt("id")
+	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+		return
+	}
+
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTopupGetGroupFailed)
@@ -560,6 +718,9 @@ func RequestAmount(c *gin.Context) {
 		return
 	}
 	id := c.GetInt("id")
+	if rejectInvalidTopUpQuota(c, id, req.Amount) {
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTopupGetGroupFailed)

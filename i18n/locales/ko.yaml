@@ -407,6 +407,9 @@ topup.plan_price_empty: "플랜 가격을 입력해 주세요"
 topup.waffo_pancake_not_full_configured: "Waffo Pancake가 완전히 설정되지 않았습니다. 결제 설정에서 게이트웨이 바인딩을 완료해 주세요"
 topup.create_plan_failed: "플랜 상품 생성에 실패했습니다"
 topup.fetch_products_failed: "상품 목록을 가져오지 못했습니다"
+topup.amount_exceeds_max: "충전 금액은 {{.Max}}을(를) 초과할 수 없습니다"
+topup.quota_out_of_range: "충전 크레딧이 지원 범위를 초과합니다"
+topup.quota_capacity_exceeded: "충전하면 지갑 잔액이 최대 한도를 초과합니다"
 
 # 구독 결제 메시지
 subscription_payment.invalid_params: "잘못된 매개변수입니다"
