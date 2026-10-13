@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -921,4 +922,96 @@ func TestNormalizeCachedUsageDoesNotOverwriteCanonicalValues(t *testing.T) {
 	require.Equal(t, 3, usage.PromptTokensDetails.CachedCreationTokens)
 	require.Equal(t, 6, usage.PromptTokensDetails.CacheWriteTokens)
 	normalizeCachedUsage(nil)
+}
+
+// Gemini bills image input at the text rate. With no image ratio configured
+// (ratio_setting.GetImageRatio defaults to 1), attributing IMAGE prompt tokens
+// to PromptTokensDetails.ImageTokens must not change the settled quota.
+func TestCalculateTextQuotaSummaryGeminiImagePromptKeepsTextRateWithoutImageRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const model = "gemini-3-flash-preview"
+	imageRatio, configured := ratio_setting.GetImageRatio(model)
+	require.False(t, configured, "test requires a Gemini model without a configured image ratio")
+	require.Equal(t, 1.0, imageRatio)
+
+	newInfo := func() *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{
+			RelayFormat:     types.RelayFormatGemini,
+			OriginModelName: model,
+			PriceData: types.PriceData{
+				ModelRatio:      1.25,
+				CompletionRatio: 4,
+				ImageRatio:      imageRatio,
+				GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+			},
+			StartTime: time.Now(),
+		}
+	}
+
+	mixed := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+	mixed.PromptTokensDetails.TextTokens = 911 // TEXT 800 + VIDEO 100 + DOCUMENT 11
+	mixed.PromptTokensDetails.ImageTokens = 1089
+
+	allText := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+	allText.PromptTokensDetails.TextTokens = 2000
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	mixedSummary := calculateTextQuotaSummary(ctx, newInfo(), mixed)
+	ctx, _ = gin.CreateTestContext(httptest.NewRecorder())
+	textSummary := calculateTextQuotaSummary(ctx, newInfo(), allText)
+
+	require.Equal(t, 1089, mixedSummary.ImageTokens)
+	require.Equal(t, textSummary.Quota, mixedSummary.Quota)
+}
+
+// Gemini promptTokensDetails include the cached portion. The handler caps
+// ImageTokens at the uncached remainder (500 of 1089 here) so the cached image
+// portion is billed only at the cache rate and never double-counted.
+func TestCalculateTextQuotaSummaryGeminiCachedImagePromptIsNotOvercharged(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const model = "gemini-3-flash-preview"
+	newInfo := func(imageRatio float64) *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{
+			RelayFormat:     types.RelayFormatGemini,
+			OriginModelName: model,
+			PriceData: types.PriceData{
+				ModelRatio:      1,
+				CompletionRatio: 4,
+				CacheRatio:      0.25,
+				ImageRatio:      imageRatio,
+				GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+			},
+			StartTime: time.Now(),
+		}
+	}
+	quota := func(imageRatio float64, usage *dto.Usage) int {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		return calculateTextQuotaSummary(ctx, newInfo(imageRatio), usage).Quota
+	}
+
+	// Usage as produced by buildUsageFromGeminiMetadata for P=2000, cached=1500,
+	// TEXT 911 + IMAGE 1089 (image capped to the 500 uncached tokens).
+	capped := func() *dto.Usage {
+		u := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+		u.PromptTokensDetails.CachedTokens = 1500
+		u.PromptTokensDetails.ImageTokens = 500
+		u.PromptTokensDetails.TextTokens = 1500
+		return u
+	}
+	allText := func() *dto.Usage {
+		u := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+		u.PromptTokensDetails.CachedTokens = 1500
+		u.PromptTokensDetails.TextTokens = 2000
+		return u
+	}
+
+	// Old way: (2000-1500) at 1 + 1500*0.25 + 50*4 = 500 + 375 + 200 = 1075.
+	require.Equal(t, 1075, quota(1, allText()))
+	require.Equal(t, 1075, quota(1, capped()), "default image ratio must leave quota unchanged")
+
+	// ImageRatio 2: only the 500 uncached image tokens get the 2x ratio.
+	// (2000-1500-500)=0 base + 1500*0.25 + 500*2 + 200 = 1575.
+	require.Equal(t, 1575, quota(2, capped()))
 }
