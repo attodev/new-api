@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/stretchr/testify/require"
 )
@@ -428,4 +429,140 @@ func TestRequestOpenAI2ClaudeMessage_ConvertsTextFileContentToText(t *testing.T)
 	require.Equal(t, "text", content[0].Type)
 	require.NotNil(t, content[0].Text)
 	require.Equal(t, "alpha\nbeta", *content[0].Text)
+}
+
+func TestRequestOpenAI2ClaudeMessage_OmitsEmptyTools(t *testing.T) {
+	maxTokens := uint(16)
+	tests := []struct {
+		name      string
+		request   dto.GeneralOpenAIRequest
+		wantTools bool
+	}{
+		{
+			name: "omitted tools",
+			request: dto.GeneralOpenAIRequest{
+				Model:     "claude-test",
+				MaxTokens: &maxTokens,
+				Messages:  []dto.Message{{Role: "user", Content: "hi"}},
+			},
+		},
+		{
+			name: "explicit empty tools",
+			request: dto.GeneralOpenAIRequest{
+				Model:     "claude-test",
+				MaxTokens: &maxTokens,
+				Messages:  []dto.Message{{Role: "user", Content: "hi"}},
+				Tools:     []dto.ToolCallRequest{},
+			},
+		},
+		{
+			name: "function tool",
+			request: dto.GeneralOpenAIRequest{
+				Model:     "claude-test",
+				MaxTokens: &maxTokens,
+				Messages:  []dto.Message{{Role: "user", Content: "hi"}},
+				Tools: []dto.ToolCallRequest{{
+					Type: "function",
+					Function: dto.FunctionRequest{
+						Name:        "get_weather",
+						Description: "Get weather by city",
+						Parameters: map[string]any{
+							"type":       "object",
+							"properties": map[string]any{"city": map[string]any{"type": "string"}},
+							"required":   []any{"city"},
+						},
+					},
+				}},
+			},
+			wantTools: true,
+		},
+		{
+			name: "web search only",
+			request: dto.GeneralOpenAIRequest{
+				Model:            "claude-test",
+				MaxTokens:        &maxTokens,
+				Messages:         []dto.Message{{Role: "user", Content: "hi"}},
+				WebSearchOptions: &dto.WebSearchOptions{SearchContextSize: "low"},
+			},
+			wantTools: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := RequestOpenAI2ClaudeMessage(nil, test.request)
+			require.NoError(t, err)
+
+			body, err := common.Marshal(got)
+			require.NoError(t, err)
+
+			if test.wantTools {
+				require.NotNil(t, got.Tools)
+				require.Contains(t, string(body), `"tools":`)
+				return
+			}
+			require.Nil(t, got.Tools)
+			require.NotContains(t, string(body), `"tools":`)
+		})
+	}
+}
+
+func TestRequestOpenAI2ClaudeMessage_ParameterlessToolsNormalizeInputSchema(t *testing.T) {
+	tests := []struct {
+		name       string
+		parameters any
+		wantSchema map[string]any
+	}{
+		{
+			name:       "omitted parameters",
+			parameters: nil,
+			wantSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			name:       "empty object parameters",
+			parameters: map[string]any{},
+			wantSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			name:       "missing type and properties",
+			parameters: map[string]any{"additionalProperties": false},
+			wantSchema: map[string]any{
+				"type":                 "object",
+				"properties":           map[string]any{},
+				"additionalProperties": false,
+			},
+		},
+		{
+			name:       "non-string type",
+			parameters: map[string]any{"type": 123, "properties": map[string]any{}},
+			wantSchema: map[string]any{"type": 123, "properties": map[string]any{}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			maxTokens := uint(1024)
+			got, err := RequestOpenAI2ClaudeMessage(nil, dto.GeneralOpenAIRequest{
+				Model:     "claude-test",
+				MaxTokens: &maxTokens,
+				Messages:  []dto.Message{{Role: "user", Content: "Call the tool."}},
+				Tools: []dto.ToolCallRequest{{
+					Type: "function",
+					Function: dto.FunctionRequest{
+						Name:        "get_current_time",
+						Description: "Get the current time",
+						Parameters:  test.parameters,
+					},
+				}},
+			})
+			require.NoError(t, err)
+			tools, ok := got.Tools.([]any)
+			require.True(t, ok)
+			require.Len(t, tools, 1)
+			tool, ok := tools[0].(*dto.Tool)
+			require.True(t, ok)
+			require.Equal(t, "get_current_time", tool.Name)
+			require.Equal(t, test.wantSchema, tool.InputSchema)
+		})
+	}
 }

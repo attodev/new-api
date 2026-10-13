@@ -101,29 +101,36 @@ func buildClaudeFileMessage(c *gin.Context, file *dto.MessageFile) (*dto.ClaudeM
 	}
 }
 
+// functionParametersToInputSchema converts OpenAI function parameters into a
+// Claude input_schema, guaranteeing an object schema with properties so that
+// parameterless tools are still accepted upstream.
+func functionParametersToInputSchema(parameters any) map[string]any {
+	params, _ := parameters.(map[string]any)
+	schema := make(map[string]any, len(params)+2)
+	for key, value := range params {
+		schema[key] = value
+	}
+	if schema["type"] == nil {
+		schema["type"] = "object"
+	}
+	if schema["properties"] == nil {
+		schema["properties"] = map[string]any{}
+	}
+	return schema
+}
+
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
-		if params, ok := tool.Function.Parameters.(map[string]any); ok {
-			claudeTool := dto.Tool{
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-			}
-			claudeTool.InputSchema = make(map[string]interface{})
-			if params["type"] != nil {
-				claudeTool.InputSchema["type"] = params["type"].(string)
-			}
-			claudeTool.InputSchema["properties"] = params["properties"]
-			claudeTool.InputSchema["required"] = params["required"]
-			for s, a := range params {
-				if s == "type" || s == "properties" || s == "required" {
-					continue
-				}
-				claudeTool.InputSchema[s] = a
-			}
-			claudeTools = append(claudeTools, &claudeTool)
+		if _, ok := tool.Function.Parameters.(map[string]any); !ok && tool.Type != "function" {
+			continue
 		}
+		claudeTools = append(claudeTools, &dto.Tool{
+			Name:        tool.Function.Name,
+			Description: tool.Function.Description,
+			InputSchema: functionParametersToInputSchema(tool.Function.Parameters),
+		})
 	}
 
 	// Web search tool
@@ -182,7 +189,10 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		Model:         textRequest.Model,
 		StopSequences: nil,
 		Temperature:   textRequest.Temperature,
-		Tools:         claudeTools,
+	}
+	// Some Claude-compatible upstreams reject an empty "tools": [] array.
+	if len(claudeTools) > 0 {
+		claudeRequest.Tools = claudeTools
 	}
 	if maxTokens := textRequest.GetMaxTokens(); maxTokens > 0 {
 		claudeRequest.MaxTokens = common.GetPointer(maxTokens)
