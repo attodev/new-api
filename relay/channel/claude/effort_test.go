@@ -76,3 +76,125 @@ func TestClaudeSupportsEffort(t *testing.T) {
 		}
 	}
 }
+
+// Mirrors upstream claudeCapabilitiesFor supportsManual
+// (relaykit/relayconvert/reasoning/claude.go:45-110). claude-mythos-preview
+// keeps supportsManual=true upstream: its case never clears it.
+func TestClaudeSupportsManualThinking(t *testing.T) {
+	cases := []struct {
+		model string
+		want  bool
+	}{
+		{"claude-opus-4-6", true},
+		{"claude-sonnet-4-5", true},
+		{"claude-opus-4-7", false},
+		{"claude-opus-4-8", false},
+		{"claude-opus-5", false},
+		{"claude-opus-5-5", false},
+		{"claude-sonnet-5", false},
+		{"claude-sonnet-5-5", false},
+		{"claude-haiku-5-5", false},
+		{"claude-fable-5-1", false},
+		{"claude-mythos-5-1", false},
+		{"claude-mythos-preview", true},
+		{"claude-opus-5-5-thinking", false},
+		{"unknown-model", true},
+	}
+	for _, c := range cases {
+		if got := claudeSupportsManualThinking(c.model); got != c.want {
+			t.Errorf("claudeSupportsManualThinking(%q)=%v want %v", c.model, got, c.want)
+		}
+	}
+}
+
+func TestClaudeStrictSampling(t *testing.T) {
+	cases := []struct {
+		model string
+		want  bool
+	}{
+		{"claude-opus-4-7", true},
+		{"claude-opus-4-8", true},
+		{"claude-opus-5", true},
+		{"claude-opus-5-5", true},
+		{"claude-sonnet-5", true},
+		{"claude-sonnet-5-5", true},
+		{"claude-haiku-5-5", true},
+		{"claude-fable-5-1", true},
+		{"claude-mythos-5-1", true},
+		{"claude-mythos-preview", true},
+		{"claude-opus-4-6", false},
+		{"claude-sonnet-4-5", false},
+		{"unknown-model", false},
+	}
+	for _, c := range cases {
+		if got := claudeStrictSampling(c.model); got != c.want {
+			t.Errorf("claudeStrictSampling(%q)=%v want %v", c.model, got, c.want)
+		}
+	}
+}
+
+// Mirrors upstream EffortFromBudget (relaykit/relayconvert/reasoning/intent.go:674).
+func TestClaudeEffortFromBudget(t *testing.T) {
+	cases := []struct {
+		budget int
+		want   string
+	}{
+		{0, "none"},
+		{-1, "high"},
+		{1, "low"},
+		{1024, "low"},
+		{1025, "medium"},
+		{8192, "medium"},
+		{8193, "high"},
+	}
+	for _, c := range cases {
+		if got := ClaudeEffortFromBudget(c.budget); got != c.want {
+			t.Errorf("ClaudeEffortFromBudget(%d)=%q want %q", c.budget, got, c.want)
+		}
+	}
+}
+
+// Upstream defaultEffort: medium on Opus 5.5 and Haiku 5.x, high elsewhere.
+func TestClaudeDefaultEffort(t *testing.T) {
+	cases := []struct{ model, want string }{
+		{"claude-opus-5-5", "medium"},
+		{"claude-haiku-5-5", "medium"},
+		{"claude-sonnet-5-5", "high"},
+		{"claude-opus-5", "high"},
+		{"claude-fable-5-1", "high"},
+		{"claude-opus-4-7", "high"},
+		{"unknown-model", "high"},
+	}
+	for _, c := range cases {
+		if got := claudeDefaultEffort(c.model); got != c.want {
+			t.Errorf("claudeDefaultEffort(%q)=%q want %q", c.model, got, c.want)
+		}
+	}
+}
+
+// Mirrors upstream supportsDisable / disableAsBetweenTools
+// (relaykit/relayconvert/reasoning/claude.go:55,63,74-75).
+func TestClaudeDisableCapability(t *testing.T) {
+	cases := []struct {
+		model                 string
+		supportsDisable, asBT bool
+	}{
+		{"claude-fable-5-1", false, false},
+		{"claude-mythos-5-1", false, false},
+		{"claude-mythos-preview", false, false},
+		{"claude-opus-5-5", false, false},
+		{"claude-sonnet-5-5", false, true},
+		{"claude-opus-5", true, false},
+		{"claude-sonnet-5", true, false},
+		{"claude-haiku-5-5", true, false},
+		{"claude-opus-4-7", true, false},
+		{"claude-opus-4-6", true, false},
+		{"unknown-model", true, false},
+	}
+	for _, c := range cases {
+		supportsDisable, asBT := claudeDisableCapability(c.model)
+		if supportsDisable != c.supportsDisable || asBT != c.asBT {
+			t.Errorf("claudeDisableCapability(%q)=(%v,%v) want (%v,%v)", c.model, supportsDisable, asBT, c.supportsDisable, c.asBT)
+		}
+	}
+}

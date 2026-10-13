@@ -15,59 +15,33 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
-	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
 
 // applyClaudeThinkingSettings adapts the thinking-related fields of an
-// Anthropic-native request: it expands the "-high"/"-thinking" model suffixes
-// into the thinking configuration each model family accepts, and normalizes
-// adaptive display so a relayed client still receives the reasoning it is
-// billed for. It reports whether request.Model was adapted, so the caller can
-// keep the upstream model name in sync.
+// Anthropic-native request: it expands the effort ("-high", ...) and
+// "-thinking" model suffixes into the thinking configuration each model
+// accepts, turns a client's budget thinking into adaptive thinking plus an
+// effort on models that reject budgets (Opus 4.7+, Claude 5.x), clears
+// sampling on models that reject it, and normalizes adaptive display so a
+// relayed client still receives the reasoning it is billed for. It reports
+// whether request.Model was adapted, so the caller can keep the upstream model
+// name in sync.
 func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName string) (modelAdapted bool) {
-	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(request.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(request.Model, "claude-opus-4-6") ||
-			strings.HasPrefix(request.Model, "claude-opus-4-7") ||
-			strings.HasPrefix(request.Model, "claude-opus-4-8")) {
+	if baseModel, effortLevel, ok := claude.ClaudeEffortSuffix(request.Model); ok {
 		request.Model = baseModel
-		request.Thinking = request.Thinking.WithAdaptive()
-		request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, effortLevel)
-		if strings.HasPrefix(request.Model, "claude-opus-4-7") ||
-			strings.HasPrefix(request.Model, "claude-opus-4-8") {
-			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400.
-			request.Temperature = nil
-			request.TopP = nil
-			request.TopK = nil
-		} else {
-			request.Temperature = common.GetPointer[float64](1.0)
-		}
+		claude.RenderClaudeThinking(request, baseModel, effortLevel, nil)
+		// Thinking needs the default temperature; strict-sampling models lose
+		// temperature/top_p/top_k altogether below.
+		request.Temperature = common.GetPointer[float64](1.0)
 		modelAdapted = true
 	} else if model_setting.GetClaudeSettings().ThinkingAdapterEnabled &&
 		strings.HasSuffix(request.Model, "-thinking") {
 		if request.Thinking == nil {
 			baseModel := strings.TrimSuffix(request.Model, "-thinking")
-			if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
-				strings.HasPrefix(baseModel, "claude-opus-4-8") {
-				// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
-				request.Thinking = request.Thinking.WithAdaptive()
-				request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, "high")
-				request.Temperature = nil
-				request.TopP = nil
-				request.TopK = nil
-			} else {
-				// BudgetTokens 1024
-				if request.MaxTokens == nil || *request.MaxTokens < 1280 {
-					request.MaxTokens = common.GetPointer[uint](1280)
-				}
-
-				// BudgetTokens max_tokens 80%
-				request.Thinking = &dto.Thinking{
-					Type:         "enabled",
-					BudgetTokens: common.GetPointer[int](int(float64(*request.MaxTokens) * model_setting.GetClaudeSettings().ThinkingAdapterBudgetTokensPercentage)),
-				}
+			if claude.RenderClaudeThinkingSuffix(request, baseModel) {
 				// TODO:
 				// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
 				request.Temperature = common.GetPointer[float64](1.0)
@@ -79,6 +53,10 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		modelAdapted = true
 	}
 
+	// A client's {type:"enabled", budget_tokens} is rejected by models that
+	// take adaptive thinking only; send them the matching effort instead.
+	claude.AdaptClaudeClientThinking(request, request.Model)
+
 	// Send the model the effort it accepts, including one the client set in
 	// output_config itself. The request is never rejected for it.
 	thinkingType := ""
@@ -86,6 +64,8 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		thinkingType = request.Thinking.Type
 	}
 	request.OutputConfig = claude.NormalizeClaudeOutputConfig(request.Model, thinkingType, request.OutputConfig)
+
+	claude.ApplyClaudeStrictSampling(request, request.Model)
 
 	// Covers adaptive thinking the client asked for directly, which no branch
 	// above touches: without this, Opus 4.7+ returns empty thinking blocks.
