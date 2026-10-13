@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -59,4 +60,24 @@ func TestChatCompletionsRequestToResponsesRequestPreservesPenalties(t *testing.T
 			assert.Equal(t, tt.presenceWant, got.PresencePenalty)
 		})
 	}
+}
+
+func TestChatToResponsesForwardsPromptCacheKey(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{Model: "gpt-5.1", PromptCacheKey: "session-42"}
+	req.Messages = []dto.Message{{Role: "user", Content: "hi"}}
+	out, err := ChatCompletionsRequestToResponsesRequest(req)
+	require.NoError(t, err)
+	require.JSONEq(t, `"session-42"`, string(out.PromptCacheKey))
+}
+
+func TestChatToResponsesOmitsEmptyPromptCacheKey(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{Model: "gpt-5.1"}
+	req.Messages = []dto.Message{{Role: "user", Content: "hi"}}
+	out, err := ChatCompletionsRequestToResponsesRequest(req)
+	require.NoError(t, err)
+	assert.Nil(t, out.PromptCacheKey)
+
+	b, err := common.Marshal(out)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "prompt_cache_key")
 }
