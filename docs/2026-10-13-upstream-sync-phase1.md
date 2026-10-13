@@ -126,11 +126,14 @@ Task 1 은 upstream 커밋 5건을 그대로 cherry-pick 했으므로 fork 커�
    marshal 시 비 Qwen 모델이면 필드를 제거해 다른 provider 가 알 수 없는 필드로
    400 을 내지 않게 한다. 필드 타입은 `json.RawMessage` 이며, 명시적 `0` 은 raw
    바이트 `0` 이 비어 있지 않으므로 Qwen 모델에서 그대로 전달된다.
-6. Responses 스트림이 `response.completed` 전에 끊기면, tool-call 인자,
-   reasoning, refusal delta 로 completion 토큰을 추정한다. prompt 추정치는
-   `billsPrompt := CompletionTokens != 0 || (started && !failed)` 일 때만 과금한다.
-   `failed` 는 `response.failed` 또는 `error` 이벤트로 설정되므로 업스트림이 명시적으로
-   실패를 알린 경우는 예외다 (`relay/channel/openai/relay_responses.go`).
+6. Responses 스트림이 `response.completed` 전에 끊기면, 출력 텍스트
+   (`response.output_text.delta`), tool-call 인자, reasoning(summary 및
+   `response.reasoning_text.delta`), refusal delta 로 completion 토큰을 추정한다.
+   prompt 추정치는 `billsPrompt := CompletionTokens != 0 || (started && !failed)`
+   일 때만 과금한다. `started` 는 업스트림이 파싱 가능한 이벤트를 하나라도 보냈다는
+   뜻(생성을 시작했다)이고, `failed` 는 `response.failed` 또는 `error` 이벤트로
+   설정되므로 업스트림이 명시적으로 실패를 알린 경우는 예외다
+   (`relay/channel/openai/relay_responses.go`).
    이전 조건은 `PromptTokens == 0 && CompletionTokens != 0` 일 때만 prompt 를
    채우는 것이었다. 중단된 스트림이 이제 과금될 수 있다.
 7. Responses 및 DeepSeek 의 cached token 은 `PromptTokensDetails.CachedTokens`
