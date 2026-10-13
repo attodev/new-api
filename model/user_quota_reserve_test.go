@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -210,4 +211,88 @@ func TestGetUserCacheServesDatabaseSnapshotWhileBatchPending(t *testing.T) {
 	reserved, err = TryReserveUserQuota(user.Id, 1)
 	require.ErrorIs(t, err, ErrQuotaCachePending)
 	require.False(t, reserved)
+}
+
+// Ported from upstream a073f74b3 (model/quota_reserve_test.go additions).
+// Upstream's single-request bound MaxQuota is this fork's MaxRequestQuota.
+func TestBatchUpdateAccumulatesTwoMaximumRequestCharges(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	common.BatchUpdateEnabled = true
+
+	user := insertUserWithQuota(t, int64(common.MaxRequestQuota)*2+100)
+	require.NoError(t, DecreaseUserQuota(user.Id, common.MaxRequestQuota, false))
+	require.NoError(t, DecreaseUserQuota(user.Id, common.MaxRequestQuota, false))
+
+	batchUpdate()
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, user.Id).Error)
+	require.Equal(t, int64(100), reloaded.Quota)
+}
+
+func TestBatchUpdateAccumulatorSaturatesOverflow(t *testing.T) {
+	resetUserQuotaBatchState(t)
+
+	addNewRecord(BatchUpdateTypeUserQuota, 1, math.MaxInt64)
+	addNewRecord(BatchUpdateTypeUserQuota, 1, 1)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	require.Equal(t, int64(math.MaxInt64), batchUpdateStores[BatchUpdateTypeUserQuota][1])
+	batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int64)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+
+	addNewRecord(BatchUpdateTypeUserQuota, 1, math.MinInt64)
+	addNewRecord(BatchUpdateTypeUserQuota, 1, -1)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	require.Equal(t, int64(math.MinInt64), batchUpdateStores[BatchUpdateTypeUserQuota][1])
+	batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int64)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+
+	addNewRecord(BatchUpdateTypeUserQuota, 1, 40)
+	addNewRecord(BatchUpdateTypeUserQuota, 1, 2)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	require.Equal(t, int64(42), batchUpdateStores[BatchUpdateTypeUserQuota][1])
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+}
+
+// GrantUserQuota is the admin-grant credit path: it enforces the wallet
+// ceiling atomically, while IncreaseUserQuota (refunds and compensation)
+// deliberately does not cap the accumulated balance.
+func TestGrantUserQuotaRespectsWalletCeiling(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	user := insertUserWithQuota(t, common.MaxQuota-2)
+
+	require.NoError(t, GrantUserQuota(user.Id, 2))
+	err := GrantUserQuota(user.Id, 1)
+	require.ErrorIs(t, err, ErrTopUpQuotaCapacityExceeded)
+
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, user.Id).Error)
+	require.Equal(t, common.MaxQuota, reloaded.Quota)
+
+	require.Error(t, GrantUserQuota(user.Id, 0))
+	require.Error(t, GrantUserQuota(user.Id, -1))
+	require.ErrorContains(t, GrantUserQuota(user.Id+1000, 1), "user not found")
+}
+
+func TestIncreaseUserQuotaRefundStillAppliesAboveCeiling(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	user := insertUserWithQuota(t, common.MaxQuota)
+
+	require.NoError(t, IncreaseUserQuota(user.Id, 5, true))
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, user.Id).Error)
+	require.Equal(t, common.MaxQuota+5, reloaded.Quota)
+}
+
+func TestIncreaseUserQuotaRejectsSingleDeltaAboveCeiling(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaBatchState(t)
+	user := insertUserWithQuota(t, 0)
+
+	require.Error(t, IncreaseUserQuota(user.Id, common.MaxQuota+1, true))
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, user.Id).Error)
+	require.Equal(t, int64(0), reloaded.Quota)
 }

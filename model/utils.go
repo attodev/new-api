@@ -2,6 +2,8 @@ package model
 
 import (
 	"errors"
+	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -48,11 +50,25 @@ func addNewRecord(type_ int, id int, value int64) {
 }
 
 func addNewRecordLocked(type_ int, id int, value int64) {
-	if _, ok := batchUpdateStores[type_][id]; !ok {
+	old, ok := batchUpdateStores[type_][id]
+	if !ok {
 		batchUpdateStores[type_][id] = value
-	} else {
-		batchUpdateStores[type_][id] += value
+		return
 	}
+
+	// Saturate instead of wrapping: a wrapped accumulator would flip a large
+	// pending charge into a credit (or vice versa). Per-request charges are
+	// bounded by common.MaxRequestQuota, so reaching this is a bug signal.
+	sum := old + value
+	if (value > 0 && sum < old) || (value < 0 && sum > old) {
+		common.SysError(fmt.Sprintf("batch update overflow: type=%d id=%d old=%d value=%d", type_, id, old, value))
+		if value > 0 {
+			sum = math.MaxInt64
+		} else {
+			sum = math.MinInt64
+		}
+	}
+	batchUpdateStores[type_][id] = sum
 }
 
 func hasPendingBatchRecord(type_ int, id int) bool {

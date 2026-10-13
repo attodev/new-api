@@ -137,7 +137,9 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("redemption code has expired")
 		}
-		err = tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
+		// Same atomic wallet-ceiling credit as top-up settlement; a code that
+		// would push the balance past common.MaxQuota stays unredeemed.
+		err = creditUserQuotaWithinCeiling(tx, userId, int64(redemption.Quota))
 		if err != nil {
 			return err
 		}
@@ -155,7 +157,19 @@ func Redeem(key string, userId int) (quota int, err error) {
 	return redemption.Quota, nil
 }
 
+// ValidateRedemptionQuota bounds the quota a redemption code credits: it
+// must be positive and fit the wallet ceiling (ported from upstream a073f74b3).
+func ValidateRedemptionQuota(quota int) error {
+	if quota <= 0 {
+		return errors.New("redemption quota must be positive")
+	}
+	return common.ValidateWalletQuota(int64(quota))
+}
+
 func (redemption *Redemption) Insert() error {
+	if err := ValidateRedemptionQuota(redemption.Quota); err != nil {
+		return err
+	}
 	var err error
 	err = DB.Create(redemption).Error
 	return err
@@ -168,6 +182,9 @@ func (redemption *Redemption) SelectUpdate() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
+	if err := ValidateRedemptionQuota(redemption.Quota); err != nil {
+		return err
+	}
 	var err error
 	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time").Updates(redemption).Error
 	return err

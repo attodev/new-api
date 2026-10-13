@@ -196,6 +196,15 @@ func applyUserQuotaDelta(id int, delta int64, forceDB bool) error {
 		}
 		return nil
 	}
+	return applyUserQuotaDeltaSync(id, delta, func() error {
+		return persistUserQuotaDelta(id, delta, forceDB)
+	})
+}
+
+// applyUserQuotaDeltaSync applies delta to the Redis user cache, then runs
+// persist; if persist fails, the cache delta is compensated so the hot path
+// never serves quota the database rejected.
+func applyUserQuotaDeltaSync(id int, delta int64, persist func() error) error {
 	cacheApplied := false
 	if common.RedisEnabled {
 		result, cacheErr := cacheApplyUserQuotaDelta(id, delta)
@@ -206,7 +215,7 @@ func applyUserQuotaDelta(id int, delta int64, forceDB bool) error {
 		}
 	}
 
-	if err := persistUserQuotaDelta(id, delta, forceDB); err != nil {
+	if err := persist(); err != nil {
 		if cacheApplied {
 			compensated, compensateErr := cacheApplyUserQuotaDelta(id, -delta)
 			if compensateErr != nil || compensated != cacheQuotaOK {

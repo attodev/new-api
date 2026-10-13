@@ -982,21 +982,35 @@ func IncreaseUserQuota(id int, quota int64, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
+	if err := common.ValidateWalletQuota(quota); err != nil {
+		return err
+	}
 	return applyUserQuotaDelta(id, quota, db)
 }
 
-// increaseUserQuota deliberately does NOT enforce common.MaxQuota. Most callers
-// are refund and compensation paths (relay settlement, task/video refunds,
-// rollback of a failed reserve), and a refund that cannot be applied silently
-// destroys quota the user already paid for -- strictly worse than the precision
-// drift a ceiling here would prevent. For payments the ceiling is enforced where
-// new quota enters instead, in CreditTopUpTarget.
-//
-// Note the remaining gap: the admin grant paths (ManageUser add_quota/override in
-// controller/user.go) validate only the sign, so a root admin can still write a
-// balance above common.MaxQuota and past Number.MAX_SAFE_INTEGER, after which the
-// frontend reads that balance imprecisely. Widening this column to bigint removed
-// the out-of-range rejection that MySQL and PostgreSQL used to supply there.
+// GrantUserQuota credits newly issued quota (an admin grant) to a user
+// wallet. Unlike IncreaseUserQuota it enforces common.MaxQuota on the
+// resulting balance, atomically in the database UPDATE, and writes through
+// to the database even when batch updates are enabled so the rejection is
+// reported to the caller.
+func GrantUserQuota(id int, quota int64) error {
+	if quota <= 0 {
+		return errors.New("quota must be positive")
+	}
+	return applyUserQuotaDeltaSync(id, quota, func() error {
+		return creditUserQuotaWithinCeiling(DB, id, quota)
+	})
+}
+
+// increaseUserQuota deliberately does NOT enforce common.MaxQuota on the
+// accumulated balance. Most callers are refund and compensation paths (relay
+// settlement, task/video refunds, rollback of a failed reserve), and a refund
+// that cannot be applied silently destroys quota the user already paid for --
+// strictly worse than the precision drift a ceiling here would prevent. The
+// ceiling is enforced where new quota enters instead: CreditTopUpTarget for
+// payments, Redeem for redemption codes and GrantUserQuota for admin grants
+// (all through creditUserQuotaWithinCeiling). IncreaseUserQuota only bounds a
+// single delta with common.ValidateWalletQuota.
 func increaseUserQuota(id int, quota int64) (err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
 	if err != nil {

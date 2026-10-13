@@ -9,9 +9,10 @@ import (
 // rounding. Every tiered billing path (pre-consume, settlement, breakdown
 // validation, log fields) MUST use this function to avoid +-1 discrepancies.
 //
-// The result saturates at int32 bounds: quota columns are 32-bit integers in
-// the database, and an oversized expression result must never wrap around
-// and turn a charge into a credit.
+// The result saturates at int32 bounds, the single-request quota bound
+// (common.MaxRequestQuota; wallet columns are bigint, but one request's
+// charge is kept far below that range): an oversized expression result must
+// never wrap around and turn a charge into a credit.
 func QuotaRound(f float64) int {
 	r := math.Round(f)
 	if math.IsNaN(r) {

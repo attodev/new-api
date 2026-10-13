@@ -362,24 +362,40 @@ func CreditTopUpTarget(tx *gorm.DB, topUp *TopUp, quota int64) error {
 		}
 		return nil
 	default:
-		result := tx.Model(&User{}).
-			Where("id = ? AND quota <= ?", topUp.UserId, maxCurrentQuota).
-			Update("quota", gorm.Expr("quota + ?", quota))
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			var count int64
-			if err := tx.Model(&User{}).Where("id = ?", topUp.UserId).Count(&count).Error; err != nil {
-				return err
-			}
-			if count == 0 {
-				return errors.New("user not found")
-			}
-			return fmt.Errorf("%w: user quota capacity exceeded", ErrTopUpQuotaCapacityExceeded)
-		}
-		return nil
+		return creditUserQuotaWithinCeiling(tx, topUp.UserId, quota)
 	}
+}
+
+// creditUserQuotaWithinCeiling adds newly issued quota (a top-up, a
+// redemption code, an admin grant) to a user wallet and atomically enforces
+// common.MaxQuota: the ceiling predicate and the increment share one UPDATE,
+// so two concurrent credits cannot both pass a separate read/check. Refund
+// and compensation paths must not use it; see increaseUserQuota.
+func creditUserQuotaWithinCeiling(tx *gorm.DB, userId int, quota int64) error {
+	maxCurrentQuota, err := topUpQuotaMaxCurrent(quota)
+	if err != nil {
+		return err
+	}
+	result := tx.Model(&User{}).
+		// A legacy or concurrently over-consumed balance can be negative. A
+		// credit must still be able to reduce that debt; only the upper bound
+		// is relevant here.
+		Where("id = ? AND quota <= ?", userId, maxCurrentQuota).
+		Update("quota", gorm.Expr("quota + ?", quota))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := tx.Model(&User{}).Where("id = ?", userId).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("user not found")
+		}
+		return fmt.Errorf("%w: user quota capacity exceeded", ErrTopUpQuotaCapacityExceeded)
+	}
+	return nil
 }
 
 func CreditedQuotaForTopUp(topUp *TopUp) int {

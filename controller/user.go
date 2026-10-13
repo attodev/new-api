@@ -938,7 +938,13 @@ func ManageUser(c *gin.Context) {
 				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
 				return
 			}
-			if err := model.IncreaseUserQuota(user.Id, req.Value, true); err != nil {
+			if err := common.ValidateWalletQuota(req.Value); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+			// An admin grant is new quota, so it goes through the ceiling-checked
+			// credit path rather than the uncapped refund helper.
+			if err := model.GrantUserQuota(user.Id, req.Value); err != nil {
 				common.ApiError(c, err)
 				return
 			}
@@ -956,6 +962,10 @@ func ManageUser(c *gin.Context) {
 			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
 				fmt.Sprintf("Admin decreased user quota: %s", logger.LogQuota(req.Value)), adminInfo)
 		case "override":
+			if err := common.ValidateWalletQuota(req.Value); err != nil {
+				common.ApiError(c, err)
+				return
+			}
 			oldQuota := user.Quota
 			if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("quota", req.Value).Error; err != nil {
 				common.ApiError(c, err)

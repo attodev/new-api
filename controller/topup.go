@@ -242,13 +242,19 @@ func getPayMoney(amount int64, group string) float64 {
 }
 
 func getMinTopup() int64 {
-	minTopup := operation_setting.MinTopUp
+	minTopup := int64(operation_setting.MinTopUp)
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
-		dMinTopup := decimal.NewFromInt(int64(minTopup))
+		dMinTopup := decimal.NewFromInt(minTopup)
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-		minTopup = int(dMinTopup.Mul(dQuotaPerUnit).IntPart())
+		// Truncate (as before) and bound by the wallet ceiling instead of a
+		// bare IntPart conversion that could wrap.
+		quota, err := common.WalletQuotaFromDecimalStrict(dMinTopup.Mul(dQuotaPerUnit).Truncate(0))
+		if err != nil {
+			return common.MaxQuota
+		}
+		minTopup = quota
 	}
-	return int64(minTopup)
+	return minTopup
 }
 
 // topUpQuotaError is a pre-payment top-up rejection carrying the i18n key
