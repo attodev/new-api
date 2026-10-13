@@ -681,26 +681,16 @@ func EpayNotify(c *gin.Context) {
 		if topUp.Status == common.TopUpStatusPending {
 			if topUp.PaymentMethod != verifyInfo.Type {
 				logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay actual payment method differs from order trade_no=%s order_payment_method=%s actual_type=%s client_ip=%s", verifyInfo.ServiceTradeNo, topUp.PaymentMethod, verifyInfo.Type, c.ClientIP()))
-				topUp.PaymentMethod = verifyInfo.Type
 			}
-			topUp.Status = common.TopUpStatusSuccess
-			err := topUp.Update()
+			quotaToAdd, err := model.RechargeEpay(topUp.TradeNo, verifyInfo.Type, c.ClientIP())
 			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("Epay update topup order failed trade_no=%s user_id=%d client_ip=%s error=%q topup=%q", topUp.TradeNo, topUp.UserId, c.ClientIP(), err.Error(), common.GetJsonString(topUp)))
-				return
-			}
-			//user, _ := model.GetUserById(topUp.UserId, false)
-			//user.Quota += topUp.Amount * 500000
-			dAmount := decimal.NewFromInt(int64(topUp.Amount))
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-			err = model.CreditTopUpTarget(model.DB, topUp, int64(quotaToAdd))
-			if err != nil {
-				logger.LogError(c.Request.Context(), fmt.Sprintf("Epay update target wallet quota failed trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s quota_to_add=%d error=%q topup=%q", topUp.TradeNo, topUp.UserId, topUp.EffectiveTargetType(), topUp.EffectiveTargetId(), c.ClientIP(), quotaToAdd, err.Error(), common.GetJsonString(topUp)))
+				// The settlement transaction rolled back, so the order stays pending.
+				// "success" was already written to Epay above, so Epay will not retry;
+				// only an admin ManualCompleteTopUp can settle this order now.
+				logger.LogError(c.Request.Context(), fmt.Sprintf("Epay settle topup order failed trade_no=%s user_id=%d target_type=%s target_id=%d client_ip=%s error=%q topup=%q", topUp.TradeNo, topUp.UserId, topUp.EffectiveTargetType(), topUp.EffectiveTargetId(), c.ClientIP(), err.Error(), common.GetJsonString(topUp)))
 				return
 			}
 			logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay recharge succeeded trade_no=%s user_id=%d client_ip=%s quota_to_add=%d money=%.2f topup=%q", topUp.TradeNo, topUp.UserId, c.ClientIP(), quotaToAdd, topUp.Money, common.GetJsonString(topUp)))
-			model.RecordTopupLog(topUp.UserId, fmt.Sprintf("Online topup succeeded, quota: %v, amount: %f", logger.LogQuota(int64(quotaToAdd)), topUp.Money), c.ClientIP(), topUp.PaymentMethod, "epay")
 		}
 	} else {
 		logger.LogInfo(c.Request.Context(), fmt.Sprintf("Epay webhook event ignored trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))

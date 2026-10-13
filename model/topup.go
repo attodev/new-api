@@ -594,6 +594,55 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 	return nil
 }
 
+// RechargeEpay settles a pending Epay order and credits its wallet target in
+// one transaction. A failed credit (for example a full wallet) rolls the status
+// change back so the order stays pending and the provider's retry can settle it.
+func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (int64, error) {
+	if tradeNo == "" {
+		return 0, errors.New("payment order number not provided")
+	}
+
+	var quota int64
+	topUp := &TopUp{}
+
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
+			return errors.New("top-up order not found")
+		}
+
+		if topUp.PaymentProvider != PaymentProviderEpay {
+			return ErrPaymentMethodMismatch
+		}
+
+		if topUp.Status != common.TopUpStatusPending {
+			return errors.New("top-up order status error")
+		}
+
+		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
+			topUp.PaymentMethod = actualPaymentMethod
+		}
+		topUp.CompleteTime = common.GetTimestamp()
+		topUp.Status = common.TopUpStatusSuccess
+		if err := tx.Save(topUp).Error; err != nil {
+			return err
+		}
+
+		quota = decimal.NewFromInt(int64(topUp.Amount)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart()
+		return CreditTopUpTarget(tx, topUp, quota)
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	RecordTopupLog(topUp.UserId, fmt.Sprintf("Online topup succeeded, quota: %v, amount: %f", logger.LogQuota(quota), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderEpay)
+	return quota, nil
+}
+
 // topUpQueryWindowSeconds limits the time window for top-up record queries (seconds).
 const topUpQueryWindowSeconds int64 = 30 * 24 * 60 * 60
 
