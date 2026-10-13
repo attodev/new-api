@@ -69,12 +69,16 @@ docker compose --profile mock up -d new-api mock-upstream && ./bootstrap.sh && d
 
 `bootstrap.sh` 는 멱등이라 설정을 바꾼 뒤 다시 실행해도 된다. 실제 채널은 new-api 콘솔(`http://PUBLIC_HOST:3000`, 루트 계정)에서 추가한다.
 
-## 4. Open WebUI 쪽 수동 설정 두 가지
+## 4. Open WebUI 쪽 수동 설정 세 가지
 
 1. **첫 로그인 사용자가 Open WebUI 관리자**가 된다(Open WebUI 규칙). 테스트 사용자 중 관리자로 쓸 사람으로 먼저 로그인한다.
 2. **배경 태스크 구분 헤더**: Open WebUI 관리자 → Settings → Connections → OpenAI 연결의 설정(톱니) → Headers 에
    `{"X-Task": "{{TASK}}"}` 를 넣고 저장한다. 이것이 있어야 제목·태그·후속질문 생성이 사용자의 `openwebui-task` 토큰으로 청구된다.
    없으면 `openwebui` 토큰으로 청구된다(동작은 함). 환경 변수로는 설정할 수 없다.
+3. **모델 공개 범위**: Open WebUI 는 연결에서 받은 모델을 관리자에게만 모두 보여주고, 일반 사용자에게는 접근 범위가 **Public** 이거나
+   그 사용자의 그룹에 허용된 모델만 보여준다. 관리자 → Admin Panel → Settings → Models 에서 각 모델을 열어 접근 범위를 Public 으로 저장한다
+   (눈 아이콘도 켜져 있어야 한다). 사용자별 모델 제한은 Open WebUI 가 아니라 new-api 쪽(사용자 그룹, `openwebui` 토큰의 모델 제한)으로 거는 편이
+   한 곳에서 관리되어 깔끔하다. new-api 에 채널을 새로 추가할 때마다 이 설정을 다시 확인한다.
 
 ## 5. 검수 (요구사항 문서 11절)
 
@@ -110,7 +114,8 @@ new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI �
 | 증상 | 확인 |
 | --- | --- |
 | bootstrap: `Field validation for 'Password' failed on the 'min' tag` | new-api 계정 비밀번호는 8~20자, 사용자 이름은 최대 20자. `.env` 의 `NEW_API_SERVICE_PASSWORD` / `NEW_API_TEST_USERS` 를 고치고 다시 실행 |
-| Open WebUI 에 모델이 하나도 없음 | `docker compose logs new-api \| grep "openwebui: rejected"`. `link_failed: no_user` 면 이메일 불일치, `jwt_invalid` 면 `OWUI_JWT_SECRET` 불일치 |
+| Open WebUI 에 모델이 하나도 없음 | `docker compose logs new-api \| grep "openwebui: rejected"`. `link_failed: no_user` 면 이메일 불일치, `jwt_invalid` 면 `OWUI_JWT_SECRET` 불일치, `privileged_user` 면 관리자·루트 → 6절의 수동 연결 |
+| 관리자는 모델이 보이는데 일반 사용자만 안 보임 | new-api 는 정상(그 사용자의 `openwebui` 토큰으로 `curl /v1/models` 하면 나온다). Open WebUI 의 모델 접근 범위가 비공개 → 4절 3번대로 Public 으로. 그래도 안 되면 Admin Panel → Users 에서 역할이 `pending` 이 아닌지 |
 | "Continue with NewAPI" 를 눌러도 반응 없음 / discovery 오류 | Open WebUI 컨테이너에서 `wget -qO- http://PUBLIC_HOST:3000/.well-known/openid-configuration` 이 되는지. 안 되면 2절의 호스트 이름 문제 |
 | 로그인 뒤 Open WebUI 가 `invalid_client` / 콜백 오류 | `.env` 의 `OIDC_CLIENT_SECRET` 과 new-api `oauth2.client_secret` 이 다름 → `bootstrap.sh` 다시 실행 |
 | id_token 검증 실패 (`iss` 불일치) | new-api `ServerAddress` 가 `http://PUBLIC_HOST:3000` 인지 (bootstrap 이 설정). 바꿨으면 Open WebUI 재시작 |
