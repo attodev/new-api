@@ -829,3 +829,96 @@ func TestCalculateTextQuotaSummary_SaturatesOnOverflow_UsePrice(t *testing.T) {
 
 	require.Equal(t, math.MaxInt32, summary.Quota)
 }
+
+func newCachedUsageTestRelayInfo(model string) *relaycommon.RelayInfo {
+	return &relaycommon.RelayInfo{
+		RelayFormat:     types.RelayFormatOpenAI,
+		OriginModelName: model,
+		PriceData: types.PriceData{
+			ModelRatio:         1,
+			CompletionRatio:    2,
+			CacheRatio:         0.25,
+			CacheCreationRatio: 1.25,
+			GroupRatioInfo:     types.GroupRatioInfo{GroupRatio: 1},
+		},
+		StartTime: time.Now(),
+	}
+}
+
+func TestCalculateTextQuotaSummaryUsesResponsesInputTokenDetailsCachedTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	relayInfo := newCachedUsageTestRelayInfo("gpt-4o")
+
+	usage := &dto.Usage{
+		PromptTokens:     100,
+		CompletionTokens: 10,
+		TotalTokens:      110,
+		InputTokensDetails: &dto.InputTokenDetails{
+			CachedTokens: 40,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	require.Equal(t, 40, summary.CacheTokens)
+	// 60 uncached input + 40*0.25 cached input + 10*2 output = 90.
+	require.Equal(t, 90, summary.Quota)
+}
+
+func TestCalculateTextQuotaSummaryUsesResponsesInputTokenDetailsCacheCreation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	relayInfo := newCachedUsageTestRelayInfo("gpt-4o")
+
+	usage := &dto.Usage{
+		PromptTokens:     100,
+		CompletionTokens: 10,
+		TotalTokens:      110,
+		InputTokensDetails: &dto.InputTokenDetails{
+			CachedCreationTokens: 20,
+		},
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	require.Equal(t, 20, summary.CacheCreationTokens)
+}
+
+func TestCalculateTextQuotaSummaryFallsBackToPromptCacheHitTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	relayInfo := newCachedUsageTestRelayInfo("deepseek-chat")
+
+	usage := &dto.Usage{
+		PromptTokens:         100,
+		CompletionTokens:     10,
+		TotalTokens:          110,
+		PromptCacheHitTokens: 35,
+	}
+
+	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	require.Equal(t, 35, summary.CacheTokens)
+	// 65 uncached input + 35*0.25 cached input + 10*2 output = 93.75 => 94.
+	require.Equal(t, 94, summary.Quota)
+}
+
+func TestNormalizeCachedUsageDoesNotOverwriteCanonicalValues(t *testing.T) {
+	usage := &dto.Usage{
+		PromptCacheHitTokens: 55,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens:         8,
+			CachedCreationTokens: 3,
+			CacheWriteTokens:     6,
+		},
+		InputTokensDetails: &dto.InputTokenDetails{
+			CachedTokens:         40,
+			CachedCreationTokens: 5,
+		},
+	}
+
+	normalizeCachedUsage(usage)
+
+	require.Equal(t, 8, usage.PromptTokensDetails.CachedTokens)
+	require.Equal(t, 3, usage.PromptTokensDetails.CachedCreationTokens)
+	require.Equal(t, 6, usage.PromptTokensDetails.CacheWriteTokens)
+	normalizeCachedUsage(nil)
+}
