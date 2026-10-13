@@ -34,9 +34,18 @@ fork 커밋은 `git log --reverse d2bb1b156..499784e79` 순서이며, upstream �
 | 22 | `2ba5cc513` | `a073f74b3` | 리뷰 반영: CSV import, check-in credit 을 지갑 ceiling 으로 제한, `GrantUserQuota` 를 DB 먼저 쓰도록 변경, 메시지 assertion 정리 |
 | 23 | `c0b313844` | `bb28f2cca` | token 계산을 `tokenkit` 모듈로 이동, 에이전트 트래픽으로 보정한 추정, tool 정의/tool_result/function call 계산 |
 | 23 | `499784e79` | `bb28f2cca` | 리뷰 반영: Gemini 가 보고한 prompt usage 를 completion 이 0 일 때도 유지, CI Go 버전 `>=1.26` |
+| 최종 리뷰 | `615d39484` | `55a6cd2a4` | 브랜치 전체 리뷰 반영: Responses 스트림이 `response.incomplete`/`done`/`failed`/`cancelled` 이벤트의 usage 를 정산에 사용(기존엔 `completed` 만), Gemini 스트림 usage 게이트를 `geminiUsageMetadataHasTokens` 로 통일, `anthropic-beta` 값 trim, `expr.md`/`price.go` 의 tiered 예약 문구 수정, `THIRD-PARTY-LICENSES.md` tokenizer v0.8.1, `text_quota_test.go` gofmt |
 
-Task 22 와 Task 23 은 각각 수정 커밋이 하나씩 더 있어 fork 커밋이 두 개다. 모든 커밋의
+Task 22 와 Task 23 은 각각 수정 커밋이 하나씩 더 있어 fork 커밋이 두 개다. 마지막 행은
+브랜치 전체 리뷰(Task 24 이후) 에서 나온 수정 묶음이다. 모든 커밋의
 `Co-Authored-By` 는 `Claude Fable 5.1 <noreply@anthropic.com>` 로 통일했다.
+
+최종 리뷰에서 남긴 후속 후보: Chat 요청의 `reasoning_effort` 가 Opus 4.7/4.8 에서
+`thinking.type:"enabled"` 로 매핑되어 400 이 나는 문제(`relay-claude.go:273-290`, 브랜치 이전부터 존재),
+`service/task_polling.go` 의 201/202 거부, Gemini prompt IMAGE modality 누락, `EpayNotify` 의
+success 선기록 순서. 릴리스 노트에 적을 것: classic UI 관리자는 새 옵션 두 개를 설정할 수 없다,
+master 노드를 먼저 배포한다(비 master 는 widen 되지 않은 스키마를 거부), Claude/Gemini 스트림의
+token 추정 시 이미지 URL fetch 가 발생할 수 있다.
 
 ### Task 20: 결제 진입점별 사전 검증 범위
 
