@@ -9,12 +9,22 @@ import (
 
 const EnableSearchModelSuffix = "-internet"
 
-func requestOpenAI2Ali(request dto.GeneralOpenAIRequest, upstreamModelName string) *dto.GeneralOpenAIRequest {
-	modelName := upstreamModelName
-	if modelName == "" {
-		modelName = request.Model
+// requestOpenAI2Ali converts a generic OpenAI request for DashScope.
+// thinking_budget is kept when either the client-facing (origin) model name or
+// the upstream (post-mapping) name is a Qwen model, so an admin mapping
+// qwen3-max to a custom deployment name does not lose it. When kept it is
+// marked KeepThinkingBudget so the generic marshaler, which only sees the
+// post-mapping name, does not drop it again.
+func requestOpenAI2Ali(request dto.GeneralOpenAIRequest, originModelName, upstreamModelName string) *dto.GeneralOpenAIRequest {
+	if originModelName == "" {
+		originModelName = request.Model
 	}
-	if !dto.IsQwenThinkingBudgetModel(modelName) {
+	if upstreamModelName == "" {
+		upstreamModelName = request.Model
+	}
+	if dto.IsQwenThinkingBudgetModel(originModelName) || dto.IsQwenThinkingBudgetModel(upstreamModelName) {
+		request.KeepThinkingBudget = true
+	} else {
 		request.ThinkingBudget = nil
 	}
 

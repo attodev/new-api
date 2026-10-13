@@ -36,14 +36,17 @@ func TestApplyClaudeThinkingSettingsKeepsExplicitDisplay(t *testing.T) {
 	require.Equal(t, "omitted", request.Thinking.Display)
 }
 
+// (i) Manual-capable models keep the client's budget thinking as sent.
 func TestApplyClaudeThinkingSettingsLeavesEnabledThinking(t *testing.T) {
 	request := &dto.ClaudeRequest{
-		Model:    "claude-opus-5",
+		Model:    "claude-opus-4-6",
 		Thinking: &dto.Thinking{Type: "enabled", BudgetTokens: intPtr(2048)},
 	}
-	require.False(t, applyClaudeThinkingSettings(request, "claude-opus-5"))
+	require.False(t, applyClaudeThinkingSettings(request, "claude-opus-4-6"))
 	require.Equal(t, "", request.Thinking.Display)
 	require.Equal(t, "enabled", request.Thinking.Type)
+	require.Equal(t, 2048, request.Thinking.GetBudgetTokens())
+	require.Empty(t, request.OutputConfig)
 }
 
 func TestApplyClaudeThinkingSettingsNoThinkingRequested(t *testing.T) {
@@ -118,5 +121,127 @@ func TestApplyClaudeThinkingSettingsNormalizesClientEffort(t *testing.T) {
 			}
 			require.JSONEq(t, c.want, string(request.OutputConfig))
 		})
+	}
+}
+
+// (g) Claude 5.x rejects budget thinking: a client-sent enabled+budget becomes
+// adaptive at the effort the budget maps to, keeping block_binding.
+func TestApplyClaudeThinkingSettingsClaude5EnabledBecomesAdaptive(t *testing.T) {
+	binding := `{"prefix_mismatch_behavior":"drop_block"}`
+	request := &dto.ClaudeRequest{
+		Model:       "claude-opus-5-5",
+		Thinking:    &dto.Thinking{Type: "enabled", BudgetTokens: intPtr(2048), BlockBinding: json.RawMessage(binding)},
+		Temperature: floatPtr(0.7),
+	}
+	require.False(t, applyClaudeThinkingSettings(request, "claude-opus-5-5"))
+	require.Equal(t, "claude-opus-5-5", request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Nil(t, request.Thinking.BudgetTokens)
+	require.Equal(t, "summarized", request.Thinking.Display)
+	require.JSONEq(t, binding, string(request.Thinking.BlockBinding))
+	require.JSONEq(t, `{"effort":"medium"}`, string(request.OutputConfig))
+	require.Nil(t, request.Temperature)
+
+	request = &dto.ClaudeRequest{
+		Model:    "claude-opus-5-5",
+		Thinking: &dto.Thinking{Type: "enabled", BudgetTokens: intPtr(2048)},
+	}
+	applyClaudeThinkingSettings(request, "claude-opus-5-5")
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Empty(t, request.Thinking.BlockBinding)
+}
+
+// A client effort in output_config wins over the budget, and other
+// output_config keys stay.
+func TestApplyClaudeThinkingSettingsClaude5EnabledKeepsClientEffort(t *testing.T) {
+	request := &dto.ClaudeRequest{
+		Model:        "claude-sonnet-5",
+		Thinking:     &dto.Thinking{Type: "enabled", BudgetTokens: intPtr(2048)},
+		OutputConfig: json.RawMessage(`{"effort":"xhigh","format":{"type":"json_schema"}}`),
+	}
+	applyClaudeThinkingSettings(request, "claude-sonnet-5")
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.JSONEq(t, `{"effort":"xhigh","format":{"type":"json_schema"}}`, string(request.OutputConfig))
+}
+
+// (h) Effort suffixes expand for Claude 5.x on the native path too.
+func TestApplyClaudeThinkingSettingsClaude5EffortSuffix(t *testing.T) {
+	request := &dto.ClaudeRequest{Model: "claude-sonnet-5-5-high", Temperature: floatPtr(0.2), TopK: intPtr(10)}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-sonnet-5-5-high"))
+	require.Equal(t, "claude-sonnet-5-5", request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "summarized", request.Thinking.Display)
+	require.JSONEq(t, `{"effort":"high"}`, string(request.OutputConfig))
+	require.Nil(t, request.Temperature)
+	require.Nil(t, request.TopP)
+	require.Nil(t, request.TopK)
+}
+
+// The -thinking suffix on Claude 5.x renders adaptive at the default effort.
+func TestApplyClaudeThinkingSettingsClaude5ThinkingSuffix(t *testing.T) {
+	request := &dto.ClaudeRequest{Model: "claude-haiku-5-5-thinking"}
+	require.True(t, applyClaudeThinkingSettings(request, "claude-haiku-5-5-thinking"))
+	require.Equal(t, "claude-haiku-5-5", request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.JSONEq(t, `{"effort":"medium"}`, string(request.OutputConfig))
+}
+
+// Strict-sampling models lose temperature/top_p/top_k on the native path
+// even without thinking; other models keep them.
+func TestApplyClaudeThinkingSettingsStrictSampling(t *testing.T) {
+	request := &dto.ClaudeRequest{Model: "claude-opus-4-8", Temperature: floatPtr(0.7), TopP: floatPtr(0.9)}
+	applyClaudeThinkingSettings(request, "claude-opus-4-8")
+	require.Nil(t, request.Thinking)
+	require.Nil(t, request.Temperature)
+	require.Nil(t, request.TopP)
+
+	request = &dto.ClaudeRequest{Model: "claude-opus-4-6", Temperature: floatPtr(0.7)}
+	applyClaudeThinkingSettings(request, "claude-opus-4-6")
+	require.NotNil(t, request.Temperature)
+}
+
+func floatPtr(v float64) *float64 { return &v }
+
+// Models that cannot turn thinking off get their lowest thinking setting for
+// a client's {type:"disabled"} instead of a 400 (upstream RenderClaude,
+// relaykit/relayconvert/reasoning/claude.go:166-217).
+func TestApplyClaudeThinkingSettingsDisabledOnCannotDisableModels(t *testing.T) {
+	binding := `{"prefix_mismatch_behavior":"drop_block"}`
+
+	// Sonnet 5.5 turns thinking off with between_tools, which takes no other
+	// thinking field and effort high or below.
+	request := &dto.ClaudeRequest{Model: "claude-sonnet-5-5", Thinking: &dto.Thinking{Type: "disabled"}}
+	applyClaudeThinkingSettings(request, request.Model)
+	require.Equal(t, &dto.Thinking{Type: "between_tools"}, request.Thinking)
+	require.Empty(t, request.OutputConfig)
+
+	request = &dto.ClaudeRequest{Model: "claude-sonnet-5-5", Thinking: &dto.Thinking{Type: "disabled"}, OutputConfig: json.RawMessage(`{"effort":"xhigh"}`)}
+	applyClaudeThinkingSettings(request, request.Model)
+	require.Equal(t, "between_tools", request.Thinking.Type)
+	require.JSONEq(t, `{"effort":"high"}`, string(request.OutputConfig))
+
+	// Opus 5.5 cannot turn thinking off: adaptive at low effort.
+	request = &dto.ClaudeRequest{Model: "claude-opus-5-5", Thinking: &dto.Thinking{Type: "disabled", BlockBinding: json.RawMessage(binding)}}
+	applyClaudeThinkingSettings(request, request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "omitted", request.Thinking.Display, "the client asked for no thinking: no summaries")
+	require.JSONEq(t, binding, string(request.Thinking.BlockBinding))
+	require.JSONEq(t, `{"effort":"low"}`, string(request.OutputConfig))
+
+	// A disable request runs at low whatever effort the client sent; other
+	// output_config keys stay.
+	request = &dto.ClaudeRequest{Model: "claude-fable-5-1", Thinking: &dto.Thinking{Type: "disabled"}, OutputConfig: json.RawMessage(`{"effort":"xhigh","format":{"type":"json_schema"}}`)}
+	applyClaudeThinkingSettings(request, request.Model)
+	require.Equal(t, "adaptive", request.Thinking.Type)
+	require.Equal(t, "omitted", request.Thinking.Display)
+	require.Empty(t, request.Thinking.BlockBinding)
+	require.JSONEq(t, `{"effort":"low","format":{"type":"json_schema"}}`, string(request.OutputConfig))
+
+	// Models that can turn thinking off keep the client's request.
+	for _, model := range []string{"claude-opus-4-6", "claude-opus-5"} {
+		request = &dto.ClaudeRequest{Model: model, Thinking: &dto.Thinking{Type: "disabled"}}
+		applyClaudeThinkingSettings(request, model)
+		require.Equal(t, &dto.Thinking{Type: "disabled"}, request.Thinking, model)
+		require.Empty(t, request.OutputConfig, model)
 	}
 }

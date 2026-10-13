@@ -10,6 +10,8 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -921,4 +923,149 @@ func TestNormalizeCachedUsageDoesNotOverwriteCanonicalValues(t *testing.T) {
 	require.Equal(t, 3, usage.PromptTokensDetails.CachedCreationTokens)
 	require.Equal(t, 6, usage.PromptTokensDetails.CacheWriteTokens)
 	normalizeCachedUsage(nil)
+}
+
+// Gemini bills image input at the text rate. With no image ratio configured
+// (ratio_setting.GetImageRatio defaults to 1), attributing IMAGE prompt tokens
+// to PromptTokensDetails.ImageTokens must not change the settled quota.
+func TestCalculateTextQuotaSummaryGeminiImagePromptKeepsTextRateWithoutImageRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const model = "gemini-3-flash-preview"
+	imageRatio, configured := ratio_setting.GetImageRatio(model)
+	require.False(t, configured, "test requires a Gemini model without a configured image ratio")
+	require.Equal(t, 1.0, imageRatio)
+
+	newInfo := func() *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{
+			RelayFormat:     types.RelayFormatGemini,
+			OriginModelName: model,
+			PriceData: types.PriceData{
+				ModelRatio:      1.25,
+				CompletionRatio: 4,
+				ImageRatio:      imageRatio,
+				GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+			},
+			StartTime: time.Now(),
+		}
+	}
+
+	mixed := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+	mixed.PromptTokensDetails.TextTokens = 911 // TEXT 800 + VIDEO 100 + DOCUMENT 11
+	mixed.PromptTokensDetails.ImageTokens = 1089
+
+	allText := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+	allText.PromptTokensDetails.TextTokens = 2000
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	mixedSummary := calculateTextQuotaSummary(ctx, newInfo(), mixed)
+	ctx, _ = gin.CreateTestContext(httptest.NewRecorder())
+	textSummary := calculateTextQuotaSummary(ctx, newInfo(), allText)
+
+	require.Equal(t, 1089, mixedSummary.ImageTokens)
+	require.Equal(t, textSummary.Quota, mixedSummary.Quota)
+}
+
+// Gemini promptTokensDetails include the cached portion. The handler caps
+// ImageTokens at the uncached remainder (500 of 1089 here) so the cached image
+// portion is billed only at the cache rate and never double-counted.
+func TestCalculateTextQuotaSummaryGeminiCachedImagePromptIsNotOvercharged(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const model = "gemini-3-flash-preview"
+	newInfo := func(imageRatio float64) *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{
+			RelayFormat:     types.RelayFormatGemini,
+			OriginModelName: model,
+			PriceData: types.PriceData{
+				ModelRatio:      1,
+				CompletionRatio: 4,
+				CacheRatio:      0.25,
+				ImageRatio:      imageRatio,
+				GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+			},
+			StartTime: time.Now(),
+		}
+	}
+	quota := func(imageRatio float64, usage *dto.Usage) int {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		return calculateTextQuotaSummary(ctx, newInfo(imageRatio), usage).Quota
+	}
+
+	// Usage as produced by buildUsageFromGeminiMetadata for P=2000, cached=1500,
+	// TEXT 911 + IMAGE 1089 (image capped to the 500 uncached tokens).
+	capped := func() *dto.Usage {
+		u := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+		u.PromptTokensDetails.CachedTokens = 1500
+		u.PromptTokensDetails.ImageTokens = 500
+		u.PromptTokensDetails.TextTokens = 1500
+		return u
+	}
+	allText := func() *dto.Usage {
+		u := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+		u.PromptTokensDetails.CachedTokens = 1500
+		u.PromptTokensDetails.TextTokens = 2000
+		return u
+	}
+
+	// Old way: (2000-1500) at 1 + 1500*0.25 + 50*4 = 500 + 375 + 200 = 1075.
+	require.Equal(t, 1075, quota(1, allText()))
+	require.Equal(t, 1075, quota(1, capped()), "default image ratio must leave quota unchanged")
+
+	// ImageRatio 2: only the 500 uncached image tokens get the 2x ratio.
+	// (2000-1500-500)=0 base + 1500*0.25 + 500*2 + 200 = 1575.
+	require.Equal(t, 1575, quota(2, capped()))
+}
+
+// Settlement subtracts cached + image + audio from the base (audio only when the
+// model has an audio input price, as gemini-2.5-flash does) and clamps at zero,
+// so image tokens that overlap cached and audio tokens are billed twice. The
+// handler caps ImageTokens at P - cached - audio; with that cap an
+// image+audio+cached prompt settles exactly like the same prompt without
+// image attribution.
+func TestCalculateTextQuotaSummaryGeminiImageAudioCachedPromptIsNotOvercharged(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	const model = "gemini-2.5-flash"
+	require.Greater(t, operation_setting.GetGeminiInputAudioPricePerMillionTokens(model), 0.0,
+		"test requires a model with a built-in audio input price")
+	newInfo := func() *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{
+			RelayFormat:     types.RelayFormatGemini,
+			OriginModelName: model,
+			PriceData: types.PriceData{
+				ModelRatio:      1,
+				CompletionRatio: 4,
+				CacheRatio:      0.25,
+				ImageRatio:      1,
+				GroupRatioInfo:  types.GroupRatioInfo{GroupRatio: 1},
+			},
+			StartTime: time.Now(),
+		}
+	}
+	quota := func(usage *dto.Usage) int {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		return calculateTextQuotaSummary(ctx, newInfo(), usage).Quota
+	}
+	build := func(image, text int) *dto.Usage {
+		u := &dto.Usage{PromptTokens: 2000, CompletionTokens: 50, TotalTokens: 2050}
+		u.PromptTokensDetails.CachedTokens = 1000
+		u.PromptTokensDetails.AudioTokens = 500
+		u.PromptTokensDetails.ImageTokens = image
+		u.PromptTokensDetails.TextTokens = text
+		return u
+	}
+
+	// No image attribution: base 2000-1000-500 = 500, cached 1000*0.25 = 250,
+	// audio 500 at the model's audio price, completion 50*4 = 200.
+	noImage := quota(build(0, 1000))
+	require.Equal(t, 1200, noImage)
+
+	// TEXT 700 + IMAGE 800 + AUDIO 500 with 1000 cached: the handler caps the
+	// image at 2000-1000-500 = 500, which settles the same as no attribution.
+	require.Equal(t, noImage, quota(build(500, 1000)))
+
+	// Without the audio-aware cap the uncapped 800 image tokens would be billed
+	// on top of the audio and cached tokens they overlap.
+	require.Equal(t, 1500, quota(build(800, 700)))
 }

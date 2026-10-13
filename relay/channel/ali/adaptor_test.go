@@ -20,6 +20,7 @@ import (
 	relayhelper "github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -166,11 +167,20 @@ func TestConvertOpenAIRequestFiltersThinkingBudgetByUpstreamModel(t *testing.T) 
 			wantValue:     0,
 		},
 		{
-			name:          "unsupported upstream overrides qwen request",
-			requestModel:  "qwen-plus",
+			name:          "neither client nor upstream is qwen",
+			requestModel:  "my-alias",
 			upstreamModel: "deepseek-r1",
 			budget:        "128",
 			wantBudget:    false,
+		},
+		{
+			// Either name being Qwen-like keeps the budget (see requestOpenAI2Ali).
+			name:          "qwen client mapped to unsupported upstream keeps budget",
+			requestModel:  "qwen-plus",
+			upstreamModel: "deepseek-r1",
+			budget:        "128",
+			wantBudget:    true,
+			wantValue:     128,
 		},
 	}
 
@@ -250,4 +260,84 @@ func TestConvertOpenAIRequestPreservesExplicitZeroForMappedQwenModel(t *testing.
 	value := gjson.GetBytes(encoded, "thinking_budget")
 	assert.True(t, value.Exists())
 	assert.Equal(t, int64(0), value.Int())
+}
+
+func convertAliChatBody(t *testing.T, clientModel, mapping, rawBody string) []byte {
+	t.Helper()
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	if mapping != "" {
+		c.Set("model_mapping", mapping)
+	}
+
+	var request dto.GeneralOpenAIRequest
+	require.NoError(t, common.Unmarshal([]byte(rawBody), &request))
+	info := &relaycommon.RelayInfo{
+		OriginModelName: clientModel,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: clientModel,
+		},
+	}
+	require.NoError(t, relayhelper.ModelMappedHelper(c, info, &request))
+
+	converted, err := (&Adaptor{}).ConvertOpenAIRequest(c, info, &request)
+	require.NoError(t, err)
+	encoded, err := common.Marshal(converted)
+	require.NoError(t, err)
+	return encoded
+}
+
+// A Qwen client model mapped to a custom deployment name (no "qwen" in it) must
+// keep thinking_budget: both the Ali conversion and the generic request
+// marshaler used to decide by the upstream name alone and dropped it.
+func TestConvertOpenAIRequestKeepsThinkingBudgetForQwenClientMappedToCustomName(t *testing.T) {
+	encoded := convertAliChatBody(t, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`,
+		`{"model":"qwen3-max","messages":[{"role":"user","content":"hi"}],"top_p":1,"enable_thinking":true,"thinking_budget":0}`)
+
+	assert.Equal(t, "my-qwen-deploy", gjson.GetBytes(encoded, "model").String())
+	value := gjson.GetBytes(encoded, "thinking_budget")
+	assert.True(t, value.Exists(), string(encoded))
+	assert.Equal(t, int64(0), value.Int())
+	assert.Contains(t, string(encoded), `"thinking_budget":0`)
+	assert.True(t, gjson.GetBytes(encoded, "enable_thinking").Bool())
+	assert.Equal(t, "hi", gjson.GetBytes(encoded, "messages.0.content").String())
+	assert.InDelta(t, 0.999, gjson.GetBytes(encoded, "top_p").Float(), 1e-9)
+}
+
+// A non-Qwen client model on Ali never gets thinking_budget upstream.
+func TestConvertOpenAIRequestDropsThinkingBudgetForNonQwenClientModel(t *testing.T) {
+	encoded := convertAliChatBody(t, "deepseek-v3", "",
+		`{"model":"deepseek-v3","messages":[{"role":"user","content":"hi"}],"thinking_budget":100}`)
+
+	assert.False(t, gjson.GetBytes(encoded, "thinking_budget").Exists(), string(encoded))
+	assert.Equal(t, "hi", gjson.GetBytes(encoded, "messages.0.content").String())
+}
+
+// compatible_handler injects ChannelSetting.SystemPrompt only when the
+// converted request is a *dto.GeneralOpenAIRequest, and the conversion chain is
+// recorded through GuessRelayFormatFromRequest. The Ali adaptor must keep
+// returning that concrete type or both are silently skipped.
+func TestConvertOpenAIRequestReturnsGeneralOpenAIRequest(t *testing.T) {
+	request := &dto.GeneralOpenAIRequest{
+		Model:    "qwen-plus",
+		Messages: []dto.Message{{Role: "user", Content: "hi"}},
+	}
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "qwen-plus",
+		ChannelMeta:     &relaycommon.ChannelMeta{UpstreamModelName: "qwen-plus"},
+	}
+
+	convertedValue, err := (&Adaptor{}).ConvertOpenAIRequest(nil, info, request)
+	require.NoError(t, err)
+	converted, ok := convertedValue.(*dto.GeneralOpenAIRequest)
+	require.True(t, ok, "got %T", convertedValue)
+
+	// Mirrors the SystemPrompt injection in relay/compatible_handler.go.
+	converted.Messages = append([]dto.Message{{Role: converted.GetSystemRoleName(), Content: "be brief"}}, converted.Messages...)
+	encoded, err := common.Marshal(converted)
+	require.NoError(t, err)
+	assert.Equal(t, "be brief", gjson.GetBytes(encoded, "messages.0.content").String())
+
+	format, ok := relaycommon.GuessRelayFormatFromRequest(convertedValue)
+	assert.True(t, ok)
+	assert.Equal(t, types.RelayFormatOpenAI, format)
 }

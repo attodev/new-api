@@ -591,3 +591,195 @@ func TestGeminiNonStreamHandlersPromptOnlyUsageMetadataEstimatesCompletionTokens
 		})
 	}
 }
+
+func geminiModalityUsageMetadata(prompt int, promptDetails, toolUseDetails []dto.GeminiPromptTokensDetails, toolUse int) dto.GeminiUsageMetadata {
+	return dto.GeminiUsageMetadata{
+		PromptTokenCount:           prompt,
+		ToolUsePromptTokenCount:    toolUse,
+		CandidatesTokenCount:       10,
+		TotalTokenCount:            prompt + toolUse + 10,
+		PromptTokensDetails:        promptDetails,
+		ToolUsePromptTokensDetails: toolUseDetails,
+	}
+}
+
+func runGeminiChatHandlerForUsage(t *testing.T, metadata dto.GeminiUsageMetadata) *dto.Usage {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	info := &relaycommon.RelayInfo{
+		RelayFormat:     types.RelayFormatGemini,
+		OriginModelName: "gemini-3-flash-preview",
+		ChannelMeta:     &relaycommon.ChannelMeta{UpstreamModelName: "gemini-3-flash-preview"},
+	}
+	payload := dto.GeminiChatResponse{
+		Candidates: []dto.GeminiChatCandidate{{
+			Content: dto.GeminiChatContent{Role: "model", Parts: []dto.GeminiPart{{Text: "ok"}}},
+		}},
+		UsageMetadata: metadata,
+	}
+	body, err := common.Marshal(payload)
+	require.NoError(t, err)
+	usage, newAPIError := GeminiChatHandler(c, info, &http.Response{Body: io.NopCloser(bytes.NewReader(body))})
+	require.Nil(t, newAPIError)
+	require.NotNil(t, usage)
+	return usage
+}
+
+func runGeminiStreamHandlerForUsage(t *testing.T, metadata dto.GeminiUsageMetadata) *dto.Usage {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	oldStreamingTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 300
+	t.Cleanup(func() { constant.StreamingTimeout = oldStreamingTimeout })
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "gemini-3-flash-preview",
+		ChannelMeta:     &relaycommon.ChannelMeta{UpstreamModelName: "gemini-3-flash-preview"},
+	}
+	chunk := dto.GeminiChatResponse{
+		Candidates: []dto.GeminiChatCandidate{{
+			Content: dto.GeminiChatContent{Role: "model", Parts: []dto.GeminiPart{{Text: "partial"}}},
+		}},
+		UsageMetadata: metadata,
+	}
+	chunkData, err := common.Marshal(chunk)
+	require.NoError(t, err)
+	resp := &http.Response{Body: io.NopCloser(bytes.NewReader([]byte("data: " + string(chunkData) + "\ndata: [DONE]\n")))}
+	usage, newAPIError := geminiStreamHandler(c, info, resp, func(_ string, _ *dto.GeminiChatResponse) bool { return true })
+	require.Nil(t, newAPIError)
+	require.NotNil(t, usage)
+	return usage
+}
+
+func TestGeminiHandlersAttributeMixedPromptModalities(t *testing.T) {
+	metadata := geminiModalityUsageMetadata(2000, []dto.GeminiPromptTokensDetails{
+		{Modality: "TEXT", TokenCount: 800},
+		{Modality: "IMAGE", TokenCount: 1089},
+		{Modality: "VIDEO", TokenCount: 100},
+		{Modality: "DOCUMENT", TokenCount: 11},
+	}, nil, 0)
+
+	for name, run := range map[string]func(*testing.T, dto.GeminiUsageMetadata) *dto.Usage{
+		"chat":   runGeminiChatHandlerForUsage,
+		"stream": runGeminiStreamHandlerForUsage,
+	} {
+		t.Run(name, func(t *testing.T) {
+			usage := run(t, metadata)
+			require.Equal(t, 2000, usage.PromptTokens)
+			require.Equal(t, 1089, usage.PromptTokensDetails.ImageTokens)
+			require.Equal(t, 911, usage.PromptTokensDetails.TextTokens)
+			require.Equal(t, 0, usage.PromptTokensDetails.AudioTokens)
+		})
+	}
+}
+
+func TestGeminiHandlersAttributeImageOnlyPrompt(t *testing.T) {
+	metadata := geminiModalityUsageMetadata(1500, []dto.GeminiPromptTokensDetails{
+		{Modality: "IMAGE", TokenCount: 1089},
+	}, nil, 0)
+
+	for name, run := range map[string]func(*testing.T, dto.GeminiUsageMetadata) *dto.Usage{
+		"chat":   runGeminiChatHandlerForUsage,
+		"stream": runGeminiStreamHandlerForUsage,
+	} {
+		t.Run(name, func(t *testing.T) {
+			usage := run(t, metadata)
+			require.Equal(t, 1500, usage.PromptTokens)
+			require.Equal(t, 1089, usage.PromptTokensDetails.ImageTokens)
+			require.Equal(t, 1500-1089, usage.PromptTokensDetails.TextTokens)
+			require.Equal(t, 0, usage.PromptTokensDetails.AudioTokens)
+		})
+	}
+}
+
+func TestBuildUsageFromGeminiMetadataToolUseImageTokens(t *testing.T) {
+	usage := buildUsageFromGeminiMetadata(geminiModalityUsageMetadata(
+		200,
+		[]dto.GeminiPromptTokensDetails{{Modality: "TEXT", TokenCount: 200}},
+		[]dto.GeminiPromptTokensDetails{{Modality: " image ", TokenCount: 700}, {Modality: "text", TokenCount: 100}},
+		800,
+	), 0)
+	require.Equal(t, 1000, usage.PromptTokens)
+	require.Equal(t, 700, usage.PromptTokensDetails.ImageTokens)
+	require.Equal(t, 300, usage.PromptTokensDetails.TextTokens)
+	require.Equal(t, 0, usage.PromptTokensDetails.AudioTokens)
+}
+
+func TestBuildUsageFromGeminiMetadataPromptDetailsAlwaysSumToPromptTokens(t *testing.T) {
+	// Audio + image only, no text-class detail: remainder is billed as text.
+	usage := buildUsageFromGeminiMetadata(geminiModalityUsageMetadata(1000, []dto.GeminiPromptTokensDetails{
+		{Modality: "AUDIO", TokenCount: 300},
+		{Modality: "IMAGE", TokenCount: 500},
+	}, nil, 0), 0)
+	details := usage.PromptTokensDetails
+	require.Equal(t, 200, details.TextTokens)
+	require.Equal(t, usage.PromptTokens, details.TextTokens+details.AudioTokens+details.ImageTokens)
+
+	// No details at all: everything is text.
+	usage = buildUsageFromGeminiMetadata(geminiModalityUsageMetadata(1000, nil, nil, 0), 0)
+	require.Equal(t, 1000, usage.PromptTokensDetails.TextTokens)
+
+	// Detail tokens exceeding the prompt count never produce negative text.
+	usage = buildUsageFromGeminiMetadata(geminiModalityUsageMetadata(100, []dto.GeminiPromptTokensDetails{
+		{Modality: "IMAGE", TokenCount: 500},
+	}, nil, 0), 0)
+	require.Equal(t, 0, usage.PromptTokensDetails.TextTokens)
+}
+
+func TestBuildUsageFromGeminiMetadataCapsImageTokensToUncachedPrompt(t *testing.T) {
+	metadata := geminiModalityUsageMetadata(2000, []dto.GeminiPromptTokensDetails{
+		{Modality: "TEXT", TokenCount: 911},
+		{Modality: "IMAGE", TokenCount: 1089},
+	}, nil, 0)
+	metadata.CachedContentTokenCount = 1500
+
+	usage := buildUsageFromGeminiMetadata(metadata, 0)
+	details := usage.PromptTokensDetails
+	require.Equal(t, 1500, details.CachedTokens)
+	require.Equal(t, 500, details.ImageTokens)
+	require.Equal(t, 1500, details.TextTokens)
+	require.Equal(t, usage.PromptTokens, details.TextTokens+details.AudioTokens+details.ImageTokens)
+	require.LessOrEqual(t, details.CachedTokens+details.ImageTokens, usage.PromptTokens)
+
+	// Cache fully covering the prompt leaves no image tokens to price.
+	metadata.CachedContentTokenCount = 2000
+	usage = buildUsageFromGeminiMetadata(metadata, 0)
+	require.Equal(t, 0, usage.PromptTokensDetails.ImageTokens)
+	require.Equal(t, 2000, usage.PromptTokensDetails.TextTokens)
+
+	// Cache that does not overlap the image tokens leaves them untouched.
+	metadata.CachedContentTokenCount = 900
+	usage = buildUsageFromGeminiMetadata(metadata, 0)
+	require.Equal(t, 1089, usage.PromptTokensDetails.ImageTokens)
+	require.Equal(t, 911, usage.PromptTokensDetails.TextTokens)
+}
+
+// Settlement subtracts cached + image + audio from the base, so the image cap
+// must leave room for audio too: P=2000, cached=1000, AUDIO=500 leaves at most
+// 500 image tokens, and the rest returns to TextTokens so the details still sum
+// to PromptTokens.
+func TestBuildUsageFromGeminiMetadataCapsImageTokensByCachedAndAudio(t *testing.T) {
+	metadata := geminiModalityUsageMetadata(2000, []dto.GeminiPromptTokensDetails{
+		{Modality: "TEXT", TokenCount: 700},
+		{Modality: "IMAGE", TokenCount: 800},
+		{Modality: "AUDIO", TokenCount: 500},
+	}, nil, 0)
+	metadata.CachedContentTokenCount = 1000
+
+	usage := buildUsageFromGeminiMetadata(metadata, 0)
+	details := usage.PromptTokensDetails
+	require.Equal(t, 1000, details.CachedTokens)
+	require.Equal(t, 500, details.AudioTokens)
+	require.Equal(t, 500, details.ImageTokens)
+	require.Equal(t, 1000, details.TextTokens)
+	require.Equal(t, usage.PromptTokens, details.TextTokens+details.AudioTokens+details.ImageTokens)
+	require.LessOrEqual(t, details.CachedTokens+details.AudioTokens+details.ImageTokens, usage.PromptTokens)
+
+	// Cached + audio covering the whole prompt leaves no image tokens to price.
+	metadata.CachedContentTokenCount = 1600
+	usage = buildUsageFromGeminiMetadata(metadata, 0)
+	require.Equal(t, 0, usage.PromptTokensDetails.ImageTokens)
+}

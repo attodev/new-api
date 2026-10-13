@@ -43,7 +43,7 @@ Task 22 와 Task 23 은 각각 수정 커밋이 하나씩 더 있어 fork 커밋
 최종 리뷰에서 남긴 후속 후보: Chat 요청의 `reasoning_effort` 가 Opus 4.7/4.8 에서
 `thinking.type:"enabled"` 로 매핑되어 400 이 나는 문제(`relay-claude.go:273-290`, 브랜치 이전부터 존재),
 `service/task_polling.go` 의 201/202 거부, Gemini prompt IMAGE modality 누락, `EpayNotify` 의
-success 선기록 순서. 릴리스 노트에 적을 것: classic UI 관리자는 새 옵션 두 개를 설정할 수 없다,
+success 선기록 순서 (네 항목 모두 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`)). 릴리스 노트에 적을 것: classic UI 관리자는 새 옵션 두 개를 설정할 수 없다,
 master 노드를 먼저 배포한다(비 master 는 widen 되지 않은 스키마를 거부), Claude/Gemini 스트림의
 token 추정 시 이미지 URL fetch 가 발생할 수 있다.
 
@@ -381,6 +381,22 @@ HEAD `499784e79`, Go 1.27 toolchain).
 
 ## 보류된 TODO
 
+### 2026-10-14 해소 현황
+
+`codex/followups-2a-2026-10` 브랜치가 아래 8건을 해소했다(항목은 지우지 않고 남긴다).
+상세는 `docs/2026-10-14-followups-2a.md`.
+
+- Chat 요청의 `reasoning_effort` 등이 Claude 5.x/Opus 4.7, 4.8 에서 `thinking.type:"enabled"` 로
+  매핑되어 400 이 나는 문제 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`)
+  (Task 1, `05bdb2596`).
+- `EpayNotify` 의 success 선기록 순서 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 2, `7ab5a8aa9`).
+- `service/task_polling.go` 의 201/202 거부 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 3, `1dd9351f6`).
+- Gemini prompt IMAGE modality 누락 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 4, `af1eddc8e`).
+- 관리자 preset 생성 경로의 `ThresholdQuota` 무제한 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 5, `4e172773a`).
+- 자동 충전 fail-closed 로그의 조직 target → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 6, `3473f535a`).
+- 매핑된 Qwen 배포명의 `thinking_budget` 제거(1단계 Task 18 의 보완) → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 7, `70b14d049`).
+- tokenkit codec 첫 호출 지연 → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`) (Task 8, `338576ab2`).
+
 ### 의도적으로 포팅하지 않은 upstream 항목 (relaykit 과제)
 
 1단계 기록의 목록(아래)을 그대로 유지하고, 2단계에서 검토하고 제외한 항목을 더한다.
@@ -408,13 +424,13 @@ team 에는 해당 기반이 없다.
   - `EpayNotify` 가 주문을 success 로 표시한 뒤 crediting 을 transaction 밖에서 한다.
     crediting 이 실패하면(예: 동시 증가로 수용량 초과) 주문은 success 인데 지급되지 않고
     이후 callback 도 재시도하지 않는다. 사전 검사가 가능성을 낮출 뿐 없애지는 못한다
-    (기존 동작, 후속 후보).
+    (기존 동작, 후속 후보). → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`).
   - 자동 충전 fail-closed 로그가 조직 검사에서도 사용자 target 을 보고한다
-    (`controller/topup.go:367`). `Validate*Capacity` helper 중복. 테스트 공백: Waffo
+    (`controller/topup.go:367`) → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`). `Validate*Capacity` helper 중복. 테스트 공백: Waffo
     tokens 모드 최소 1, 조직 threshold 자동 충전, 조직 Toss krw 모드, tokens 모드 PayPal.
     Stripe 견적과 결제 사이 1단위 truncation 은 upstream 도 같다.
   - 관리자 preset 생성 경로는 `ThresholdQuota` 를 제한하지 않는다. 사용자 등록 시에는
-    거부되지만 관리자는 만들 수 있다.
+    거부되지만 관리자는 만들 수 있다. → 2026-10-14 해소 (`docs/2026-10-14-followups-2a.md`).
 - Task 21 (pre-consume)
   - `expr.md` 와 `price.go` 의 "tiered leaf 는 모두 token 가격" 문구는 과장이다.
     상수/param 항도 같이 배수로 커진다.

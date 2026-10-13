@@ -161,6 +161,13 @@ func UpdateSunoTasks(ctx context.Context, taskChannelM map[int][]string, taskM m
 	return nil
 }
 
+// taskPollStatusAccepted reports whether an upstream status code counts as a
+// successful task poll. Any 2xx is accepted (e.g. 201 Created, 202 Accepted),
+// mirroring relay.taskSubmitStatusAccepted (service cannot import relay).
+func taskPollStatusAccepted(code int) bool {
+	return code >= http.StatusOK && code < http.StatusMultipleChoices
+}
+
 func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM map[string]*model.Task) error {
 	logger.LogInfo(ctx, fmt.Sprintf("channel #%d pending tasks: %d", channelId, len(taskIds)))
 	if len(taskIds) == 0 {
@@ -198,11 +205,11 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 		common.SysLog(fmt.Sprintf("Get Task Do req error: %v", err))
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
+	defer resp.Body.Close()
+	if !taskPollStatusAccepted(resp.StatusCode) {
 		logger.LogError(ctx, fmt.Sprintf("Get Task status code: %d", resp.StatusCode))
 		return fmt.Errorf("Get Task status code: %d", resp.StatusCode)
 	}
-	defer resp.Body.Close()
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		common.SysLog(fmt.Sprintf("Get Suno Task parse body error: %v", err))

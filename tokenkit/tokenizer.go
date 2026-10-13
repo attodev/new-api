@@ -15,6 +15,15 @@ var (
 	cl100kBase = sync.OnceValue(func() tokenizer.Codec { return codec.NewCl100kBase() })
 )
 
+// Warm builds the o200k and cl100k codecs now instead of on the first GPT or
+// o-series Count call, which otherwise pays the build (hundreds of
+// milliseconds). It is safe to call repeatedly and from several goroutines;
+// after the first call it returns immediately.
+func Warm() {
+	o200kBase()
+	cl100kBase()
+}
+
 // maxRunBytes bounds a run of letters, whitespace, or symbols passed to the
 // encoder in one piece. BPE cost grows with the square of a pre-tokenized
 // piece: 100,000 Chinese characters without punctuation take about 20 s in one

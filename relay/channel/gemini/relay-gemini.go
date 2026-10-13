@@ -1001,6 +1001,31 @@ func getResponseToolCall(item *dto.GeminiPart) *dto.ToolCallResponse {
 	}
 }
 
+// addGeminiPromptModalityTokens folds Gemini per-modality prompt token counts
+// into the OpenAI-style prompt token details.
+//
+// Google bills image, video and document input at the text rate, so VIDEO and
+// DOCUMENT are booked as text tokens. IMAGE is kept separate as ImageTokens:
+// settlement prices it with ImageRatio, which defaults to 1
+// (ratio_setting.GetImageRatio), so image-input quota is unchanged for models
+// without a configured image ratio. Side effect: the pkg/billingexpr `img`
+// variable now sees Gemini image prompt tokens. AUDIO stays AudioTokens.
+// Modality names are compared case-insensitively. Unknown modalities are not
+// counted here; they fall into the TextTokens remainder in
+// buildUsageFromGeminiMetadata only when no text-class detail exists.
+func addGeminiPromptModalityTokens(details *dto.InputTokenDetails, items []dto.GeminiPromptTokensDetails) {
+	for _, item := range items {
+		switch strings.ToUpper(strings.TrimSpace(item.Modality)) {
+		case "IMAGE":
+			details.ImageTokens += item.TokenCount
+		case "AUDIO":
+			details.AudioTokens += item.TokenCount
+		case "TEXT", "VIDEO", "DOCUMENT":
+			details.TextTokens += item.TokenCount
+		}
+	}
+}
+
 func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackPromptTokens int) dto.Usage {
 	promptTokens := metadata.PromptTokenCount + metadata.ToolUsePromptTokenCount
 	if promptTokens <= 0 && fallbackPromptTokens > 0 {
@@ -1015,20 +1040,8 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 	usage.CompletionTokenDetails.ReasoningTokens = metadata.ThoughtsTokenCount
 	usage.PromptTokensDetails.CachedTokens = metadata.CachedContentTokenCount
 
-	for _, detail := range metadata.PromptTokensDetails {
-		if detail.Modality == "AUDIO" {
-			usage.PromptTokensDetails.AudioTokens += detail.TokenCount
-		} else if detail.Modality == "TEXT" {
-			usage.PromptTokensDetails.TextTokens += detail.TokenCount
-		}
-	}
-	for _, detail := range metadata.ToolUsePromptTokensDetails {
-		if detail.Modality == "AUDIO" {
-			usage.PromptTokensDetails.AudioTokens += detail.TokenCount
-		} else if detail.Modality == "TEXT" {
-			usage.PromptTokensDetails.TextTokens += detail.TokenCount
-		}
-	}
+	addGeminiPromptModalityTokens(&usage.PromptTokensDetails, metadata.PromptTokensDetails)
+	addGeminiPromptModalityTokens(&usage.PromptTokensDetails, metadata.ToolUsePromptTokensDetails)
 	for _, detail := range metadata.CandidatesTokensDetails {
 		switch detail.Modality {
 		case "IMAGE":
@@ -1044,8 +1057,30 @@ func buildUsageFromGeminiMetadata(metadata dto.GeminiUsageMetadata, fallbackProm
 		usage.CompletionTokens = usage.TotalTokens - usage.PromptTokens
 	}
 
-	if usage.PromptTokens > 0 && usage.PromptTokensDetails.TextTokens == 0 && usage.PromptTokensDetails.AudioTokens == 0 {
-		usage.PromptTokensDetails.TextTokens = usage.PromptTokens
+	// Keep the prompt details summing to PromptTokens. When Google reported a
+	// text-class detail (TEXT/VIDEO/DOCUMENT) the detail sum is trusted as-is;
+	// only when none was reported is the text share derived as the remainder
+	// after audio and image (clamped at zero). With no details at all this
+	// degenerates to TextTokens = PromptTokens.
+	if details := &usage.PromptTokensDetails; usage.PromptTokens > 0 && details.TextTokens == 0 {
+		details.TextTokens = max(usage.PromptTokens-details.AudioTokens-details.ImageTokens, 0)
+	}
+
+	// Gemini's promptTokensDetails include the cached portion. Settlement
+	// bills base = prompt - cached - image - audio (clamped at 0; audio only
+	// when the model has an audio input price) plus cached*cacheRatio +
+	// image*imageRatio + the audio price, so image tokens overlapping the
+	// cached or audio portions would be double-counted (the clamp hides the
+	// negative base) and overcharge the user. Cached tokens are already priced
+	// at the cache ratio and audio at its own price; only the remainder may
+	// carry the image ratio (a cached image portion is still billed, at the
+	// cache rate). Cap ImageTokens accordingly and return the capped-off amount
+	// to TextTokens so the details keep summing to PromptTokens.
+	if details := &usage.PromptTokensDetails; details.ImageTokens > 0 {
+		if maxImage := max(usage.PromptTokens-details.CachedTokens-details.AudioTokens, 0); details.ImageTokens > maxImage {
+			details.ImageTokens = maxImage
+			details.TextTokens = max(details.TextTokens, usage.PromptTokens-details.AudioTokens-details.ImageTokens)
+		}
 	}
 
 	return usage

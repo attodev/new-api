@@ -158,6 +158,12 @@ func (req WalletAutoRechargePresetRequest) normalizeAndValidate() (WalletAutoRec
 		if req.ThresholdQuota < 0 {
 			return req, errors.New("wallet auto recharge preset threshold quota cannot be negative")
 		}
+		// A threshold above MaxQuota minus one charge could never be credited, so
+		// the policy would fail closed on every trigger. Reject it up front, the
+		// same way the user-facing policy path does.
+		if err := ValidateWalletAutoRechargeThresholdCapacity(req.ThresholdQuota, WalletAutoRechargeCreditQuota(req.Amount)); err != nil {
+			return req, err
+		}
 	}
 
 	return req, nil

@@ -26,6 +26,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	_ "github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/tokenkit"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-contrib/sessions"
@@ -288,6 +289,10 @@ func InitResources() error {
 	ratio_setting.InitRatioSettings()
 
 	service.InitHttpClient()
+
+	// Build the tiktoken codecs in the background so the first OpenAI-family
+	// request does not pay for it; startup does not wait.
+	go tokenkit.Warm()
 
 	// Initialize SQL Database
 	err = model.InitDB()

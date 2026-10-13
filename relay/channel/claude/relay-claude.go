@@ -19,7 +19,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/reasonmap"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
-	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -220,46 +219,21 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		claudeRequest.MaxTokens = &defaultMaxTokens
 	}
 
-	if baseModel, effortLevel, ok := reasoning.TrimEffortSuffix(textRequest.Model); ok && effortLevel != "" &&
-		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") ||
-			strings.HasPrefix(textRequest.Model, "claude-opus-4-7") ||
-			strings.HasPrefix(textRequest.Model, "claude-opus-4-8")) {
+	// Each branch renders thinking through RenderClaudeThinking, which sends a
+	// model that rejects budget thinking (Opus 4.7+, Claude 5.x) adaptive
+	// thinking with an effort instead.
+	if baseModel, effortLevel, ok := ClaudeEffortSuffix(textRequest.Model); ok {
 		claudeRequest.Model = baseModel
-		claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
-		claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(baseModel, effortLevel)
-		if strings.HasPrefix(baseModel, "claude-opus-4-7") ||
-			strings.HasPrefix(baseModel, "claude-opus-4-8") {
-			// Opus 4.7/4.8 reject non-default temperature/top_p/top_k with 400.
-			claudeRequest.Temperature = nil
-			claudeRequest.TopP = nil
-			claudeRequest.TopK = nil
-		} else {
-			claudeRequest.TopP = nil
-			claudeRequest.Temperature = common.GetPointer[float64](1.0)
-		}
+		RenderClaudeThinking(&claudeRequest, baseModel, effortLevel, nil)
+		// Thinking needs the default sampling; strict-sampling models lose
+		// temperature/top_p/top_k altogether below.
+		claudeRequest.TopP = nil
+		claudeRequest.Temperature = common.GetPointer[float64](1.0)
 	} else if model_setting.GetClaudeSettings().ThinkingAdapterEnabled &&
 		strings.HasSuffix(textRequest.Model, "-thinking") {
 
 		trimmedModel := strings.TrimSuffix(textRequest.Model, "-thinking")
-		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") ||
-			strings.HasPrefix(trimmedModel, "claude-opus-4-8") {
-			// Opus 4.7/4.8 reject thinking.type="enabled"; use adaptive at high effort.
-			claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
-			claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(trimmedModel, "high")
-			claudeRequest.Temperature = nil
-			claudeRequest.TopP = nil
-			claudeRequest.TopK = nil
-		} else {
-			// BudgetTokens 1024
-			if claudeRequest.MaxTokens == nil || *claudeRequest.MaxTokens < 1280 {
-				claudeRequest.MaxTokens = common.GetPointer[uint](1280)
-			}
-
-			// BudgetTokens max_tokens 80%
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](int(float64(*claudeRequest.MaxTokens) * model_setting.GetClaudeSettings().ThinkingAdapterBudgetTokensPercentage)),
-			}
+		if RenderClaudeThinkingSuffix(&claudeRequest, trimmedModel) {
 			// TODO:
 			// https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking#important-considerations-when-using-extended-thinking
 			claudeRequest.TopP = nil
@@ -271,23 +245,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	}
 
 	if textRequest.ReasoningEffort != "" {
-		switch textRequest.ReasoningEffort {
-		case "low":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](1280),
-			}
-		case "medium":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](2048),
-			}
-		case "high":
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: common.GetPointer[int](4096),
-			}
-		}
+		RenderClaudeReasoningEffort(&claudeRequest, claudeRequest.Model, textRequest.ReasoningEffort)
 	}
 
 	// reasoning , budgetTokens
@@ -297,12 +255,12 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 			return nil, err
 		}
 
-		budgetTokens := reasoning.MaxTokens
-		if budgetTokens > 0 {
-			claudeRequest.Thinking = &dto.Thinking{
-				Type:         "enabled",
-				BudgetTokens: &budgetTokens,
-			}
+		if budgetTokens := reasoning.MaxTokens; budgetTokens > 0 {
+			RenderClaudeThinking(&claudeRequest, claudeRequest.Model, "", &budgetTokens)
+		} else if reasoning.Effort != "" && !claudeSupportsManualThinking(claudeRequest.Model) {
+			// Only models without budget thinking honor an openrouter effort;
+			// the others ignore it as before.
+			RenderClaudeReasoningEffort(&claudeRequest, claudeRequest.Model, reasoning.Effort)
 		}
 	}
 
@@ -310,6 +268,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	// tokens while returning empty thinking blocks. Relayed clients surface
 	// reasoning to the user, so restore the summary unless asked otherwise.
 	claudeRequest.Thinking.NormalizeAdaptiveDisplay()
+	ApplyClaudeStrictSampling(&claudeRequest, claudeRequest.Model)
 
 	if textRequest.Stop != nil {
 		// stop maybe string/array string, convert to array string
