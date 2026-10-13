@@ -64,3 +64,26 @@ func TestThinkingWithAdaptive(t *testing.T) {
 	require.Equal(t, "omitted", got.Display)
 	require.JSONEq(t, string(binding), string(got.BlockBinding))
 }
+
+// A model that takes a lower effort than the suffix asks for is sent that
+// lower effort, not rejected.
+func TestRequestOpenAI2ClaudeMessageEffortSuffixIsCappedToModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct{ model, wantEffort string }{
+		{"claude-opus-4-6-xhigh", "max"},
+		{"claude-opus-4-7-xhigh", "xhigh"},
+		{"claude-opus-4-7-minimal", "low"},
+	}
+	for _, c := range cases {
+		t.Run(c.model, func(t *testing.T) {
+			ctx, _ := gin.CreateTestContext(nil)
+			request := dto.GeneralOpenAIRequest{
+				Model:    c.model,
+				Messages: []dto.Message{{Role: "user", Content: "hi"}},
+			}
+			claudeRequest, err := RequestOpenAI2ClaudeMessage(ctx, request)
+			require.NoError(t, err)
+			require.Equal(t, c.wantEffort, claudeRequest.GetEfforts())
+		})
+	}
+}

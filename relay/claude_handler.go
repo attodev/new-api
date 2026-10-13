@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/relay/channel/claude"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
@@ -32,7 +32,7 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		(strings.HasPrefix(request.Model, "claude-opus-4-6") || strings.HasPrefix(request.Model, "claude-opus-4-7")) {
 		request.Model = baseModel
 		request.Thinking = request.Thinking.WithAdaptive()
-		request.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
+		request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, effortLevel)
 		if strings.HasPrefix(request.Model, "claude-opus-4-7") {
 			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
 			request.Temperature = nil
@@ -49,7 +49,7 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 			if strings.HasPrefix(baseModel, "claude-opus-4-7") {
 				// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
 				request.Thinking = request.Thinking.WithAdaptive()
-				request.OutputConfig = json.RawMessage(`{"effort":"high"}`)
+				request.OutputConfig = claude.ClaudeOutputConfigForEffort(baseModel, "high")
 				request.Temperature = nil
 				request.TopP = nil
 				request.TopK = nil
@@ -74,6 +74,14 @@ func applyClaudeThinkingSettings(request *dto.ClaudeRequest, originModelName str
 		}
 		modelAdapted = true
 	}
+
+	// Send the model the effort it accepts, including one the client set in
+	// output_config itself. The request is never rejected for it.
+	thinkingType := ""
+	if request.Thinking != nil {
+		thinkingType = request.Thinking.Type
+	}
+	request.OutputConfig = claude.NormalizeClaudeOutputConfig(request.Model, thinkingType, request.OutputConfig)
 
 	// Covers adaptive thinking the client asked for directly, which no branch
 	// above touches: without this, Opus 4.7+ returns empty thinking blocks.

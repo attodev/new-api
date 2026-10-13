@@ -224,7 +224,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		(strings.HasPrefix(textRequest.Model, "claude-opus-4-6") || strings.HasPrefix(textRequest.Model, "claude-opus-4-7")) {
 		claudeRequest.Model = baseModel
 		claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
-		claudeRequest.OutputConfig = json.RawMessage(fmt.Sprintf(`{"effort":"%s"}`, effortLevel))
+		claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(baseModel, effortLevel)
 		if strings.HasPrefix(baseModel, "claude-opus-4-7") {
 			// Opus 4.7 rejects non-default temperature/top_p/top_k with 400.
 			claudeRequest.Temperature = nil
@@ -241,7 +241,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		if strings.HasPrefix(trimmedModel, "claude-opus-4-7") {
 			// Opus 4.7 rejects thinking.type="enabled"; use adaptive at high effort.
 			claudeRequest.Thinking = claudeRequest.Thinking.WithAdaptive()
-			claudeRequest.OutputConfig = json.RawMessage(`{"effort":"high"}`)
+			claudeRequest.OutputConfig = ClaudeOutputConfigForEffort(trimmedModel, "high")
 			claudeRequest.Temperature = nil
 			claudeRequest.TopP = nil
 			claudeRequest.TopK = nil
