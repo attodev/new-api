@@ -15,6 +15,17 @@ import (
 // In memory mode the underlying memoryStorage reuses the same backing array,
 // so this is equivalent to bytes.NewReader(data) in terms of memory usage.
 //
+// The returned getBody hands out a new, independent reader over the full body
+// on every call, per the http.Request.GetBody contract of returning a fresh
+// copy of the body. It is meant to be propagated to http.Request.GetBody
+// (which net/http cannot derive from a type-erased io.Reader) so the HTTP/2
+// transport can transparently retry the request when the upstream resets the
+// stream after the body was already written ("http2: Transport: cannot retry
+// err ... after Request.Body was written"). Each reader has its own cursor, so
+// replays never share seek state with the primary body or with each other, and
+// closing a replayed reader never releases the underlying storage. Once the
+// storage is closed, getBody fails with common.ErrStorageClosed.
+//
 // The caller MUST invoke closer.Close() once the upstream call has finished
 // (typically via defer) to release the disk file / memory accounting.
 //
@@ -22,10 +33,10 @@ import (
 // transport from prematurely closing the underlying BodyStorage. The returned
 // size is meant to be propagated to http.Request.ContentLength because the
 // type-erased io.Reader prevents net/http from auto-detecting it.
-func NewOutboundJSONBody(data []byte) (body io.Reader, size int64, closer io.Closer, err error) {
+func NewOutboundJSONBody(data []byte) (body io.Reader, size int64, getBody func() (io.ReadCloser, error), closer io.Closer, err error) {
 	storage, err := common.CreateBodyStorage(data)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, nil, nil, err
 	}
-	return common.ReaderOnly(storage), storage.Size(), storage, nil
+	return common.ReaderOnly(storage), storage.Size(), storage.NewReader, storage, nil
 }
