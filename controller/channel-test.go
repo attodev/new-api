@@ -809,7 +809,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		testRequest.StreamOptions = &dto.StreamOptions{IncludeUsage: true}
 	}
 
-	if dto.IsOpenAIReasoningOModel(model) {
+	if dto.GetOpenAIChatCapabilities(model, "").UseMaxCompletionTokens {
 		testRequest.MaxCompletionTokens = lo.ToPtr(uint(16))
 	} else if strings.Contains(model, "thinking") {
 		if !strings.Contains(model, "claude") {
