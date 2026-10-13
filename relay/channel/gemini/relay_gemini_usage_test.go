@@ -409,7 +409,8 @@ func TestGeminiChatStreamHandlerCumulativeUsageTakesLastFrame(t *testing.T) {
 }
 
 // A stream whose last usageMetadata only carries prompt tokens (for example a
-// client abort before the final chunk) falls back to estimating the output.
+// client abort before the final chunk) estimates only the output; the
+// upstream-reported prompt and cached tokens are billed as reported.
 // An agent turn that only calls a tool still produced output tokens.
 func TestGeminiStreamHandlerPromptOnlyUsageMetadataEstimatesCompletionTokens(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -450,8 +451,9 @@ func TestGeminiStreamHandlerPromptOnlyUsageMetadataEstimatesCompletionTokens(t *
 					},
 				},
 				UsageMetadata: dto.GeminiUsageMetadata{
-					PromptTokenCount: 151,
-					TotalTokenCount:  151,
+					PromptTokenCount:        151,
+					CachedContentTokenCount: 100,
+					TotalTokenCount:         151,
 				},
 			}
 
@@ -468,7 +470,66 @@ func TestGeminiStreamHandlerPromptOnlyUsageMetadataEstimatesCompletionTokens(t *
 			})
 			require.Nil(t, newAPIError)
 			require.NotNil(t, usage)
+			require.Equal(t, 151, usage.PromptTokens)
+			require.Equal(t, 100, usage.PromptTokensDetails.CachedTokens)
 			require.Equal(t, tokenkit.Estimate("gemini-3-flash-preview", tc.usageText), usage.CompletionTokens)
+			require.Greater(t, usage.CompletionTokens, 0)
+			require.Equal(t, usage.PromptTokens+usage.CompletionTokens, usage.TotalTokens)
+		})
+	}
+}
+
+// Non-stream responses get the same treatment: a function-call-only turn whose
+// usageMetadata reports the prompt but no candidates keeps the reported prompt
+// and cached tokens and estimates only the completion.
+func TestGeminiNonStreamHandlersPromptOnlyUsageMetadataEstimatesCompletionTokens(t *testing.T) {
+	const model = "gemini-3-flash-preview"
+	payload := dto.GeminiChatResponse{
+		Candidates: []dto.GeminiChatCandidate{
+			{
+				Content: dto.GeminiChatContent{
+					Role: "model",
+					Parts: []dto.GeminiPart{
+						{FunctionCall: &dto.FunctionCall{FunctionName: "read_file", Arguments: map[string]any{"path": "main.go"}}},
+					},
+				},
+			},
+		},
+		UsageMetadata: dto.GeminiUsageMetadata{
+			PromptTokenCount:        151,
+			CachedContentTokenCount: 100,
+			TotalTokenCount:         151,
+		},
+	}
+	body, err := common.Marshal(payload)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name    string
+		format  types.RelayFormat
+		handler func(*gin.Context, *relaycommon.RelayInfo, *http.Response) (*dto.Usage, *types.NewAPIError)
+	}{
+		{"chat", types.RelayFormatOpenAI, GeminiChatHandler},
+		{"native", types.RelayFormatGemini, GeminiTextGenerationHandler},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+			info := &relaycommon.RelayInfo{
+				RelayFormat:     tc.format,
+				OriginModelName: model,
+				ChannelMeta:     &relaycommon.ChannelMeta{UpstreamModelName: model},
+			}
+			info.SetEstimatePromptTokens(20)
+
+			usage, newAPIError := tc.handler(c, info, &http.Response{Body: io.NopCloser(bytes.NewReader(body))})
+			require.Nil(t, newAPIError)
+			require.NotNil(t, usage)
+			require.Equal(t, 151, usage.PromptTokens)
+			require.Equal(t, 100, usage.PromptTokensDetails.CachedTokens)
+			require.Equal(t, tokenkit.Estimate(model, `read_file{"path":"main.go"}`), usage.CompletionTokens)
 			require.Greater(t, usage.CompletionTokens, 0)
 			require.Equal(t, usage.PromptTokens+usage.CompletionTokens, usage.TotalTokens)
 		})
