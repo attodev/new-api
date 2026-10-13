@@ -29,6 +29,9 @@ ENV GOEXPERIMENT=greenteagc
 WORKDIR /build
 
 ADD go.mod go.sum ./
+# tokenkit is a local submodule referenced via replace; its go.mod must be
+# present for go mod download to resolve the main module graph.
+ADD tokenkit/go.mod ./tokenkit/go.mod
 RUN go mod download
 
 COPY . .

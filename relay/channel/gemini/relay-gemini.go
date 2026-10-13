@@ -1327,6 +1327,29 @@ func handleFinalStream(c *gin.Context, info *relaycommon.RelayInfo, resp *dto.Ch
 	return nil
 }
 
+// geminiResponseUsageText is the output text the completion-token fallback
+// estimates: text parts plus function call names and arguments.
+func geminiResponseUsageText(response *dto.GeminiChatResponse) string {
+	if response == nil {
+		return ""
+	}
+	var text strings.Builder
+	for _, candidate := range response.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.Text != "" {
+				text.WriteString(part.Text)
+			}
+			// Function calls are most of an agent turn's output.
+			if part.FunctionCall != nil {
+				text.WriteString(part.FunctionCall.FunctionName)
+				args, _ := common.Marshal(part.FunctionCall.Arguments)
+				text.Write(args)
+			}
+		}
+	}
+	return text.String()
+}
+
 func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response, callback func(data string, geminiResponse *dto.GeminiChatResponse) bool) (*dto.Usage, *types.NewAPIError) {
 	var usage = &dto.Usage{}
 	var imageCount int
@@ -1348,11 +1371,9 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 				if part.InlineData != nil && part.InlineData.MimeType != "" {
 					imageCount++
 				}
-				if part.Text != "" {
-					responseText.WriteString(part.Text)
-				}
 			}
 		}
+		responseText.WriteString(geminiResponseUsageText(&geminiResponse))
 
 		if geminiResponse.UsageMetadata.TotalTokenCount != 0 {
 			mappedUsage := buildUsageFromGeminiMetadata(geminiResponse.UsageMetadata, info.GetEstimatePromptTokens())

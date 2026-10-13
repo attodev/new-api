@@ -12,6 +12,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/tokenkit"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -148,7 +149,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		tempStr := responseTextBuilder.String()
 		if len(tempStr) > 0 {
 			// token
-			completionTokens := service.CountTextToken(tempStr, info.UpstreamModelName)
+			completionTokens := tokenkit.Count(info.UpstreamModelName, tempStr)
 			usage.CompletionTokens = completionTokens
 		}
 	}

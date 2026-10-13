@@ -2,6 +2,8 @@ package dto
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -75,13 +77,47 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	var inputTexts []string
+	if r.SystemInstructions != nil {
+		for _, part := range r.SystemInstructions.Parts {
+			if part.Text != "" {
+				inputTexts = append(inputTexts, part.Text)
+			}
+		}
+	}
 	for _, content := range r.Contents {
 		for _, part := range content.Parts {
 			if part.Text != "" {
 				inputTexts = append(inputTexts, part.Text)
 			}
-			if source := part.InlineData.ToFileSource(); source != nil {
-				mimeType := part.InlineData.MimeType
+			// Function calls and responses replayed in agent loops are part of the prompt.
+			if part.FunctionCall != nil {
+				args, _ := common.Marshal(part.FunctionCall.Arguments)
+				inputTexts = append(inputTexts, part.FunctionCall.FunctionName, string(args))
+			}
+			mediaParts := []GeminiPart{part}
+			if part.FunctionResponse != nil {
+				inputTexts = append(inputTexts, part.FunctionResponse.Name)
+				// Count tool output as the text the model reads, not JSON-escaped.
+				for _, key := range slices.Sorted(maps.Keys(part.FunctionResponse.Response)) {
+					if text, ok := part.FunctionResponse.Response[key].(string); ok {
+						inputTexts = append(inputTexts, text)
+						continue
+					}
+					value, _ := common.Marshal(part.FunctionResponse.Response[key])
+					inputTexts = append(inputTexts, string(value))
+				}
+				// Multimodal function responses carry media such as agent screenshots.
+				var responseParts []GeminiPart
+				if common.Unmarshal(part.FunctionResponse.Parts, &responseParts) == nil {
+					mediaParts = append(mediaParts, responseParts...)
+				}
+			}
+			for _, media := range mediaParts {
+				source := media.InlineData.ToFileSource()
+				if source == nil {
+					continue
+				}
+				mimeType := media.InlineData.MimeType
 				var fileType types.FileType
 				if strings.HasPrefix(mimeType, "image/") {
 					fileType = types.FileTypeImage
@@ -92,12 +128,25 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 				} else {
 					fileType = types.FileTypeFile
 				}
+				// Image cost depends on the media resolution; a part's own level
+				// overrides the request-wide one.
+				detail := string(r.GenerationConfig.MediaResolution)
+				var partResolution struct {
+					Level string `json:"level"`
+				}
+				if common.Unmarshal(media.MediaResolution, &partResolution) == nil && partResolution.Level != "" {
+					detail = partResolution.Level
+				}
 				files = append(files, &types.FileMeta{
 					FileType: fileType,
 					Source:   source,
+					Detail:   detail,
 				})
 			}
 		}
+	}
+	if len(r.Tools) > 0 {
+		inputTexts = append(inputTexts, string(r.Tools))
 	}
 
 	inputText := strings.Join(inputTexts, "\n")

@@ -185,24 +185,34 @@ func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
 				}
 			}
 		}
+		// Assistant tool calls replayed in agent loops are part of the prompt.
+		for _, toolCall := range message.ParseToolCalls() {
+			if len(toolCall.Custom) > 0 {
+				texts = append(texts, string(toolCall.Custom))
+				continue
+			}
+			texts = append(texts, toolCall.Function.Name, toolCall.Function.Arguments)
+		}
 	}
 
-	if r.Tools != nil {
-		openaiTools := r.Tools
-		for _, tool := range openaiTools {
-			tokenCountMeta.ToolsCount++
-			texts = append(texts, tool.Function.Name)
-			if tool.Function.Description != "" {
-				texts = append(texts, tool.Function.Description)
-			}
-			if tool.Function.Parameters != nil {
-				texts = append(texts, fmt.Sprintf("%v", tool.Function.Parameters))
-			}
+	for _, tool := range r.Tools {
+		tokenCountMeta.ToolsCount++
+		if len(tool.Custom) > 0 {
+			texts = append(texts, string(tool.Custom))
+			continue
 		}
-		//toolTokens := CountTokenInput(countStr, request.Model)
-		//tkm += 8
-		//tkm += toolTokens
+		texts = append(texts, tool.Function.Name)
+		if tool.Function.Description != "" {
+			texts = append(texts, tool.Function.Description)
+		}
+		if tool.Function.Parameters != nil {
+			parameters, _ := common.Marshal(tool.Function.Parameters)
+			texts = append(texts, string(parameters))
+		}
 	}
+	//toolTokens := CountTokenInput(countStr, request.Model)
+	//tkm += 8
+	//tkm += toolTokens
 	tokenCountMeta.CombineText = strings.Join(texts, "\n")
 	tokenCountMeta.Files = fileMeta
 	return &tokenCountMeta
@@ -665,9 +675,9 @@ func (m *Message) ParseContent() []MediaContent {
 
 		case ContentTypeImageURL:
 			imageUrl := contentItem["image_url"]
-			temp := &MessageImageUrl{
-				Detail: "high",
-			}
+			// An omitted detail stays empty: upstream defaults it to auto, which
+			// costs more than high on gpt-5.5 and later.
+			temp := &MessageImageUrl{}
 			switch v := imageUrl.(type) {
 			case string:
 				temp.Url = v
@@ -1011,7 +1021,12 @@ func (r *OpenAIResponsesRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	if len(r.Instructions) > 0 {
-		texts = append(texts, string(r.Instructions))
+		var instructions string
+		if common.GetJsonType(r.Instructions) == "string" && common.Unmarshal(r.Instructions, &instructions) == nil {
+			texts = append(texts, instructions)
+		} else {
+			texts = append(texts, string(r.Instructions))
+		}
 	}
 
 	if len(r.Metadata) > 0 {
@@ -1070,6 +1085,11 @@ type Input struct {
 	Type    string          `json:"type,omitempty"`
 	Role    string          `json:"role,omitempty"`
 	Content json.RawMessage `json:"content,omitempty"`
+	// Tool-call items replayed in agent loops.
+	Name      string          `json:"name,omitempty"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+	ToolInput json.RawMessage `json:"input,omitempty"`
+	Output    json.RawMessage `json:"output,omitempty"`
 }
 
 type MediaInput struct {
@@ -1084,7 +1104,8 @@ type MediaInput struct {
 // Reference implementation mirrors Message.ParseContent:
 //   - input can be a string, treated as an input_text item
 //   - input can be an array of objects with a `type` field
-//     supported types: input_text, input_image, input_file
+//     supported types: input_text, output_text, input_image, input_file
+//   - tool-call items contribute their name, arguments or input, and output as input_text
 func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 	if r.Input == nil {
 		return nil
@@ -1109,15 +1130,28 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 		var inputs []Input
 		_ = common.Unmarshal(r.Input, &inputs)
 		for _, input := range inputs {
-			if common.GetJsonType(input.Content) == "string" {
+			content := input.Content
+			switch input.Type {
+			case "function_call":
+				content = input.Arguments
+			case "custom_tool_call":
+				content = input.ToolInput
+			case "function_call_output", "custom_tool_call_output", "local_shell_call_output":
+				content = input.Output
+			}
+			if input.Name != "" {
+				mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: input.Name})
+			}
+
+			if common.GetJsonType(content) == "string" {
 				var str string
-				_ = common.Unmarshal(input.Content, &str)
+				_ = common.Unmarshal(content, &str)
 				mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: str})
 			}
 
-			if common.GetJsonType(input.Content) == "array" {
+			if common.GetJsonType(content) == "array" {
 				var array []any
-				_ = common.Unmarshal(input.Content, &array)
+				_ = common.Unmarshal(content, &array)
 				for _, itemAny := range array {
 					// Already parsed MediaContent
 					if media, ok := itemAny.(MediaInput); ok {
@@ -1136,7 +1170,7 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 						continue
 					}
 					switch typeVal {
-					case "input_text":
+					case "input_text", "output_text":
 						text, _ := item["text"].(string)
 						mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: text})
 					case "input_image":

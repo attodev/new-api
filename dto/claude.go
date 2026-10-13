@@ -316,9 +316,25 @@ func (c *ClaudeRequest) GetTokenCountMeta() *types.TokenCountMeta {
 					texts = append(texts, string(b))
 				}
 			case "tool_result":
-				if media.Content != nil {
-					b, _ := common.Marshal(media.Content)
-					texts = append(texts, string(b))
+				// Count tool output as the text the model reads; JSON-encoding it
+				// would escape newlines and quotes and count image base64 as text.
+				if media.IsStringContent() {
+					texts = append(texts, media.GetStringContent())
+					break
+				}
+				for _, part := range media.ParseMediaContent() {
+					if source := part.ToFileSource(); source != nil {
+						fileType := types.FileTypeFile
+						if part.Type == "image" {
+							fileType = types.FileTypeImage
+						}
+						fileMeta = append(fileMeta, &types.FileMeta{FileType: fileType, Source: source})
+					} else if part.Type == "text" {
+						texts = append(texts, part.GetText())
+					} else {
+						b, _ := common.Marshal(part)
+						texts = append(texts, string(b))
+					}
 				}
 			}
 		}
@@ -440,6 +456,18 @@ func ProcessTools(tools []any) ([]*Tool, []*ClaudeWebSearchTool) {
 			normalTools = append(normalTools, &t)
 		case ClaudeWebSearchTool:
 			webSearchTools = append(webSearchTools, &t)
+		case map[string]any:
+			// Tools decoded from client JSON arrive as maps.
+			toolType, _ := t["type"].(string)
+			if strings.HasPrefix(toolType, "web_search") {
+				if webSearchTool, err := common.Any2Type[ClaudeWebSearchTool](t); err == nil {
+					webSearchTools = append(webSearchTools, &webSearchTool)
+				}
+				continue
+			}
+			if normalTool, err := common.Any2Type[Tool](t); err == nil {
+				normalTools = append(normalTools, &normalTool)
+			}
 		default:
 			continue
 		}

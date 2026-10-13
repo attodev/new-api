@@ -660,6 +660,8 @@ type ClaudeResponseInfo struct {
 	Created      int64
 	Model        string
 	ResponseText strings.Builder
+	// ToolUseCount counts streamed tool_use blocks for the output-token fallback.
+	ToolUseCount int
 	Usage        *dto.Usage
 	Done         bool
 }
@@ -816,6 +818,9 @@ func FormatClaudeResponseInfo(claudeResponse *dto.ClaudeResponse, oaiResponse *d
 			if claudeResponse.Delta.Thinking != nil {
 				claudeInfo.ResponseText.WriteString(*claudeResponse.Delta.Thinking)
 			}
+			if claudeResponse.Delta.PartialJson != nil {
+				claudeInfo.ResponseText.WriteString(*claudeResponse.Delta.PartialJson)
+			}
 		}
 	} else if claudeResponse.Type == "message_delta" {
 		// usage
@@ -844,6 +849,11 @@ func FormatClaudeResponseInfo(claudeResponse *dto.ClaudeResponse, oaiResponse *d
 
 		claudeInfo.Done = true
 	} else if claudeResponse.Type == "content_block_start" {
+		// Tool calls are most of an agent turn's output; count them for usage fallback.
+		if block := claudeResponse.ContentBlock; block != nil && block.Type == "tool_use" {
+			claudeInfo.ResponseText.WriteString(block.Name)
+			claudeInfo.ToolUseCount++
+		}
 	} else {
 		return false
 	}
@@ -911,6 +921,9 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 		}
 		// —— message_start cache
 		fallback := service.ResponseText2Usage(c, claudeInfo.ResponseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+		// Each tool_use block costs about 40 output tokens beyond its name and JSON
+		// input (measured on Claude Haiku 4.5 and Sonnet 5 agent turns).
+		fallback.CompletionTokens += claudeInfo.ToolUseCount * 40
 		if claudeInfo.Usage.CompletionTokens == 0 ||
 			(!claudeInfo.Done && fallback.CompletionTokens > claudeInfo.Usage.CompletionTokens) {
 			claudeInfo.Usage.CompletionTokens = fallback.CompletionTokens

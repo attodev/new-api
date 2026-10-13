@@ -17,6 +17,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/tokenkit"
 
 	"github.com/QuantumNous/new-api/types"
 
@@ -242,8 +243,19 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		completionTokens := simpleResponse.Usage.CompletionTokens
 		if completionTokens == 0 {
 			for _, choice := range simpleResponse.Choices {
-				ctkm := service.CountTextToken(choice.Message.StringContent()+choice.Message.GetReasoningContent(), info.UpstreamModelName)
-				completionTokens += ctkm
+				var text strings.Builder
+				text.WriteString(choice.Message.StringContent())
+				text.WriteString(choice.Message.GetReasoningContent())
+				// Tool calls are most of an agent turn's output.
+				for _, toolCall := range choice.Message.ParseToolCalls() {
+					if len(toolCall.Custom) > 0 {
+						text.Write(toolCall.Custom)
+						continue
+					}
+					text.WriteString(toolCall.Function.Name)
+					text.WriteString(toolCall.Function.Arguments)
+				}
+				completionTokens += tokenkit.Count(info.UpstreamModelName, text.String())
 			}
 		}
 		simpleResponse.Usage = dto.Usage{
