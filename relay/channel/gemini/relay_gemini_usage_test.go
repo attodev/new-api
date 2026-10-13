@@ -331,3 +331,78 @@ func TestGeminiTextGenerationHandlerUsesEstimatedPromptTokensWhenUsagePromptMiss
 	require.Equal(t, 100, usage.CompletionTokens)
 	require.Equal(t, 110, usage.TotalTokens)
 }
+
+// Gemini stream usageMetadata is a cumulative snapshot on every frame, so the
+// final usage must come from the last frame instead of summing all frames.
+func TestGeminiChatStreamHandlerCumulativeUsageTakesLastFrame(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	oldStreamingTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 300
+	t.Cleanup(func() {
+		constant.StreamingTimeout = oldStreamingTimeout
+	})
+
+	info := &relaycommon.RelayInfo{
+		RelayFormat:     types.RelayFormatOpenAI,
+		OriginModelName: "gemini-3-flash-preview",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "gemini-3-flash-preview",
+		},
+	}
+
+	textDetails := []dto.GeminiPromptTokensDetails{
+		{Modality: "TEXT", TokenCount: 1089},
+	}
+	frames := []dto.GeminiChatResponse{
+		{
+			Candidates: []dto.GeminiChatCandidate{{Content: dto.GeminiChatContent{Role: "model", Parts: []dto.GeminiPart{{Text: "a"}}}}},
+			UsageMetadata: dto.GeminiUsageMetadata{
+				PromptTokenCount:     1200,
+				CandidatesTokenCount: 10,
+				TotalTokenCount:      1210,
+				PromptTokensDetails:  textDetails,
+			},
+		},
+		{
+			Candidates: []dto.GeminiChatCandidate{{Content: dto.GeminiChatContent{Role: "model", Parts: []dto.GeminiPart{{Text: "b"}}}}},
+			UsageMetadata: dto.GeminiUsageMetadata{
+				PromptTokenCount:     1200,
+				CandidatesTokenCount: 20,
+				TotalTokenCount:      1220,
+				PromptTokensDetails:  textDetails,
+			},
+		},
+		{
+			Candidates: []dto.GeminiChatCandidate{{Content: dto.GeminiChatContent{Role: "model", Parts: []dto.GeminiPart{{Text: "c"}}}}},
+			UsageMetadata: dto.GeminiUsageMetadata{
+				PromptTokenCount:     1200,
+				CandidatesTokenCount: 30,
+				TotalTokenCount:      1230,
+				PromptTokensDetails:  textDetails,
+			},
+		},
+	}
+
+	var streamBody []byte
+	for _, frame := range frames {
+		data, err := common.Marshal(frame)
+		require.NoError(t, err)
+		streamBody = append(streamBody, []byte("data: "+string(data)+"\n\n")...)
+	}
+	streamBody = append(streamBody, []byte("data: [DONE]\n")...)
+
+	resp := &http.Response{
+		Body: io.NopCloser(bytes.NewReader(streamBody)),
+	}
+
+	usage, newAPIError := GeminiChatStreamHandler(c, info, resp)
+	require.Nil(t, newAPIError)
+	require.NotNil(t, usage)
+	require.Equal(t, 1089, usage.PromptTokensDetails.TextTokens)
+	require.Equal(t, 1200, usage.PromptTokens)
+	require.Equal(t, 30, usage.CompletionTokens)
+	require.Equal(t, 1230, usage.TotalTokens)
+}
