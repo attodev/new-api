@@ -151,3 +151,29 @@ func TestApplyPricingDiscountKeepsPreviousVendorWhenVendorsMissing(t *testing.T)
 	_, ok = resolveVendorName("local-model")
 	require.False(t, ok)
 }
+
+// A vendor the rebuild knows wins over the previous snapshot: a renamed vendor
+// and a model moved to another vendor take the new name and its discount.
+func TestApplyPricingDiscountKnownVendorBeatsPreviousSnapshot(t *testing.T) {
+	t.Cleanup(resetModelVendorNameCache)
+	require.NoError(t, ratio_setting.UpdateVendorDiscountByJSONString(`{"OpenAI":10,"OpenAI Inc":25,"Azure":20}`))
+	t.Cleanup(func() { _ = ratio_setting.UpdateVendorDiscountByJSONString(`{}`) })
+	publishModelVendorNames(map[string]string{"gpt-4o": "OpenAI", "o1": "OpenAI"})
+
+	vendorNameByID := map[int]string{7: "OpenAI Inc", 8: "Azure"}
+	building := map[string]string{}
+	renamed := Pricing{ModelName: "gpt-4o", VendorID: 7}
+	applyPricingDiscount(&renamed, vendorNameByID, building)
+	moved := Pricing{ModelName: "o1", VendorID: 8}
+	applyPricingDiscount(&moved, vendorNameByID, building)
+	require.Equal(t, 25.0, renamed.DiscountPercent)
+	require.Equal(t, 20.0, moved.DiscountPercent)
+	publishModelVendorNames(building)
+
+	name, ok := resolveVendorName("gpt-4o")
+	require.True(t, ok)
+	require.Equal(t, "OpenAI Inc", name)
+	name, ok = resolveVendorName("o1")
+	require.True(t, ok)
+	require.Equal(t, "Azure", name)
+}

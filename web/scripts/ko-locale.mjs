@@ -143,6 +143,25 @@ export function validateEntry(en, ko, { skip, fragment = false }) {
   return issues
 }
 
+// Validates ko against en for the given keys (default: every en key) and
+// returns [key, issues] pairs. Shared by `check` and the vitest merge gate
+// (src/i18n/__tests__/ko-coverage.test.ts).
+export function findLocaleIssues(en, ko, skip, keys = Object.keys(en)) {
+  const bad = []
+  for (const k of keys) {
+    if (!(k in ko)) {
+      bad.push([k, ['missing']])
+      continue
+    }
+    const issues = validateEntry(en[k], ko[k], {
+      skip: skip.has(k),
+      fragment: HANGUL_OPTIONAL.has(k),
+    })
+    if (issues.length) bad.push([k, issues])
+  }
+  return bad
+}
+
 function edgeSpace(text) {
   return `${text.match(/^\s*/)[0]}\u0000${text.match(/\s*$/)[0]}`
 }
@@ -286,18 +305,7 @@ async function check(batchId) {
     }
     keys = batch.keys
   }
-  const bad = []
-  for (const k of keys) {
-    if (!(k in ko)) {
-      bad.push([k, ['missing']])
-      continue
-    }
-    const issues = validateEntry(en[k], ko[k], {
-      skip: skip.has(k),
-      fragment: HANGUL_OPTIONAL.has(k),
-    })
-    if (issues.length) bad.push([k, issues])
-  }
+  const bad = findLocaleIssues(en, ko, skip, keys)
   for (const [k, issues] of bad) {
     console.log(`✗ ${JSON.stringify(k)}: ${issues.join('; ')}`)
   }
