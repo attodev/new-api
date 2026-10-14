@@ -159,6 +159,8 @@ func InitOptionMap() {
 	common.OptionMap["ModelRequestRateLimitGroup"] = setting.ModelRequestRateLimitGroup2JSONString()
 	common.OptionMap["ModelRatio"] = ratio_setting.ModelRatio2JSONString()
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
+	common.OptionMap["ModelDiscount"] = ratio_setting.ModelDiscount2JSONString()   // fork: O6
+	common.OptionMap["VendorDiscount"] = ratio_setting.VendorDiscount2JSONString() // fork: O6
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
@@ -657,6 +659,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.DataExportDefaultTime = value
 	case "ModelRatio":
 		err = ratio_setting.UpdateModelRatioByJSONString(value)
+	case "ModelDiscount", "VendorDiscount": // fork: O6
+		err = updateDiscountOption(key, value)
 	case "GroupRatio":
 		err = ratio_setting.UpdateGroupRatioByJSONString(value)
 	case "GroupGroupRatio":
