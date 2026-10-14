@@ -19,7 +19,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func TestConvertOpenAIRequestFiltersThinkingBudgetByUpstreamModel(t *testing.T) {
+func TestConvertOpenAIRequestKeepsThinkingBudgetWhenEitherNameIsQwen(t *testing.T) {
 	tests := []struct {
 		name          string
 		requestModel  string
@@ -45,11 +45,12 @@ func TestConvertOpenAIRequestFiltersThinkingBudgetByUpstreamModel(t *testing.T) 
 			wantValue:     0,
 		},
 		{
-			name:          "unsupported upstream overrides qwen request",
+			name:          "qwen client mapped to unsupported upstream keeps budget",
 			requestModel:  "qwen-plus",
 			upstreamModel: "deepseek-r1",
 			budget:        "128",
-			wantBudget:    false,
+			wantBudget:    true,
+			wantValue:     128,
 		},
 	}
 

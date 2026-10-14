@@ -9,12 +9,8 @@ import (
 
 const EnableSearchModelSuffix = "-internet"
 
-func requestOpenAI2Ali(request dto.GeneralOpenAIRequest, upstreamModelName string) *dto.GeneralOpenAIRequest {
-	modelName := upstreamModelName
-	if modelName == "" {
-		modelName = request.Model
-	}
-	if !dto.IsQwenThinkingBudgetModel(modelName) {
+func requestOpenAI2Ali(request dto.GeneralOpenAIRequest, keepThinkingBudget bool) *dto.GeneralOpenAIRequest { // fork: O11
+	if !keepThinkingBudget {
 		request.ThinkingBudget = nil
 	}
 
