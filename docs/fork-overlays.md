@@ -181,6 +181,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/columns/common-logs-columns.tsx:70, 811 | import 한 줄, 표의 `TimingMetricsCell`에 `useTimeSec={effectiveUseTimeSec(other, useTime)}` (`other`는 같은 셀에서 이미 파싱됨) | web/src/features/usage-logs/lib/timing-breakdown.ts |
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/common-log-mobile-card.tsx:37, 212 | import 한 줄, 모바일 카드의 `useTimeSec={effectiveUseTimeSec(other, log.use_time)}` (tokens/s 계산의 `use_time`은 그대로) | web/src/features/usage-logs/lib/timing-breakdown.ts |
 | O7 타이밍 분해 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json | `Timing Breakdown`, `Model Provider`, `Gateway Overhead` 키 3개 (`Vendor discount` 뒤) | — |
+| O9 한글 | web/package.json:27 | scripts에 `"i18n:ko": "node scripts/ko-locale.mjs"` 한 줄 (JSON이라 `// fork: O9` 주석을 달 수 없어 이 표로만 표시) | web/scripts/ko-locale.mjs, web/scripts/ko-locale.test.mjs |
+| O9 한글 | web/src/i18n/locales/ko.json | 신규 locale 파일(upstream 파일 아님). `node scripts/ko-locale.mjs seed`가 en.json 키 순서로 team `kr.json`의 한글 값과 영어 placeholder를 채우고, 이후 배치 번역으로 placeholder를 없앤다. `_extras`/`_reports`는 `sync-i18n.mjs` 관리 영역이라 쓰지 않는다 | docs/translation-glossary.ko.md, docs/i18n/ko-batches.json, docs/i18n/ko-skip.json |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
