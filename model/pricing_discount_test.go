@@ -1,7 +1,10 @@
 package model
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/QuantumNous/new-api/relaykit/dto"
 
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/stretchr/testify/require"
@@ -23,31 +26,117 @@ func TestEffectiveDiscountPercentModelBeatsVendor(t *testing.T) {
 func TestApplyPricingDiscountFillsCache(t *testing.T) {
 	require.NoError(t, ratio_setting.UpdateVendorDiscountByJSONString(`{"OpenAI":10}`))
 	t.Cleanup(func() { _ = ratio_setting.UpdateVendorDiscountByJSONString(`{}`); resetModelVendorNameCache() })
+	names := map[string]string{}
 	p := Pricing{ModelName: "gpt-4o", VendorID: 7}
-	applyPricingDiscount(&p, map[int]string{7: "OpenAI"})
+	applyPricingDiscount(&p, map[int]string{7: "OpenAI"}, names)
 	require.Equal(t, 10.0, p.DiscountPercent)
-	require.Equal(t, "OpenAI", modelVendorNameCache["gpt-4o"])
+	require.Equal(t, "OpenAI", names["gpt-4o"])
 
 	// cache keys are normalised like GetModelDiscountMultiplier
 	g := Pricing{ModelName: "gpt-4-gizmo-abc", VendorID: 7}
-	applyPricingDiscount(&g, map[int]string{7: "OpenAI"})
-	require.Equal(t, "OpenAI", modelVendorNameCache["gpt-4-gizmo-*"])
+	applyPricingDiscount(&g, map[int]string{7: "OpenAI"}, names)
+	require.Equal(t, "OpenAI", names["gpt-4-gizmo-*"])
+	publishModelVendorNames(names)
 	name, ok := resolveVendorName("gpt-4-gizmo-other")
 	require.True(t, ok)
 	require.Equal(t, "OpenAI", name)
 }
 
-func TestResolveVendorNameAndInvalidate(t *testing.T) {
+// A rebuild fills a local map; resolvers keep reading the previous snapshot
+// until the rebuild publishes, so a half-built map never drops a vendor.
+func TestResolveVendorNameReadsPreviousSnapshotDuringRebuild(t *testing.T) {
 	t.Cleanup(resetModelVendorNameCache)
-	resetModelVendorNameCache()
-	p := Pricing{ModelName: "gpt-4o", VendorID: 7}
-	applyPricingDiscount(&p, map[int]string{7: "OpenAI"})
+	publishModelVendorNames(map[string]string{"gpt-4o": "OpenAI"})
+
+	building := map[string]string{}
+	p := Pricing{ModelName: "claude-3", VendorID: 8}
+	applyPricingDiscount(&p, map[int]string{8: "Anthropic"}, building)
+
 	name, ok := resolveVendorName("gpt-4o")
-	require.True(t, ok)
+	require.True(t, ok, "half-built rebuild must not hide the previous vendor name")
 	require.Equal(t, "OpenAI", name)
 
+	// the publish replaces the snapshot wholesale (stale models drop out)
+	publishModelVendorNames(building)
+	_, ok = resolveVendorName("gpt-4o")
+	require.False(t, ok)
+	name, ok = resolveVendorName("claude-3")
+	require.True(t, ok)
+	require.Equal(t, "Anthropic", name)
+}
+
+func TestInvalidatePricingCacheKeepsVendorNameSnapshot(t *testing.T) {
+	t.Cleanup(resetModelVendorNameCache)
+	publishModelVendorNames(map[string]string{"gpt-4o": "OpenAI"})
+
 	InvalidatePricingCache()
-	require.Nil(t, modelVendorNameCache)
+	name, ok := lookupModelVendorName("gpt-4o")
+	require.True(t, ok, "invalidate must keep the previous snapshot until the next rebuild publishes")
+	require.Equal(t, "OpenAI", name)
+}
+
+// With no snapshot (first start) the resolver triggers at most one pricing
+// build per vendorNameColdBuildRetry window, even when the build publishes
+// nothing (DB error) — no rebuild storm on the billing path.
+func TestResolveVendorNameColdStartBuildsAtMostOncePerWindow(t *testing.T) {
+	resetModelVendorNameCache()
+	calls := 0
+	original := vendorNameColdBuild
+	vendorNameColdBuild = func() { calls++ }
+	t.Cleanup(func() { vendorNameColdBuild = original; resetModelVendorNameCache() })
+
+	for i := 0; i < 50; i++ {
+		_, ok := resolveVendorName("gpt-4o")
+		require.False(t, ok)
+	}
+	require.Equal(t, 1, calls, "a failed cold build must not be retried on every resolve")
+
+	// an empty pricing table publishes an empty (non-nil) snapshot: no more builds
+	resetModelVendorNameCache()
+	calls = 0
+	vendorNameColdBuild = func() { calls++; publishModelVendorNames(map[string]string{}) }
+	for i := 0; i < 50; i++ {
+		_, ok := resolveVendorName("gpt-4o")
+		require.False(t, ok)
+	}
+	require.Equal(t, 1, calls)
+}
+
+func TestUpdatePricingPublishesVendorNamesAtomically(t *testing.T) {
+	resetPricingEndpointTestTables(t)
+	t.Cleanup(resetModelVendorNameCache)
+	vendor := &Vendor{Name: "OpenAI"}
+	require.NoError(t, DB.Create(vendor).Error)
+	require.NoError(t, DB.Create(&Model{ModelName: "gpt-4o", VendorID: vendor.Id}).Error)
+	insertPricingEndpointChannel(t, 901, 1, dto.ChannelOtherSettings{})
+	for i := 0; i < 50; i++ {
+		insertPricingEndpointAbility(t, 901, fmt.Sprintf("filler-%02d", i))
+	}
+	insertPricingEndpointAbility(t, 901, "gpt-4o")
+	InitChannelCache()
+	GetPricing()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 20; i++ {
+			InvalidatePricingCache()
+			GetPricing()
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			name, ok := resolveVendorName("gpt-4o")
+			require.True(t, ok)
+			require.Equal(t, "OpenAI", name)
+			return
+		default:
+			name, ok := resolveVendorName("gpt-4o")
+			require.True(t, ok, "resolver must never see a partial vendor map")
+			require.Equal(t, "OpenAI", name)
+		}
+	}
 }
 
 func TestUpdateDiscountOptionInvalidatesOnlyOnSuccess(t *testing.T) {

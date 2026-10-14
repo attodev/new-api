@@ -2,6 +2,7 @@ package model
 
 import (
 	"sync"
+	"time"
 
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
@@ -43,26 +44,60 @@ func vendorDiscountPercent(name string) float64 {
 }
 
 // modelVendorNameCache maps FormatMatchingModelName(modelName) -> vendor name.
-// It has its own lock so the billing-path resolver never takes updatePricingLock:
-// writers (updatePricing via applyPricingDiscount, InvalidatePricingCache) already
-// hold updatePricingLock and take modelVendorNameMu inside it.
+// It is an immutable snapshot: updatePricing fills a local map and publishes it
+// with one assignment (publishModelVendorNames) after its loop, so a resolver
+// never sees a half-built map. InvalidatePricingCache leaves the snapshot in
+// place; the previous names serve until the next successful rebuild publishes.
+// It has its own lock so the billing-path resolver never takes updatePricingLock.
 var (
 	modelVendorNameCache map[string]string
 	modelVendorNameMu    sync.RWMutex
+)
+
+// vendorNameColdBuildRetry is the negative-cache window of the first-start
+// build: while no snapshot has been published, the resolver triggers at most
+// one pricing build per window (a failed or skipped build is not retried on
+// every billed request).
+const vendorNameColdBuildRetry = time.Minute
+
+var (
+	// vendorNameColdBuild builds the pricing cache (and so the snapshot); a var
+	// so tests can count and stub it.
+	vendorNameColdBuild = func() { GetPricing() }
+	// vendorNameColdBuildMu serialises cold builds; lock order:
+	// vendorNameColdBuildMu -> updatePricingLock -> modelVendorNameMu.
+	vendorNameColdBuildMu   sync.Mutex
+	vendorNameColdBuildLast time.Time
 )
 
 func init() {
 	ratio_setting.SetVendorResolver(resolveVendorName)
 }
 
+// resetModelVendorNameCache drops the snapshot (tests only: production never
+// clears it, see InvalidatePricingCache).
 func resetModelVendorNameCache() {
 	modelVendorNameMu.Lock()
 	modelVendorNameCache = nil
 	modelVendorNameMu.Unlock()
+	vendorNameColdBuildMu.Lock()
+	vendorNameColdBuildLast = time.Time{}
+	vendorNameColdBuildMu.Unlock()
 }
 
-// lookupModelVendorName returns the cached vendor name and whether the cache
-// has been built at all.
+// publishModelVendorNames swaps in a fully built snapshot. Called at the end of
+// a successful updatePricing; the map must not be written afterwards.
+func publishModelVendorNames(names map[string]string) {
+	if names == nil {
+		names = map[string]string{}
+	}
+	modelVendorNameMu.Lock()
+	modelVendorNameCache = names
+	modelVendorNameMu.Unlock()
+}
+
+// lookupModelVendorName returns the snapshot's vendor name and whether a
+// snapshot has been published at all.
 func lookupModelVendorName(key string) (name string, built bool) {
 	modelVendorNameMu.RLock()
 	defer modelVendorNameMu.RUnlock()
@@ -70,29 +105,38 @@ func lookupModelVendorName(key string) (name string, built bool) {
 }
 
 // resolveVendorName answers the vendor name of a model for vendor discounts.
-// It never takes updatePricingLock; when the cache has not been built it calls
-// GetPricing() once to build it (which takes updatePricingLock itself), so it must
-// not be called while channelSyncLock is held (lock order: updatePricingLock -> channelSyncLock).
+// It reads the published snapshot only. On a true cold start (no snapshot yet)
+// it builds the pricing cache once per vendorNameColdBuildRetry window (which
+// takes updatePricingLock), so it must not be called while channelSyncLock is
+// held (lock order: updatePricingLock -> channelSyncLock).
 func resolveVendorName(modelName string) (string, bool) {
 	key := ratio_setting.FormatMatchingModelName(modelName)
 	name, built := lookupModelVendorName(key)
 	if !built {
-		GetPricing()
+		coldBuildModelVendorNames()
 		name, _ = lookupModelVendorName(key)
 	}
 	return name, name != ""
 }
 
+func coldBuildModelVendorNames() {
+	vendorNameColdBuildMu.Lock()
+	defer vendorNameColdBuildMu.Unlock()
+	if _, built := lookupModelVendorName(""); built {
+		return // another resolver's build published meanwhile
+	}
+	if !vendorNameColdBuildLast.IsZero() && time.Since(vendorNameColdBuildLast) < vendorNameColdBuildRetry {
+		return
+	}
+	vendorNameColdBuildLast = time.Now()
+	vendorNameColdBuild()
+}
+
 // applyPricingDiscount fills the display discount percent of a pricing row and
-// records the model's vendor name for resolveVendorName. Called from
-// updatePricing while updatePricingLock is held.
-func applyPricingDiscount(p *Pricing, vendorNameByID map[int]string) {
+// records the model's vendor name into names, the rebuild's local map that
+// updatePricing publishes after its loop. Called while updatePricingLock is held.
+func applyPricingDiscount(p *Pricing, vendorNameByID map[int]string, names map[string]string) {
 	vendorName := vendorNameByID[p.VendorID]
 	p.DiscountPercent = effectiveDiscountPercent(p.ModelName, vendorName)
-	modelVendorNameMu.Lock()
-	defer modelVendorNameMu.Unlock()
-	if modelVendorNameCache == nil {
-		modelVendorNameCache = map[string]string{}
-	}
-	modelVendorNameCache[ratio_setting.FormatMatchingModelName(p.ModelName)] = vendorName
+	names[ratio_setting.FormatMatchingModelName(p.ModelName)] = vendorName
 }

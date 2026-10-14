@@ -100,7 +100,6 @@ func InvalidatePricingCache() {
 	pricingMap = nil
 	vendorsList = nil
 	lastGetPricingTime = time.Time{}
-	resetModelVendorNameCache() // fork: O6
 }
 
 // GetVendors 返回当前定价接口使用到的供应商信息
@@ -223,7 +222,7 @@ func updatePricing() {
 
 	// 构建对前端友好的供应商列表
 	vendorsList = make([]PricingVendor, 0, len(vendorMap))
-	vendorNameByID := make(map[int]string, len(vendorMap)) // fork: O6
+	vendorNameByID, modelVendorNames := make(map[int]string, len(vendorMap)), map[string]string{} // fork: O6
 	for _, v := range vendorMap {
 		vendorNameByID[v.Id] = v.Name // fork: O6
 		vendorsList = append(vendorsList, PricingVendor{
@@ -434,7 +433,7 @@ func updatePricing() {
 				})
 			}
 		}
-		applyPricingDiscount(&pricing, vendorNameByID) // fork: O6
+		applyPricingDiscount(&pricing, vendorNameByID, modelVendorNames) // fork: O6
 		pricingMap = append(pricingMap, pricing)
 	}
 
@@ -452,6 +451,7 @@ func updatePricing() {
 		modelQuotaTypeMap[p.ModelName] = p.QuotaType
 	}
 	modelEnableGroupsLock.Unlock()
+	publishModelVendorNames(modelVendorNames) // fork: O6
 
 	lastGetPricingTime = time.Now()
 }
