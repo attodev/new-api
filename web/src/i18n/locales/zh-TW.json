@@ -7277,6 +7277,14 @@
     "Zhipu": "智譜",
     "Zhipu GLM": "智譜GLM",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "Import Users": "Import Users",
+    "Import": "Import",
+    "Exporting...": "Exporting...",
+    "{{count}} users created": "{{count}} users created",
+    "{{count}} users skipped (already exist)": "{{count}} users skipped (already exist)",
+    "Select .xlsx file": "Select .xlsx file",
+    "Import failed": "Import failed",
+    "Errors": "Errors"
   }
 }

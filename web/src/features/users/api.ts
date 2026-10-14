@@ -32,6 +32,7 @@ import type {
   ManageUserAction,
   ManageUserQuotaPayload,
   ApiResponse,
+  ImportResult,
 } from './types'
 
 // A step-up proof is single-use, so the request carrying it must never be
@@ -266,4 +267,37 @@ export async function adminUnbindCustomOAuth(
     securityProofConfig(proofToken)
   )
   return res.data
+}
+
+// ============================================================================
+// Import / Export APIs
+// ============================================================================
+
+/**
+ * Export all users as an Excel file.
+ * Triggers a file download in the browser.
+ */
+export async function exportUsers(): Promise<void> {
+  const res = await api.get('/api/user/export', { responseType: 'blob' })
+  const url = window.URL.createObjectURL(new Blob([res.data]))
+  const link = document.createElement('a')
+  link.href = url
+  const timestamp = Date.now()
+  link.setAttribute('download', `users-${timestamp}.xlsx`)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+/**
+ * Import users from an Excel file.
+ */
+export async function importUsers(file: File): Promise<ImportResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await api.post('/api/user/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data.data as ImportResult
 }

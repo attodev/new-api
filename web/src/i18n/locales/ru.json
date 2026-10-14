@@ -7277,6 +7277,14 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Import Users": "Import Users",
+    "Import": "Import",
+    "Exporting...": "Exporting...",
+    "{{count}} users created": "{{count}} users created",
+    "{{count}} users skipped (already exist)": "{{count}} users skipped (already exist)",
+    "Select .xlsx file": "Select .xlsx file",
+    "Import failed": "Import failed",
+    "Errors": "Errors"
   }
 }
