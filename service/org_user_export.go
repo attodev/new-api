@@ -29,6 +29,9 @@ func importedWalletQuota(usd float64) (int, error) {
 }
 
 // OrgExcelHeaders defines ordered columns for org user export/import.
+// The group column is export-only: the import never writes users.group (it sets
+// channel access and the billing ratio, which organization admins must not
+// choose), so the cell is ignored and new users get the default group.
 var OrgExcelHeaders = []string{
 	"username", "display_name", "organization_role",
 	"quota", "used_quota", "group", "status", "remark", "initial_password",
@@ -93,6 +96,8 @@ type OrgImportResult struct {
 }
 
 // ImportOrgUsersFromFile parses an Excel file and assigns/creates users for an org.
+// The group column is ignored (never written); platform admins and the owner are
+// never edited or detached, including by removeAbsent.
 func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent bool) (*OrgImportResult, error) {
 	result := &OrgImportResult{
 		UpdatedUsernames: []string{},
@@ -194,9 +199,6 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 				if orgRole != existingUser.OrganizationRole {
 					updates["organization_role"] = orgRole
 				}
-				if grp := getCell(row, "group"); grp != "" {
-					updates["group"] = grp
-				}
 				if st := getCell(row, "status"); st != "" {
 					updates["status"] = stringToStatus(st)
 				}
@@ -255,10 +257,6 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 			quotaProvided = true
 		}
 
-		group := getCell(row, "group")
-		if group == "" {
-			group = "default"
-		}
 		displayName := getCell(row, "display_name")
 		if displayName == "" {
 			displayName = username
@@ -270,7 +268,6 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 			DisplayName: displayName,
 			Role:        common.RoleCommonUser,
 			Status:      stringToStatus(getCell(row, "status")),
-			Group:       group,
 			Remark:      getCell(row, "remark"),
 		}
 
@@ -302,7 +299,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 	if removeAbsent {
 		var currentMembers []model.User
 		if err := model.DB.
-			Where("organization_id = ? AND organization_role != ?", organizationId, model.OrganizationRoleOwner).
+			Where("organization_id = ? AND organization_role != ? AND role < ?", organizationId, model.OrganizationRoleOwner, common.RoleAdminUser).
 			Find(&currentMembers).Error; err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("remove-absent: failed to query members: %v", err))
 		} else {

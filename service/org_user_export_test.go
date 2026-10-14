@@ -144,3 +144,51 @@ func TestImportOrgUsersDoesNotDemoteOwnerOrTouchPlatformAdmins(t *testing.T) {
 	require.Equal(t, common.RoleAdminUser, admin.Role)
 	require.Zero(t, result.Removed, "remove-absent never drops the owner")
 }
+
+func TestImportOrgUsersRemoveAbsentKeepsUnlistedPlatformAdmins(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 0, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 22, "plat_admin", 0, 1, model.OrganizationRoleMember)
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 22).Update("role", common.RoleAdminUser).Error)
+	// Neither the owner, the platform admin nor member_21 is listed.
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role"},
+		{"someone_else", "member"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, true)
+	require.NoError(t, err)
+	require.Equal(t, 1, result.Removed)
+	require.Equal(t, []string{"member_21"}, result.RemovedUsernames)
+	var owner, admin, member model.User
+	require.NoError(t, model.DB.First(&owner, 20).Error)
+	require.Equal(t, 1, owner.OrganizationId)
+	require.NoError(t, model.DB.First(&admin, 22).Error)
+	require.Equal(t, 1, admin.OrganizationId, "an unlisted platform admin stays in the organization")
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.Zero(t, member.OrganizationId)
+}
+
+func TestImportOrgUsersIgnoresGroupColumn(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 0, 1, model.OrganizationRoleMember)
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Update("group", "default").Error)
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "group", "initial_password"},
+		{"member_21", "member", "vip", ""},
+		{"brand_new", "member", "vip", "password123"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, false)
+	require.NoError(t, err)
+	require.Empty(t, result.Errors)
+	require.Equal(t, 1, result.Updated)
+	require.Equal(t, 1, result.Created)
+	var existing, created model.User
+	require.NoError(t, model.DB.First(&existing, 21).Error)
+	require.Equal(t, "default", existing.Group)
+	require.NoError(t, model.DB.Where("username = ?", "brand_new").First(&created).Error)
+	require.Equal(t, "default", created.Group)
+}
