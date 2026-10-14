@@ -1,0 +1,850 @@
+package controller
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
+
+	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
+	"github.com/thanhpk/randstr"
+)
+
+const (
+	paypalProductionBase = "https://api-m.paypal.com"
+	paypalSandboxBase    = "https://api-m.sandbox.paypal.com"
+)
+
+type paypalTokenCache struct {
+	mu        sync.Mutex
+	token     string
+	expiresAt time.Time
+}
+
+var ppTokenCache = &paypalTokenCache{}
+
+type PayPalPayRequest struct {
+	Amount        int64  `json:"amount"`
+	PaymentMethod string `json:"payment_method"`
+	SuccessURL    string `json:"success_url,omitempty"`
+	CancelURL     string `json:"cancel_url,omitempty"`
+}
+
+type paypalLink struct {
+	Href   string `json:"href"`
+	Rel    string `json:"rel"`
+	Method string `json:"method"`
+}
+
+type paypalOrderResponse struct {
+	ID            string       `json:"id"`
+	Status        string       `json:"status"`
+	Links         []paypalLink `json:"links"`
+	PurchaseUnits []struct {
+		ReferenceID string `json:"reference_id"`
+		Payments    struct {
+			Captures []struct {
+				ID           string `json:"id"`
+				Status       string `json:"status"`
+				FinalCapture bool   `json:"final_capture"`
+				Amount       struct {
+					CurrencyCode string `json:"currency_code"`
+					Value        string `json:"value"`
+				} `json:"amount"`
+			} `json:"captures"`
+		} `json:"payments"`
+	} `json:"purchase_units"`
+}
+
+type paypalTokenResponse struct {
+	AccessToken string  `json:"access_token"`
+	ExpiresIn   float64 `json:"expires_in"`
+}
+
+type paypalWebhookEvent struct {
+	EventType string `json:"event_type"`
+	Resource  struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+		Amount struct {
+			CurrencyCode string `json:"currency_code"`
+			Value        string `json:"value"`
+		} `json:"amount"`
+		PurchaseUnits []struct {
+			ReferenceID string `json:"reference_id"`
+		} `json:"purchase_units"`
+		SupplementaryData struct {
+			RelatedIDs struct {
+				OrderID string `json:"order_id"`
+			} `json:"related_ids"`
+		} `json:"supplementary_data"`
+	} `json:"resource"`
+}
+
+func getPayPalBaseURL() string {
+	if setting.PayPalSandbox {
+		return paypalSandboxBase
+	}
+	return paypalProductionBase
+}
+
+func getPayPalAccessToken(ctx context.Context) (string, error) {
+	ppTokenCache.mu.Lock()
+	defer ppTokenCache.mu.Unlock()
+
+	if ppTokenCache.token != "" && time.Now().Before(ppTokenCache.expiresAt) {
+		return ppTokenCache.token, nil
+	}
+
+	baseURL := getPayPalBaseURL()
+	credentials := base64.StdEncoding.EncodeToString([]byte(setting.PayPalClientId + ":" + setting.PayPalClientSecret))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/oauth2/token", strings.NewReader("grant_type=client_credentials"))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Basic "+credentials)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("PayPal token fetch failed: status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp paypalTokenResponse
+	if err := common.Unmarshal(body, &tokenResp); err != nil {
+		return "", err
+	}
+
+	if tokenResp.AccessToken == "" {
+		return "", fmt.Errorf("PayPal token response missing access_token")
+	}
+
+	expiresIn := tokenResp.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = 32400
+	}
+	ppTokenCache.token = tokenResp.AccessToken
+	ppTokenCache.expiresAt = time.Now().Add(time.Duration(expiresIn-60) * time.Second)
+
+	return ppTokenCache.token, nil
+}
+
+// createPayPalOrder creates a PayPal order and returns (paypalOrderID, approvalURL, error).
+func createPayPalOrder(ctx context.Context, referenceId string, amountUSD float64, returnURL string, cancelURL string) (string, string, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("Get PayPal token failed: %w", err)
+	}
+
+	// Append ref to return URL so we can identify the order on capture
+	if strings.Contains(returnURL, "?") {
+		returnURL += "&ref=" + referenceId
+	} else {
+		returnURL += "?ref=" + referenceId
+	}
+
+	// Standard PayPal Checkout flow (application_context).
+	// We deliberately avoid payment_source.paypal / PAYER_ACTION_REQUIRED because
+	// that flow causes PayPal sandbox to show "PENDING → FAILED" and produces
+	// unstable capture behaviour.  The standard CREATED → APPROVED → CAPTURED
+	// path is well-tested, works with any PayPal-supported payment method, and
+	// is what virtually all other PayPal integrations use.
+	payload := map[string]interface{}{
+		"intent": "CAPTURE",
+		"purchase_units": []map[string]interface{}{
+			{
+				"reference_id": referenceId,
+				"amount": map[string]interface{}{
+					"currency_code": "USD",
+					"value":         fmt.Sprintf("%.2f", amountUSD),
+				},
+			},
+		},
+		"application_context": map[string]interface{}{
+			"return_url":          returnURL,
+			"cancel_url":          cancelURL,
+			"user_action":         "PAY_NOW",
+			"shipping_preference": "NO_SHIPPING",
+		},
+	}
+
+	bodyBytes, err := common.Marshal(payload)
+	if err != nil {
+		return "", "", err
+	}
+
+	baseURL := getPayPalBaseURL()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v2/checkout/orders", strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Standard order creation returns 201 Created.
+	if resp.StatusCode != http.StatusCreated {
+		return "", "", fmt.Errorf("PayPal create order failed: status=%d body=%s", resp.StatusCode, string(respBody))
+	}
+
+	var order paypalOrderResponse
+	if err := common.Unmarshal(respBody, &order); err != nil {
+		return "", "", err
+	}
+
+	// Standard flow uses "approve" link; keep "payer-action" as fallback.
+	for _, link := range order.Links {
+		if link.Rel == "approve" || link.Rel == "payer-action" {
+			return order.ID, link.Href, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("PayPal order response missing payment link order_id=%s status=%s", order.ID, order.Status)
+}
+
+// capturePayPalOrder captures a PayPal order by its PayPal order ID.
+func capturePayPalOrder(ctx context.Context, paypalOrderId string) (*paypalOrderResponse, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Get PayPal token failed: %w", err)
+	}
+
+	baseURL := getPayPalBaseURL()
+	url := fmt.Sprintf("%s/v2/checkout/orders/%s/capture", baseURL, paypalOrderId)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader("{}"))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("PayPal capture order failed: status=%d body=%s", resp.StatusCode, string(respBody))
+	}
+
+	var order paypalOrderResponse
+	if err := common.Unmarshal(respBody, &order); err != nil {
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+func RequestPayPalPay(c *gin.Context) {
+	var req PayPalPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		paymentError(c, common.NewMessage("Invalid parameters"))
+		return
+	}
+
+	if req.PaymentMethod != model.PaymentMethodPayPal {
+		paymentError(c, common.NewMessage("Unsupported payment channel"))
+		return
+	}
+
+	minTopup := getPayPalMinTopup()
+	if req.Amount < minTopup {
+		paymentError(c, common.NewMessage("Top-up amount cannot be less than {{min}}", map[string]any{"min": minTopup}))
+		return
+	}
+
+	if req.Amount > 10000 {
+		paymentError(c, common.NewMessage("Top-up amount cannot exceed {{max}}", map[string]any{"max": 10000}))
+		return
+	}
+
+	if req.SuccessURL != "" && common.ValidateRedirectURL(req.SuccessURL) != nil {
+		paymentError(c, common.NewMessage("Payment success redirect URL is not in the trusted domain list"))
+		return
+	}
+
+	if req.CancelURL != "" && common.ValidateRedirectURL(req.CancelURL) != nil {
+		paymentError(c, common.NewMessage("Payment cancel redirect URL is not in the trusted domain list"))
+		return
+	}
+
+	id := c.GetInt("id")
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		paymentError(c, common.NewMessage("User does not exist"))
+		return
+	}
+
+	reference := fmt.Sprintf("new-api-paypal-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
+	referenceId := "ppl_" + common.Sha1([]byte(reference))
+
+	chargedMoney := getPayPalPayMoney(float64(req.Amount), user.Group)
+	if chargedMoney <= 0.01 {
+		paymentError(c, common.NewMessage("Payment amount is too low"))
+		return
+	}
+	if rejectInvalidCreditedQuota(c, id, getPayPalCreditedQuota(chargedMoney)) {
+		return
+	}
+
+	captureURL := system_setting.ServerAddress + "/api/paypal/capture"
+	cancelURL := system_setting.ServerAddress + "/wallet"
+	if req.CancelURL != "" {
+		cancelURL = req.CancelURL
+	}
+
+	paypalOrderId, approvalURL, err := createPayPalOrder(c.Request.Context(), referenceId, chargedMoney, captureURL, cancelURL)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal create order failed user_id=%d trade_no=%s amount=%d error=%q", id, referenceId, req.Amount, err.Error()))
+		paymentError(c, common.NewMessage("Failed to start payment"))
+		return
+	}
+
+	topUp := &model.TopUp{
+		UserId:          id,
+		Amount:          req.Amount,
+		Money:           chargedMoney,
+		TradeNo:         referenceId,
+		ProviderOrderId: paypalOrderId,
+		PaymentMethod:   model.PaymentMethodPayPal,
+		PaymentProvider: model.PaymentProviderPayPal,
+		CreateTime:      time.Now().Unix(),
+		Status:          common.TopUpStatusPending,
+	}
+	if err = topUp.Insert(); err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("PayPal create topup order failed user_id=%d trade_no=%s paypal_order=%s error=%q", id, referenceId, paypalOrderId, err.Error()))
+		paymentError(c, common.NewMessage("Failed to create order"))
+		return
+	}
+
+	logger.LogInfo(c.Request.Context(), fmt.Sprintf("PayPal topup order created user_id=%d trade_no=%s paypal_order=%s amount=%d money=%.2f capture_url=%q approval_url=%q", id, referenceId, paypalOrderId, req.Amount, chargedMoney, captureURL, approvalURL))
+	c.JSON(http.StatusOK, gin.H{
+		"message": "success",
+		"data": gin.H{
+			"pay_link": approvalURL,
+		},
+	})
+}
+
+// paypalRedirect issues a 302 redirect using a path-only URL so the browser
+// stays on the same origin regardless of how ServerAddress is configured.
+func paypalRedirect(c *gin.Context, path string) {
+	c.Redirect(http.StatusFound, path)
+}
+
+// PayPalCapture handles the redirect back from PayPal after user approves.
+// PayPal appends ?token={paypalOrderId}&PayerID={payerId} to the return URL.
+// Our return URL also includes ?ref={referenceId}.
+//
+// Capture flow:
+//  1. Call PayPal capture API.
+//  2. If capture is COMPLETED → credit user immediately (idempotent with webhook).
+//  3. If capture is PENDING   → log and redirect to topup; PAYMENT.CAPTURE.COMPLETED
+//     webhook will credit when PayPal settles.
+//  4. Any other status / error → log and redirect to topup.
+func PayPalCapture(c *gin.Context) {
+	ctx := c.Request.Context()
+	referenceID := c.Query("ref")
+	paypalOrderID := c.Query("token")
+	if referenceID == "" || paypalOrderID == "" {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture missing params ref=%q token=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+
+	LockOrder(referenceID)
+	defer UnlockOrder(referenceID)
+
+	topUp := model.GetTopUpByTradeNo(referenceID)
+	if topUp == nil {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture local order not found ref=%q order_id=%q client_ip=%s", referenceID, paypalOrderID, c.ClientIP()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+	if err := validatePayPalTopUpOrder(topUp, paypalOrderID, referenceID); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture order validation failed error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+	if topUp.Status == common.TopUpStatusSuccess {
+		// Already fulfilled (e.g. by a previous webhook). Just send to logs.
+		paypalRedirect(c, "/usage-logs")
+		return
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture abnormal order status ref=%q status=%q client_ip=%s", referenceID, topUp.Status, c.ClientIP()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+
+	captureResult, err := capturePayPalOrder(ctx, paypalOrderID)
+	if err != nil {
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture API failed ref=%q order_id=%q client_ip=%s error=%q", referenceID, paypalOrderID, c.ClientIP(), err.Error()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+
+	// Determine capture status (order-level and capture-level).
+	// PayPal sandbox sometimes returns PENDING for the capture even when the
+	// order itself completes normally.  In that case we skip immediate credit
+	// and let the PAYMENT.CAPTURE.COMPLETED webhook do it later.
+	captureStatus := ""
+	if len(captureResult.PurchaseUnits) > 0 && len(captureResult.PurchaseUnits[0].Payments.Captures) > 0 {
+		captureStatus = captureResult.PurchaseUnits[0].Payments.Captures[0].Status
+	}
+
+	if captureStatus == "PENDING" {
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal capture PENDING ref=%q order_id=%q — PAYMENT.CAPTURE.COMPLETED webhook will credit", referenceID, paypalOrderID))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+
+	// Full validation: order COMPLETED, capture COMPLETED, amount/currency match.
+	if err := validatePayPalCapturedOrderResponse(topUp, paypalOrderID, captureResult); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal capture validation failed error=%q client_ip=%s", err.Error(), c.ClientIP()))
+		paypalRedirect(c, "/wallet")
+		return
+	}
+
+	// Credit the user immediately on browser return.
+	// fulfillPayPalOrder is idempotent — a subsequent PAYMENT.CAPTURE.COMPLETED
+	// webhook will be a no-op if the order was already credited here.
+	if err := fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), "browser-capture"); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("PayPal capture recharge failed ref=%q order_id=%q error=%q", referenceID, paypalOrderID, err.Error()))
+		// Don't block redirect — webhook will retry.
+	}
+	paypalRedirect(c, "/usage-logs")
+}
+
+// getPayPalCreditedQuota mirrors RechargePayPal, which credits the order's
+// Money (the charged amount from getPayPalPayMoney) times QuotaPerUnit.
+func getPayPalCreditedQuota(chargedMoney float64) decimal.Decimal {
+	return decimal.NewFromFloat(chargedMoney).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
+}
+
+func getPayPalPayMoney(amount float64, group string) float64 {
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		amount = amount / common.QuotaPerUnit
+	}
+	topupGroupRatio := common.GetTopupGroupRatio(group)
+	if topupGroupRatio == 0 {
+		topupGroupRatio = 1
+	}
+	discount := 1.0
+	if ds, ok := operation_setting.GetPaymentSetting().AmountDiscount[int(amount)]; ok {
+		if ds > 0 {
+			discount = ds
+		}
+	}
+	return amount * setting.PayPalUnitPrice * topupGroupRatio * discount
+}
+
+// ============================================================================
+// PayPal Webhook
+// ============================================================================
+
+// paypalVerifyRequest is the body sent to PayPal's signature-verification endpoint.
+type paypalVerifyRequest struct {
+	AuthAlgo         string          `json:"auth_algo"`
+	CertURL          string          `json:"cert_url"`
+	TransmissionID   string          `json:"transmission_id"`
+	TransmissionSig  string          `json:"transmission_sig"`
+	TransmissionTime string          `json:"transmission_time"`
+	WebhookID        string          `json:"webhook_id"`
+	WebhookEvent     json.RawMessage `json:"webhook_event"`
+}
+
+// verifyPayPalWebhookSignature calls PayPal's verify API and returns true when
+// the signature is valid.
+func verifyPayPalWebhookSignature(ctx context.Context, req paypalVerifyRequest) (bool, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	bodyBytes, err := common.Marshal(req)
+	if err != nil {
+		return false, err
+	}
+
+	baseURL := getPayPalBaseURL()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		baseURL+"/v1/notifications/verify-webhook-signature",
+		strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return false, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("PayPal webhook verify failed: status=%d body=%s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		VerificationStatus string `json:"verification_status"`
+	}
+	if err := common.Unmarshal(respBody, &result); err != nil {
+		return false, err
+	}
+	return result.VerificationStatus == "SUCCESS", nil
+}
+
+// getPayPalOrder calls GET /v2/checkout/orders/{orderID}.
+func getPayPalOrder(ctx context.Context, orderID string) (*paypalOrderResponse, error) {
+	token, err := getPayPalAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL := getPayPalBaseURL()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		baseURL+"/v2/checkout/orders/"+orderID, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("PayPal order lookup failed: status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	var order paypalOrderResponse
+	if err := common.Unmarshal(body, &order); err != nil {
+		return nil, err
+	}
+	if len(order.PurchaseUnits) == 0 {
+		return nil, fmt.Errorf("PayPal order missing purchase_units order_id=%s", orderID)
+	}
+	return &order, nil
+}
+
+func getPayPalOrderReferenceID(order *paypalOrderResponse) string {
+	if order == nil || len(order.PurchaseUnits) == 0 {
+		return ""
+	}
+	return order.PurchaseUnits[0].ReferenceID
+}
+
+func validatePayPalTopUpOrder(topUp *model.TopUp, orderID string, referenceID string) error {
+	if topUp == nil {
+		return fmt.Errorf("PayPal local order not found")
+	}
+	if topUp.PaymentProvider != model.PaymentProviderPayPal {
+		return fmt.Errorf("PayPal order provider mismatch ref=%s provider=%s", topUp.TradeNo, topUp.PaymentProvider)
+	}
+	if topUp.ProviderOrderId == "" || topUp.ProviderOrderId != orderID {
+		return fmt.Errorf("PayPal order id mismatch ref=%s expected=%s actual=%s", topUp.TradeNo, topUp.ProviderOrderId, orderID)
+	}
+	if referenceID == "" || referenceID != topUp.TradeNo {
+		return fmt.Errorf("PayPal reference_id mismatch expected=%s actual=%s", topUp.TradeNo, referenceID)
+	}
+	return nil
+}
+
+func validatePayPalCaptureForTopUp(topUp *model.TopUp, orderID string, referenceID string, captureStatus string, currency string, value string) error {
+	if err := validatePayPalTopUpOrder(topUp, orderID, referenceID); err != nil {
+		return err
+	}
+	if captureStatus != "COMPLETED" {
+		return fmt.Errorf("PayPal capture status mismatch ref=%s status=%s", topUp.TradeNo, captureStatus)
+	}
+	if strings.ToUpper(currency) != "USD" {
+		return fmt.Errorf("PayPal capture currency mismatch ref=%s currency=%s", topUp.TradeNo, currency)
+	}
+	expectedValue := fmt.Sprintf("%.2f", topUp.Money)
+	if value != expectedValue {
+		return fmt.Errorf("PayPal capture amount mismatch ref=%s expected=%s actual=%s", topUp.TradeNo, expectedValue, value)
+	}
+	return nil
+}
+
+func validatePayPalCapturedOrderResponse(topUp *model.TopUp, orderID string, order *paypalOrderResponse) error {
+	if order == nil {
+		return fmt.Errorf("PayPal capture response is empty")
+	}
+	if order.ID != "" && order.ID != orderID {
+		return fmt.Errorf("PayPal capture order id mismatch expected=%s actual=%s", orderID, order.ID)
+	}
+	if order.Status != "COMPLETED" {
+		return fmt.Errorf("PayPal capture order status mismatch order_id=%s status=%s", orderID, order.Status)
+	}
+	if len(order.PurchaseUnits) == 0 || len(order.PurchaseUnits[0].Payments.Captures) == 0 {
+		return fmt.Errorf("PayPal capture response missing capture details order_id=%s", orderID)
+	}
+	referenceID := getPayPalOrderReferenceID(order)
+	capture := order.PurchaseUnits[0].Payments.Captures[0]
+	return validatePayPalCaptureForTopUp(topUp, orderID, referenceID, capture.Status, capture.Amount.CurrencyCode, capture.Amount.Value)
+}
+
+// fulfillPayPalOrder credits the user for the given trade_no idempotently.
+// The caller must validate the PayPal order, capture status, amount, and currency first.
+// It must be called while holding the order lock.
+// Returns an error only for transient failures (DB errors) that the caller should
+// propagate as 5xx so PayPal retries the webhook.
+func fulfillPayPalOrder(ctx context.Context, referenceID string, clientIP string, eventType string) error {
+	topUp := model.GetTopUpByTradeNo(referenceID)
+	if topUp == nil {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook order not found ref=%q event=%s", referenceID, eventType))
+		return nil // permanent — no retry needed
+	}
+	if topUp.Status == common.TopUpStatusSuccess {
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook already processed ref=%q event=%s", referenceID, eventType))
+		return nil // idempotent — already done
+	}
+	if topUp.Status != common.TopUpStatusPending {
+		logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook abnormal status ref=%q status=%q event=%s", referenceID, topUp.Status, eventType))
+		return nil // permanent — no retry needed
+	}
+	if err := model.RechargePayPal(referenceID, clientIP); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("PayPal webhook recharge failed ref=%q event=%s error=%q", referenceID, eventType, err.Error()))
+		return err // transient — caller should return 5xx
+	}
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook recharge succeeded ref=%q event=%s", referenceID, eventType))
+	return nil
+}
+
+// PayPalWebhook handles incoming webhook events from PayPal.
+//
+// Relevant events:
+//   - CHECKOUT.ORDER.APPROVED : user approved; normally PayPalCapture captures
+//     after the browser returns.
+//   - PAYMENT.CAPTURE.COMPLETED : capture is confirmed; credit the user.
+func PayPalWebhook(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	if !isPayPalWebhookEnabled() {
+		logger.LogWarn(ctx, common.LogText("PayPal webhook rejected reason=webhook_disabled path=%q client_ip=%s", c.Request.RequestURI, c.ClientIP()))
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		logger.LogError(ctx, "PayPal webhook body read failed: "+err.Error())
+		c.AbortWithStatus(http.StatusServiceUnavailable)
+		return
+	}
+
+	// Verify signature via PayPal API.
+	// In sandbox mode we skip cryptographic verification because:
+	//   - PayPal sandbox webhook IDs are environment-specific and often
+	//     misconfigured during development.
+	//   - The sandbox IP range is trusted enough for dev/test purposes.
+	// Production always verifies.
+	if !setting.PayPalSandbox {
+		verified, err := verifyPayPalWebhookSignature(ctx, paypalVerifyRequest{
+			AuthAlgo:         c.GetHeader("PAYPAL-AUTH-ALGO"),
+			CertURL:          c.GetHeader("PAYPAL-CERT-URL"),
+			TransmissionID:   c.GetHeader("PAYPAL-TRANSMISSION-ID"),
+			TransmissionSig:  c.GetHeader("PAYPAL-TRANSMISSION-SIG"),
+			TransmissionTime: c.GetHeader("PAYPAL-TRANSMISSION-TIME"),
+			WebhookID:        setting.PayPalWebhookID,
+			WebhookEvent:     json.RawMessage(body),
+		})
+		if err != nil || !verified {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal webhook signature verification failed client_ip=%s webhook_id=%q transmission_id=%q error=%v",
+				c.ClientIP(), setting.PayPalWebhookID, c.GetHeader("PAYPAL-TRANSMISSION-ID"), err))
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	} else {
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal sandbox webhook received (signature verification skipped) client_ip=%s transmission_id=%q",
+			c.ClientIP(), c.GetHeader("PAYPAL-TRANSMISSION-ID")))
+	}
+
+	// Parse event envelope
+	var event paypalWebhookEvent
+	if err := common.Unmarshal(body, &event); err != nil {
+		logger.LogError(ctx, "PayPal webhook parse failed: "+err.Error())
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook received event=%s client_ip=%s", event.EventType, c.ClientIP()))
+
+	switch event.EventType {
+
+	case "CHECKOUT.ORDER.APPROVED":
+		// Browser return URL owns the capture step for standard PayPal Checkout.
+		// Acknowledge this event so PayPal stops retrying it.
+		paypalOrderID := event.Resource.ID
+		if paypalOrderID == "" {
+			logger.LogWarn(ctx, "PayPal CHECKOUT.ORDER.APPROVED: resource.id missing")
+			c.Status(http.StatusOK)
+			return
+		}
+
+		var referenceID string
+		var order *paypalOrderResponse
+		if len(event.Resource.PurchaseUnits) > 0 {
+			referenceID = event.Resource.PurchaseUnits[0].ReferenceID
+		}
+		if referenceID == "" {
+			// Fallback: fetch order details
+			order, err = getPayPalOrder(ctx, paypalOrderID)
+			if err != nil {
+				logger.LogError(ctx, fmt.Sprintf("PayPal APPROVED: order lookup failed order_id=%s error=%q", paypalOrderID, err.Error()))
+				c.Status(http.StatusServiceUnavailable) // 503 → PayPal 재시도
+				return
+			}
+			referenceID = getPayPalOrderReferenceID(order)
+		}
+		if referenceID == "" {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: reference_id missing order_id=%s", paypalOrderID))
+			c.Status(http.StatusOK)
+			return
+		}
+		topUp := model.GetTopUpByTradeNo(referenceID)
+		if topUp == nil {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: local order not found ref=%q order_id=%s", referenceID, paypalOrderID))
+			c.Status(http.StatusOK)
+			return
+		}
+		if err := validatePayPalTopUpOrder(topUp, paypalOrderID, referenceID); err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal APPROVED: order validation failed error=%q", err.Error()))
+			c.Status(http.StatusOK)
+			return
+		}
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal APPROVED: waiting for browser return capture ref=%q order_id=%s", referenceID, paypalOrderID))
+
+	case "PAYMENT.CAPTURE.COMPLETED":
+		// Capture is confirmed. Credit the user after validating the event and order.
+		orderID := event.Resource.SupplementaryData.RelatedIDs.OrderID
+		if orderID == "" {
+			logger.LogWarn(ctx, "PayPal PAYMENT.CAPTURE.COMPLETED: order_id missing")
+			c.Status(http.StatusOK)
+			return
+		}
+
+		order, err := getPayPalOrder(ctx, orderID)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: order lookup failed order_id=%s error=%q", orderID, err.Error()))
+			c.Status(http.StatusServiceUnavailable) // 503 → PayPal 재시도
+			return
+		}
+		referenceID := getPayPalOrderReferenceID(order)
+		if referenceID == "" {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: reference_id missing order_id=%s", orderID))
+			c.Status(http.StatusOK)
+			return
+		}
+
+		LockOrder(referenceID)
+		defer UnlockOrder(referenceID)
+
+		topUp := model.GetTopUpByTradeNo(referenceID)
+		if err := validatePayPalCapturedOrderResponse(topUp, orderID, order); err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("PayPal CAPTURE.COMPLETED: validation failed error=%q", err.Error()))
+			c.Status(http.StatusOK)
+			return
+		}
+		if err := fulfillPayPalOrder(ctx, referenceID, c.ClientIP(), event.EventType); err != nil {
+			c.Status(http.StatusServiceUnavailable) // 503 → PayPal 재시도
+			return
+		}
+
+	default:
+		// Unrelated event; acknowledge so PayPal stops retrying.
+		logger.LogInfo(ctx, fmt.Sprintf("PayPal webhook ignored event=%s", event.EventType))
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func RequestPayPalAmount(c *gin.Context) {
+	var req PayPalPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		paymentError(c, common.NewMessage("Invalid parameters"))
+		return
+	}
+	minTopup := getPayPalMinTopup()
+	if req.Amount < minTopup {
+		paymentError(c, common.NewMessage("Top-up amount cannot be less than {{min}}", map[string]any{"min": minTopup}))
+		return
+	}
+	if req.Amount > 10000 {
+		paymentError(c, common.NewMessage("Top-up amount cannot exceed {{max}}", map[string]any{"max": 10000}))
+		return
+	}
+	id := c.GetInt("id")
+	user, err := model.GetUserById(id, false)
+	if err != nil || user == nil {
+		paymentError(c, common.NewMessage("User does not exist"))
+		return
+	}
+	money := getPayPalPayMoney(float64(req.Amount), user.Group)
+	if rejectInvalidCreditedQuota(c, id, getPayPalCreditedQuota(money)) {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "success", "data": fmt.Sprintf("%.2f", money)})
+}
+
+func getPayPalMinTopup() int64 {
+	minTopup := setting.PayPalMinTopUp
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		minTopup = minTopup * int(common.QuotaPerUnit)
+	}
+	return int64(minTopup)
+}

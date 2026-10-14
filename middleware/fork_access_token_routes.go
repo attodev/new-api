@@ -5,9 +5,11 @@ package middleware
 // package-level vars are initialised before init runs. Tasks that add fork routes
 // append to this map.
 var forkAccessTokenRouteRules = map[string]accessTokenRouteRule{
-	"POST /api/admin/test-email": accessTokenScopeRule("option:write"), // O5 admin SMTP test mail
-	"GET /api/user/export":       accessTokenScopeRule("user:read"),    // O4 user Excel export
-	"POST /api/user/import":      accessTokenScopeRule("user:write"),   // O4 user Excel import
+	"POST /api/admin/test-email":   accessTokenScopeRule("option:write"), // O5 admin SMTP test mail
+	"POST /api/user/paypal/pay":    accessTokenScopeRule("wallet:write"), // O2 PayPal create order
+	"POST /api/user/paypal/amount": accessTokenScopeRule("wallet:read"),  // O2 PayPal amount quote
+	"GET /api/user/export":         accessTokenScopeRule("user:read"),    // O4 user Excel export
+	"POST /api/user/import":        accessTokenScopeRule("user:write"),   // O4 user Excel import
 }
 
 func init() {

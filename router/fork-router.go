@@ -15,11 +15,16 @@ import (
 func registerForkPublicRoutes(apiRouter *gin.RouterGroup) {
 	bodyLimit := middleware.AnonymousRequestBodyLimit()
 	apiRouter.POST("/contact", middleware.CriticalRateLimit(), bodyLimit, controller.Contact)
+	apiRouter.GET("/paypal/capture", controller.PayPalCapture)
+	apiRouter.POST("/paypal/webhook", bodyLimit, controller.PayPalWebhook)
 	apiRouter.POST("/admin/test-email", middleware.AdminAuth(), middleware.CriticalRateLimit(), controller.TestEmail)
 }
 
-// registerForkSelfRoutes: user-authenticated endpoints (filled by O2).
-func registerForkSelfRoutes(selfRoute *gin.RouterGroup) {}
+// registerForkSelfRoutes: user-authenticated endpoints (O2 PayPal top-up).
+func registerForkSelfRoutes(selfRoute *gin.RouterGroup) {
+	selfRoute.POST("/paypal/pay", middleware.CriticalRateLimit(), controller.RequestPayPalPay)
+	selfRoute.POST("/paypal/amount", controller.RequestPayPalAmount)
+}
 
 // registerForkAdminUserRoutes: admin endpoints under /api/user (O4 user Excel export/import).
 func registerForkAdminUserRoutes(adminRoute *gin.RouterGroup) {

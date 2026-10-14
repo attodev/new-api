@@ -33,7 +33,9 @@ var accessTokenExemptRoutes = []string{
 	"GET /api/home_page_content",
 	"GET /api/ratio_config",
 	"GET /api/user/groups",
-	"POST /api/contact", // fork: O5 landing inquiry form
+	"POST /api/contact",        // fork: O5 landing inquiry form
+	"GET /api/paypal/capture",  // fork: O2 PayPal browser return
+	"POST /api/paypal/webhook", // fork: O2 PayPal webhook
 
 	// Anonymous account entry points.
 	"GET /api/verification",
