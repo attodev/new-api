@@ -142,6 +142,7 @@
     "Username or email": "ユーザー名またはメールアドレス",
     "This user still has a personal balance or subscription": "このユーザーには個人残高またはサブスクリプションが残っています",
     "New member role": "新しいメンバーのロール",
+    "Already a member": "すでにメンバーです",
     "Discounts": "割引",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "モデルごとの割引率（0–100）。モデル独自の割引が設定されている場合、ベンダー割引より優先されます。",
     "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.": "ベンダーごとの割引率（0–100）。モデル個別の割引がないそのベンダーのモデルにのみ適用されます。",

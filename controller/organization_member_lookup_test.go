@@ -14,7 +14,7 @@ import (
 )
 
 // fork: O3 — organization admins add members by exact username/email lookup,
-// and a user who still holds a personal balance or subscription cannot be
+// and a user who still holds a personal or affiliate balance or a subscription cannot be
 // assigned (spec §9 decision 6).
 
 func TestOrganizationMemberLookupIsExactMatchOnly(t *testing.T) {
@@ -107,7 +107,25 @@ func TestAssignRefusesUserWithActiveSubscription(t *testing.T) {
 	resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut,
 		fmt.Sprintf("/api/organization/users/%d/membership", sub.Id), `{"organization_role":"member"}`,
 		gin.Param{Key: "id", Value: strconv.Itoa(sub.Id)})
+	require.Equal(t, http.StatusOK, resp.Code)
 	require.Contains(t, resp.Body.String(), "personal balance")
+	orgId, err := model.GetUserOrganizationId(sub.Id)
+	require.NoError(t, err)
+	require.Equal(t, 0, orgId)
+}
+
+// Pending affiliate earnings (users.aff_quota) are personal money too.
+func TestAssignRefusesUserWithAffiliateBalance(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	affiliate := model.User{Username: "affiliate", AffCode: "aff-affiliate", Password: "12345678", Role: common.RoleCommonUser,
+		Status: common.UserStatusEnabled, AffQuota: 700}
+	require.NoError(t, f.db.Create(&affiliate).Error)
+
+	resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(affiliate.Id))
+	requireOrgSecurityResult(t, resp, false, "user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization")
+	orgId, err := model.GetUserOrganizationId(affiliate.Id)
+	require.NoError(t, err)
+	require.Equal(t, 0, orgId)
 }
 
 func TestAssignAcceptsClearedUserAndKeepsRoleChangesForMembers(t *testing.T) {

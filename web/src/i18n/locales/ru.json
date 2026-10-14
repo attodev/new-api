@@ -142,6 +142,7 @@
     "Username or email": "Имя пользователя или email",
     "This user still has a personal balance or subscription": "У этого пользователя ещё есть личный баланс или подписка",
     "New member role": "Роль нового участника",
+    "Already a member": "Уже участник",
     "Discounts": "Скидки",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "Процент скидки для модели (0–100). Собственная скидка модели имеет приоритет над любой скидкой поставщика.",
     "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.": "Процент скидки для поставщика (0–100). Применяется только к моделям поставщика без собственной скидки.",

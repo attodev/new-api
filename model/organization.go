@@ -251,13 +251,14 @@ func CreateOrganization(name string, description string, ownerUserId int, quota 
 // ErrOrganizationAssignHasPersonalBalance refuses to pull a user into an
 // organization while the user still owns personal value (spec §9 decision 6):
 // inside an organization users.quota becomes an allowance the organization
-// admins control, so joining must not hand them someone's own balance.
-var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has a personal balance or subscription; it must be cleared before joining an organization")
+// admins control, so joining must not hand them someone's own balance —
+// pending affiliate earnings (aff_quota) included.
+var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization")
 
 // AssignUserToOrganization serializes membership changes on the user row.
 // Cross-organization transfers are deliberately rejected; they require a
 // separate owner/organization lifecycle. A user joining from outside must have
-// no personal balance and no active personal subscription.
+// no personal balance, no affiliate balance and no active personal subscription.
 func AssignUserToOrganization(userID, organizationID int, organizationRole string) error {
 	return assignUserToOrganization(userID, organizationID, organizationRole, true)
 }
@@ -282,7 +283,7 @@ func assignUserToOrganization(userID, organizationID int, organizationRole strin
 			return errors.New("user belongs to another organization")
 		}
 		if requireClearedBalance && user.OrganizationId == 0 { // joining from outside: personal balance must be clear
-			if user.Quota > 0 {
+			if user.Quota > 0 || user.AffQuota > 0 {
 				return ErrOrganizationAssignHasPersonalBalance
 			}
 			active, err := hasActiveUserSubscriptionTx(tx, userID)

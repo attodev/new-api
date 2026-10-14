@@ -142,6 +142,7 @@
     "Username or email": "用户名或邮箱",
     "This user still has a personal balance or subscription": "该用户仍有个人余额或订阅",
     "New member role": "新成员角色",
+    "Already a member": "已是成员",
     "Discounts": "折扣",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "按模型设置的折扣百分比（0–100）。模型设置了自己的折扣时，优先于任何供应商折扣。",
     "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.": "按供应商设置的折扣百分比（0–100）。仅适用于该供应商下没有模型专属折扣的模型。",

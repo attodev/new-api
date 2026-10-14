@@ -415,6 +415,8 @@ Query (둘 중 정확히 하나):
 - 대상은 `role < RoleAdminUser`이고 `organization_id = 0`(미소속)이거나 actor와 같은 조직인 사용자다. 부분 일치·접두 일치는 하지 않는다.
 - 일치하는 사용자가 정확히 한 명이 아니면(없음, 다른 조직 소속, 전역 관리자) HTTP 404 `{"success": false, "message": "user not found"}`.
 - 조회 결과는 할당 가능 여부를 보장하지 않는다. 개인 잔액·구독 거부는 5.5의 할당 시점에 판정한다.
+- 같은 조직 구성원도 찾을 수 있다(`organization_id`가 actor 조직과 같음). 웹 화면은 이 경우 `Already a member`로 표시하고 추가 버튼을 막는다.
+- 웹 화면은 입력값을 먼저 `username`으로 조회하고, 404이고 입력값에 `@`가 있으면 `email`로 다시 조회한다(`@`가 들어간 username도 찾을 수 있다).
 
 ### 5.3 조직 사용자 상세 조회
 
@@ -508,7 +510,7 @@ Body:
 - 전역 관리자 사용자는 조직에서 관리할 수 없다 (`global admin users cannot be managed by organization admins`).
 - 역할 값이 `member`, `admin`, `owner`가 아니면 `invalid organization role`.
 - 대상 사용자가 이미 다른 조직에 속해 있으면 모델이 거부한다 (`user belongs to another organization`). 조직이 비활성이면 `organization is not active`.
-- **개인 잔액 거부(spec §9 결정 6):** 조직 밖에서 들어오는 사용자가 개인 잔액(`users.quota > 0`)이나 활성 개인 구독(`user_subscriptions.status = 'active' AND end_time > now`)을 가지고 있으면 거부한다 (`user still has a personal balance or subscription; it must be cleared before joining an organization`, `message_key` 같음). 조직에 들어오면 `users.quota`는 조직 관리자가 정하는 한도가 되므로, 사용자가 잔액을 다 쓰거나 운영자가 정리한 뒤에만 들어올 수 있다. 판정은 `model.AssignUserToOrganization`의 사용자 행 잠금 트랜잭션 안에서 한다. 초대·수락 흐름은 없다. 만료·취소된 구독은 막지 않는다. 이미 같은 조직 구성원의 역할 변경에는 적용하지 않는다.
+- **개인 잔액 거부(spec §9 결정 6):** 조직 밖에서 들어오는 사용자가 개인 잔액(`users.quota > 0`), 추천(affiliate) 잔액(`users.aff_quota > 0` — 아직 잔액으로 옮기지 않은 추천 수익도 개인 돈이다)이나 활성 개인 구독(`user_subscriptions.status = 'active' AND end_time > now`)을 가지고 있으면 거부한다 (`user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization`, `message_key` 같음). 조직에 들어오면 `users.quota`는 조직 관리자가 정하는 한도가 되므로, 사용자가 잔액을 다 쓰거나 운영자가 정리한 뒤에만 들어올 수 있다. 판정은 `model.AssignUserToOrganization`의 사용자 행 잠금 트랜잭션 안에서 한다. 초대·수락 흐름은 없다. 만료·취소된 구독은 막지 않는다. 이미 같은 조직 구성원의 역할 변경에는 적용하지 않는다.
 - 이미 조직 구성원인 경우 이 API로 역할을 변경할 수 있다.
 - 성공하면 `organization.user.assign` 감사 로그가 남는다.
 
@@ -570,7 +572,7 @@ Path:
 - `group` 열은 읽지 않는다(내보내기 전용). 새 사용자는 기본 그룹을 받는다.
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
 - 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
-- 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다 — `model.AssignCreatedUserToOrganization`).
+- 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance, affiliate balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다 — `model.AssignCreatedUserToOrganization`).
 
 응답: `{"success": true, "data": {"assigned": n, "created": n, "updated": n, "removed": n, ... , "errors": [...]}}` (`OrgImportResult`). 요청마다 `organization.user.import` 감사 로그가 남는다.
 
@@ -943,7 +945,7 @@ Query:
 | owner가 아닌 사용자가 owner 행 변경 | `only the organization owner can manage the owner` |
 | `owner` 역할 부여 시도 | `ownership is assigned when the organization is created` |
 | 다른 조직 사용자를 멤버로 추가 | `user belongs to another organization` |
-| 개인 잔액(`quota > 0`)이나 활성 개인 구독이 있는 사용자를 멤버로 추가(API·가져오기) | `user still has a personal balance or subscription; it must be cleared before joining an organization` |
+| 개인 잔액(`quota > 0`), 추천 잔액(`aff_quota > 0`)이나 활성 개인 구독이 있는 사용자를 멤버로 추가(API·가져오기) | `user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization` |
 | 멤버 조회에 username/email이 없거나 둘 다 있음 | `provide either a username or an email` |
 | 멤버 조회에 정확히 일치하는 사용자 없음 | HTTP 404 `user not found` |
 | owner 제거 시도 | `organization owner cannot be removed` |

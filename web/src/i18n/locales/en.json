@@ -142,6 +142,7 @@
     "Username or email": "Username or email",
     "This user still has a personal balance or subscription": "This user still has a personal balance or subscription",
     "New member role": "New member role",
+    "Already a member": "Already a member",
     "Discounts": "Discounts",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.",
     "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.": "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.",

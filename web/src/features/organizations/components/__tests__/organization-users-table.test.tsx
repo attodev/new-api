@@ -214,10 +214,12 @@ describe('OrganizationUsersTable', () => {
       'ghost@example.com{Enter}'
     )
 
-    expect(api.lookupOrganizationMember).toHaveBeenCalledWith({
-      email: 'ghost@example.com',
-    })
     expect(await screen.findByText('User not found')).toBeInTheDocument()
+    // Username first; an input with "@" falls back to an email lookup.
+    expect(api.lookupOrganizationMember.mock.calls).toEqual([
+      [{ username: 'ghost@example.com' }],
+      [{ email: 'ghost@example.com' }],
+    ])
     expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
   })
 
@@ -232,9 +234,9 @@ describe('OrganizationUsersTable', () => {
     api.assignOrganizationUser.mockResolvedValue({
       success: false,
       message:
-        'user still has a personal balance or subscription; it must be cleared before joining an organization',
+        'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization',
       message_key:
-        'user still has a personal balance or subscription; it must be cleared before joining an organization',
+        'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization',
     })
     render(<OrganizationUsersTable />)
     await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
@@ -257,6 +259,58 @@ describe('OrganizationUsersTable', () => {
     expect(toast.error).toHaveBeenCalledWith(
       'This user still has a personal balance or subscription'
     )
+  })
+
+  it('finds a username that contains "@" without an email lookup', async () => {
+    signIn(2, 'admin')
+    api.lookupOrganizationMember.mockResolvedValue({
+      id: 44,
+      username: 'odd@name',
+      display_name: '',
+      organization_id: 0,
+    })
+    api.assignOrganizationUser.mockResolvedValue({ success: true })
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+
+    await userEvent.type(
+      screen.getByPlaceholderText('Username or email'),
+      'odd@name{Enter}'
+    )
+
+    expect(await screen.findByText('odd@name')).toBeInTheDocument()
+    expect(api.lookupOrganizationMember.mock.calls).toEqual([
+      [{ username: 'odd@name' }],
+    ])
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(api.assignOrganizationUser).toHaveBeenCalledWith(44, {
+      organization_role: 'member',
+    })
+  })
+
+  it('marks an existing member as already a member and blocks Add', async () => {
+    signIn(1, 'owner')
+    api.lookupOrganizationMember.mockResolvedValue({
+      id: 2,
+      username: 'adam',
+      display_name: '',
+      organization_id: 7,
+    })
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+
+    await userEvent.type(
+      screen.getByPlaceholderText('Username or email'),
+      'adam'
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Look up user' }))
+
+    expect(await screen.findByText('Already a member')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+    expect(
+      screen.queryByRole('combobox', { name: 'New member role' })
+    ).toBeNull()
+    expect(api.assignOrganizationUser).not.toHaveBeenCalled()
   })
 
   it('shows a plain member no add-member section', async () => {

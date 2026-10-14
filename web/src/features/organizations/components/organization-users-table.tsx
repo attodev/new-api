@@ -123,7 +123,7 @@ const ASSIGNABLE_ROLES: AssignableRole[] = [
 ]
 // Backend message key for model.ErrOrganizationAssignHasPersonalBalance.
 const PERSONAL_BALANCE_ASSIGN_ERROR =
-  'user still has a personal balance or subscription; it must be cleared before joining an organization'
+  'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization'
 const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 const PAGE_SIZE = 20
 
@@ -419,9 +419,12 @@ export function OrganizationUsersTable() {
     if (!query) return
     setLookingUp(true)
     try {
-      const user = await lookupOrganizationMember(
-        query.includes('@') ? { email: query } : { username: query }
-      )
+      // Username first, so a username containing "@" is still found; only
+      // then an "@" input is tried as an email.
+      let user = await lookupOrganizationMember({ username: query })
+      if (!user && query.includes('@')) {
+        user = await lookupOrganizationMember({ email: query })
+      }
       setLookupResult(user)
       setAssignRole(ORGANIZATION_ROLE.MEMBER)
     } catch (error: unknown) {
@@ -431,8 +434,15 @@ export function OrganizationUsersTable() {
     }
   }
 
+  // The lookup also finds members of the caller's own organization; adding
+  // them again would only overwrite their role.
+  const lookupIsMember =
+    !!lookupResult &&
+    !!currentUser?.organization_id &&
+    lookupResult.organization_id === currentUser.organization_id
+
   async function handleAssignUser() {
-    if (!lookupResult) return
+    if (!lookupResult || lookupIsMember) return
     setAssigning(true)
     try {
       const res = await assignOrganizationUser(lookupResult.id, {
@@ -884,7 +894,12 @@ export function OrganizationUsersTable() {
                         </div>
                       )}
                   </div>
-                  {isOrganizationOwner && (
+                  {lookupIsMember && (
+                    <span className='text-muted-foreground text-sm'>
+                      {t('Already a member')}
+                    </span>
+                  )}
+                  {isOrganizationOwner && !lookupIsMember && (
                     <NativeSelect
                       aria-label={t('New member role')}
                       value={assignRole}
@@ -904,7 +919,7 @@ export function OrganizationUsersTable() {
                   )}
                   <Button
                     onClick={() => void handleAssignUser()}
-                    disabled={assigning}
+                    disabled={assigning || lookupIsMember}
                   >
                     <UserPlus />
                     {t('Add')}

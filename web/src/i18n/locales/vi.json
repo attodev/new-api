@@ -142,6 +142,7 @@
     "Username or email": "Tên người dùng hoặc email",
     "This user still has a personal balance or subscription": "Người dùng này vẫn còn số dư cá nhân hoặc gói đăng ký",
     "New member role": "Vai trò thành viên mới",
+    "Already a member": "Đã là thành viên",
     "Discounts": "Giảm giá",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "Phần trăm giảm giá theo mô hình (0–100). Khi mô hình có mức giảm giá riêng, mức này được ưu tiên hơn mọi giảm giá của nhà cung cấp.",
     "Per-vendor discount percentage (0–100). Applied only to a vendor's models that have no model-specific discount.": "Phần trăm giảm giá theo nhà cung cấp (0–100). Chỉ áp dụng cho các mô hình của nhà cung cấp không có giảm giá riêng.",

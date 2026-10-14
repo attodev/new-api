@@ -327,8 +327,8 @@ func TestImportOrgUsersRefusesUnaffiliatedUserWithPersonalBalance(t *testing.T) 
 	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
 	require.NoError(t, err)
 	require.Len(t, result.Errors, 2, "%v", result.Errors)
-	require.Contains(t, result.Errors[0], "line 2 (rich_31): failed to assign: user still has a personal balance or subscription")
-	require.Contains(t, result.Errors[1], "line 3 (subscriber_32): failed to assign: user still has a personal balance or subscription")
+	require.Contains(t, result.Errors[0], "line 2 (rich_31): failed to assign: user still has a personal balance, affiliate balance or subscription")
+	require.Contains(t, result.Errors[1], "line 3 (subscriber_32): failed to assign: user still has a personal balance, affiliate balance or subscription")
 	require.Equal(t, 1, result.Assigned)
 
 	for id, want := range map[int]int{31: 0, 32: 0, 33: 1} {
