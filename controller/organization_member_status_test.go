@@ -193,3 +193,41 @@ func leaveBeforeUserUpdate(t *testing.T, db *gorm.DB, userId int) {
 	}))
 	t.Cleanup(func() { _ = db.Callback().Update().Remove(name) })
 }
+
+// Review M5 — a non-GET /api/organization/* request reads the actor's
+// membership (user row) once: the guard keeps the row it read in the gin context and the handler's
+// getOrganizationActor reuses it.
+func TestGuardedOrganizationWriteReadsActorRowOnce(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	actorReads := 0
+	const name = "test:count_actor_user_reads"
+	require.NoError(t, f.db.Callback().Query().After("gorm:query").Register(name, func(tx *gorm.DB) {
+		// Membership reads select organization_id; the audit log's
+		// username-only lookup (Redis-cached in production) is not one.
+		if tx.Statement.Table == "users" && len(tx.Statement.Vars) > 0 && tx.Statement.Vars[0] == any(f.owner.Id) &&
+			strings.Contains(tx.Statement.SQL.String(), "organization_id") {
+			actorReads++
+		}
+	}))
+	t.Cleanup(func() { _ = f.db.Callback().Query().Remove(name) })
+
+	res := performMemberGuardedRequest(f.owner, http.MethodPatch, fmt.Sprintf("/api/organization/users/%d", f.member.Id), `{"organization_remark":"night shift"}`)
+	require.Contains(t, res.Body.String(), `"success":true`)
+	require.Equal(t, 1, actorReads, "guard and handler must share one read of the actor row")
+	require.Equal(t, "night shift", orgSecurityUser(t, f.db, f.member.Id).OrganizationRemark)
+}
+
+func TestGetOrganizationActorReusesGuardRow(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set("id", f.admin.Id)
+	guardRow := f.admin
+	guardRow.OrganizationRole = model.OrganizationRoleOwner // differs from the DB row
+	ctx.Set(organizationGuardActorKey, &guardRow)
+
+	actor, err := getOrganizationActor(ctx)
+	require.NoError(t, err)
+	require.Equal(t, model.OrganizationRoleOwner, actor.OrganizationRole, "the guard's row is reused, not re-read")
+	actor.OrganizationRole = model.OrganizationRoleMember
+	require.Equal(t, model.OrganizationRoleOwner, guardRow.OrganizationRole, "callers get a copy")
+}

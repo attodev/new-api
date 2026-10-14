@@ -139,7 +139,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	// check if free model pre-consume is disabled
 	if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
 		// if model price or ratio is 0, do not pre-consume quota
-		if groupRatioInfo.GroupRatio == 0 {
+		if freeModelGroupRatio(groupRatioInfo) == 0 { // fork: O6
 			preConsumedQuota = 0
 			freeModel = true
 		} else if usePrice {
@@ -245,7 +245,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (hostt
 			return hosttypes.PriceData{}, err
 		}
 		if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
-			if groupRatioInfo.GroupRatio == 0 || modelPrice == 0 {
+			if freeModelGroupRatio(groupRatioInfo) == 0 || modelPrice == 0 { // fork: O6
 				quota = 0
 				freeModel = true
 			}
@@ -259,7 +259,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (hostt
 		}
 		modelPrice = -1
 		if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
-			if groupRatioInfo.GroupRatio == 0 || modelRatio == 0 {
+			if freeModelGroupRatio(groupRatioInfo) == 0 || modelRatio == 0 { // fork: O6
 				quota = 0
 				freeModel = true
 			}
@@ -384,7 +384,7 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 
 	freeModel := false
 	if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
-		if groupRatioInfo.GroupRatio == 0 {
+		if freeModelGroupRatio(groupRatioInfo) == 0 { // fork: O6
 			preConsumedQuota = 0
 			freeModel = true
 		}

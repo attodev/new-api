@@ -3,11 +3,13 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -129,9 +131,14 @@ func TestOrganizationMemberCannotCheckIn(t *testing.T) {
 	require.NoError(t, model.DB.Model(&model.Checkin{}).Count(&checkins).Error)
 	require.Zero(t, checkins)
 
-	// A user outside any organization still checks in.
+	// The guard lets a user outside any organization through. Checked on the
+	// guard itself: a full DoCheckin credits through IncreaseUserQuota, whose
+	// fire-and-forget cache goroutine (no completion signal) would race the
+	// test cleanup under -race; the non-member check-in itself is upstream's.
 	outsider := model.User{Id: 50, Username: "outsider", Password: "x", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AffCode: "outsider"}
 	require.NoError(t, model.DB.Create(&outsider).Error)
-	res = performOrganizationRequest(DoCheckin, outsider, http.MethodPost, "/api/user/checkin", "")
-	require.Contains(t, res.Body.String(), `"success":true`)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	require.False(t, rejectOrganizationMemberPersonalInflow(ctx, outsider.Id))
+	require.Zero(t, recorder.Body.Len())
 }

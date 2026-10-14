@@ -69,6 +69,15 @@ func IsUserOrganizationDisabled(userId int) (bool, error) {
 	if err != nil || organizationId <= 0 {
 		return false, err
 	}
+	return IsOrganizationDisabled(organizationId)
+}
+
+// IsOrganizationDisabled reports whether the organization is not enabled; a
+// missing organization row is not "disabled" (same as IsUserOrganizationDisabled).
+func IsOrganizationDisabled(organizationId int) (bool, error) {
+	if organizationId <= 0 {
+		return false, nil
+	}
 	status, err := GetOrganizationStatus(organizationId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, nil

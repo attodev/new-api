@@ -123,4 +123,5 @@ if mul != 1 {
 - 모든 과금 식 = `… × GroupRatio × Discount × …`, 할인은 **경로마다 정확히 한 번**, 사전차감 == 정산.
 - 정가(`ModelRatio`/`ModelPrice`)는 변경하지 않음 — 할인은 별도 레이어라 켜고 끄기 자유.
 - 100% 할인은 과금 0이고, 로그의 `group_ratio`에는 `BaseGroupRatio`(기저값)가 남는다.
+- 할인은 `FreeModel`을 바꾸지 않는다. `relay/helper/price.go`의 무료 모델 판정 4곳은 `freeModelGroupRatio`(할인을 접은 경우 `BaseGroupRatio`, 아니면 `GroupRatio`)를 본다. 100% 할인 모델도 결제 세션(조직·구성원 상태 검사)을 거치고 0을 예약한다.
 - 옵션 변경 시 가격 캐시 즉시 무효화 → 마켓플레이스·과금에 곧바로 반영.

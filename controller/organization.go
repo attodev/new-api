@@ -559,7 +559,16 @@ func limitOrganizationLogTimeRange(c *gin.Context, start int64, end int64, unit 
 	return limited * unit, true
 }
 
+// getOrganizationActor returns the caller's user row. On a guarded non-GET
+// request it reuses the row RejectDisabledOrganizationMutation already read
+// (a copy, so callers cannot change the guard's value).
 func getOrganizationActor(c *gin.Context) (*model.User, error) {
+	if value, ok := c.Get(organizationGuardActorKey); ok {
+		if actor, ok := value.(*model.User); ok && actor != nil && actor.Id == c.GetInt("id") {
+			copied := *actor
+			return &copied, nil
+		}
+	}
 	return model.GetUserById(c.GetInt("id"), false)
 }
 

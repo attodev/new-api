@@ -20,3 +20,15 @@ func foldDiscountIntoGroupRatio(info *hosttypes.GroupRatioInfo, originName, bill
 	info.DiscountSource = source
 	info.GroupRatio *= mul
 }
+
+// freeModelGroupRatio is the group ratio the free-model gate reads: the
+// pre-discount base, so a model/vendor discount (even 100%) never turns a
+// paid model into a "free model" that skips the billing session — the
+// organization and member-suspension checks still run and reserve 0. A group
+// that is itself free (ratio 0) still counts as free.
+func freeModelGroupRatio(info hosttypes.GroupRatioInfo) float64 {
+	if info.DiscountSource == "" {
+		return info.GroupRatio
+	}
+	return info.BaseGroupRatio
+}

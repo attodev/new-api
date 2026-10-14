@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
@@ -34,26 +33,37 @@ func RejectDisabledOrganizationMutation() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		disabled, err := model.IsUserOrganizationDisabled(c.GetInt("id"))
+		// One read of the actor row serves the disabled/suspended checks and,
+		// through organizationGuardActorKey, the handler's getOrganizationActor.
+		actor, err := model.GetUserById(c.GetInt("id"), false)
 		if err != nil {
 			common.ApiError(c, err)
 			c.Abort()
 			return
 		}
-		if disabled {
-			common.ApiError(c, model.ErrOrganizationDisabled)
-			c.Abort()
-			return
-		}
-		if err := model.RequireActiveOrganizationMember(c.GetInt("id")); err != nil {
-			if errors.Is(err, model.ErrOrganizationMemberSuspended) {
-				common.ApiErrorStatus(c, http.StatusForbidden, err)
-			} else {
+		if actor.OrganizationId > 0 {
+			disabled, err := model.IsOrganizationDisabled(actor.OrganizationId)
+			if err != nil {
 				common.ApiError(c, err)
+				c.Abort()
+				return
 			}
-			c.Abort()
-			return
+			if disabled {
+				common.ApiError(c, model.ErrOrganizationDisabled)
+				c.Abort()
+				return
+			}
+			if actor.OrganizationMemberStatus == model.OrganizationMemberStatusSuspended {
+				common.ApiErrorStatus(c, http.StatusForbidden, model.ErrOrganizationMemberSuspended)
+				c.Abort()
+				return
+			}
 		}
+		c.Set(organizationGuardActorKey, actor)
 		c.Next()
 	}
 }
+
+// organizationGuardActorKey holds the *model.User the guard read for a non-GET
+// request; getOrganizationActor reuses it instead of reading the row again.
+const organizationGuardActorKey = "organization_guard_actor"

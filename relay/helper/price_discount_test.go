@@ -4,7 +4,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -104,4 +106,41 @@ func TestHandleGroupRatioResolvesDiscountByOriginThenBillingName(t *testing.T) {
 	require.NoError(t, ratio_setting.UpdateModelDiscountByJSONString(`{"claude-sonnet-4-5-thinking":30,"claude-sonnet-4-5":20}`))
 	got = HandleGroupRatio(c, newInfo())
 	require.InDelta(t, 0.7, got.DiscountMultiplier, 1e-9)
+}
+
+// Review M2: the free-model gate reads the pre-discount group ratio.
+func TestFreeModelGroupRatioIgnoresDiscount(t *testing.T) {
+	require.Zero(t, freeModelGroupRatio(hosttypes.GroupRatioInfo{GroupRatio: 0, BaseGroupRatio: 0, DiscountMultiplier: 1}),
+		"a free group stays free")
+	require.Equal(t, 1.5, freeModelGroupRatio(hosttypes.GroupRatioInfo{GroupRatio: 0, BaseGroupRatio: 1.5, DiscountMultiplier: 0, DiscountSource: "model"}),
+		"a 100% discount is not a free model")
+	require.Equal(t, 2.0, freeModelGroupRatio(hosttypes.GroupRatioInfo{GroupRatio: 2}),
+		"PriceData not built by HandleGroupRatio keeps its group ratio")
+}
+
+func TestFullDiscountPerCallModelIsNotFree(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	quotaSetting := operation_setting.GetQuotaSetting()
+	oldFreePreConsume := quotaSetting.EnableFreeModelPreConsume
+	quotaSetting.EnableFreeModelPreConsume = false
+	savedPrices := ratio_setting.ModelPrice2JSONString()
+	prices := ratio_setting.GetModelPriceCopy()
+	prices["full-discount-per-call"] = 0.04
+	raw, err := common.Marshal(prices)
+	require.NoError(t, err)
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(string(raw)))
+	require.NoError(t, ratio_setting.UpdateModelDiscountByJSONString(`{"full-discount-per-call":100}`))
+	t.Cleanup(func() {
+		quotaSetting.EnableFreeModelPreConsume = oldFreePreConsume
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(savedPrices))
+		_ = ratio_setting.UpdateModelDiscountByJSONString(`{}`)
+	})
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/images/generations", nil)
+	info := &relaycommon.RelayInfo{OriginModelName: "full-discount-per-call", UsingGroup: "default", ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	priceData, err := ModelPriceHelperPerCall(c, info)
+	require.NoError(t, err)
+	require.False(t, priceData.FreeModel)
+	require.Zero(t, priceData.Quota)
 }
