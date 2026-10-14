@@ -359,15 +359,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			continue
 		}
 
-		// Insert and assignment share one transaction: a failed assignment
-		// leaves no account behind.
-		if err := model.CreateUserInOrganization(newUser, organizationId, orgRole); err != nil {
+		// Insert, assignment and member fields share one transaction: a
+		// failure leaves no account behind.
+		if err := model.CreateUserInOrganization(newUser, organizationId, orgRole, memberFields); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
 			continue
-		}
-
-		if err := model.UpdateOrganizationMemberFields(newUser.Id, organizationId, memberFields); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
 		}
 
 		if quotaProvided {

@@ -263,13 +263,14 @@ func AssignUserToOrganization(userID, organizationID int, organizationRole strin
 	return assignUserToOrganization(userID, organizationID, organizationRole, true)
 }
 
-// CreateUserInOrganization inserts a new account and assigns it to the
-// organization in one transaction (Excel import), so a failed assignment
-// (disabled organization, invalid role) leaves no orphan account behind.
-// Nobody else owns the new account's sign-up bonus, so the personal-balance
-// refusal does not apply. The post-insert work (sidebar defaults, sign-up
-// bonus log) runs after commit.
-func CreateUserInOrganization(user *User, organizationId int, organizationRole string) error {
+// CreateUserInOrganization inserts a new account, assigns it to the
+// organization and writes its organization member fields (member_status,
+// organization_remark; may be empty) in one transaction (Excel import), so a
+// failed assignment or field write (disabled organization, invalid role) leaves
+// no orphan or half-created member behind. Nobody else owns the new account's
+// sign-up bonus, so the personal-balance refusal does not apply. The
+// post-insert work (sidebar defaults, sign-up bonus log) runs after commit.
+func CreateUserInOrganization(user *User, organizationId int, organizationRole string, memberFields map[string]interface{}) error {
 	if user == nil || organizationId <= 0 || !IsValidOrganizationRole(organizationRole) {
 		return errors.New("invalid organization assignment")
 	}
@@ -279,6 +280,9 @@ func CreateUserInOrganization(user *User, organizationId int, organizationRole s
 		}
 		if err := assignUserToOrganizationTx(tx, user.Id, organizationId, organizationRole, false); err != nil {
 			return fmt.Errorf("failed to set org membership: %w", err)
+		}
+		if err := updateOrganizationMemberFieldsTx(tx, user.Id, organizationId, memberFields); err != nil {
+			return fmt.Errorf("failed to set member status or note: %w", err)
 		}
 		return nil
 	}); err != nil {

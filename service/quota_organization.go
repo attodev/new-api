@@ -6,18 +6,15 @@ import (
 
 // fork: O3 — PreWssConsumeQuota (service/quota.go) checks the personal balance
 // and the token before every realtime (WSS) charge. For an organization member
-// users.quota is only the member spending cap, so the shared organization
-// wallet must also cover the charge. Hook: one line after the user-quota check
+// users.quota is only the member spending cap, so the organization wallet the
+// charge goes to must also cover it. Hook: one line after the user-quota check
 // in PreWssConsumeQuota.
 
 // requireOrganizationWalletFor returns ErrInsufficientOrganizationWalletQuota
-// when userId is an organization member and the organization wallet holds less
-// than quota. Users outside an organization pass without a wallet read.
-func requireOrganizationWalletFor(userId int, quota int) error {
-	organizationId, _, err := model.GetUserOrganizationMembership(userId)
-	if err != nil {
-		return err
-	}
+// when the organization pinned at session start (relayInfo.BillingOrganizationId,
+// the same organization postConsumeOrganizationQuota charges) holds less than
+// quota. organizationId 0 (no organization funding) passes without a read.
+func requireOrganizationWalletFor(organizationId int, quota int) error {
 	if organizationId <= 0 {
 		return nil
 	}

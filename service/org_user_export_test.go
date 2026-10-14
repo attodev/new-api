@@ -511,3 +511,36 @@ func TestImportOrgUsersLeavesNoUserWhenAssignmentFails(t *testing.T) {
 	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("username = ?", "orphan_new").Count(&count).Error)
 	require.Zero(t, count)
 }
+
+// Fix round 1 — the new user's member fields (member_status, organization
+// note) are written in the same transaction: a failed field write leaves no
+// half-created member.
+func TestImportOrgUsersLeavesNoUserWhenMemberFieldWriteFails(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+
+	const name = "test:import_member_fields_fail"
+	require.NoError(t, model.DB.Callback().Update().Before("gorm:update").Register(name, func(tx *gorm.DB) {
+		if updates, ok := tx.Statement.Dest.(map[string]interface{}); ok && tx.Statement.Table == "users" {
+			if _, writesRemark := updates["organization_remark"]; writesRemark {
+				_ = tx.AddError(fmt.Errorf("forced member field failure"))
+			}
+		}
+	}))
+	t.Cleanup(func() { _ = model.DB.Callback().Update().Remove(name) })
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "initial_password", "member_status", "organization_remark"},
+		{"half_new", model.OrganizationRoleMember, "password123", "suspended", "night shift"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], "line 2 (half_new): failed to set member status or note: forced member field failure")
+	require.Zero(t, result.Created)
+
+	var count int64
+	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("username = ?", "half_new").Count(&count).Error)
+	require.Zero(t, count)
+}

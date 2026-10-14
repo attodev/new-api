@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
@@ -147,16 +148,44 @@ func SearchOrganizationTopUps(organizationId int, keyword string, pageInfo *comm
 	return topups, total, err
 }
 
+// organizationTopUpExpireAge is the safety age below which a pending order of
+// an enabled organization is kept: the owner may still be in the provider
+// checkout.
+const organizationTopUpExpireAge = time.Hour
+
 // ExpirePendingOrganizationTopUps marks an organization's pending top-up
 // orders expired (root action for abandoned checkouts, which otherwise block
-// DeleteOrganizationClearingOwner). Settlement only credits pending orders, so
-// a late provider callback for an expired order credits nothing.
-func ExpirePendingOrganizationTopUps(organizationId int) (int64, error) {
+// DeleteOrganizationClearingOwner). For an enabled organization only orders
+// older than organizationTopUpExpireAge are expired and the younger ones are
+// counted in skippedRecent; a disabled organization cannot be paid into, so
+// all of its pending orders are expired. Settlement only credits pending
+// orders, so a late provider callback for an expired order credits nothing.
+func ExpirePendingOrganizationTopUps(organizationId int) (expired int64, skippedRecent int64, err error) {
 	if organizationId <= 0 {
-		return 0, errOrganizationTopUpWithoutTarget
+		return 0, 0, errOrganizationTopUpWithoutTarget
 	}
-	result := DB.Model(&TopUp{}).
-		Where("target_type = ? AND target_id = ? AND status = ?", TopUpTargetTypeOrganization, organizationId, common.TopUpStatusPending).
-		Update("status", common.TopUpStatusExpired)
-	return result.RowsAffected, result.Error
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var org Organization
+		if err := lockForUpdate(tx).Select("id", "status").Where("id = ?", organizationId).First(&org).Error; err != nil {
+			return err
+		}
+		pending := func() *gorm.DB {
+			return tx.Model(&TopUp{}).Where("target_type = ? AND target_id = ? AND status = ?",
+				TopUpTargetTypeOrganization, organizationId, common.TopUpStatusPending)
+		}
+		update := pending()
+		if org.Status == OrganizationStatusEnabled {
+			update = update.Where("create_time < ?", time.Now().Add(-organizationTopUpExpireAge).Unix())
+		}
+		result := update.Update("status", common.TopUpStatusExpired)
+		if result.Error != nil {
+			return result.Error
+		}
+		expired = result.RowsAffected
+		return pending().Count(&skippedRecent).Error
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return expired, skippedRecent, nil
 }

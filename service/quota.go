@@ -142,7 +142,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if userQuota < quota {
 		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(quota))
 	}
-	if err := requireOrganizationWalletFor(relayInfo.UserId, quota); err != nil { // fork: O3
+	if err := requireOrganizationWalletFor(relayInfo.BillingOrganizationId, quota); err != nil { // fork: O3
 		return err
 	}
 

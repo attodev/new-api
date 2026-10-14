@@ -15,8 +15,9 @@ import (
 // fork: O3 — platform (root) administration of organization top-up orders.
 
 // ExpireOrganizationTopUps (POST /api/organizations/:id/topups/expire) marks
-// the organization's pending top-up orders expired so an abandoned checkout no
-// longer blocks DeleteOrganization. Settled orders are not touched.
+// the organization's abandoned pending top-up orders expired so they no longer
+// block DeleteOrganization (orders younger than an hour are kept unless the
+// organization is disabled). Settled orders are not touched.
 func ExpireOrganizationTopUps(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
 		common.ApiErrorT(c, "root permission required")
@@ -37,13 +38,13 @@ func ExpireOrganizationTopUps(c *gin.Context) {
 		return
 	}
 
-	expired, err := model.ExpirePendingOrganizationTopUps(organizationId)
+	expired, skippedRecent, err := model.ExpirePendingOrganizationTopUps(organizationId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	recordOrganizationAudit(c, "organization.topup.expire",
-		fmt.Sprintf("Expired %d pending top-up orders of organization %d", expired, organizationId),
-		map[string]any{"organization_id": organizationId, "expired": expired})
-	common.ApiSuccess(c, gin.H{"expired": expired})
+		fmt.Sprintf("Expired %d pending top-up orders of organization %d (%d recent orders kept)", expired, organizationId, skippedRecent),
+		map[string]any{"organization_id": organizationId, "expired": expired, "skipped_recent": skippedRecent})
+	common.ApiSuccess(c, gin.H{"expired": expired, "skipped_recent": skippedRecent})
 }

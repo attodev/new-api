@@ -11,6 +11,7 @@ import (
 	"errors"
 
 	"github.com/QuantumNous/new-api/common"
+	"gorm.io/gorm"
 )
 
 const (
@@ -64,13 +65,17 @@ func GetUserOrganizationMembership(userId int) (organizationId int, memberStatus
 // changes nothing (MySQL then reports 0 affected rows) is not an error while
 // the user is still a member.
 func UpdateOrganizationMemberFields(userId int, organizationId int, updates map[string]interface{}) error {
+	return updateOrganizationMemberFieldsTx(DB, userId, organizationId, updates)
+}
+
+func updateOrganizationMemberFieldsTx(tx *gorm.DB, userId int, organizationId int, updates map[string]interface{}) error {
 	if userId <= 0 || organizationId <= 0 {
 		return errors.New("invalid organization member")
 	}
 	if len(updates) == 0 {
 		return nil
 	}
-	result := DB.Model(&User{}).
+	result := tx.Model(&User{}).
 		Where("id = ? AND organization_id = ?", userId, organizationId).
 		Updates(updates)
 	if result.Error != nil {
@@ -80,7 +85,7 @@ func UpdateOrganizationMemberFields(userId int, organizationId int, updates map[
 		return nil
 	}
 	var members int64
-	if err := DB.Model(&User{}).Where("id = ? AND organization_id = ?", userId, organizationId).Count(&members).Error; err != nil {
+	if err := tx.Model(&User{}).Where("id = ? AND organization_id = ?", userId, organizationId).Count(&members).Error; err != nil {
 		return err
 	}
 	if members == 0 {

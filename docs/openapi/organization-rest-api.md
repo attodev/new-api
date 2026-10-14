@@ -83,7 +83,7 @@
 - 조직 회원은 교환 코드(`POST /api/user/topup`)로 개인 잔액을 채울 수 없다(`organization members cannot redeem codes into their personal balance`).
 - 조직 회원은 개인 유료 충전(`/api/user/pay`, `/api/user/amount`, Stripe·PayPal·Creem·Waffo·Waffo Pancake의 pay/amount)을 시작할 수 없다(`organization members cannot top up their personal balance`, 결제 API 형태). 조직 지갑 충전은 7장의 조직 API를 쓴다.
 - 조직 회원은 추천 잔액 이체(`POST /api/user/aff_transfer`)와 출석 체크(`POST /api/user/checkin`)도 할 수 없다. 둘 다 개인 잔액에 적립되는 흐름이라 같은 메시지 `{"success": false, "message": "organization members cannot top up their personal balance"}`로 거부되고 `quota`·`aff_quota`·출석 기록은 바뀌지 않는다(`controller/topup_target.go` `rejectOrganizationMemberPersonalInflow`).
-- 조직 회원의 realtime(WebSocket) 과금 선검사(`service.PreWssConsumeQuota`)는 회원 한도·토큰 잔량에 더해 조직 지갑도 본다. 조직 지갑 잔액이 이번 과금액보다 적으면 `organization wallet quota insufficient`로 거부된다(`service/quota_organization.go`). 조직 밖 사용자는 조직 지갑을 읽지 않는다.
+- 조직 회원의 realtime(WebSocket) 과금 선검사(`service.PreWssConsumeQuota`)는 회원 한도·토큰 잔량에 더해 조직 지갑도 본다. 확인하는 지갑은 세션 시작 때 과금 세션이 고정한 조직(`relayInfo.BillingOrganizationId`, 실제로 차감되는 조직)이다. 그 지갑 잔액이 이번 과금액보다 적으면 `organization wallet quota insufficient`로 거부된다(`service/quota_organization.go`). 조직 자금이 아닌 세션(조직 밖 사용자, 무료 모델)은 조직 지갑을 읽지 않는다.
 
 ### 2.1.1 접근 토큰 스코프
 
@@ -268,16 +268,17 @@ Path:
 
 처리 규칙:
 
-- 이 조직의 `target_type = organization`, `status = pending`인 충전 주문을 모두 `status = expired`로 바꾼다(`model.ExpirePendingOrganizationTopUps`). `success`·`failed`·`expired` 주문과 다른 조직·개인 주문은 바뀌지 않는다.
+- 이 조직의 `target_type = organization`, `status = pending`인 충전 주문을 `status = expired`로 바꾼다(`model.ExpirePendingOrganizationTopUps`). `success`·`failed`·`expired` 주문과 다른 조직·개인 주문은 바뀌지 않는다.
+- 안전 기준: 활성 조직(`status = 1`)은 `create_time`이 1시간(`organizationTopUpExpireAge`)보다 오래된 pending 주문만 만료시킨다. 그보다 최근 주문은 소유자가 아직 결제 중일 수 있어 그대로 두고 `skipped_recent`로 센다(이 주문이 남아 있으면 조직 삭제는 계속 거부된다). 비활성 조직(`status = 2`)은 더 결제될 수 없으므로 나이와 관계없이 pending 주문을 모두 만료시킨다.
 - 정산은 pending 주문만 적립하므로, 만료된 주문에 늦게 도착한 결제 콜백은 아무것도 적립하지 않는다. 실제로 결제된 주문을 만료시키면 그 금액은 provider 쪽에서 환불·수동 처리해야 한다. 실행 전 provider 대시보드에서 미결제를 확인한다.
-- 대기 주문이 없으면 `expired: 0`으로 성공한다.
+- 대기 주문이 없으면 `expired: 0`, `skipped_recent: 0`으로 성공한다.
 - 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
-- `organization.topup.expire` 감사 로그를 남긴다(params `organization_id`, `expired`).
+- `organization.topup.expire` 감사 로그를 남긴다(params `organization_id`, `expired`, `skipped_recent`).
 
 응답:
 
 ```json
-{ "success": true, "message": "", "data": { "expired": 2 } }
+{ "success": true, "message": "", "data": { "expired": 2, "skipped_recent": 1 } }
 ```
 
 ## 4. 조직 기본 정보와 모니터링 API
@@ -617,7 +618,7 @@ Path:
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
 - 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
 - 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance, affiliate balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다).
-- 새 사용자 생성과 조직 배정은 한 트랜잭션이다(`model.CreateUserInOrganization`). 배정이 실패하면(예: 비활성 조직) 사용자 행도 남지 않고 `line N (<username>): failed to set org membership: <사유>` 행 오류가 된다.
+- 새 사용자 생성, 조직 배정, `member_status`·`organization_remark` 쓰기는 한 트랜잭션이다(`model.CreateUserInOrganization`). 배정이 실패하면(예: 비활성 조직) `line N (<username>): failed to set org membership: <사유>`, 회원 필드 쓰기가 실패하면 `line N (<username>): failed to set member status or note: <사유>` 행 오류가 되고 어느 쪽이든 사용자 행은 남지 않는다.
 
 응답: `{"success": true, "data": {"assigned": n, "created": n, "updated": n, "removed": n, ... , "errors": [...]}}` (`OrgImportResult`). 요청마다 `organization.user.import` 감사 로그가 남는다.
 
