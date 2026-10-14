@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import i18next from 'i18next'
 import { describe, expect, test } from 'vitest'
 
+import ko from '@/i18n/locales/ko.json' // fork: O9
+
 import {
   getServerErrorMessage,
   getServerErrorMessageKey,
@@ -89,6 +91,32 @@ describe('server error message mapping', () => {
       expect(
         getServerErrorMessage({ isAxiosError: true, response: { data } })
       ).toBe('额度超出有效范围，最大为 100')
+    } finally {
+      await i18next.changeLanguage('en')
+    }
+  })
+
+  // fork: O9 — organization errors reach the web console as message_key and
+  // render from the Korean locale.
+  test('translates an organization message_key into Korean', async () => {
+    i18next.addResourceBundle('ko', 'translation', ko.translation)
+    await i18next.changeLanguage('ko')
+    try {
+      expect(
+        getServerErrorMessage({
+          success: false,
+          message: 'organization target permission denied',
+          message_key: 'organization target permission denied',
+        })
+      ).toBe('이 대상에 대한 조직 권한이 없습니다')
+      expect(
+        getServerErrorMessage({
+          success: false,
+          message: 'name is required',
+          message_key: '{{field}} is required',
+          message_params: { field: 'name' },
+        })
+      ).toBe('name은(는) 필수입니다')
     } finally {
       await i18next.changeLanguage('en')
     }

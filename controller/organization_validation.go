@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -33,48 +31,48 @@ const (
 func trimAndValidateText(field string, value string, maxLength int, required bool) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if required && trimmed == "" {
-		return "", fmt.Errorf("%s is required", field)
+		return "", common.NewMessage("{{field}} is required", map[string]any{"field": field})
 	}
 	if utf8.RuneCountInString(trimmed) > maxLength {
-		return "", fmt.Errorf("%s must be at most %d characters", field, maxLength)
+		return "", common.NewMessage("{{field}} must be at most {{max}} characters", map[string]any{"field": field, "max": maxLength})
 	}
 	return trimmed, nil
 }
 
 func validateIntRange(field string, value int, min int, max int) error {
 	if value < min || value > max {
-		return fmt.Errorf("%s must be between %d and %d", field, min, max)
+		return common.NewMessage("{{field}} must be between {{min}} and {{max}}", map[string]any{"field": field, "min": min, "max": max})
 	}
 	return nil
 }
 
 func validateInt64Range(field string, value int64, min int64, max int64) error {
 	if value < min || value > max {
-		return fmt.Errorf("%s must be between %d and %d", field, min, max)
+		return common.NewMessage("{{field}} must be between {{min}} and {{max}}", map[string]any{"field": field, "min": min, "max": max})
 	}
 	return nil
 }
 
 func validatePositiveReferenceId(field string, value int) error {
 	if value <= 0 {
-		return fmt.Errorf("%s must be greater than 0", field)
+		return common.NewMessage("{{field}} must be greater than 0", map[string]any{"field": field})
 	}
 	if value > MaxOrganizationReferenceId {
-		return fmt.Errorf("%s must be at most %d", field, MaxOrganizationReferenceId)
+		return common.NewMessage("{{field}} must be at most {{max}}", map[string]any{"field": field, "max": MaxOrganizationReferenceId})
 	}
 	return nil
 }
 
 func validateOrganizationStatus(status int) error {
 	if status != model.OrganizationStatusEnabled && status != model.OrganizationStatusDisabled {
-		return errors.New(OrganizationStatusAllowedError)
+		return common.NewMessage(OrganizationStatusAllowedError)
 	}
 	return nil
 }
 
 func validateOrganizationMemberStatus(status int) error {
 	if !model.IsValidOrganizationMemberStatus(status) {
-		return errors.New(OrganizationMemberStatusAllowedError)
+		return common.NewMessage(OrganizationMemberStatusAllowedError)
 	}
 	return nil
 }
@@ -88,6 +86,6 @@ func validateOrganizationDurationUnit(durationUnit string) error {
 		model.SubscriptionDurationCustom:
 		return nil
 	default:
-		return errors.New(OrganizationDurationUnitAllowedError)
+		return common.NewMessage(OrganizationDurationUnitAllowedError)
 	}
 }

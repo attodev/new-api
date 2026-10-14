@@ -194,6 +194,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 (백엔드) | i18n/i18n_test.go:42-44 | `TestLanguageFromUserSetting` 케이스 표에 `ko`, `ko-KR`, `kr` 세 줄 | i18n/ko_test.go |
 | O9 한글 (백엔드) | common/constants.go:41 | `DefaultLanguage` 주석의 언어 목록에 `ko` 한 단어 | — |
 | O9 한글 (백엔드) | i18n/locales/ko.yaml | 신규 locale 파일(upstream 파일 아님). `en.yaml` 66키 전부, 같은 순서·주석 구조. team `i18n/locales/ko.yaml`에 같은 키가 있는 19개는 그 값, 나머지 47개는 용어집으로 번역 | docs/translation-glossary.ko.md |
+| O9 한글 (fork 메시지) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json (끝 66키), web/src/i18n/locales/ko.json | fork 조직·결제·문의 파일이 `common.NewMessage`/`ApiErrorT`로 보내는 `message_key` 66개를 `Subscription status expired` 뒤에 추가. en은 키와 같은 값, ko는 용어집 번역, 나머지 6개 locale은 영어 placeholder(이번 단계에서 번역하지 않음) | controller/organization_i18n_test.go (`forkMessageSources`의 소스에서 키를 읽어 en.json에 있는지 검사) |
+| O9 한글 (fork 메시지) | web/src/lib/server-error-message.test.ts:22,99-123 | `ko.json` import 한 줄과 조직 `message_key`(`organization target permission denied`, `{{field}} is required` + params)가 ko에서 한국어로 렌더되는 테스트 한 건 | web/src/i18n/locales/ko.json |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

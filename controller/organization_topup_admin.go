@@ -31,7 +31,7 @@ func ExpireOrganizationTopUps(c *gin.Context) {
 	var organization model.Organization
 	if err := model.DB.Select("id").Where("id = ?", organizationId).First(&organization).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "organization not found"})
+			common.ApiErrorStatus(c, http.StatusNotFound, common.NewMessage("organization not found"))
 			return
 		}
 		common.ApiError(c, err)

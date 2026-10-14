@@ -239,7 +239,7 @@ func CreateOrganization(name string, description string, ownerUserId int, quota 
 			return err
 		}
 		if owner.OrganizationId > 0 {
-			return errors.New("user already belongs to an organization")
+			return common.NewMessage("user already belongs to an organization")
 		}
 		if err := tx.Create(org).Error; err != nil {
 			return err
@@ -343,7 +343,7 @@ func assignUserToOrganizationTx(tx *gorm.DB, userID, organizationID int, organiz
 		return err
 	}
 	if user.OrganizationId != 0 && user.OrganizationId != organizationID {
-		return errors.New("user belongs to another organization")
+		return common.NewMessage("user belongs to another organization")
 	}
 	if requireClearedBalance && user.OrganizationId == 0 { // joining from outside: personal balance must be clear
 		if user.Quota > 0 || user.AffQuota > 0 {
@@ -369,7 +369,7 @@ func assignUserToOrganizationTx(tx *gorm.DB, userID, organizationID int, organiz
 		return err
 	}
 	if organization.Status != OrganizationStatusEnabled {
-		return errors.New("organization is not active")
+		return common.NewMessage("organization is not active")
 	}
 	result := tx.Model(&User{}).
 		Where("id = ? AND organization_id = ?", userID, user.OrganizationId).
@@ -381,7 +381,7 @@ func assignUserToOrganizationTx(tx *gorm.DB, userID, organizationID int, organiz
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
-		return errors.New("organization membership changed concurrently")
+		return common.NewMessage("organization membership changed concurrently")
 	}
 	return nil
 }
@@ -440,7 +440,7 @@ func CanManageOrganizationTarget(actor User, target User) bool {
 // UpdateOrganizationFields applies organization updates under a row lock.
 func UpdateOrganizationFields(id int, updates map[string]interface{}) error {
 	if id <= 0 {
-		return errors.New("invalid organization id")
+		return common.NewMessage("invalid organization id")
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
 		var org Organization
@@ -464,7 +464,7 @@ func DeleteOrganization(id int) error {
 // cleared.
 func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuota int, err error) {
 	if id <= 0 {
-		return 0, 0, errors.New("invalid organization id")
+		return 0, 0, common.NewMessage("invalid organization id")
 	}
 	// Reading the owner before taking locks is safe only when it is verified
 	// again under the organization lock. If an owner transfer wins that race,
@@ -502,7 +502,7 @@ func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuot
 				return err
 			}
 			if memberCount > 0 {
-				return fmt.Errorf("organization has %d non-owner members, remove them first", memberCount)
+				return common.NewMessage("organization has {{count}} non-owner members, remove them first", map[string]any{"count": memberCount})
 			}
 
 			// A pending organization top-up would settle into a deleted wallet
@@ -514,7 +514,7 @@ func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuot
 				return err
 			}
 			if pendingTopUps > 0 {
-				return fmt.Errorf("organization has %d pending top-up orders, wait for them to settle or expire first", pendingTopUps)
+				return common.NewMessage("organization has {{count}} pending top-up orders, wait for them to settle or expire first", map[string]any{"count": pendingTopUps})
 			}
 
 			// 2. Delete user subscriptions
@@ -573,12 +573,12 @@ func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuot
 			return ownerUserId, ownerPreviousQuota, nil
 		}
 	}
-	return 0, 0, errors.New("organization owner changed concurrently, retry deletion")
+	return 0, 0, common.NewMessage("organization owner changed concurrently, retry deletion")
 }
 
 // ErrOrganizationMembershipChanged reports that the user is no longer a member
 // of the organization a membership clear was scoped to.
-var ErrOrganizationMembershipChanged = errors.New("user is no longer a member of this organization")
+var ErrOrganizationMembershipChanged = common.NewMessage("user is no longer a member of this organization")
 
 // ClearOrganizationMembership removes a user from organizationId and zeroes
 // users.quota in the same transaction: inside an organization the user quota is

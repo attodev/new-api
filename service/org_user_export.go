@@ -103,7 +103,7 @@ func BuildOrgExportFile(organizationId int) (*excelize.File, error) {
 
 	const maxExportRows = 10000
 	if len(users) > maxExportRows {
-		return nil, fmt.Errorf("too many members to export: %d (maximum %d)", len(users), maxExportRows)
+		return nil, common.NewMessage("too many members to export: {{count}} (maximum {{max}})", map[string]any{"count": len(users), "max": maxExportRows})
 	}
 
 	f := excelize.NewFile()
@@ -164,7 +164,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 	sheetName := f.GetSheetName(0)
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read sheet: %w", err)
+		return nil, common.NewMessage("failed to read sheet: {{error}}", map[string]any{"error": err.Error()})
 	}
 	if len(rows) < 2 {
 		return result, nil
@@ -172,7 +172,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 
 	const maxImportRows = 1000
 	if len(rows)-1 > maxImportRows {
-		return nil, fmt.Errorf("too many rows: maximum %d, got %d", maxImportRows, len(rows)-1)
+		return nil, common.NewMessage("too many rows: maximum {{max}}, got {{count}}", map[string]any{"max": maxImportRows, "count": len(rows) - 1})
 	}
 
 	headerIdx := map[string]int{}
@@ -186,7 +186,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 	}
 	for _, retired := range orgExcelRetiredColumns {
 		if hasColumn(retired.column) {
-			return nil, fmt.Errorf("unsupported column: %s — use %s", retired.column, retired.replacement)
+			return nil, common.NewMessage("unsupported column: {{column}} — use {{replacement}}", map[string]any{"column": retired.column, "replacement": retired.replacement})
 		}
 	}
 	getCell := func(row []string, key string) string {

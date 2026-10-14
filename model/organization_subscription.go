@@ -348,17 +348,17 @@ func CreateOrganizationUserSubscriptionFromPlan(organizationId int, userId int, 
 			return err
 		}
 		if user.OrganizationId != organizationId {
-			return errors.New("target user is outside organization")
+			return common.NewMessage("target user is outside organization")
 		}
 		if user.Role >= common.RoleAdminUser {
-			return errors.New("target user cannot be system administrator")
+			return common.NewMessage("target user cannot be system administrator")
 		}
 		plan, err := getOrganizationSubscriptionPlanByIdTx(tx, organizationId, planId)
 		if err != nil {
 			return err
 		}
 		if !plan.Enabled {
-			return errors.New("organization subscription plan is disabled")
+			return common.NewMessage("organization subscription plan is disabled")
 		}
 		nowUnix := common.GetTimestamp()
 		now := time.Unix(nowUnix, 0)

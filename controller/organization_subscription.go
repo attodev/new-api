@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -144,7 +143,7 @@ func requireOrganizationSubscriptionPlan(c *gin.Context, organizationId int, pla
 		return false
 	}
 	if count == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "subscription plan not found"})
+		common.ApiErrorStatus(c, http.StatusNotFound, common.NewMessage("subscription plan not found"))
 		return false
 	}
 	return true
@@ -381,10 +380,10 @@ func buildOrganizationSubscriptionPlanUpdates(req organizationSubscriptionPlanRe
 	}
 	durationValue := req.DurationValue
 	if durationValue < 0 {
-		return nil, errors.New(OrganizationDurationValueRangeError)
+		return nil, common.NewMessage(OrganizationDurationValueRangeError)
 	}
 	if durationValue > MaxOrganizationSubscriptionDurationValue {
-		return nil, errors.New(OrganizationDurationValueRangeError)
+		return nil, common.NewMessage(OrganizationDurationValueRangeError)
 	}
 	if durationValue == 0 && durationUnit != model.SubscriptionDurationCustom {
 		durationValue = 1
@@ -394,7 +393,7 @@ func buildOrganizationSubscriptionPlanUpdates(req organizationSubscriptionPlanRe
 			return nil, err
 		}
 	} else if req.CustomSeconds < 0 || req.CustomSeconds > MaxOrganizationSubscriptionCustomSeconds {
-		return nil, fmt.Errorf("custom_seconds must be between 0 and %d", MaxOrganizationSubscriptionCustomSeconds)
+		return nil, common.NewMessage("{{field}} must be between {{min}} and {{max}}", map[string]any{"field": "custom_seconds", "min": 0, "max": MaxOrganizationSubscriptionCustomSeconds})
 	}
 	if err := validateIntRange("sort_order", req.SortOrder, -MaxOrganizationSubscriptionSortOrder, MaxOrganizationSubscriptionSortOrder); err != nil {
 		return nil, err

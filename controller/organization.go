@@ -920,7 +920,7 @@ func DeleteOrganization(c *gin.Context) {
 	ownerUserId, ownerPreviousQuota, err := model.DeleteOrganizationClearingOwner(organizationId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "organization not found"})
+			common.ApiErrorStatus(c, http.StatusNotFound, common.NewMessage("organization not found"))
 			return
 		}
 		common.ApiError(c, err)
@@ -971,14 +971,14 @@ func ImportOrganizationUsers(c *gin.Context) {
 
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
-		common.ApiError(c, fmt.Errorf("failed to read file: %w", err))
+		common.ApiError(c, common.NewMessage("failed to read file: {{error}}", map[string]any{"error": err.Error()}))
 		return
 	}
 	defer file.Close()
 
 	f, err := excelize.OpenReader(file)
 	if err != nil {
-		common.ApiError(c, fmt.Errorf("invalid xlsx file: %w", err))
+		common.ApiError(c, common.NewMessage("invalid xlsx file: {{error}}", map[string]any{"error": err.Error()}))
 		return
 	}
 	defer f.Close()

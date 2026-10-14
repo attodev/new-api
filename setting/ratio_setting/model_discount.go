@@ -1,8 +1,6 @@
 package ratio_setting
 
 import (
-	"errors"
-
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/types"
 )
@@ -24,7 +22,7 @@ func validateDiscountJSON(jsonStr string) error {
 	}
 	for name, percent := range m {
 		if percent < 0 || percent > 100 {
-			return errors.New("discount percent for '" + name + "' must be between 0 and 100")
+			return common.NewMessage("discount percent for '{{name}}' must be between 0 and 100", map[string]any{"name": name})
 		}
 	}
 	return nil

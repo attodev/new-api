@@ -47,7 +47,7 @@ func Contact(c *gin.Context) {
 		return
 	}
 	if common.ContactEmail == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Contact email is not configured"})
+		common.ApiErrorStatus(c, http.StatusServiceUnavailable, common.NewMessage("Contact email is not configured"))
 		return
 	}
 	subject := fmt.Sprintf("[%s] Enterprise Inquiry — %s", common.SystemName, req.Org)
