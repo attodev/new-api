@@ -1292,6 +1292,9 @@ func TopUp(c *gin.Context) {
 	}
 
 	id := c.GetInt("id")
+	if rejectOrganizationMemberRedeem(c, id) { // fork: O3
+		return
+	}
 	lock := getTopUpLock(id)
 	if !lock.TryLock() {
 		common.ApiErrorT(c, "Top-up is processing, please try again later")

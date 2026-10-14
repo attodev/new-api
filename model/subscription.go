@@ -789,6 +789,9 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		if err := lockForUpdate(tx).Where("id = ?", userId).First(&user).Error; err != nil {
 			return err
 		}
+		if err := rejectOrganizationMemberBalancePay(&user); err != nil { // fork: O3
+			return err
+		}
 		if requiredQuota > 0 && user.Quota < requiredQuota {
 			return common.NewMessage("Insufficient balance")
 		}

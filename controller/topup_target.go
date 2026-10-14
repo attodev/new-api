@@ -73,7 +73,9 @@ func prepareOrganizationPaymentTarget(c *gin.Context) bool {
 	return true
 }
 
-// validateTopUpTargetCapacity checks the wallet this order settles into.
+// validateTopUpTargetCapacity checks the wallet this order settles into. Every
+// pay and amount flow reaches it, so it also refuses personal top-ups for
+// organization members (model.ValidateTopUpTargetCapacity).
 func validateTopUpTargetCapacity(c *gin.Context, userId int, creditedQuota int) error {
 	targetType := getTopUpTargetType(c)
 	targetId := userId
@@ -81,4 +83,14 @@ func validateTopUpTargetCapacity(c *gin.Context, userId int, creditedQuota int) 
 		targetId = getTopUpTargetId(c)
 	}
 	return model.ValidateTopUpTargetCapacity(targetType, targetId, creditedQuota)
+}
+
+// rejectOrganizationMemberRedeem is the TopUp (redemption code) guard: an
+// organization member's users.quota is the member cap, not a personal wallet.
+func rejectOrganizationMemberRedeem(c *gin.Context, userId int) bool {
+	if err := model.RejectOrganizationMemberRedeem(userId); err != nil {
+		common.ApiError(c, err)
+		return true
+	}
+	return false
 }

@@ -63,6 +63,9 @@ func ValidateTopUpTargetCapacity(targetType string, targetId int, creditedQuota 
 		}
 		return ValidateOrganizationWalletCapacity(targetId, creditedQuota)
 	}
+	if err := rejectOrganizationMemberPersonalTopUp(targetId); err != nil {
+		return err
+	}
 	return ValidateTopUpQuotaCapacity(targetId, creditedQuota)
 }
 
