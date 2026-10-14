@@ -80,6 +80,11 @@ var accessTokenExemptRoutes = []string{
 var accessTokenHelperRoutes = map[string]authz.Permission{
 	"GET /api/task_plugin_options": authz.TaskPluginBind,
 	"GET /api/audit":               authz.AuditRead,
+	// fork: O3 organization administration (router/organization-router.go)
+	"GET /api/organizations/":       authz.OrganizationRead,
+	"POST /api/organizations/":      authz.OrganizationWrite,
+	"PATCH /api/organizations/:id":  authz.OrganizationWrite,
+	"DELETE /api/organizations/:id": authz.OrganizationWrite,
 }
 
 func newAccessTokenScopeTestEngine(t *testing.T) *gin.Engine {

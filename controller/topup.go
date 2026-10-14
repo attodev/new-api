@@ -263,7 +263,7 @@ func paymentError(c *gin.Context, err error) {
 func rejectInvalidCreditedQuota(c *gin.Context, userId int, quota decimal.Decimal) bool {
 	creditedQuota, err := validateCreditedQuota(quota)
 	if err == nil {
-		err = model.ValidateTopUpQuotaCapacity(userId, creditedQuota)
+		err = validateTopUpTargetCapacity(c, userId, creditedQuota) // fork: O3
 	}
 	if err != nil {
 		paymentError(c, err)
@@ -275,7 +275,7 @@ func rejectInvalidCreditedQuota(c *gin.Context, userId int, quota decimal.Decima
 func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
 	creditedQuota, err := validateTopUpQuota(amount)
 	if err == nil {
-		err = model.ValidateTopUpQuotaCapacity(userId, creditedQuota)
+		err = validateTopUpTargetCapacity(c, userId, creditedQuota) // fork: O3
 	}
 	if err != nil {
 		paymentError(c, err)
@@ -348,6 +348,8 @@ func RequestEpay(c *gin.Context) {
 	}
 	topUp := &model.TopUp{
 		UserId:          id,
+		TargetType:      getTopUpTargetType(c), // fork: O3
+		TargetId:        getTopUpTargetId(c),   // fork: O3
 		Amount:          amount,
 		Money:           payMoney,
 		TradeNo:         tradeNo,

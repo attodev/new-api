@@ -92,6 +92,17 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 조회 | model/midjourney.go:37 | `TaskQueryParams.UserIDs []int` 필드 (조직 관리자가 회원 작업만 조회) | model/log_organization.go |
 | O3 조직 조회 | model/midjourney.go:87-89 | `GetAllTasks` 필터 체인 끝 `if len(queryParams.UserIDs) > 0 { query = query.Where("user_id IN ?", …) }` 3줄 | model/log_organization.go |
 | O3 조직 조회 | model/midjourney.go:234-236 | `CountAllTasks` 필터 체인 끝 같은 3줄 | model/log_organization.go |
+| O3 조직 라우트 | router/api-router.go:285-286 | `registerForkPublicRoutes` 다음 `// fork: O3` 주석 줄 + `registerForkOrganizationRoutes(apiRouter)` (주석을 윗줄에 둬 이웃 줄 gofmt 정렬을 유지) | router/organization-router.go |
+| O3 조직 라우트 | router/access_token_scope_test.go:83-87 | `accessTokenHelperRoutes`에 `// fork: O3` 주석 + `/api/organizations/` 4줄 (handlePermissionRoute 자동 선언: organization:read/write) | router/organization-router.go, service/authz/resources_organization.go |
+| O3 조직 라우트 | middleware/access_token_routes.go (레지스트리) | 없음 — `/api/organization/*` 34개를 fork 레지스트리에 선언(기본 session; wallet·topup/self·`.../amount` 5개는 wallet:read, `.../pay` 6개는 wallet:write, subscription/self는 profile:read) | middleware/fork_access_token_routes.go |
+| O3 조직 권한 | service/authz/authz_test.go:161-162, 195-196 | `TestSetUserPermissionsStoresOnlyOverrides` 기대 맵 2곳에 빈 줄 + `ResourceOrganization: {ActionRead: false, ActionWrite: false}` (등록된 리소스 전체를 열거하는 테스트; 빈 줄로 gofmt 정렬 분리) | service/authz/resources_organization.go |
+| O3 조직 충전 | controller/topup.go:266, 278 | `rejectInvalidCreditedQuota`·`rejectInvalidTopUpQuota`의 `model.ValidateTopUpQuotaCapacity(userId, …)` → `validateTopUpTargetCapacity(c, userId, …)` (조직 주문은 조직 지갑 상한으로 검사) | controller/topup_target.go |
+| O3 조직 충전 | controller/topup.go:351-352 | `RequestEpay` `&model.TopUp{`에 `TargetType: getTopUpTargetType(c)`, `TargetId: getTopUpTargetId(c)` 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup_stripe.go:121-122 | Stripe `RequestPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup_creem.go:119-120 | Creem `RequestPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup_waffo.go:226-227 | `RequestWaffoPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup_waffo_pancake.go:383-384 | `RequestWaffoPancakePay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup_paypal.go:345-346 | `RequestPayPalPay` `&model.TopUp{`에 같은 2줄 (fork O2 파일) | controller/topup_target.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

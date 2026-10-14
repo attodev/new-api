@@ -342,6 +342,8 @@ func RequestPayPalPay(c *gin.Context) {
 
 	topUp := &model.TopUp{
 		UserId:          id,
+		TargetType:      getTopUpTargetType(c), // fork: O3
+		TargetId:        getTopUpTargetId(c),   // fork: O3
 		Amount:          req.Amount,
 		Money:           chargedMoney,
 		TradeNo:         referenceId,

@@ -380,6 +380,8 @@ func RequestWaffoPancakePay(c *gin.Context) {
 	tradeNo := fmt.Sprintf("WAFFO_PANCAKE-%d-%d-%s", id, time.Now().UnixMilli(), randstr.String(6))
 	topUp := &model.TopUp{
 		UserId:          id,
+		TargetType:      getTopUpTargetType(c), // fork: O3
+		TargetId:        getTopUpTargetId(c),   // fork: O3
 		Amount:          normalizeWaffoPancakeTopUpAmount(req.Amount),
 		Money:           payMoney,
 		TradeNo:         tradeNo,
