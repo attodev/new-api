@@ -25,6 +25,12 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O2 PayPal | controller/topup.go:122 | data map `"paypal_min_topup"` | controller/payment_availability_paypal.go |
 | O2 PayPal | router/access_token_scope_test.go | exempt 목록에 `"GET /api/paypal/capture"`, `"POST /api/paypal/webhook"` 2줄 | router/fork-router.go, controller/topup_paypal.go |
 | O2 PayPal | middleware/access_token_routes.go (레지스트리) | 없음 — `POST /api/user/paypal/pay`(wallet:write), `POST /api/user/paypal/amount`(wallet:read)를 fork 레지스트리에 선언 | middleware/fork_access_token_routes.go |
+| O1 랜딩·가이드 | router/web-router.go:20-21 | `WebAssets.LandingPublicFS` / `LandingTemplatesFS` 필드 (`fs.FS`, `io/fs` import) | router/landing-router.go, web/landing/{templates,public} |
+| O1 랜딩·가이드 | router/web-router.go:27 | `registerLandingRoutes(router, assets, compress, middleware.GlobalWebRateLimit(frontendFS))` | router/landing-router.go |
+| O1 랜딩·가이드 | router/web-router.go:39 | NoRoute 체인 `landingStatic(assets),` (AccessTokenAudit 다음, GlobalWebRateLimit 앞) | router/landing-router.go |
+| O1 랜딩·가이드 | main.go:50-54 | `//go:embed web/landing/public`, `//go:embed web/landing/templates` 변수 2개 | web/landing/{public,templates} |
+| O1 랜딩·가이드 | main.go:214 | `router.WebAssets{...}`에 `LandingPublicFS`, `LandingTemplatesFS` 필드 | router/landing-router.go |
+| O1 랜딩·가이드 | web/public/favicon.ico, web/public/logo.png | 브랜드 파일 2개를 web/landing/public 것으로 교체 | web/landing/public/favicon.ico, web/landing/public/logo.png |
 
 ## 빌드·테스트 전제
 - `web/dist/index.html`이 있어야 루트 패키지가 빌드된다 (`cd web && bun run build`).

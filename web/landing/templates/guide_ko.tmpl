@@ -1,0 +1,438 @@
+{{define "guide_ko"}}
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{template "google_analytics" .}}
+    <title>AlRouter(알라우터) — AI API 통합 게이트웨이</title>
+    <link rel="canonical" href="https://alrouter.ai/guide" />
+    <link rel="alternate" hreflang="ko" href="https://alrouter.ai/guide" />
+    <link rel="alternate" hreflang="en" href="https://alrouter.ai/en/guide" />
+    <link rel="alternate" hreflang="x-default" href="https://alrouter.ai/guide" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <script>
+      (function loadLucide(retriesLeft) {
+        var s = document.createElement('script');
+        s.src = '/lucide.min.js';
+        s.onload = function () {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+          }
+        };
+        s.onerror = function () {
+          if (retriesLeft > 0) {
+            setTimeout(function () { loadLucide(retriesLeft - 1); }, 600);
+          }
+        };
+        document.head.appendChild(s);
+      })(3);
+    </script>
+    <link rel="stylesheet" href="/landing.css?v=20260716-interaction-a11y" />
+    <link rel="stylesheet" href="/guide.css" />
+  </head>
+  <body>
+    {{template "header_ko" .}}
+    <!-- ── 본문 ── -->
+    <div class="guide-wrap">
+      <div class="guide-head">
+        <span class="guide-eyebrow">사용 가이드</span>
+        <h1>AlRouter를 CLI에서 연결하는 방법</h1>
+        <p>환경변수를 직접 등록하거나, CC Switch로 한 번에 등록할 수 있습니다.</p>
+        <p>영상을 참고하거나, 영상 하단의 단계별 설명을 따라해 보세요.</p>
+      </div>
+
+      <!-- 그룹 선택 -->
+      <div class="guide-group-picker" role="tablist">
+        <button class="guide-group-btn" data-group="manual" aria-selected="true" role="tab"><i data-lucide="terminal"></i>환경변수 직접 설정</button>
+        <button class="guide-group-btn" data-group="ccswitch" aria-selected="false" role="tab"><i data-lucide="wand-2"></i>CC Switch로 한 번에 설정</button>
+      </div>
+
+      <!-- ══════════ 그룹: 수동 설정 ══════════ -->
+      <div class="guide-group active" id="guide-group-manual">
+        <section class="guide-panel active" id="guide-panel-manual">
+          <div class="guide-video-frame">
+            <video id="guideVideo" controls playsinline preload="metadata" aria-label="환경변수 직접 설정 가이드 영상" poster="/videos/guide/guide-manual-anthropic-poster.png">
+              <source src="/videos/guide/guide-manual-anthropic.mp4" type="video/mp4" />
+            </video>
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlay" data-label-start="영상 재생" data-label-resume="영상 계속 재생" aria-label="영상 재생">
+              <div class="anim-play-btn">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="6,3 20,12 6,21" />
+                </svg>
+              </div>
+            </button>
+            <div class="guide-end-controls" id="guideEndControls" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-4" />
+                </svg>
+                다시 보기
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-divider">영상이 잘 안 보이시나요? 아래 글로도 따라 하실 수 있습니다</div>
+
+          <div class="guide-written">
+            <h3>단계별로 따라 하기</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>AlRouter 로그인</h4></div>
+                  <p>API 키를 발급하기 전에 AlRouter 계정으로 로그인합니다.</p>
+                  <figure class="guide-step-shot-fig guide-step-shot-fig--login">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-1-login-ko.png" alt="AlRouter 로그인 화면" />
+                    <figcaption>1-1. AlRouter 로그인</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>API 키 발급</h4></div>
+                  <p>대시보드 'API 키' 메뉴로 이동해 새로운 API 키를 생성하고, 생성된 키를 복사합니다.<br>이 키 하나로 이후 모든 설정에 사용합니다.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-create-ko.png" alt="API 키 생성 화면" />
+                      <figcaption>2-1. API 키 생성</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-copy-ko.png" alt="생성된 API 키 복사 화면" />
+                      <figcaption>2-2. 생성된 키 복사</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>환경변수 등록</h4></div>
+                  <p>사용 중인 CLI에 맞는 환경변수를 셸 설정 파일에 추가하고 적용합니다.</p>
+                  <p class="guide-aside">셸 설정 파일은 터미널을 열 때마다 자동으로 실행되는 설정 파일입니다 (zsh는 <span class="mono">~/.zshrc</span>, bash는 <span class="mono">~/.bash_profile</span> 또는 <span class="mono">~/.bashrc</span>).<br>여기에 환경변수를 추가해두면 새로 여는 터미널마다 매번 다시 입력할 필요 없이 자동으로 적용됩니다.</p>
+
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">1</span>셸 설정 파일에 환경변수 추가</div>
+                    <div class="guide-substep-body">
+                      <div class="guide-pitfall"><b>주의</b><p>아래 예시의 키 값 대신, 실제로 발급받은 키 값을 입력해 주세요.</p></div>
+
+                      <div class="guide-provider-table">
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#d97757">Anthropic</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> ANTHROPIC_BASE_URL=<span class="c2">"https://alrouter.ai"</span>
+<span class="c1">export</span> ANTHROPIC_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#4285f4">Google</span>
+                          <div class="guide-term">
+                            <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> GOOGLE_GEMINI_BASE_URL=<span class="c2">"https://alrouter.ai/v1beta"</span>
+<span class="c1">export</span> GEMINI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                          </div>
+                        </div>
+                        <div class="guide-provider-row">
+                          <span class="guide-provider-name" style="color:#10a37f">OpenAI</span>
+                          <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:10px">
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.zshrc</span></div>
+<pre><span class="c1">export</span> OPENAI_API_KEY=<span class="c2">"sk-발급받은키"</span></pre>
+                            </div>
+                            <p style="margin:0; font-size:13px; color:#c9d6ea"><b style="color:#10a37f">Codex</b> — Codex CLI는 Base URL을 환경변수가 아닌 별도의 설정 파일에서 관리합니다.<br>API 키는 그대로 두고, 아래 값을 <span class="mono">~/.codex/config.toml</span>에 추가하세요.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>openai_base_url = <span class="c2">"https://alrouter.ai/v1"</span></pre>
+                            </div>
+                            <p class="guide-aside">위 설정 추가 후 Codex 사용 시 "Falling back from WebSockets to HTTPS" 경고가 뜰 수 있습니다.<br>동작에는 지장이 없으나, 경고 메시지 노출을 원치 않으실 경우 아래 내용을 추가하세요.</p>
+                            <div class="guide-term" style="margin-top:0">
+                              <div class="guide-term-bar"><i></i><i></i><i></i><span class="fname">~/.codex/config.toml</span></div>
+<pre>[features]
+responses_websockets_v2 = false</pre>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <figure class="guide-step-shot-fig">
+                        <img class="guide-step-shot" src="/images/guide/manual/step-3-env-edit-ko.png" alt="셸 설정 파일에 환경변수를 추가하는 화면" />
+                        <figcaption>3-1. 셸 설정 파일에 환경변수 추가</figcaption>
+                      </figure>
+                    </div>
+                  </div>
+
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">2</span>변경한 설정 적용</div>
+                    <div class="guide-substep-body">
+                      <p class="guide-substep-desc">터미널을 새로 열거나, 아래 명령어로 지금 열려 있는 터미널에 바로 적용할 수 있습니다.</p>
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ source ~/.zshrc</pre>
+                      </div>
+                      <figure class="guide-step-shot-fig">
+                        <img class="guide-step-shot" src="/images/guide/manual/step-3-env-apply.png" alt="설정을 적용한 터미널 화면" />
+                        <figcaption>3-2. 변경한 설정 적용</figcaption>
+                      </figure>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>연결 확인</h4></div>
+                  <p>새 터미널에서 claude를 실행한 뒤, <span class="mono mono-cmd">/status</span>로 AlRouter 연결을 확인합니다.<br>base URL 항목에 alrouter.ai가 표시되면 정상입니다.</p>
+                  <div class="guide-pitfall"><b>주의</b><p>환경변수는 새로 여는 터미널부터 적용됩니다. 등록 전에 열려 있던 터미널이면 새 창에서 실행하세요.</p></div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/manual/step-4-status.png" alt="/status 연결 확인 화면" />
+                    <figcaption>4-1. /status 연결 확인</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>테스트</h4></div>
+                  <p>간단한 프롬프트를 입력해 정상적으로 연결됐는지 확인합니다.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; 연동 테스트입니다. "Claude Code 연결 성공"이라고만 답해주세요.</span>
+<span class="cm">Claude Code 연결 성공</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/manual/step-5-test-ko.png" alt="테스트 프롬프트 응답 화면" />
+                    <figcaption>5-1. 테스트 프롬프트 응답</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">6</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>사용량 확인</h4></div>
+                  <p>모든 요청은 '사용 로그' 메뉴에서 키별로 토큰과 비용까지 확인할 수 있습니다.<br>'개요'나 '대시보드' 화면에서는 차트로 사용량 추이를 한눈에 볼 수도 있습니다.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-usage-log-ko.png" alt="사용 로그 화면" />
+                      <figcaption>6-1. 사용 로그</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-dashboard-ko.png" alt="대시보드 차트 화면" />
+                      <figcaption>6-2. 대시보드 차트</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════ 그룹: CC Switch ══════════ -->
+      <div class="guide-group" id="guide-group-ccswitch">
+        <section class="guide-panel active" id="guide-panel-ccswitch">
+          <div class="guide-video-frame">
+            <video id="guideVideoCc" controls playsinline preload="metadata" aria-label="CC Switch 설정 가이드 영상" poster="/videos/guide/guide-cc-anthropic-poster.png">
+              <source src="/videos/guide/guide-cc-anthropic.mp4" type="video/mp4" />
+            </video>
+            <button type="button" class="anim-play-overlay guide-play-overlay" id="guidePlayOverlayCc" data-label-start="영상 재생" data-label-resume="영상 계속 재생" aria-label="영상 재생">
+              <div class="anim-play-btn">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                  <polygon points="6,3 20,12 6,21" />
+                </svg>
+              </div>
+            </button>
+            <div class="guide-end-controls" id="guideEndControlsCc" style="display: none">
+              <button type="button" class="anim-end-btn anim-end-replay" id="guideReplayBtnCc">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-4" />
+                </svg>
+                다시 보기
+              </button>
+            </div>
+          </div>
+
+          <div class="guide-divider">영상이 잘 안 보이시나요? 아래 글로도 따라 하실 수 있습니다</div>
+
+          <div class="guide-written">
+            <h3>단계별로 따라 하기</h3>
+            <div class="guide-step-track">
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">0</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>CC Switch 설치</h4></div>
+                  <p>이미 설치되어 있다면 이 단계는 건너뛰어도 됩니다.</p>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">1</span>macOS · Homebrew (권장)</div>
+                    <div class="guide-substep-body">
+                      <div class="guide-term">
+                        <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ brew tap farion1231/ccswitch
+$ brew install --cask cc-switch</pre>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="guide-substep">
+                    <div class="guide-substep-head"><span class="guide-substep-num">2</span>macOS / Windows · GitHub Releases</div>
+                    <div class="guide-substep-body">
+                      <p class="guide-substep-desc">운영체제에 맞는 설치 파일을 다운로드해 실행합니다.</p>
+                      <a class="guide-gh-link" href="https://github.com/farion1231/cc-switch/releases" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+                        <span>GitHub Releases에서 다운로드</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">1</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>AlRouter 로그인</h4></div>
+                  <p>API 키를 발급하기 전에 AlRouter 계정으로 로그인합니다.</p>
+                  <figure class="guide-step-shot-fig guide-step-shot-fig--login">
+                    <img class="guide-step-shot" src="/images/guide/shared/step-1-login-ko.png" alt="AlRouter 로그인 화면" />
+                    <figcaption>1-1. AlRouter 로그인</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">2</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>API 키 발급</h4></div>
+                  <p>대시보드 'API 키' 메뉴로 이동해 새로운 API 키를 생성하고, 생성된 키를 복사합니다.<br>이 키 하나로 이후 모든 설정에 사용합니다.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-create-ko.png" alt="API 키 생성 화면" />
+                      <figcaption>2-1. API 키 생성</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-2-api-key-copy-ko.png" alt="생성된 API 키 복사 화면" />
+                      <figcaption>2-2. 생성된 키 복사</figcaption>
+                    </figure>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">3</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>CC Switch에 자동 등록</h4></div>
+                  <p>API 키의 더보기 메뉴에서 "CC Switch"를 선택하고, 프로바이더와 기본 모델을 입력하면 CC Switch가 열립니다.<br>내용을 확인하고 "Import"를 클릭하면 등록이 완료됩니다.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-input-ko.png" alt="CC Switch 입력 창" />
+                      <figcaption>3-1. 프로바이더·기본 모델 입력</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-import-review.png" alt="CC Switch Import 확인 화면" />
+                      <figcaption>3-2. 내용 확인</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/cc-switch/step-3-import-success.png" alt="CC Switch Import 완료 화면" />
+                      <figcaption>3-3. Import 완료</figcaption>
+                    </figure>
+                  </div>
+                  <div class="guide-note">
+                    <span class="mark">TIP</span>
+                    <p>CC Switch 목록에서 선택만 바꾸면, 언제든 다시 공식 프로바이더로 손쉽게 전환할 수 있습니다.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">4</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>연결 확인</h4></div>
+                  <p>Claude Code를 재시작한 후, <span class="mono mono-cmd">/status</span>로 AlRouter 연결을 확인합니다.<br>Anthropic base URL에 alrouter.ai가 표시되면 정상입니다.</p>
+                  <div class="guide-pitfall"><b>주의</b><p>환경 설정은 재시작 후부터 적용됩니다. 등록 전에 열려 있던 세션이면 완전히 종료 후 새로 실행하세요.</p></div>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+&gt; /status
+<span class="cm">Anthropic base URL: https://alrouter.ai</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/cc-switch/step-4-status.png" alt="/status 연결 확인 화면" />
+                    <figcaption>4-1. /status 연결 확인</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">5</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>테스트</h4></div>
+                  <p>간단한 프롬프트를 입력해 정상적으로 연결됐는지 확인합니다.</p>
+                  <div class="guide-term">
+                    <div class="guide-term-bar"><i></i><i></i><i></i></div>
+<pre>$ claude
+<span class="c3">&gt; 연동 테스트입니다. "Claude Code 연결 성공"이라고만 답해주세요.</span>
+<span class="cm">Claude Code 연결 성공</span></pre>
+                  </div>
+                  <figure class="guide-step-shot-fig">
+                    <img class="guide-step-shot" src="/images/guide/cc-switch/step-5-test-ko.png" alt="테스트 프롬프트 응답 화면" />
+                    <figcaption>5-1. 테스트 프롬프트 응답</figcaption>
+                  </figure>
+                </div>
+              </div>
+
+              <div class="guide-step">
+                <div class="guide-step-num-wrap"><span class="guide-step-num" style="color:#d97757">6</span></div>
+                <div class="guide-step-body">
+                  <div class="guide-step-top"><h4>사용량 확인</h4></div>
+                  <p>모든 요청은 '사용 로그' 메뉴에서 키별로 토큰과 비용까지 확인할 수 있습니다.<br>'개요'나 '대시보드' 화면에서는 차트로 사용량 추이를 한눈에 볼 수도 있습니다.</p>
+                  <div class="guide-step-shot-row">
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-usage-log-ko.png" alt="사용 로그 화면" />
+                      <figcaption>6-1. 사용 로그</figcaption>
+                    </figure>
+                    <figure class="guide-step-shot-fig">
+                      <img class="guide-step-shot" src="/images/guide/shared/step-6-dashboard-ko.png" alt="대시보드 차트 화면" />
+                      <figcaption>6-2. 대시보드 차트</figcaption>
+                    </figure>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    {{template "footer_ko" .}}
+
+    <!-- 스크린샷 확대 보기 -->
+    <div class="shot-lightbox" id="shotLightbox">
+      <button class="shot-lightbox-close" id="shotLightboxClose" aria-label="닫기">✕</button>
+      <button class="shot-lightbox-nav shot-lightbox-prev" id="shotLightboxPrev" aria-label="이전 이미지">‹</button>
+      <div class="shot-lightbox-body">
+        <div class="shot-lightbox-img-wrap">
+          <img class="shot-lightbox-img" id="shotLightboxImg" src="" alt="" />
+        </div>
+        <div class="shot-lightbox-caption" id="shotLightboxCaption"></div>
+        <div class="shot-lightbox-dots" id="shotLightboxDots"></div>
+      </div>
+      <button class="shot-lightbox-nav shot-lightbox-next" id="shotLightboxNext" aria-label="다음 이미지">›</button>
+    </div>
+
+    <script src="/popup.js?v=20260716-interaction-a11y" defer></script>
+    <script src="/guide.js?v=20260715-video-controls" defer></script>
+    <script src="https://chatbot.alrouter.ai/widget.js" data-api-base="https://chatbot.alrouter.ai"></script>
+  </body>
+</html>
+{{end}}

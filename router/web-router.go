@@ -2,6 +2,7 @@ package router
 
 import (
 	"embed"
+	"io/fs"
 	"net/http"
 	"strings"
 
@@ -14,13 +15,16 @@ import (
 
 // WebAssets holds the embedded dashboard frontend assets.
 type WebAssets struct {
-	BuildFS   embed.FS
-	IndexPage []byte
+	BuildFS            embed.FS
+	IndexPage          []byte
+	LandingPublicFS    fs.FS // fork: O1 web/landing/public
+	LandingTemplatesFS fs.FS // fork: O1 web/landing/templates
 }
 
 func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.HandlerFunc) {
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
 	compress := gzip.Gzip(gzip.DefaultCompression)
+	registerLandingRoutes(router, assets, compress, middleware.GlobalWebRateLimit(frontendFS)) // fork: O1
 
 	router.NoRoute(
 		pluginDispatcher,
@@ -32,6 +36,7 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 			}
 		},
 		middleware.AccessTokenAudit(),
+		landingStatic(assets), // fork: O1
 		middleware.GlobalWebRateLimit(frontendFS),
 		middleware.Cache(),
 		middleware.ServeFrontendFiles(frontendFS),
