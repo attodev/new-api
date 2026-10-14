@@ -126,6 +126,13 @@ export function getPaymentIcon(
           style={{ color: PAYMENT_ICON_COLORS[PAYMENT_TYPES.CREEM] }}
         />
       )
+    case PAYMENT_TYPES.PAYPAL: // fork: O2
+      return (
+        <CreditCard
+          className={className}
+          style={{ color: PAYMENT_ICON_COLORS[PAYMENT_TYPES.PAYPAL] }}
+        />
+      )
     case PAYMENT_TYPES.WAFFO:
       return (
         <CreditCard

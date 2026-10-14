@@ -19,7 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
+import { OrganizationMemberWalletSummary } from '@/features/organizations/components/organization-member-wallet-summary' // fork: O3
+import { OrganizationWallet } from '@/features/organizations/components/organization-wallet' // fork: O3
+import { pickWalletView } from '@/features/organizations/lib/wallet-view' // fork: O3
 import { Wallet } from '@/features/wallet'
+import { useAuthStore } from '@/stores/auth-store' // fork: O3
 
 const walletSearchSchema = z.object({
   show_history: z.boolean().optional(),
@@ -32,5 +36,14 @@ export const Route = createFileRoute('/_authenticated/wallet/')({
 
 function RouteComponent() {
   const { show_history } = Route.useSearch()
+  // fork: O3 — organization owner/member wallets (organizations/lib/wallet-view.ts)
+  const view = pickWalletView(useAuthStore((s) => s.auth.user))
+  if (view === 'organization_owner') {
+    return <OrganizationWallet initialShowHistory={show_history} />
+  }
+  if (view === 'organization_member') {
+    return <OrganizationMemberWalletSummary />
+  }
+  // fork: O3 end
   return <Wallet initialShowHistory={show_history} />
 }
