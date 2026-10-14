@@ -30,11 +30,24 @@ const backendPort = new URL(backendURL).port || '3000'
 const frontendPort = new URL(baseURL).port || '3001'
 
 // A backend started by Playwright uses a scratch SQLite file outside the repo
-// unless SQL_DSN or SQLITE_PATH is already set. The pragmas mirror the
-// backend's default common.SQLitePath.
+// unless SQLITE_PATH is set (or SQL_DSN with E2E_ALLOW_EXTERNAL_DB=1). The
+// pragmas mirror the backend's default common.SQLitePath.
 const sqlitePath =
   process.env.SQLITE_PATH ||
   `${path.join(os.tmpdir(), 'new-api-e2e.db')}?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_txlock=immediate`
+
+// The suite creates and deletes users, so the backend never inherits an
+// external database or Redis unless E2E_ALLOW_EXTERNAL_DB=1 opts in.
+// Playwright merges process.env under webServer.env, so dropping the keys is
+// not enough: blank them (the backend treats an empty value as unset).
+const externalDbEnv =
+  process.env.E2E_ALLOW_EXTERNAL_DB === '1'
+    ? {}
+    : { SQL_DSN: '', LOG_SQL_DSN: '', REDIS_CONN_STRING: '' }
+
+// Start fresh servers on the configured ports unless E2E_REUSE_SERVER=1 asks
+// to reuse ones that are already running.
+const reuseExistingServer = process.env.E2E_REUSE_SERVER === '1'
 
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
 
@@ -61,13 +74,14 @@ export default defineConfig({
       cwd: path.resolve(__dirname, '..'),
       env: {
         ...process.env,
+        ...externalDbEnv,
         SQLITE_PATH: sqlitePath,
         CRITICAL_RATE_LIMIT_ENABLE: 'false',
         GLOBAL_WEB_RATE_LIMIT_ENABLE: 'false',
         GLOBAL_API_RATE_LIMIT_ENABLE: 'false',
       },
       url: backendURL,
-      reuseExistingServer: true,
+      reuseExistingServer,
       timeout: 180_000,
     },
     {
@@ -78,7 +92,7 @@ export default defineConfig({
         VITE_REACT_APP_SERVER_URL: backendURL,
       },
       url: baseURL,
-      reuseExistingServer: true,
+      reuseExistingServer,
       timeout: 120_000,
     },
   ],

@@ -99,6 +99,10 @@ async function openAuthenticatedPage(page: Page, path = '/dashboard') {
     // /sign-in: sign in through the UI again to re-establish the session.
     await signInWithUi(page, creds.username, creds.password)
   }
+  // Sign-in lands on /dashboard; end on the requested path even when the
+  // last attempt had to sign in again.
+  await page.goto(path)
+  await page.waitForLoadState('networkidle').catch(() => {})
   return page
 }
 

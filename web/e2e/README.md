@@ -15,9 +15,9 @@ bun run e2e:install   # Playwright Chromium (최초 1회)
 E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=12345678 bun run e2e
 ```
 
-`playwright.config.ts`의 `webServer`가 두 서버를 띄운다(이미 떠 있으면 재사용, `reuseExistingServer: true`).
+`playwright.config.ts`의 `webServer`가 두 서버를 새로 띄운다. 이미 떠 있는 서버를 재사용하려면 `E2E_REUSE_SERVER=1`을 준다(기본은 재사용하지 않으므로 3100/3101 포트가 비어 있어야 한다).
 
-- 백엔드: 저장소 루트에서 `go run . --port 3100` (rate limit 3종 비활성화). `SQL_DSN`·`SQLITE_PATH`가 없으면 SQLite 파일 `$TMPDIR/new-api-e2e.db`를 쓴다(저장소 밖).
+- 백엔드: 저장소 루트에서 `go run . --port 3100` (rate limit 3종 비활성화). `SQLITE_PATH`가 없으면 SQLite 파일 `$TMPDIR/new-api-e2e.db`를 쓴다(저장소 밖). 테스트가 사용자를 만들고 지우므로, 상속된 `SQL_DSN`·`LOG_SQL_DSN`·`REDIS_CONN_STRING`은 `E2E_ALLOW_EXTERNAL_DB=1`이 아니면 백엔드 env에서 빈 값으로 덮어쓴다(Playwright가 `process.env`를 항상 합치므로).
 - 프런트엔드: `web/`에서 `bun run dev -- --host 127.0.0.1 --port 3101 --strict-port` (rsbuild). `VITE_REACT_APP_SERVER_URL`을 백엔드 URL로 넘겨 `/api` 프록시 대상을 맞춘다.
 
 빈 DB에는 root 계정이 없으므로 **최초 1회 `POST /api/setup`** 으로 root를 만들어야 한다. upstream 비밀번호 정책은 8–128자이므로 `123456` 같은 6자리 비밀번호는 setup에서 거부된다.
@@ -41,7 +41,7 @@ curl -s -X POST http://127.0.0.1:3100/api/setup \
 
 # 3) 테스트 실행 (root/12345678은 E2E_ADMIN_* 기본값과 일치). 떠 있는 백엔드를 재사용한다.
 cd web
-bun run e2e
+E2E_REUSE_SERVER=1 bun run e2e
 ```
 
 > setup만 끝낸 뒤 백엔드를 내리고 `bun run e2e`를 실행해도 된다. 그러면 webServer가 같은 `$TMPDIR/new-api-e2e.db`로 `go run .`을 띄운다.
@@ -50,14 +50,16 @@ bun run e2e
 
 ## 환경 변수
 
-| 변수                                  | 기본값                     | 설명                                                                      |
-| ------------------------------------- | -------------------------- | ------------------------------------------------------------------------- |
-| `E2E_ADMIN_USERNAME`                  | `root`                     | 루트 관리자 계정 (DB에 선존재해야 함)                                     |
-| `E2E_ADMIN_PASSWORD`                  | `12345678`                 | 공통 비밀번호 (생성되는 모든 계정에 재사용, 8–128자)                      |
-| `E2E_BACKEND_URL`                     | `http://127.0.0.1:3100`    | 백엔드 URL                                                                |
-| `E2E_BASE_URL`                        | `http://127.0.0.1:3101`    | 프런트엔드 URL (Playwright webServer)                                     |
-| `SQLITE_PATH`                         | `$TMPDIR/new-api-e2e.db?…` | Playwright가 띄우는 백엔드의 SQLite 경로 (`SQL_DSN`이 있으면 그쪽이 우선) |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | (없음)                     | 시스템 Chromium 경로. 없으면 Playwright 번들 Chromium                     |
+| 변수                                  | 기본값                     | 설명                                                                                                                            |
+| ------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_ADMIN_USERNAME`                  | `root`                     | 루트 관리자 계정 (DB에 선존재해야 함)                                                                                           |
+| `E2E_ADMIN_PASSWORD`                  | `12345678`                 | 공통 비밀번호 (생성되는 모든 계정에 재사용, 8–128자)                                                                            |
+| `E2E_BACKEND_URL`                     | `http://127.0.0.1:3100`    | 백엔드 URL                                                                                                                      |
+| `E2E_BASE_URL`                        | `http://127.0.0.1:3101`    | 프런트엔드 URL (Playwright webServer)                                                                                           |
+| `SQLITE_PATH`                         | `$TMPDIR/new-api-e2e.db?…` | Playwright가 띄우는 백엔드의 SQLite 경로 (`E2E_ALLOW_EXTERNAL_DB=1`과 `SQL_DSN`이 함께 있으면 그쪽이 우선)                      |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` | (없음)                     | 시스템 Chromium 경로. 없으면 Playwright 번들 Chromium                                                                           |
+| `E2E_REUSE_SERVER`                    | (없음)                     | `1`이면 이미 떠 있는 백엔드/프런트엔드 서버를 재사용. 기본은 3100/3101에 새로 띄운다                                            |
+| `E2E_ALLOW_EXTERNAL_DB`               | (없음)                     | `1`이면 상속된 `SQL_DSN`·`LOG_SQL_DSN`·`REDIS_CONN_STRING`을 백엔드에 넘긴다. 기본은 빈 값으로 덮어써 실제 DB를 건드리지 않는다 |
 
 ## 픽스처 구조
 
@@ -345,7 +347,7 @@ GLOBAL_API_RATE_LIMIT_ENABLE=false
 GLOBAL_WEB_RATE_LIMIT_ENABLE=false
 ```
 
-`playwright.config.ts`의 `webServer.env`에도 이미 설정되어 있으나, `reuseExistingServer: true`로 인해 이미 기동된 서버를 재사용할 경우 해당 서버의 환경 변수가 적용된다.
+`playwright.config.ts`의 `webServer.env`에도 이미 설정되어 있으나, `E2E_REUSE_SERVER=1`로 이미 기동된 서버를 재사용할 경우 해당 서버의 환경 변수가 적용된다.
 
 ### Chromium
 
