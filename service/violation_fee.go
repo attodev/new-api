@@ -128,6 +128,7 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 	}
 
 	model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, feeQuota)
+	UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, feeQuota) // fork: O3
 	model.UpdateChannelUsedQuota(relayInfo.ChannelId, feeQuota)
 
 	useTimeSeconds := time.Now().Unix() - relayInfo.StartTime.Unix()

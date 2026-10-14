@@ -193,9 +193,12 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other *model.LogOther) 
 	if relayInfo.UserSetting.BillingPreference != "" {
 		other.SetPublic("billing_preference", relayInfo.UserSetting.BillingPreference)
 	}
-	if relayInfo.BillingSource == "subscription" {
+	if relayInfo.BillingSource == "subscription" || isOrganizationSubscriptionSource(relayInfo.BillingSource) { // fork: O3
 		if relayInfo.SubscriptionId != 0 {
 			other.SetPublic("subscription_id", relayInfo.SubscriptionId)
+			if isOrganizationSubscriptionSource(relayInfo.BillingSource) { // fork: O3
+				other.SetPublic("organization_user_subscription_id", relayInfo.SubscriptionId)
+			}
 		}
 		if relayInfo.SubscriptionPreConsumed > 0 {
 			other.SetPublic("subscription_pre_consumed", relayInfo.SubscriptionPreConsumed)

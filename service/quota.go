@@ -232,6 +232,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 			relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
 	} else {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, quota) // fork: O3
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
@@ -371,6 +372,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 			relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, billingModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, quota) // fork: O3
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
@@ -438,7 +440,11 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int, sendEmail bool) (result postConsumeQuotaResult, err error) {
 
 	// 1) Consume from wallet quota OR subscription item
-	if relayInfo != nil && relayInfo.BillingSource == BillingSourceSubscription {
+	if handled, orgErr := postConsumeOrganizationQuota(relayInfo, quota); handled { // fork: O3
+		if orgErr != nil {
+			return result, orgErr
+		}
+	} else if relayInfo != nil && relayInfo.BillingSource == BillingSourceSubscription { // fork: O3
 		if relayInfo.SubscriptionId == 0 {
 			return result, errors.New("subscription id is missing")
 		}

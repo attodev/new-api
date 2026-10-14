@@ -63,6 +63,9 @@ func TestMain(m *testing.M) {
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
+	if err := model.MigrateForkOrganizationTables(db); err != nil { // fork: O3
+		panic("failed to migrate organization tables: " + err.Error())
+	}
 
 	os.Exit(m.Run())
 }
@@ -84,6 +87,10 @@ func truncate(t *testing.T) {
 		model.DB.Exec("DELETE FROM user_subscriptions")
 		model.DB.Exec("DELETE FROM system_task_locks")
 		model.DB.Exec("DELETE FROM system_tasks")
+		model.DB.Exec("DELETE FROM organizations")                                 // fork: O3
+		model.DB.Exec("DELETE FROM organization_subscription_plans")               // fork: O3
+		model.DB.Exec("DELETE FROM organization_user_subscriptions")               // fork: O3
+		model.DB.Exec("DELETE FROM organization_subscription_pre_consume_records") // fork: O3
 	})
 }
 

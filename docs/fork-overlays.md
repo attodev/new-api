@@ -60,6 +60,31 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 | model/task_cas_test.go:63,97 | TestMain AutoMigrate에 조직 모델 4개, `truncateTables`에 `organizations` | model/organization_quota_reserve_test.go |
 | O3 조직 | model/topup.go (Recharge/Stripe Recharge/ManualCompleteTopUp/RechargeCreem/RechargeWaffo/RechargeWaffoPancake) | `creditTopUpQuota`→`creditTopUpTarget(tx, topUp, …)`, `syncCreditUserQuotaCache`→`syncCreditTopUpCache(topUp, …)` 12줄(정산 6곳 × 2). `ManualCompleteTopUp`은 사후 sync가 `topUp`을 보도록 `var topUp *TopUp`을 클로저 밖으로 올림(선언 1줄 + 대입 1줄) | model/topup_target.go |
 | O3 조직 | model/topup_paypal.go | `RechargePayPal`의 `creditTopUpTarget`/`syncCreditTopUpCache` 2줄 | model/topup_target.go |
+| O3 조직 과금 | service/billing.go:17-18 | const 블록에 빈 줄 + `BillingSourceOrganizationSubscription = "organization_subscription"` (빈 줄로 gofmt 정렬 분리) | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing.go:83 | `SettleBilling` 알림 분기 조건에 `\|\| isOrganizationSubscriptionSource(relayInfo.BillingSource)` (조직 플랜도 구독 잔여량 알림) | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:80 | `Settle`의 `SubscriptionPostDelta` 조건에 `\|\| isOrganizationSubscriptionSource(s.funding.Source())` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:122 | `Refund` goroutine, 구독 extraReserved 환급 블록 뒤 `refundOrganizationExtraReserved(funding, subscriptionId, extraReserved)` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:151-153 | `needsRefundLocked`의 `return false` 앞 `if organizationFundingNeedsRefund(s.funding) { return true }` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:246 | `preConsume` 오류 매핑 조건에 `\|\| isOrganizationSubscriptionPreConsumeError(errMsg)` ("no active organization subscription"을 403 구독 부족으로) | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:294-295 | `reserveFunding` `default:` 앞 `case *OrganizationWalletFunding, *OrganizationSubscriptionFunding:` + `return reserveOrganizationFunding(s.funding, delta, s.lang)` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:313-314 | `rollbackFundingReserve` 마지막 case 뒤 같은 case + `rollbackOrganizationFundingReserve(s.funding, delta)` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:352-354 | `shouldTrust` `case BillingSourceWallet:` 첫 줄 `if _, ok := s.funding.(*OrganizationWalletFunding); ok { return false }` (조직 지갑은 신뢰 우회 없음) | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:362-363 | `shouldTrust` `case BillingSourceOrganizationSubscription:` + `return false` | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:387 | `syncRelayInfo` 끝 `syncOrganizationRelayInfo(s.funding, info, s.extraReserved)` (BillingOrganizationId·조직 구독 필드) | service/billing_session_organization.go |
+| O3 조직 과금 | service/billing_session.go:401-403 | `NewBillingSession` `pref := …` 다음 `newOrganizationBillingSession(...)` 3줄 (조직 회원은 개인 과금 선호를 쓰지 않음) | service/billing_session_organization.go |
+| O3 조직 과금 | service/quota.go:443-447 | `postConsumeQuotaWithResult` 자금 분기 앞 `postConsumeOrganizationQuota` 4줄, 기존 `if relayInfo != nil && … BillingSourceSubscription {`가 `} else if …`로 바뀜 (gofmt가 `else`와 `if`를 한 줄로 합침) | service/billing_session_organization.go |
+| O3 조직 과금 | service/quota.go:235, 375 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, quota)` (2곳) | service/funding_source_organization.go |
+| O3 조직 과금 | service/text_quota.go:449 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, summary.Quota)` | service/funding_source_organization.go |
+| O3 조직 과금 | service/violation_fee.go:131 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, feeQuota)` | service/funding_source_organization.go |
+| O3 조직 과금 | service/task_billing.go:92 | `LogTaskConsumption` `UpdateUserUsedQuotaAndRequestCount` 뒤 `UpdateOrganizationUsedQuotaForUser(info.UserId, info.PriceData.Quota)` | service/funding_source_organization.go |
+| O3 조직 과금 | service/task_billing.go:118-120 | `taskAdjustFunding` 첫 줄 `if handled, err := taskAdjustOrganizationFunding(task, delta); handled { return err }` (제출 시 고정한 조직으로 정산·환급) | service/task_billing_organization.go, service/funding_source_organization.go |
+| O3 조직 과금 | service/task_billing.go:284 | `RefundTaskQuota` `UpdateUserUsedQuota(task.UserId, -quota)` 뒤 `taskAdjustOrganizationUsedQuota(task, -quota)` | service/task_billing_organization.go |
+| O3 조직 과금 | service/task_billing.go:352 | `RecalculateTaskQuota` `UpdateUserUsedQuota(task.UserId, quotaDelta)` 뒤 `taskAdjustOrganizationUsedQuota(task, quotaDelta)` | service/task_billing_organization.go |
+| O3 조직 과금 | service/log_info_generate.go:196 | 구독 로그 블록 조건에 `\|\| isOrganizationSubscriptionSource(relayInfo.BillingSource)` | service/billing_session_organization.go |
+| O3 조직 과금 | service/log_info_generate.go:199-201 | `subscription_id` 설정 뒤 조직 구독이면 `organization_user_subscription_id` 공개 필드 3줄 | service/billing_session_organization.go |
+| O3 조직 과금 | service/midjourney.go:50 | `PrepareMidjourneyTaskBilling` 구독 거부 조건에 `\|\| isOrganizationSubscriptionSource(relayInfo.BillingSource)` | service/billing_session_organization.go |
+| O3 조직 과금 | relay/mjproxy_handler.go:298, 678 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `service.UpdateOrganizationUsedQuotaForUser(…UserId, midjourneyTask.Quota)` (2곳) | service/funding_source_organization.go |
+| O3 조직 과금 | service/task_billing_test.go:66-68, 90-93 | TestMain AutoMigrate 뒤 `model.MigrateForkOrganizationTables(db)` 3줄, `truncate`에 조직 테이블 4개 `DELETE` 4줄 | service/organization_billing_test.go, service/funding_source_organization_test.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

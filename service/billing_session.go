@@ -77,7 +77,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		}
 	}
 	// 3) 更新 relayInfo 上的订阅 PostDelta（用于日志）
-	if s.funding.Source() == BillingSourceSubscription {
+	if s.funding.Source() == BillingSourceSubscription || isOrganizationSubscriptionSource(s.funding.Source()) { // fork: O3
 		s.relayInfo.SubscriptionPostDelta += int64(delta)
 	}
 	s.settled = true
@@ -119,6 +119,7 @@ func (s *BillingSession) Refund(c *gin.Context) {
 				common.SysLog(common.LogText("error refunding subscription extra reserved quota: %s", err.Error()))
 			}
 		}
+		refundOrganizationExtraReserved(funding, subscriptionId, extraReserved) // fork: O3
 		// 2) 退还令牌额度
 		if tokenConsumed > 0 && !isPlayground {
 			if err := model.IncreaseTokenQuota(tokenId, tokenKey, tokenConsumed); err != nil {
@@ -145,6 +146,9 @@ func (s *BillingSession) needsRefundLocked() bool {
 	}
 	// 订阅可能在 tokenConsumed=0 时仍预扣了额度
 	if sub, ok := s.funding.(*SubscriptionFunding); ok && sub.preConsumed > 0 {
+		return true
+	}
+	if organizationFundingNeedsRefund(s.funding) { // fork: O3
 		return true
 	}
 	return false
@@ -239,7 +243,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "subscription quota insufficient") {
+		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "subscription quota insufficient") || isOrganizationSubscriptionPreConsumeError(errMsg) { // fork: O3
 			return types.NewErrorWithStatusCode(errors.New(i18n.T(c, i18n.MsgQuotaSubscriptionInsufficient, map[string]any{"Error": errMsg})), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
@@ -287,6 +291,8 @@ func (s *BillingSession) reserveFunding(delta int, requireAvailableQuota bool) e
 			)
 		}
 		return nil
+	case *OrganizationWalletFunding, *OrganizationSubscriptionFunding: // fork: O3
+		return reserveOrganizationFunding(s.funding, delta, s.lang)
 	default:
 		return types.NewError(fmt.Errorf("unsupported funding source: %s", s.funding.Source()), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 	}
@@ -304,6 +310,8 @@ func (s *BillingSession) rollbackFundingReserve(delta int) {
 		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta)); err != nil {
 			common.SysLog(common.LogText("error rolling back subscription funding reserve: %s", err.Error()))
 		}
+	case *OrganizationWalletFunding, *OrganizationSubscriptionFunding: // fork: O3
+		rollbackOrganizationFundingReserve(s.funding, delta)
 	}
 }
 
@@ -341,12 +349,17 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 
 	switch s.funding.Source() {
 	case BillingSourceWallet:
+		if _, ok := s.funding.(*OrganizationWalletFunding); ok { // fork: O3
+			return false
+		}
 		return float64(s.relayInfo.UserQuota) > trustQuota
 	case BillingSourceSubscription:
 		// 订阅不能启用信任旁路。原因：
 		// 1. PreConsumeUserSubscription 要求 amount>0 来创建预扣记录并锁定订阅
 		// 2. SubscriptionFunding.PreConsume 忽略参数，始终用 s.amount 预扣
 		// 3. 若信任旁路将 effectiveQuota 设为 0，会导致 preConsumedQuota 与实际订阅预扣不一致
+		return false
+	case BillingSourceOrganizationSubscription: // fork: O3
 		return false
 	default:
 		return false
@@ -371,6 +384,7 @@ func (s *BillingSession) syncRelayInfo() {
 		info.SubscriptionId = 0
 		info.SubscriptionPreConsumed = 0
 	}
+	syncOrganizationRelayInfo(s.funding, info, s.extraReserved) // fork: O3
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +398,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
+	if session, apiErr, handled := newOrganizationBillingSession(c, relayInfo, preConsumedQuota); handled { // fork: O3
+		return session, apiErr
+	}
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
