@@ -304,3 +304,60 @@ func TestSetImportedOrganizationMemberQuotaIsAbsolute(t *testing.T) {
 	require.NoError(t, model.SetOrganizationMemberQuota(21, 2, 900))
 	require.Equal(t, 500, getUserQuotaForBillingTest(t, 21))
 }
+
+// fork: O3 (spec §9 decision 6) — an unaffiliated user who still holds a
+// personal balance or an active subscription joins only after it is cleared;
+// the import reports that row and leaves the user out.
+func TestImportOrgUsersRefusesUnaffiliatedUserWithPersonalBalance(t *testing.T) {
+	truncate(t)
+	withDefaultQuotaPerUnit(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 31, "rich_31", 5000, 0, "")
+	seedOrganizationUser(t, 32, "subscriber_32", 0, 0, "")
+	seedOrganizationUser(t, 33, "cleared_33", 0, 0, "")
+	require.NoError(t, model.DB.Create(&model.UserSubscription{UserId: 32, Status: "active", EndTime: common.GetTimestamp() + 3600}).Error)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role"},
+		{"rich_31", model.OrganizationRoleMember},
+		{"subscriber_32", model.OrganizationRoleMember},
+		{"cleared_33", model.OrganizationRoleMember},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 2, "%v", result.Errors)
+	require.Contains(t, result.Errors[0], "line 2 (rich_31): failed to assign: user still has a personal balance or subscription")
+	require.Contains(t, result.Errors[1], "line 3 (subscriber_32): failed to assign: user still has a personal balance or subscription")
+	require.Equal(t, 1, result.Assigned)
+
+	for id, want := range map[int]int{31: 0, 32: 0, 33: 1} {
+		organizationId, err := model.GetUserOrganizationId(id)
+		require.NoError(t, err)
+		require.Equal(t, want, organizationId, "user %d", id)
+	}
+}
+
+// An account the import itself creates has no prior owner to consent: its
+// sign-up bonus (QuotaForNewUser) must not block the row.
+func TestImportOrgUsersAssignsNewUsersDespiteSignUpBonus(t *testing.T) {
+	truncate(t)
+	withDefaultQuotaPerUnit(t)
+	previous := common.QuotaForNewUser
+	common.QuotaForNewUser = 1234
+	t.Cleanup(func() { common.QuotaForNewUser = previous })
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "initial_password"},
+		{"bonus_new", model.OrganizationRoleMember, "password123"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Empty(t, result.Errors)
+	require.Equal(t, 1, result.Created)
+	var created model.User
+	require.NoError(t, model.DB.Where("username = ?", "bonus_new").First(&created).Error)
+	require.Equal(t, 1, created.OrganizationId)
+}

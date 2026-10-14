@@ -297,7 +297,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			continue
 		}
 
-		if err := model.AssignUserToOrganization(newUser.Id, organizationId, orgRole); err != nil {
+		if err := model.AssignCreatedUserToOrganization(newUser.Id, organizationId, orgRole); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set org membership: %v", lineNum, username, err))
 			continue
 		}

@@ -46,7 +46,7 @@ func setupOrgSecurityTest(t *testing.T) *orgSecurityFixture {
 		common.RedisEnabled = previousRedis
 		common.SetDatabaseTypes(previousMain, previousLog)
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.AuditLog{}, &model.TopUp{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.AuditLog{}, &model.TopUp{}, &model.UserSubscription{}))
 	require.NoError(t, model.MigrateForkOrganizationTables(db))
 
 	f := &orgSecurityFixture{db: db}
@@ -178,11 +178,14 @@ func TestOrganizationUserListsDoNotDiscloseSecrets(t *testing.T) {
 		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AffCode: "aff-free"}
 	require.NoError(t, f.db.Create(&outsider).Error)
 
-	for name, handler := range map[string]gin.HandlerFunc{
-		"list":       ListOrganizationUsers,
-		"assignable": ListAssignableOrganizationUsers,
+	for name, request := range map[string]struct {
+		handler gin.HandlerFunc
+		path    string
+	}{
+		"list":   {ListOrganizationUsers, "/?p=1&page_size=10"},
+		"lookup": {LookupOrganizationMember, "/?username=free_user"},
 	} {
-		res := orgSecurityRequest(handler, f.admin, http.MethodGet, "/?p=1&page_size=10", "")
+		res := orgSecurityRequest(request.handler, f.admin, http.MethodGet, request.path, "")
 		requireOrgSecurityResult(t, res, true, "")
 		body := res.Body.String()
 		require.Contains(t, body, `"username"`, name)

@@ -872,7 +872,7 @@ func TestOrganizationOwnerCanAssignMemberRole(t *testing.T) {
 	require.Equal(t, model.OrganizationRoleMember, reloaded.OrganizationRole)
 }
 
-func TestOrganizationOwnerCanListAssignableUsers(t *testing.T) {
+func TestOrganizationOwnerCanLookUpMembers(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	owner := model.User{Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner"}
 	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
@@ -885,21 +885,22 @@ func TestOrganizationOwnerCanListAssignableUsers(t *testing.T) {
 	require.NoError(t, model.DB.Create(&otherOrg).Error)
 	require.NoError(t, model.DB.Create(&globalAdmin).Error)
 
-	res := performOrganizationRequest(
-		ListAssignableOrganizationUsers,
-		owner,
-		http.MethodGet,
-		"/api/organization/assignable-users",
-		"",
-	)
-
-	require.Equal(t, http.StatusOK, res.Code)
-	body := res.Body.String()
-	require.NotContains(t, body, `"username":"owner"`)
-	require.Contains(t, body, `"username":"member"`)
-	require.Contains(t, body, `"username":"unassigned"`)
-	require.NotContains(t, body, `"username":"other"`)
-	require.NotContains(t, body, `"username":"global"`)
+	for username, found := range map[string]bool{"member": true, "unassigned": true, "other": false, "global": false} {
+		res := performOrganizationRequest(
+			LookupOrganizationMember,
+			owner,
+			http.MethodGet,
+			"/api/organization/users/lookup?username="+username,
+			"",
+		)
+		if found {
+			require.Equal(t, http.StatusOK, res.Code, username)
+			require.Contains(t, res.Body.String(), `"username":"`+username+`"`)
+		} else {
+			require.Equal(t, http.StatusNotFound, res.Code, username)
+			require.NotContains(t, res.Body.String(), `"username":"`+username+`"`)
+		}
+	}
 }
 
 func TestOrganizationOwnerCannotAssignSelf(t *testing.T) {
@@ -924,7 +925,7 @@ func TestOrganizationOwnerCannotAssignSelf(t *testing.T) {
 	require.Equal(t, model.OrganizationRoleOwner, reloaded.OrganizationRole)
 }
 
-func TestOrganizationAdminCanListAssignableUsers(t *testing.T) {
+func TestOrganizationAdminCanLookUpUnassignedUser(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
 	unassigned := model.User{Username: "unassigned", Password: "password", Role: common.RoleCommonUser, AffCode: "unassigned"}
@@ -932,10 +933,10 @@ func TestOrganizationAdminCanListAssignableUsers(t *testing.T) {
 	require.NoError(t, model.DB.Create(&unassigned).Error)
 
 	res := performOrganizationRequest(
-		ListAssignableOrganizationUsers,
+		LookupOrganizationMember,
 		admin,
 		http.MethodGet,
-		"/api/organization/assignable-users",
+		"/api/organization/users/lookup?username=unassigned",
 		"",
 	)
 
@@ -944,21 +945,24 @@ func TestOrganizationAdminCanListAssignableUsers(t *testing.T) {
 	require.Contains(t, res.Body.String(), `"username":"unassigned"`)
 }
 
-func TestOrganizationMemberCannotListAssignableUsers(t *testing.T) {
+func TestOrganizationMemberCannotLookUpUsers(t *testing.T) {
 	setupOrganizationControllerTestDB(t)
 	member := model.User{Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member"}
+	unassigned := model.User{Username: "unassigned", Password: "password", Role: common.RoleCommonUser, AffCode: "unassigned"}
 	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&unassigned).Error)
 
 	res := performOrganizationRequest(
-		ListAssignableOrganizationUsers,
+		LookupOrganizationMember,
 		member,
 		http.MethodGet,
-		"/api/organization/assignable-users",
+		"/api/organization/users/lookup?username=unassigned",
 		"",
 	)
 
 	require.Equal(t, http.StatusOK, res.Code)
 	require.Contains(t, res.Body.String(), `"success":false`)
+	require.NotContains(t, res.Body.String(), `"username":"unassigned"`)
 }
 
 func TestOrganizationAdminCanAssignMemberRole(t *testing.T) {

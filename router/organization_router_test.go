@@ -21,7 +21,7 @@ func TestOrganizationRoutesRegistered(t *testing.T) {
 		"GET /api/organizations/", "POST /api/organizations/", "PATCH /api/organizations/:id", "DELETE /api/organizations/:id",
 		"GET /api/organization/", "GET /api/organization/dashboard", "GET /api/organization/logs", "GET /api/organization/mj", "GET /api/organization/task",
 		"GET /api/organization/users", "GET /api/organization/users/export", "POST /api/organization/users/import",
-		"GET /api/organization/assignable-users", "GET /api/organization/users/:id", "PATCH /api/organization/users/:id",
+		"GET /api/organization/users/lookup", "GET /api/organization/users/:id", "PATCH /api/organization/users/:id",
 		"PUT /api/organization/users/:id/membership", "DELETE /api/organization/users/:id/membership",
 		"GET /api/organization/subscription/self", "GET /api/organization/subscription/plans", "POST /api/organization/subscription/plans",
 		"PATCH /api/organization/subscription/plans/:id", "DELETE /api/organization/subscription/plans/:id",
@@ -39,6 +39,8 @@ func TestOrganizationRoutesRegistered(t *testing.T) {
 	for _, gone := range []string{"POST /api/organization/toss/pay", "GET /api/organization/wallet/auto-recharge"} {
 		require.False(t, registered[gone], "excluded route %s is registered", gone)
 	}
+	require.True(t, registered["GET /api/organization/users/lookup"])
+	require.False(t, registered["GET /api/organization/assignable-users"], "the assignable-users listing was replaced by the exact lookup")
 	require.Equal(t, 38, len(registered)) // 4 platform + 34 member routes (team 46 minus Toss 2 and auto-recharge 6)
 	require.Equal(t, authz.Permission{Resource: "organization", Action: "write"}, authz.OrganizationWrite)
 	_ = http.MethodGet

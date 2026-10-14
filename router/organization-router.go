@@ -39,7 +39,7 @@ func registerForkOrganizationRoutes(apiRouter *gin.RouterGroup) {
 		organizationRoute.GET("/users", controller.ListOrganizationUsers)
 		organizationRoute.GET("/users/export", controller.ExportOrganizationUsers)
 		organizationRoute.POST("/users/import", controller.ImportOrganizationUsers)
-		organizationRoute.GET("/assignable-users", controller.ListAssignableOrganizationUsers)
+		organizationRoute.GET("/users/lookup", controller.LookupOrganizationMember)
 		organizationRoute.GET("/users/:id", controller.GetOrganizationUser)
 		organizationRoute.PATCH("/users/:id", controller.UpdateOrganizationUser)
 		organizationRoute.PUT("/users/:id/membership", controller.AssignOrganizationUser)

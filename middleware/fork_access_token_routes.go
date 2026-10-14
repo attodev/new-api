@@ -20,7 +20,7 @@ var forkAccessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/organization/users":                     accessTokenSessionRule,
 	"GET /api/organization/users/export":              accessTokenSessionRule,
 	"POST /api/organization/users/import":             accessTokenSessionRule,
-	"GET /api/organization/assignable-users":          accessTokenSessionRule,
+	"GET /api/organization/users/lookup":              accessTokenSessionRule,
 	"GET /api/organization/users/:id":                 accessTokenSessionRule,
 	"PATCH /api/organization/users/:id":               accessTokenSessionRule,
 	"PUT /api/organization/users/:id/membership":      accessTokenSessionRule,

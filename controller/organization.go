@@ -673,40 +673,6 @@ func ListOrganizationUsers(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
-func ListAssignableOrganizationUsers(c *gin.Context) {
-	actor, err := getOrganizationActor(c)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorT(c, "organization admin permission required")
-		return
-	}
-
-	pageInfo := common.GetPageQuery(c)
-	users := []organizationUserView{}
-	query := model.DB.Model(&model.User{}).
-		Where("role < ?", common.RoleAdminUser).
-		Where("id <> ?", actor.Id).
-		Where("organization_id = ? OR organization_id = 0", actor.OrganizationId).
-		Session(&gorm.Session{})
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if err := query.Select(organizationUserViewColumns).Order("id").Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&users).Error; err != nil {
-		common.ApiError(c, err)
-		return
-	}
-
-	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
-	common.ApiSuccess(c, pageInfo)
-}
-
 func GetOrganizationUser(c *gin.Context) {
 	actor, err := getOrganizationActor(c)
 	if err != nil {

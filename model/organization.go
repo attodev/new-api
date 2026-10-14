@@ -248,10 +248,28 @@ func CreateOrganization(name string, description string, ownerUserId int, quota 
 	return org, nil
 }
 
+// ErrOrganizationAssignHasPersonalBalance refuses to pull a user into an
+// organization while the user still owns personal value (spec §9 decision 6):
+// inside an organization users.quota becomes an allowance the organization
+// admins control, so joining must not hand them someone's own balance.
+var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has a personal balance or subscription; it must be cleared before joining an organization")
+
 // AssignUserToOrganization serializes membership changes on the user row.
 // Cross-organization transfers are deliberately rejected; they require a
-// separate owner/organization lifecycle.
+// separate owner/organization lifecycle. A user joining from outside must have
+// no personal balance and no active personal subscription.
 func AssignUserToOrganization(userID, organizationID int, organizationRole string) error {
+	return assignUserToOrganization(userID, organizationID, organizationRole, true)
+}
+
+// AssignCreatedUserToOrganization assigns an account the caller has just
+// created for the organization (Excel import). Nobody else owns its sign-up
+// bonus, so the personal-balance refusal does not apply.
+func AssignCreatedUserToOrganization(userID, organizationID int, organizationRole string) error {
+	return assignUserToOrganization(userID, organizationID, organizationRole, false)
+}
+
+func assignUserToOrganization(userID, organizationID int, organizationRole string, requireClearedBalance bool) error {
 	if userID <= 0 || organizationID <= 0 || !IsValidOrganizationRole(organizationRole) {
 		return errors.New("invalid organization assignment")
 	}
@@ -262,6 +280,18 @@ func AssignUserToOrganization(userID, organizationID int, organizationRole strin
 		}
 		if user.OrganizationId != 0 && user.OrganizationId != organizationID {
 			return errors.New("user belongs to another organization")
+		}
+		if requireClearedBalance && user.OrganizationId == 0 { // joining from outside: personal balance must be clear
+			if user.Quota > 0 {
+				return ErrOrganizationAssignHasPersonalBalance
+			}
+			active, err := hasActiveUserSubscriptionTx(tx, userID)
+			if err != nil {
+				return err
+			}
+			if active {
+				return ErrOrganizationAssignHasPersonalBalance
+			}
 		}
 		var organization Organization
 		if err := lockForUpdate(tx).Select("id", "status").Where("id = ?", organizationID).First(&organization).Error; err != nil {
@@ -284,6 +314,18 @@ func AssignUserToOrganization(userID, organizationID int, organizationRole strin
 		}
 		return nil
 	})
+}
+
+// hasActiveUserSubscriptionTx is HasActiveUserSubscription (model/subscription.go)
+// inside tx.
+func hasActiveUserSubscriptionTx(tx *gorm.DB, userID int) (bool, error) {
+	var count int64
+	if err := tx.Model(&UserSubscription{}).
+		Where("user_id = ? AND status = ? AND end_time > ?", userID, "active", common.GetTimestamp()).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func CanManageOrganizationTarget(actor User, target User) bool {
