@@ -125,7 +125,7 @@
 
 결과 줄의 `Add`를 누른다. 소유자는 그 전에 `member`/`admin`을 고를 수 있고, 관리자는 `member`로 추가한다.
 
-- 개인 잔액(quota)·추천 잔액(aff_quota)이 남았거나 활성 개인 구독이 있는 사용자는 `This user still has a personal balance or subscription`으로 거부된다. 잔액을 소진하거나 전체 관리자가 정리한 뒤 다시 추가한다. 초대·수락 절차는 없다.
+- 개인 잔액(quota)·추천 잔액(aff_quota)이 남았거나 활성 개인 구독, 결제 대기 중인 개인 충전·구독 주문이 있는 사용자는 `This user still has a personal balance, subscription or pending orders`으로 거부된다. 잔액을 소진하거나 전체 관리자가 정리한 뒤 다시 추가한다. 초대·수락 절차는 없다.
 - 추가 성공 시 해당 사용자는 선택한 역할(기본 `member`)로 조직에 추가된다.
 
 ### 4. 역할 변경 (필요한 경우, 소유자)
@@ -469,7 +469,7 @@ organization quota insufficient, remaining: ＄0.000000
 - 자기 자신을 바꾸려 했다 (`organization admins cannot modify their own membership`).
 - `owner` 역할을 부여하려 했다 (`ownership is assigned when the organization is created`).
 - 대상 사용자가 다른 조직에 속해 있다 (`user belongs to another organization`, 화면 조회는 `User not found`).
-- 대상 사용자에게 개인 잔액·추천 잔액·활성 개인 구독이 남아 있다 (`This user still has a personal balance or subscription`).
+- 대상 사용자에게 개인 잔액·추천 잔액·활성 개인 구독이나 결제 대기 중인 개인 주문이 남아 있다 (`This user still has a personal balance, subscription or pending orders`).
 - 조직 관리자 본인이 정지 상태다 (`organization membership is suspended`, HTTP 403).
 
 해결:

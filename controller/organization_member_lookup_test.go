@@ -122,7 +122,7 @@ func TestAssignRefusesUserWithAffiliateBalance(t *testing.T) {
 	require.NoError(t, f.db.Create(&affiliate).Error)
 
 	resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(affiliate.Id))
-	requireOrgSecurityResult(t, resp, false, "user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization")
+	requireOrgSecurityResult(t, resp, false, orgAssignPersonalBalanceMessage)
 	orgId, err := model.GetUserOrganizationId(affiliate.Id)
 	require.NoError(t, err)
 	require.Equal(t, 0, orgId)
@@ -148,4 +148,62 @@ func TestAssignAcceptsClearedUserAndKeepsRoleChangesForMembers(t *testing.T) {
 	resp = orgSecurityRequest(AssignOrganizationUser, f.owner, http.MethodPut, "/", `{"organization_role":"admin"}`, orgSecurityIdParam(f.member.Id))
 	requireOrgSecurityResult(t, resp, true, "")
 	require.Equal(t, model.OrganizationRoleAdmin, orgSecurityUser(t, f.db, f.member.Id).OrganizationRole)
+}
+
+const orgAssignPersonalBalanceMessage = "user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization"
+
+// A personal order opened before joining would settle into what has become an
+// organization allowance (review I2): a pending personal top-up refuses the
+// join; an organization-wallet order or a settled/expired one does not.
+func TestAssignRefusesUserWithPendingPersonalTopUp(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	payer := model.User{Username: "payer", AffCode: "aff-payer", Password: "12345678", Role: common.RoleCommonUser, Status: common.UserStatusEnabled}
+	require.NoError(t, f.db.Create(&payer).Error)
+	for i, targetType := range []string{model.TopUpTargetTypeUser, ""} {
+		order := model.TopUp{UserId: payer.Id, TradeNo: fmt.Sprintf("pending-personal-%d", i), Status: common.TopUpStatusPending,
+			TargetType: targetType, TargetId: payer.Id, CreateTime: time.Now().Unix()}
+		require.NoError(t, f.db.Create(&order).Error)
+		if targetType == "" { // the column default would otherwise write 'user'
+			require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", order.Id).Update("target_type", "").Error)
+		}
+
+		resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(payer.Id))
+		requireOrgSecurityResult(t, resp, false, orgAssignPersonalBalanceMessage)
+		orgId, err := model.GetUserOrganizationId(payer.Id)
+		require.NoError(t, err)
+		require.Equal(t, 0, orgId, "target_type %q", targetType)
+
+		require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", order.Id).Update("status", common.TopUpStatusExpired).Error)
+	}
+
+	// An order for an organization wallet is not personal money.
+	require.NoError(t, f.db.Create(&model.TopUp{UserId: payer.Id, TradeNo: "pending-org", Status: common.TopUpStatusPending,
+		TargetType: model.TopUpTargetTypeOrganization, TargetId: f.org.Id, CreateTime: time.Now().Unix()}).Error)
+	resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(payer.Id))
+	requireOrgSecurityResult(t, resp, true, "")
+	orgId, err := model.GetUserOrganizationId(payer.Id)
+	require.NoError(t, err)
+	require.Equal(t, f.org.Id, orgId)
+}
+
+func TestAssignRefusesUserWithPendingSubscriptionOrder(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	buyer := model.User{Username: "buyer", AffCode: "aff-buyer", Password: "12345678", Role: common.RoleCommonUser, Status: common.UserStatusEnabled}
+	require.NoError(t, f.db.Create(&buyer).Error)
+	order := model.SubscriptionOrder{UserId: buyer.Id, PlanId: 1, Money: 10, TradeNo: "pending-sub", Status: common.TopUpStatusPending}
+	require.NoError(t, order.Insert())
+
+	resp := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(buyer.Id))
+	requireOrgSecurityResult(t, resp, false, orgAssignPersonalBalanceMessage)
+	orgId, err := model.GetUserOrganizationId(buyer.Id)
+	require.NoError(t, err)
+	require.Equal(t, 0, orgId)
+
+	// Once the provider expires the checkout the user can join.
+	require.NoError(t, model.ExpireSubscriptionOrder("pending-sub", ""))
+	resp = orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(buyer.Id))
+	requireOrgSecurityResult(t, resp, true, "")
+	orgId, err = model.GetUserOrganizationId(buyer.Id)
+	require.NoError(t, err)
+	require.Equal(t, f.org.Id, orgId)
 }

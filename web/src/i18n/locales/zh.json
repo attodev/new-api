@@ -140,7 +140,7 @@
     "Gateway Overhead": "网关开销",
     "Look up user": "查找用户",
     "Username or email": "用户名或邮箱",
-    "This user still has a personal balance or subscription": "该用户仍有个人余额或订阅",
+    "This user still has a personal balance, subscription or pending orders": "该用户仍有个人余额、订阅或待支付订单",
     "New member role": "新成员角色",
     "Suspended": "已暂停",
     "Suspend": "暂停",

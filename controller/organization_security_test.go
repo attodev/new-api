@@ -46,7 +46,7 @@ func setupOrgSecurityTest(t *testing.T) *orgSecurityFixture {
 		common.RedisEnabled = previousRedis
 		common.SetDatabaseTypes(previousMain, previousLog)
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.AuditLog{}, &model.TopUp{}, &model.UserSubscription{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.AuditLog{}, &model.TopUp{}, &model.UserSubscription{}, &model.SubscriptionOrder{}))
 	require.NoError(t, model.MigrateForkOrganizationTables(db))
 
 	f := &orgSecurityFixture{db: db}

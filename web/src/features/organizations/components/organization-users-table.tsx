@@ -132,7 +132,7 @@ const ASSIGNABLE_ROLES: AssignableRole[] = [
 ]
 // Backend message key for model.ErrOrganizationAssignHasPersonalBalance.
 const PERSONAL_BALANCE_ASSIGN_ERROR =
-  'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization'
+  'user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization'
 const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 const PAGE_SIZE = 20
 
@@ -465,7 +465,11 @@ export function OrganizationUsersTable() {
         setLookupResult(undefined)
         await loadUsers()
       } else if (isPersonalBalanceAssignError(res)) {
-        toast.error(t('This user still has a personal balance or subscription'))
+        toast.error(
+          t(
+            'This user still has a personal balance, subscription or pending orders'
+          )
+        )
       } else {
         toast.error(res.message || t('Failed to assign organization member'))
       }

@@ -405,22 +405,27 @@ func TestImportOrgUsersRefusesUnaffiliatedUserWithPersonalBalance(t *testing.T) 
 	seedOrganizationUser(t, 31, "rich_31", 5000, 0, "")
 	seedOrganizationUser(t, 32, "subscriber_32", 0, 0, "")
 	seedOrganizationUser(t, 33, "cleared_33", 0, 0, "")
+	seedOrganizationUser(t, 34, "payer_34", 0, 0, "")
 	require.NoError(t, model.DB.Create(&model.UserSubscription{UserId: 32, Status: "active", EndTime: common.GetTimestamp() + 3600}).Error)
+	require.NoError(t, model.DB.Create(&model.TopUp{UserId: 34, TradeNo: "import-pending-34", Status: common.TopUpStatusPending,
+		TargetType: model.TopUpTargetTypeUser, TargetId: 34, CreateTime: common.GetTimestamp()}).Error)
 
 	f := newImportWorkbook(t, [][]any{
 		{"username", "organization_role"},
 		{"rich_31", model.OrganizationRoleMember},
 		{"subscriber_32", model.OrganizationRoleMember},
 		{"cleared_33", model.OrganizationRoleMember},
+		{"payer_34", model.OrganizationRoleMember},
 	})
 	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
 	require.NoError(t, err)
-	require.Len(t, result.Errors, 2, "%v", result.Errors)
-	require.Contains(t, result.Errors[0], "line 2 (rich_31): failed to assign: user still has a personal balance, affiliate balance or subscription")
-	require.Contains(t, result.Errors[1], "line 3 (subscriber_32): failed to assign: user still has a personal balance, affiliate balance or subscription")
+	require.Len(t, result.Errors, 3, "%v", result.Errors)
+	require.Contains(t, result.Errors[2], "line 5 (payer_34): failed to assign: user still has a personal balance, affiliate balance, subscription or pending orders")
+	require.Contains(t, result.Errors[0], "line 2 (rich_31): failed to assign: user still has a personal balance, affiliate balance, subscription or pending orders")
+	require.Contains(t, result.Errors[1], "line 3 (subscriber_32): failed to assign: user still has a personal balance, affiliate balance, subscription or pending orders")
 	require.Equal(t, 1, result.Assigned)
 
-	for id, want := range map[int]int{31: 0, 32: 0, 33: 1} {
+	for id, want := range map[int]int{31: 0, 32: 0, 33: 1, 34: 0} {
 		organizationId, err := model.GetUserOrganizationId(id)
 		require.NoError(t, err)
 		require.Equal(t, want, organizationId, "user %d", id)
@@ -543,4 +548,38 @@ func TestImportOrgUsersLeavesNoUserWhenMemberFieldWriteFails(t *testing.T) {
 	var count int64
 	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("username = ?", "half_new").Count(&count).Error)
 	require.Zero(t, count)
+}
+
+// Review M4 — an unaffiliated existing user joins and gets the sheet's member
+// fields in one transaction: a failed field write leaves the user outside the
+// organization and the row is not counted as assigned.
+func TestImportOrgUsersKeepsExistingUserOutsideWhenMemberFieldWriteFails(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 35, "joiner_35", 0, 0, "")
+
+	const name = "test:import_existing_member_fields_fail"
+	require.NoError(t, model.DB.Callback().Update().Before("gorm:update").Register(name, func(tx *gorm.DB) {
+		if updates, ok := tx.Statement.Dest.(map[string]interface{}); ok && tx.Statement.Table == "users" {
+			if _, writesRemark := updates["organization_remark"]; writesRemark {
+				_ = tx.AddError(fmt.Errorf("forced member field failure"))
+			}
+		}
+	}))
+	t.Cleanup(func() { _ = model.DB.Callback().Update().Remove(name) })
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "member_status", "organization_remark"},
+		{"joiner_35", model.OrganizationRoleMember, "suspended", "night shift"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], "line 2 (joiner_35): failed to set member status or note: forced member field failure")
+	require.Zero(t, result.Assigned)
+
+	organizationId, err := model.GetUserOrganizationId(35)
+	require.NoError(t, err)
+	require.Zero(t, organizationId, "a failed member-field write must roll back the assignment")
 }

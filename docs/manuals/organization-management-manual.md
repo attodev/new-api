@@ -167,8 +167,8 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 - 미소속 사용자 목록은 보여주지 않는다. 입력값을 먼저 username으로 조회하고, 없으면서 입력값에 `@`가 있으면 email로 다시 조회한다. 부분 일치는 하지 않는다(email은 대소문자 무시). 조회 결과에는 잔액·비고가 나오지 않는다.
 - 이미 우리 조직 구성원이면 결과 줄에 `Already a member`가 표시되고 `Add`는 비활성화된다(역할 변경은 Role 컬럼에서 한다).
 - 조직 미소속 일반 사용자와 같은 조직 구성원만 찾을 수 있다. 다른 조직 소속 사용자와 전역 관리자는 `User not found`로 나온다.
-- **개인 잔액이 남은 사용자는 추가할 수 없다.** 개인 잔액(quota)이나 추천 잔액(aff_quota)이 0보다 크거나 활성 개인 구독이 있으면 `Add`가 `This user still has a personal balance or subscription` 안내로 거부된다(API 메시지는 `user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization`). 조직에 들어오면 개인 quota가 조직 관리자가 정하는 한도로 바뀌기 때문이다. 사용자가 잔액을 다 쓰거나 구독이 끝난 뒤, 또는 전체 관리자가 사용자 관리에서 잔액을 0으로 정리하고 구독을 취소한 뒤 다시 추가한다. 초대·수락 절차는 없다.
-- Excel 가져오기도 같다. 잔액이나 활성 구독이 있는 기존 사용자 행은 `failed to assign: user still has a personal balance, affiliate balance or subscription` 행 오류가 된다. 가져오기가 새로 만드는 사용자는 해당하지 않는다.
+- **개인 잔액이 남은 사용자는 추가할 수 없다.** 개인 잔액(quota)이나 추천 잔액(aff_quota)이 0보다 크거나, 활성 개인 구독 또는 결제 대기 중인 개인 충전·구독 주문이 있으면 `Add`가 `This user still has a personal balance, subscription or pending orders` 안내로 거부된다(API 메시지는 `user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization`). 조직에 들어오면 개인 quota가 조직 관리자가 정하는 한도로 바뀌기 때문이다. 사용자가 잔액을 다 쓰거나 구독이 끝난 뒤, 또는 전체 관리자가 사용자 관리에서 잔액을 0으로 정리하고 구독을 취소한 뒤 다시 추가한다. 결제 대기 주문은 결제가 끝나거나 결제사가 만료시키면 풀린다(가입 전에 연 결제가 가입 뒤 끝나면 그 돈이 조직 한도가 되어 버리기 때문에 막는다). 초대·수락 절차는 없다.
+- Excel 가져오기도 같다. 잔액, 활성 구독이나 결제 대기 주문이 있는 기존 사용자 행은 `failed to assign: user still has a personal balance, affiliate balance, subscription or pending orders` 행 오류가 된다. 기존 사용자의 배정과 `member_status`·조직 메모 쓰기는 한 트랜잭션이라, 메모 쓰기가 실패하면 그 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만드는 사용자는 해당하지 않는다.
 - 역할 변경은 사용자 테이블의 Role 컬럼(소유자 화면)이나 API로 따로 수행한다.
 
 ## 6-1. 조직 사용자 역할 변경하기
@@ -508,9 +508,9 @@ quota reset은 별도로 설정하지 않고 플랜 기간과 동일하게 동�
 
 조직 과금 오류는 영문으로 나온다. 예: 조직 지갑 부족 `organization quota insufficient, remaining: ＄0.000000` (HTTP 403). 2026-10-14 수동 실행에서 확인했다.
 
-### 사용자 추가가 `This user still has a personal balance, affiliate balance or subscription`으로 거부됨
+### 사용자 추가가 `This user still has a personal balance, subscription or pending orders`으로 거부됨
 
-추가하려는 사용자에게 개인 잔액(quota > 0), 추천 잔액(aff_quota > 0)이나 활성 개인 구독이 남아 있다(6장). 사용자가 잔액을 소진하거나 구독이 만료·취소되면 추가할 수 있다. 바로 넣어야 하면 전체 관리자가 사용자 관리에서 그 사용자의 잔액을 0으로 바꾸고 개인 구독을 취소한다.
+화면 안내는 `This user still has a personal balance, subscription or pending orders`, API 메시지는 `user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization`이다. 추가하려는 사용자에게 개인 잔액(quota > 0), 추천 잔액(aff_quota > 0), 활성 개인 구독이나 결제 대기 중인 개인 충전·구독 주문이 남아 있다(6장). 사용자가 잔액을 소진하거나 구독이 만료·취소되거나 결제 대기 주문이 결제·만료되면 추가할 수 있다. 결제사가 만료시키지 않는 버려진 주문(예: Epay 충전)은 운영자가 그 주문의 상태를 `expired`로 바꿔야 한다. 바로 넣어야 하면 전체 관리자가 사용자 관리에서 그 사용자의 잔액을 0으로 바꾸고 개인 구독을 취소한다.
 
 ### 플랜 삭제 후에도 사용자가 남아 보임
 

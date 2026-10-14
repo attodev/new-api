@@ -236,9 +236,9 @@ describe('OrganizationUsersTable', () => {
     api.assignOrganizationUser.mockResolvedValue({
       success: false,
       message:
-        'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization',
+        'user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization',
       message_key:
-        'user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization',
+        'user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization',
     })
     render(<OrganizationUsersTable />)
     await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
@@ -259,7 +259,7 @@ describe('OrganizationUsersTable', () => {
       organization_role: 'member',
     })
     expect(toast.error).toHaveBeenCalledWith(
-      'This user still has a personal balance or subscription'
+      'This user still has a personal balance, subscription or pending orders'
     )
   })
 

@@ -140,7 +140,7 @@
     "Gateway Overhead": "ゲートウェイのオーバーヘッド",
     "Look up user": "ユーザーを検索",
     "Username or email": "ユーザー名またはメールアドレス",
-    "This user still has a personal balance or subscription": "このユーザーには個人残高またはサブスクリプションが残っています",
+    "This user still has a personal balance, subscription or pending orders": "このユーザーには個人残高、サブスクリプション、または未完了の注文が残っています",
     "New member role": "新しいメンバーのロール",
     "Suspended": "停止中",
     "Suspend": "停止",

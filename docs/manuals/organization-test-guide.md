@@ -274,7 +274,7 @@ bun run e2e:install
 2. `Organization Users` 메뉴로 이동한다.
 3. `Assign Organization Member`의 `Username or email`에 조직 밖 일반 사용자(개인 잔액 0, 활성 개인 구독 없음)의 username을 정확히 입력하고 `Look up user`를 누른다. 결과 한 줄이 나오면 역할 `member`로 `Add`를 누른다. 이름 일부만 넣으면 `User not found`인지도 확인한다.
 4. 새 사용자가 `member`로 조직 사용자 목록에 표시되는지 확인한다.
-4-1. 개인 잔액(quota > 0)이나 추천 잔액(aff_quota > 0)이 있는 조직 밖 사용자를 같은 방법으로 추가하면 `This user still has a personal balance, affiliate balance or subscription`으로 거부되는지 확인한다.
+4-1. 개인 잔액(quota > 0)이나 추천 잔액(aff_quota > 0)이 있거나 결제 대기(pending) 중인 개인 충전·구독 주문이 있는 조직 밖 사용자를 같은 방법으로 추가하면 `This user still has a personal balance, subscription or pending orders`으로 거부되는지 확인한다.
 5. `Role` 컬럼에서 한 사용자를 `admin`으로 바꾸고 `Save`를 누른다. 선택지에 `owner`가 없는지 확인한다.
 6. 조직 관리자로 로그인한다.
 7. 같은 화면에서 `Assign Organization Member`로 다른 조직 밖 사용자를 추가할 수 있는지 확인한다.
@@ -288,7 +288,7 @@ bun run e2e:install
 기대 결과:
 
 - 소유자와 관리자는 조직 밖 일반 사용자를 username/email 정확 조회로 찾아 자기 조직에 추가할 수 있다(소유자는 역할 선택, 관리자 화면은 `member`로). 미소속 사용자 목록은 없다.
-- 개인 잔액·추천 잔액이나 활성 개인 구독이 있는 사용자는 API·화면·Excel 가져오기 모두 `user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization`으로 거부된다.
+- 개인 잔액·추천 잔액, 활성 개인 구독이나 결제 대기 중인 개인 주문이 있는 사용자는 API·화면·Excel 가져오기 모두 `user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization`으로 거부된다.
 - 관리자는 member↔admin 전환을 할 수 있다. `owner`는 `ownership is assigned when the organization is created`로 거부된다.
 - 자기 자신 변경은 `organization admins cannot modify their own membership`, 관리자의 owner 변경은 `only the organization owner can manage the owner`로 거부된다.
 - 관리자는 자기 조직 일반 사용자의 quota와 상태를 수정할 수 있다.

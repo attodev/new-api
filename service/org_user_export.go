@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -298,12 +299,15 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
 				continue
 			}
-			if err := model.AssignUserToOrganization(existingUser.Id, organizationId, orgRole); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
+			// One transaction: a failed member-field write leaves the user outside.
+			if err := model.AssignUserToOrganizationWithMemberFields(existingUser.Id, organizationId, orgRole, memberFields); err != nil {
+				var fieldsErr *model.OrganizationMemberFieldsError
+				if errors.As(err, &fieldsErr) {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
+				} else {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
+				}
 				continue
-			}
-			if err := model.UpdateOrganizationMemberFields(existingUser.Id, organizationId, memberFields); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
 			}
 			if err := model.InvalidateUserCache(existingUser.Id); err != nil {
 				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)

@@ -252,8 +252,10 @@ func CreateOrganization(name string, description string, ownerUserId int, quota 
 // organization while the user still owns personal value (spec §9 decision 6):
 // inside an organization users.quota becomes an allowance the organization
 // admins control, so joining must not hand them someone's own balance —
-// pending affiliate earnings (aff_quota) included.
-var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization")
+// pending affiliate earnings (aff_quota) included — and so must a personal
+// top-up or subscription order still pending at a payment provider, which
+// would otherwise settle into the organization allowance after joining.
+var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization")
 
 // AssignUserToOrganization serializes membership changes on the user row.
 // Cross-organization transfers are deliberately rejected; they require a
@@ -261,6 +263,30 @@ var ErrOrganizationAssignHasPersonalBalance = common.NewMessage("user still has 
 // no personal balance, no affiliate balance and no active personal subscription.
 func AssignUserToOrganization(userID, organizationID int, organizationRole string) error {
 	return assignUserToOrganization(userID, organizationID, organizationRole, true)
+}
+
+// OrganizationMemberFieldsError marks the member-field write (member_status,
+// organization_remark) of AssignUserToOrganizationWithMemberFields as the step
+// that failed, so callers can report it apart from an assignment refusal.
+type OrganizationMemberFieldsError struct{ Err error }
+
+func (e *OrganizationMemberFieldsError) Error() string { return e.Err.Error() }
+func (e *OrganizationMemberFieldsError) Unwrap() error { return e.Err }
+
+// AssignUserToOrganizationWithMemberFields is AssignUserToOrganization (with the
+// personal-balance refusal) plus the member-field write in one transaction
+// (Excel import of an existing unaffiliated user): a failed field write rolls
+// the join back, so the user never joins without the sheet's status or note.
+func AssignUserToOrganizationWithMemberFields(userID, organizationID int, organizationRole string, memberFields map[string]interface{}) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := assignUserToOrganizationTx(tx, userID, organizationID, organizationRole, true); err != nil {
+			return err
+		}
+		if err := updateOrganizationMemberFieldsTx(tx, userID, organizationID, memberFields); err != nil {
+			return &OrganizationMemberFieldsError{Err: err}
+		}
+		return nil
+	})
 }
 
 // CreateUserInOrganization inserts a new account, assigns it to the
@@ -321,6 +347,13 @@ func assignUserToOrganizationTx(tx *gorm.DB, userID, organizationID int, organiz
 		if active {
 			return ErrOrganizationAssignHasPersonalBalance
 		}
+		pending, err := hasPendingPersonalOrderTx(tx, userID)
+		if err != nil {
+			return err
+		}
+		if pending {
+			return ErrOrganizationAssignHasPersonalBalance
+		}
 	}
 	var organization Organization
 	if err := lockForUpdate(tx).Select("id", "status").Where("id = ?", organizationID).First(&organization).Error; err != nil {
@@ -350,6 +383,29 @@ func hasActiveUserSubscriptionTx(tx *gorm.DB, userID int) (bool, error) {
 	var count int64
 	if err := tx.Model(&UserSubscription{}).
 		Where("user_id = ? AND status = ? AND end_time > ?", userID, "active", common.GetTimestamp()).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// hasPendingPersonalOrderTx reports a pending personal top-up (any target other
+// than an organization wallet, matching TopUp.EffectiveTargetType) or a pending
+// subscription order (always personal). Settlement credits pending orders
+// without re-checking membership, so such an order must not outlive the join.
+func hasPendingPersonalOrderTx(tx *gorm.DB, userID int) (bool, error) {
+	var count int64
+	if err := tx.Model(&TopUp{}).
+		Where("user_id = ? AND status = ? AND (target_type IS NULL OR target_type <> ?)",
+			userID, common.TopUpStatusPending, TopUpTargetTypeOrganization).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	if err := tx.Model(&SubscriptionOrder{}).
+		Where("user_id = ? AND status = ?", userID, common.TopUpStatusPending).
 		Count(&count).Error; err != nil {
 		return false, err
 	}

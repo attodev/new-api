@@ -140,7 +140,7 @@
     "Gateway Overhead": "Накладные расходы шлюза",
     "Look up user": "Найти пользователя",
     "Username or email": "Имя пользователя или email",
-    "This user still has a personal balance or subscription": "У этого пользователя ещё есть личный баланс или подписка",
+    "This user still has a personal balance, subscription or pending orders": "У этого пользователя ещё есть личный баланс, подписка или незавершённые заказы",
     "New member role": "Роль нового участника",
     "Suspended": "Приостановлен",
     "Suspend": "Приостановить",

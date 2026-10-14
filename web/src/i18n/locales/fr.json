@@ -140,7 +140,7 @@
     "Gateway Overhead": "Surcharge de la passerelle",
     "Look up user": "Rechercher l'utilisateur",
     "Username or email": "Nom d'utilisateur ou e-mail",
-    "This user still has a personal balance or subscription": "Cet utilisateur a encore un solde personnel ou un abonnement",
+    "This user still has a personal balance, subscription or pending orders": "Cet utilisateur a encore un solde personnel, un abonnement ou des commandes en attente",
     "New member role": "Rôle du nouveau membre",
     "Suspended": "Suspendu",
     "Suspend": "Suspendre",

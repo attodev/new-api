@@ -47,6 +47,7 @@ func setupOrganizationControllerTestDB(t *testing.T) *gorm.DB {
 		&model.AuditLog{},
 		&model.UserSubscription{},
 		&model.TopUp{},
+		&model.SubscriptionOrder{},
 	))
 	require.NoError(t, model.MigrateForkOrganizationTables(db))
 
