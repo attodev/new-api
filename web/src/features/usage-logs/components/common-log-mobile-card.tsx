@@ -80,6 +80,7 @@ export function CommonLogMobileCard<TData>(props: {
       ? other.user_group_ratio
       : other?.group_ratio
   const discountHint = formatDiscountHint(other?.discount_multiplier) // fork: O6
+  const effectiveUseTime = effectiveUseTimeSec(other, log.use_time) // fork: O7
   const fields: Record<FieldName, LogField> = {
     model: {
       label: t('Model'),
@@ -200,8 +201,8 @@ export function CommonLogMobileCard<TData>(props: {
                   isTask={other?.is_task === true}
                   isSyncTask={other?.task_sync === true}
                   tokensPerSecond={
-                    log.use_time > 0 && log.completion_tokens > 0
-                      ? log.completion_tokens / log.use_time
+                    effectiveUseTime > 0 && log.completion_tokens > 0 // fork: O7
+                      ? log.completion_tokens / effectiveUseTime // fork: O7
                       : null
                   }
                   streamStatus={other?.stream_status}
@@ -378,7 +379,7 @@ export function CommonLogMobileCard<TData>(props: {
                 )}
               </div>
             )}
-            {selectedField === 'user' && showUserInfo && (
+            {selectedField === 'user' && showUserInfo /* fork: O3 */ && (
               <Button
                 variant='outline'
                 className='min-h-11'

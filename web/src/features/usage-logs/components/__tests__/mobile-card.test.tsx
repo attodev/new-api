@@ -337,3 +337,20 @@ it('shows loading placeholders without displaying stale log fields', () => {
     screen.queryByRole('button', { name: /^Model:/ })
   ).not.toBeInTheDocument()
 })
+
+// fork: O7 — throughput uses the precise e2e_ms like the duration does, so a
+// sub-second request (use_time truncated to 0) still shows its tokens/s.
+it('computes mobile tokens per second from the precise end-to-end time', () => {
+  renderLogs({
+    logs: [
+      {
+        ...log,
+        is_stream: true,
+        use_time: 0,
+        completion_tokens: 100,
+        other: JSON.stringify({ e2e_ms: 2000 }),
+      },
+    ],
+  })
+  expect(screen.getByText('50 t/s')).toBeVisible()
+})
