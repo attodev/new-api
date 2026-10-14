@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 //
 //   node scripts/ko-locale.mjs seed [--force]    build ko.json, batches and the skip list
 //   node scripts/ko-locale.mjs check [--batch N] validate ko.json against en.json
+//                                                (--batch needs the seed's batch list)
 //   node scripts/ko-locale.mjs status            count english placeholders still left
 //
 // Run from the web/ package root (see the `i18n:ko` script in package.json).
@@ -270,6 +271,12 @@ async function check(batchId) {
   const skip = new Set(await readJson(SKIP))
   let keys = Object.keys(en)
   if (batchId !== undefined) {
+    // The batch list only existed while phase D translated ko.json; it was
+    // removed afterwards, so `check` alone validates the whole file.
+    if (!existsSync(BATCHES)) {
+      console.error(`no batch list (${BATCHES}); run check without --batch`)
+      process.exit(2)
+    }
     const batch = (await readJson(BATCHES)).batches.find(
       (b) => b.id === batchId
     )

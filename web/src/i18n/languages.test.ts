@@ -53,6 +53,7 @@ describe('convertDetectedLanguage', () => {
   })
 })
 
+// fork: O9 — Korean (ko) and the legacy team code kr.
 describe('Korean interface language', () => {
   test('maps Korean BCP-47 tags onto ko', () => {
     expect(convertDetectedLanguage('ko')).toBe('ko')
