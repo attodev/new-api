@@ -24,12 +24,20 @@ func (topUp *TopUp) EffectiveTargetType() string {
 	return TopUpTargetTypeUser
 }
 
+// EffectiveTargetId returns the wallet owner id. An organization order with no
+// target id yields 0 (never the payer's user id, which would address an
+// unrelated organization).
 func (topUp *TopUp) EffectiveTargetId() int {
-	if topUp.EffectiveTargetType() == TopUpTargetTypeOrganization && topUp.TargetId > 0 {
-		return topUp.TargetId
+	if topUp.EffectiveTargetType() == TopUpTargetTypeOrganization {
+		if topUp.TargetId > 0 {
+			return topUp.TargetId
+		}
+		return 0
 	}
 	return topUp.UserId
 }
+
+var errOrganizationTopUpWithoutTarget = errors.New("organization top-up order has no target organization")
 
 // ValidateOrganizationWalletCapacity is the pre-payment check for an
 // organization wallet, mirroring ValidateTopUpQuotaCapacity.
@@ -50,6 +58,9 @@ func ValidateOrganizationWalletCapacity(orgId int, creditedQuota int) error {
 
 func ValidateTopUpTargetCapacity(targetType string, targetId int, creditedQuota int) error {
 	if targetType == TopUpTargetTypeOrganization {
+		if targetId <= 0 {
+			return errOrganizationTopUpWithoutTarget
+		}
 		return ValidateOrganizationWalletCapacity(targetId, creditedQuota)
 	}
 	return ValidateTopUpQuotaCapacity(targetId, creditedQuota)
@@ -86,7 +97,11 @@ func creditOrganizationQuota(tx *gorm.DB, orgId int, creditedQuota int) error {
 // (Stripe customer id, Creem email) only apply to user targets.
 func creditTopUpTarget(tx *gorm.DB, topUp *TopUp, creditedQuota int, updates map[string]any) error {
 	if topUp.EffectiveTargetType() == TopUpTargetTypeOrganization {
-		return creditOrganizationQuota(tx, topUp.EffectiveTargetId(), creditedQuota)
+		orgId := topUp.EffectiveTargetId()
+		if orgId <= 0 {
+			return errOrganizationTopUpWithoutTarget
+		}
+		return creditOrganizationQuota(tx, orgId, creditedQuota)
 	}
 	return creditTopUpQuota(tx, topUp.UserId, creditedQuota, updates)
 }

@@ -76,8 +76,31 @@ func TestOrganizationTopUpsListOnlyOrganizationOrders(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 1, total)
 	require.Equal(t, "org-9-a", topups[0].TradeNo)
-	found, total, err := SearchOrganizationTopUps(9, "%org-9%", &common.PageInfo{Page: 1, PageSize: 10})
+	found, total, err := SearchOrganizationTopUps(9, "%org-%", &common.PageInfo{Page: 1, PageSize: 10})
 	require.NoError(t, err)
 	require.EqualValues(t, 1, total)
 	require.Len(t, found, 1)
+}
+
+func TestCreditTopUpTargetRejectsOrganizationOrderWithoutTarget(t *testing.T) {
+	cleanupTopUpTargetTest(t)
+	user := &User{Id: 703, Username: "topup_target_notarget", Status: common.UserStatusEnabled, Quota: 5}
+	require.NoError(t, DB.Create(user).Error)
+	// An organization whose id equals the payer's user id must not be paid by mistake.
+	org := &Organization{Id: user.Id, Name: "topup-notarget-org", OwnerUserId: user.Id, Quota: 100, Status: OrganizationStatusEnabled}
+	require.NoError(t, DB.Create(org).Error)
+	topUp := &TopUp{UserId: user.Id, TargetType: TopUpTargetTypeOrganization, TargetId: 0}
+	require.Equal(t, 0, topUp.EffectiveTargetId())
+
+	err := DB.Transaction(func(tx *gorm.DB) error { return creditTopUpTarget(tx, topUp, 50, nil) })
+	require.Error(t, err)
+	require.Error(t, ValidateTopUpTargetCapacity(TopUpTargetTypeOrganization, 0, 50))
+
+	var gotUser User
+	require.NoError(t, DB.First(&gotUser, user.Id).Error)
+	require.Equal(t, 5, gotUser.Quota)
+	var orgs []Organization
+	require.NoError(t, DB.Find(&orgs).Error)
+	require.Len(t, orgs, 1)
+	require.EqualValues(t, 100, orgs[0].Quota)
 }
