@@ -163,6 +163,7 @@
 | Target / Source (audit, vendor merge) | 대상 / 원본 | 감사 로그의 대상, 공급업체 병합의 "Source vendors"(원본 공급업체)와 "Target vendor"(대상 공급업체). 플러그인·마켓플레이스의 Source는 "소스", 설정값의 출처 표시는 "출처". |
 | Telegram | 영문 유지 | 시드된 "Telegram 계정 연결" 등과 맞춥니다. |
 | Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. |
+| Tier (pricing) | 티어 | 가격·할인 단계. 시드된 "폴백 티어", "티어별 가격"과 맞춥니다. "Tier name"은 "티어 이름". 기존 값에는 "등급"이 더 많지만(아래 "통일 예정") 새 번역은 "티어"만 씁니다. 사용자 등급(user level)은 "등급"을 그대로 씁니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -193,3 +194,4 @@
 | Turnstile (영문 유지) | 회전문 | `Enable Turnstile` = "회전문 활성화"(오역). 다른 Turnstile 키는 모두 영문을 유지합니다. |
 | 폐기 (Revoke) | 취소 | 배치 1의 `Access token revoked` = "액세스 토큰 취소됨", `A token that never expires stays valid until you revoke it…` = "취소할 때까지", 시드된 `Create, revoke, and audit API tokens.` = "취소" 3회. |
 | Telegram (영문 유지) | 텔레그램 | 시드된 `Enable Telegram OAuth` = "텔레그램 OAuth 활성화" 1회. |
+| 티어 (Tier) | 등급, 등급제 | 시드된 값과 이전 배치 16개 키(`Tier`, `Tier name`, `Add tier`, `Remove tier`, `Hit tier`, `Matched Tier`, `{{count}} tiers`, `Tiered` = "등급제", `Tiered price table`, 할인 등급 3개 등). `Allow service_tier passthrough` = "서비스등급 패스스루"도 함께 점검합니다. |
