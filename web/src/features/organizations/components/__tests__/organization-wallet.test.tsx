@@ -188,4 +188,28 @@ describe('OrganizationWallet', () => {
     )
     errorSpy.mockRestore()
   })
+
+  it('rejects a Waffo payment below the minimum top-up without calling the endpoint', async () => {
+    topup.info = {
+      ...topupInfo(),
+      enable_waffo_topup: true,
+      waffo_min_topup: 0,
+      waffo_pay_methods: [{ name: 'Waffo Card' }],
+    }
+    const toast = await import('sonner')
+    const errorSpy = vi.spyOn(toast.toast, 'error')
+    render(<OrganizationWallet />)
+
+    await screen.findByText(formatQuota(ORGANIZATION_QUOTA))
+    fireEvent.change(screen.getByRole('spinbutton'), {
+      target: { value: '5' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Waffo Card' }))
+
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith('Minimum topup amount: 10')
+    )
+    expect(api.requestOrganizationWaffoPayment).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
 })

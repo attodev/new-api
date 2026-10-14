@@ -398,6 +398,11 @@ export function OrganizationWallet({
     _method: WaffoPayMethod,
     index: number
   ) => {
+    const minTopup = getMinTopupAmount(topupInfo)
+    if (topupAmount < minTopup) {
+      toast.error(t('Minimum topup amount: {{amount}}', { amount: minTopup }))
+      return
+    }
     setPaymentLoading(`waffo-${index}`)
     setProcessing(true)
     try {
@@ -408,6 +413,10 @@ export function OrganizationWallet({
       if (isApiSuccess(response)) {
         const paymentUrl = getPaymentUrl(response.data)
         if (paymentUrl) {
+          if (!isSafeHttpUrl(paymentUrl)) {
+            toast.error(t('Invalid payment redirect URL'))
+            return
+          }
           window.open(paymentUrl, '_blank')
           toast.success(t('Redirecting to payment page...'))
           return
