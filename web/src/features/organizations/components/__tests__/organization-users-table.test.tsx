@@ -31,18 +31,22 @@ const api = vi.hoisted(() => ({
   createOrganization: vi.fn(),
   deleteOrganization: vi.fn(),
   exportOrgUsers: vi.fn(),
-  getAssignableOrganizationUsers: vi.fn(),
   getOrganizationProfile: vi.fn(),
   getOrganizationUsers: vi.fn(),
   getOrganizationUserSubscriptions: vi.fn(),
   getAllOrganizations: vi.fn(),
   importOrgUsers: vi.fn(),
+  lookupOrganizationMember: vi.fn(),
   removeOrganizationUserMembership: vi.fn(),
   updateOrganization: vi.fn(),
   updateOrganizationUser: vi.fn(),
 }))
 
 vi.mock('../../api', () => api)
+
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+
+vi.mock('sonner', () => ({ toast }))
 
 vi.mock('@/features/users/api', () => ({
   getUsers: vi.fn(async () => ({ success: true, data: { items: [] } })),
@@ -101,6 +105,8 @@ beforeEach(() => {
     removeItem: () => undefined,
   })
   for (const fn of Object.values(api)) fn.mockReset()
+  toast.success.mockReset()
+  toast.error.mockReset()
   api.getOrganizationUsers.mockResolvedValue({
     success: true,
     data: { page: 1, page_size: 20, total: 3, items: MEMBERS },
@@ -120,10 +126,6 @@ beforeEach(() => {
       quota: 1000000,
       used_quota: 0,
     },
-  })
-  api.getAssignableOrganizationUsers.mockResolvedValue({
-    success: true,
-    data: { page: 1, page_size: 50, total: 0, items: [] },
   })
 })
 
@@ -162,6 +164,99 @@ describe('OrganizationUsersTable', () => {
     expect(within(rowOf('adam')).getByRole('checkbox')).toBeDisabled()
     expect(within(rowOf('mia')).getByRole('spinbutton')).toBeEnabled()
     expect(within(rowOf('mia')).getByRole('checkbox')).toBeEnabled()
+  })
+
+  it('adds a member by exact lookup with the chosen role', async () => {
+    signIn(1, 'owner')
+    api.lookupOrganizationMember.mockResolvedValue({
+      id: 42,
+      username: 'newbie',
+      display_name: 'New Bie',
+      organization_id: 0,
+    })
+    api.assignOrganizationUser.mockResolvedValue({ success: true })
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    // Nothing is listed before a lookup.
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
+
+    await userEvent.type(
+      screen.getByPlaceholderText('Username or email'),
+      ' newbie '
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Look up user' }))
+
+    expect(api.lookupOrganizationMember).toHaveBeenCalledWith({
+      username: 'newbie',
+    })
+    expect(await screen.findByText('newbie')).toBeInTheDocument()
+    expect(screen.getByText('New Bie')).toBeInTheDocument()
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'New member role' }),
+      'admin'
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(api.assignOrganizationUser).toHaveBeenCalledWith(42, {
+      organization_role: 'admin',
+    })
+    expect(toast.success).toHaveBeenCalledWith('Organization member assigned')
+  })
+
+  it('looks up by email and shows when no user matches', async () => {
+    signIn(2, 'admin')
+    api.lookupOrganizationMember.mockResolvedValue(null)
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+
+    await userEvent.type(
+      screen.getByPlaceholderText('Username or email'),
+      'ghost@example.com{Enter}'
+    )
+
+    expect(api.lookupOrganizationMember).toHaveBeenCalledWith({
+      email: 'ghost@example.com',
+    })
+    expect(await screen.findByText('User not found')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
+  })
+
+  it('explains the personal-balance refusal and adds non-owner picks as members', async () => {
+    signIn(2, 'admin')
+    api.lookupOrganizationMember.mockResolvedValue({
+      id: 43,
+      username: 'rich',
+      display_name: '',
+      organization_id: 0,
+    })
+    api.assignOrganizationUser.mockResolvedValue({
+      success: false,
+      message:
+        'user still has a personal balance or subscription; it must be cleared before joining an organization',
+      message_key:
+        'user still has a personal balance or subscription; it must be cleared before joining an organization',
+    })
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+
+    await userEvent.type(
+      screen.getByPlaceholderText('Username or email'),
+      'rich'
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Look up user' }))
+    await screen.findByText('rich')
+    // Only the owner picks a role; other admins add plain members.
+    expect(
+      screen.queryByRole('combobox', { name: 'New member role' })
+    ).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(api.assignOrganizationUser).toHaveBeenCalledWith(43, {
+      organization_role: 'member',
+    })
+    expect(toast.error).toHaveBeenCalledWith(
+      'This user still has a personal balance or subscription'
+    )
   })
 
   it('shows a plain member no add-member section', async () => {

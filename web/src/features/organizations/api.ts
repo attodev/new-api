@@ -43,6 +43,7 @@ import type {
   Organization,
   OrganizationDashboardData,
   OrganizationDashboardParams,
+  OrganizationMemberLookup,
   OrgImportResult,
   OrganizationSubscriptionPlan,
   OrganizationSubscriptionPlanPayload,
@@ -336,16 +337,26 @@ export async function getOrganizationUsers(params: {
   return res.data
 }
 
-export async function getAssignableOrganizationUsers(params: {
-  page?: number
-  size?: number
-}): Promise<ApiResponse<OrganizationUsersPage>> {
+/**
+ * Exact username or email lookup for adding a member. Resolves to null when no
+ * unaffiliated user or member of the caller's organization matches (404).
+ */
+export async function lookupOrganizationMember(params: {
+  username?: string
+  email?: string
+}): Promise<OrganizationMemberLookup | null> {
   const search = new URLSearchParams()
-  if (params.page) search.set('p', String(params.page))
-  if (params.size) search.set('page_size', String(params.size))
-  const suffix = search.toString() ? `?${search.toString()}` : ''
-  const res = await api.get(`/api/organization/assignable-users${suffix}`)
-  return res.data
+  if (params.username) search.set('username', params.username)
+  if (params.email) search.set('email', params.email)
+  const res = await api.get(
+    `/api/organization/users/lookup?${search.toString()}`,
+    { validateStatus: (status) => status === 200 || status === 404 }
+  )
+  if (res.status === 404) return null
+  const body = requireServerSuccess(
+    res.data as ApiResponse<OrganizationMemberLookup>
+  )
+  return body.data ?? null
 }
 
 export async function updateOrganizationUser(

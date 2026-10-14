@@ -34,7 +34,7 @@
 
 조직 소유자는 자기 조직의 운영 책임자다.
 
-- 조직 사용자 추가
+- 조직 사용자 추가 (추가할 때 `member`/`admin` 역할 선택 가능)
 - 조직 사용자 역할 관리 (member ↔ admin. 화면의 Role 드롭다운은 소유자에게만 보인다)
 - 조직 사용자 quota 조정
 - 조직 지갑 조회와 충전 (소유자 전용)
@@ -49,7 +49,7 @@
 조직 관리자는 자기 조직의 사용자 사용량과 구독을 관리한다.
 
 - 조직 사용자 목록 조회
-- 조직 사용자 추가 (화면에서는 `member`로 추가. API로는 `admin`으로도 추가 가능)
+- 조직 사용자 추가 (username/email 정확 조회 후 추가. 화면에서는 `member`로 추가. API로는 `admin`으로도 추가 가능)
 - 조직 사용자 역할 변경 (member ↔ admin. 화면에는 Role 드롭다운이 없어 API `PUT /api/organization/users/:id/membership`로 한다)
 - 조직 사용자 상태 관리
 - 조직 사용자 quota 조정
@@ -152,13 +152,18 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 
 1. 조직 소유자 또는 조직 관리자 계정으로 로그인한다.
 2. `Organization Users` 메뉴로 이동한다.
-3. `Assign Organization Member` 영역에서 추가할 사용자의 username을 입력한다.
-4. `Add` 버튼을 누른다 (또는 Enter 키).
+3. `Assign Organization Member` 영역의 `Username or email` 칸에 추가할 사용자의 username 또는 email을 **정확히** 입력한다.
+4. `Look up user` 버튼을 누른다 (또는 Enter 키).
+5. 사용자를 찾으면 결과 한 줄(username, 표시 이름)이 나온다. 없으면 `User not found`가 표시된다.
+6. 소유자는 결과 줄의 역할 선택(`member`/`admin`)을 고른다. 관리자 화면에는 역할 선택이 없고 `member`로 추가된다.
+7. `Add` 버튼을 누른다. 성공하면 `Organization member assigned`가 표시되고 사용자 목록이 갱신된다.
 
 동작 정책:
 
-- 입력한 username이 할당 후보(조직 미소속 일반 사용자와 같은 조직 사용자, 첫 50명)에 없으면 `User not found`가 표시된다. 이미 다른 조직에 속한 사용자는 서버가 `user belongs to another organization`으로 거부한다.
-- 화면에서 추가하면 역할은 항상 `member`로 설정된다. 조직 관리자도 추가할 수 있다.
+- 미소속 사용자 목록은 보여주지 않는다. 입력값에 `@`가 있으면 email로, 없으면 username으로 조회하며 부분 일치는 하지 않는다(email은 대소문자 무시). 조회 결과에는 잔액·비고가 나오지 않는다.
+- 조직 미소속 일반 사용자와 같은 조직 구성원만 찾을 수 있다. 다른 조직 소속 사용자와 전역 관리자는 `User not found`로 나온다.
+- **개인 잔액이 남은 사용자는 추가할 수 없다.** 개인 잔액(quota)이 0보다 크거나 활성 개인 구독이 있으면 `Add`가 `This user still has a personal balance or subscription`으로 거부된다. 조직에 들어오면 개인 quota가 조직 관리자가 정하는 한도로 바뀌기 때문이다. 사용자가 잔액을 다 쓰거나 구독이 끝난 뒤, 또는 전체 관리자가 사용자 관리에서 잔액을 0으로 정리하고 구독을 취소한 뒤 다시 추가한다. 초대·수락 절차는 없다.
+- Excel 가져오기도 같다. 잔액이나 활성 구독이 있는 기존 사용자 행은 `failed to assign: user still has a personal balance or subscription` 행 오류가 된다. 가져오기가 새로 만드는 사용자는 해당하지 않는다.
 - 역할 변경은 사용자 테이블의 Role 컬럼(소유자 화면)이나 API로 따로 수행한다.
 
 ## 6-1. 조직 사용자 역할 변경하기
@@ -466,6 +471,10 @@ quota reset은 별도로 설정하지 않고 플랜 기간과 동일하게 동�
 ### 오류 문구
 
 조직 과금 오류는 영문으로 나온다. 예: 조직 지갑 부족 `organization quota insufficient, remaining: ＄0.000000` (HTTP 403). 2026-10-14 수동 실행에서 확인했다.
+
+### 사용자 추가가 `This user still has a personal balance or subscription`으로 거부됨
+
+추가하려는 사용자에게 개인 잔액(quota > 0)이나 활성 개인 구독이 남아 있다(6장). 사용자가 잔액을 소진하거나 구독이 만료·취소되면 추가할 수 있다. 바로 넣어야 하면 전체 관리자가 사용자 관리에서 그 사용자의 잔액을 0으로 바꾸고 개인 구독을 취소한다.
 
 ### 플랜 삭제 후에도 사용자가 남아 보임
 

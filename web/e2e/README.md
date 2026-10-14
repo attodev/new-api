@@ -100,7 +100,7 @@ setup·teardown 테스트가 사용하는 UI 기반 헬퍼다. 모두 시드 데
 
 - `createUserViaUi(page, user)` — `/users`의 "Add User" 드로어에서 신규 사용자를 생성한다.
 - `createOrganizationViaUi(page, options)` — `/organization`에서 조직을 신규 생성한다(`E2E Org <runId>`).
-- `assignMemberViaUi(page, username)` — `/organization` 멤버 추가 섹션("Add")으로 사용자를 조직 멤버로 등록한다.
+- `assignMemberViaUi(page, username)` — `/organization` 멤버 추가 섹션에서 "Username or email"에 username을 넣고 "Look up user"로 정확 조회한 뒤, 결과 한 줄이 보이면 "Add"로 조직 멤버로 등록한다(미소속 사용자 목록은 없다).
 - `promoteMemberToAdminViaUi(page, username)` — 조직 사용자 테이블의 Role 셀렉터로 멤버를 org admin으로 승격한다.
 - `removeMemberFromOrganizationViaUi(page, username)` — 행 선택 → "Remove from organization" → "Save".
 - `deleteOrganizationViaUi(page, name)` — 조직을 삭제한다.
@@ -207,7 +207,7 @@ Import 버튼이 보이고, 클릭하면 모달 dialog가 열리며, Escape 키�
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`, `memberPage`
 
-admin은 멤버 추가 섹션의 Username 입력란이 보이고, member는 `/organization` 접근 시 `/403` 또는 `/sign-in`으로 리디렉트됨을 동시에 검증한다.
+admin은 멤버 추가 섹션의 "Username or email" 입력란이 보이고, 없는 username(`e2e_nobody_<runId>`)을 조회하면 "User not found"가 표시되며, member는 `/organization` 접근 시 `/403` 또는 `/sign-in`으로 리디렉트됨을 검증한다.
 
 ---
 

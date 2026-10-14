@@ -1,7 +1,7 @@
 # 조직 관련 Backend REST API 명세
 
 작성일: 2026-06-15  
-최종 수정: 2026-10-14 (upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
+최종 수정: 2026-10-14 (단계 C 작업 8: `assignable-users` 목록을 `users/lookup` 정확 조회로 바꾸고 개인 잔액·구독이 있는 사용자의 할당 거부를 추가. 이전 — upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
 
 ## 1. 문서 범위
 
@@ -79,7 +79,7 @@ upstream의 scoped access token으로 호출할 때 적용되는 규칙이다(`m
 
 | 라우트 | 규칙 |
 | --- | --- |
-| `/api/organization/*` 기본 (20개: profile, dashboard, logs, mj, task, users 계열, assignable-users, membership, subscription plans/users) | 세션 전용 — 접근 토큰으로는 호출할 수 없다 |
+| `/api/organization/*` 기본 (20개: profile, dashboard, logs, mj, task, users 계열, users/lookup, membership, subscription plans/users) | 세션 전용 — 접근 토큰으로는 호출할 수 없다 |
 | `GET /api/organization/wallet`, `GET /api/organization/topup/self`, `POST .../amount` 5개 | `wallet:read` |
 | `POST .../pay` 6개 | `wallet:write` |
 | `GET /api/organization/subscription/self` | `profile:read` |
@@ -385,26 +385,36 @@ Query:
 - 전역 관리자 계정은 조직 사용자 목록에서 제외된다.
 - 정렬 컬럼은 dialect별로 quoting된다(`group` 예약어 대응).
 
-### 5.2 조직에 할당 가능한 사용자 목록 조회
+### 5.2 추가할 사용자 정확 조회
 
-`GET /api/organization/assignable-users`
+`GET /api/organization/users/lookup`
 
-조직 소유자/관리자용이다 (`organization admin permission required`).
+조직 소유자/관리자용이다 (`organization admin permission required`). 조직 미소속 사용자 목록은 없다(spec §9 결정 6): 멤버를 추가하려면 username 또는 email을 정확히 알아야 한다.
 
-Query:
+Query (둘 중 정확히 하나):
 
 | 이름 | 타입 | 필수 | 범위/값 | 설명 |
 | --- | --- | --- | --- | --- |
-| `p` | integer | 선택 | 1 이상 권장 | 페이지 번호 |
-| `page_size` | integer | 선택 | 1-100 권장 | 페이지 크기 |
+| `username` | string | 택1 | 앞뒤 공백 제거 | username 정확 일치 |
+| `email` | string | 택1 | 앞뒤 공백 제거, 소문자화 | `LOWER(email)` 정확 일치 |
 
-응답 `data`: `PageInfo<OrganizationUser[]>` (5.1과 같은 제한 뷰)
+둘 다 없거나 둘 다 주면 `provide either a username or an email`.
+
+응답 `data` (`OrganizationMemberLookup`): `id`, `username`, `display_name`, `organization_id`. `quota`, `used_quota`, `remark`, 이메일, 역할·상태는 포함하지 않는다.
+
+```json
+{
+  "success": true,
+  "message": "",
+  "data": { "id": 42, "username": "alice", "display_name": "Alice", "organization_id": 0 }
+}
+```
 
 처리 규칙:
 
-- 전역 관리자 계정은 제외된다.
-- 자기 자신은 제외된다.
-- 현재 구현은 `organization_id = actor.OrganizationId OR organization_id = 0` 조건을 사용한다. 즉 같은 조직 사용자와 조직 미소속 사용자가 함께 포함될 수 있다.
+- 대상은 `role < RoleAdminUser`이고 `organization_id = 0`(미소속)이거나 actor와 같은 조직인 사용자다. 부분 일치·접두 일치는 하지 않는다.
+- 일치하는 사용자가 정확히 한 명이 아니면(없음, 다른 조직 소속, 전역 관리자) HTTP 404 `{"success": false, "message": "user not found"}`.
+- 조회 결과는 할당 가능 여부를 보장하지 않는다. 개인 잔액·구독 거부는 5.5의 할당 시점에 판정한다.
 
 ### 5.3 조직 사용자 상세 조회
 
@@ -492,12 +502,13 @@ Body:
 
 처리 규칙:
 
-- 조직 admin 이상이면 호출 가능하다. 조직 관리자도 새 멤버를 `member` 또는 `admin`으로 추가할 수 있고, 기존 구성원의 역할을 member↔admin으로 바꿀 수 있다. (웹 화면은 추가를 항상 `member`로 하고, Role 드롭다운은 owner에게만 보인다.)
+- 조직 admin 이상이면 호출 가능하다. 조직 관리자도 새 멤버를 `member` 또는 `admin`으로 추가할 수 있고, 기존 구성원의 역할을 member↔admin으로 바꿀 수 있다. (웹 화면은 5.2 조회로 한 명을 찾은 뒤 추가한다. 추가할 역할 선택과 표의 Role 드롭다운은 owner에게만 보이고, 관리자는 `member`로 추가한다.)
 - `owner` 역할은 누구도 부여할 수 없다 (`ownership is assigned when the organization is created`).
 - 자기 자신은 대상이 될 수 없다 (`organization admins cannot reassign themselves`). owner 행은 owner 본인만 대상으로 할 수 있다.
 - 전역 관리자 사용자는 조직에서 관리할 수 없다 (`global admin users cannot be managed by organization admins`).
 - 역할 값이 `member`, `admin`, `owner`가 아니면 `invalid organization role`.
 - 대상 사용자가 이미 다른 조직에 속해 있으면 모델이 거부한다 (`user belongs to another organization`). 조직이 비활성이면 `organization is not active`.
+- **개인 잔액 거부(spec §9 결정 6):** 조직 밖에서 들어오는 사용자가 개인 잔액(`users.quota > 0`)이나 활성 개인 구독(`user_subscriptions.status = 'active' AND end_time > now`)을 가지고 있으면 거부한다 (`user still has a personal balance or subscription; it must be cleared before joining an organization`, `message_key` 같음). 조직에 들어오면 `users.quota`는 조직 관리자가 정하는 한도가 되므로, 사용자가 잔액을 다 쓰거나 운영자가 정리한 뒤에만 들어올 수 있다. 판정은 `model.AssignUserToOrganization`의 사용자 행 잠금 트랜잭션 안에서 한다. 초대·수락 흐름은 없다. 만료·취소된 구독은 막지 않는다. 이미 같은 조직 구성원의 역할 변경에는 적용하지 않는다.
 - 이미 조직 구성원인 경우 이 API로 역할을 변경할 수 있다.
 - 성공하면 `organization.user.assign` 감사 로그가 남는다.
 
@@ -559,6 +570,7 @@ Path:
 - `group` 열은 읽지 않는다(내보내기 전용). 새 사용자는 기본 그룹을 받는다.
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
 - 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
+- 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다 — `model.AssignCreatedUserToOrganization`).
 
 응답: `{"success": true, "data": {"assigned": n, "created": n, "updated": n, "removed": n, ... , "errors": [...]}}` (`OrgImportResult`). 요청마다 `organization.user.import` 감사 로그가 남는다.
 
@@ -931,6 +943,9 @@ Query:
 | owner가 아닌 사용자가 owner 행 변경 | `only the organization owner can manage the owner` |
 | `owner` 역할 부여 시도 | `ownership is assigned when the organization is created` |
 | 다른 조직 사용자를 멤버로 추가 | `user belongs to another organization` |
+| 개인 잔액(`quota > 0`)이나 활성 개인 구독이 있는 사용자를 멤버로 추가(API·가져오기) | `user still has a personal balance or subscription; it must be cleared before joining an organization` |
+| 멤버 조회에 username/email이 없거나 둘 다 있음 | `provide either a username or an email` |
+| 멤버 조회에 정확히 일치하는 사용자 없음 | HTTP 404 `user not found` |
 | owner 제거 시도 | `organization owner cannot be removed` |
 | 구성원이 남은 조직 삭제 | `organization has N non-owner members, remove them first` |
 | 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` |

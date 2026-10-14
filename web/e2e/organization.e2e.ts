@@ -161,9 +161,15 @@ async function createOrganizationViaUi(
   await expect(page.getByText(/organization created/i)).toBeVisible()
 }
 
+// Members are added by exact lookup (no listing): look the user up, confirm
+// the single result row, then add.
 async function assignMemberViaUi(page: Page, username: string) {
   await openAuthenticatedPage(page, '/organization')
-  await page.getByPlaceholder('Username', { exact: true }).fill(username)
+  await page
+    .getByPlaceholder('Username or email', { exact: true })
+    .fill(username)
+  await page.getByRole('button', { name: 'Look up user', exact: true }).click()
+  await expect(page.getByText(username, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page.getByText(/organization member assigned/i)).toBeVisible()
 }
@@ -557,8 +563,16 @@ test.describe('organization browser smoke tests', () => {
       '/organization'
     )
     await expect(
-      adminPage2.getByPlaceholder('Username', { exact: true })
+      adminPage2.getByPlaceholder('Username or email', { exact: true })
     ).toBeVisible()
+    // There is no list of assignable users: an unknown name finds nothing.
+    await adminPage2
+      .getByPlaceholder('Username or email', { exact: true })
+      .fill(`e2e_nobody_${runId}`)
+    await adminPage2
+      .getByRole('button', { name: 'Look up user', exact: true })
+      .click()
+    await expect(adminPage2.getByText('User not found')).toBeVisible()
 
     const memberPage2 = await openAuthenticatedPage(memberPage, '/organization')
     await expect(memberPage2).toHaveURL(/\/403|\/sign-in/)

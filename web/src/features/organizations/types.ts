@@ -34,6 +34,14 @@ export interface OrganizationUser {
   remark?: string
 }
 
+/** GET /api/organization/users/lookup: identity only, no quota or remark. */
+export interface OrganizationMemberLookup {
+  id: number
+  username: string
+  display_name: string
+  organization_id: number
+}
+
 export interface OrganizationUsersPage {
   page: number
   page_size: number
@@ -61,6 +69,7 @@ export interface OrganizationsPage {
 export interface ApiResponse<T = unknown> {
   success: boolean
   message?: string
+  message_key?: string
   data?: T
 }
 

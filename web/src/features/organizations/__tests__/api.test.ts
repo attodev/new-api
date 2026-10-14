@@ -26,6 +26,7 @@ import {
   exportOrgUsers,
   getAllOrganizations,
   importOrgUsers,
+  lookupOrganizationMember,
 } from '../api'
 
 vi.mock('@/lib/api', () => ({
@@ -140,5 +141,46 @@ describe('organization list and quotes', () => {
       '/api/organization/waffo/amount'
     )
     expect(vi.mocked(api.post).mock.calls[0][1]).toEqual({ amount: 10 })
+  })
+})
+
+describe('organization member lookup', () => {
+  test('sends the exact username and returns the single match', async () => {
+    const user = {
+      id: 5,
+      username: 'a b',
+      display_name: 'A',
+      organization_id: 0,
+    }
+    vi.mocked(api.get).mockResolvedValue({
+      status: 200,
+      data: { success: true, data: user },
+    })
+    await expect(
+      lookupOrganizationMember({ username: 'a b' })
+    ).resolves.toEqual(user)
+    expect(vi.mocked(api.get).mock.calls[0][0]).toBe(
+      '/api/organization/users/lookup?username=a+b'
+    )
+  })
+
+  test('resolves to null when no user matches (404)', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      status: 404,
+      data: { success: false, message: 'user not found' },
+    })
+    await expect(
+      lookupOrganizationMember({ email: 'x@example.com' })
+    ).resolves.toBeNull()
+    expect(vi.mocked(api.get).mock.calls[0][0]).toBe(
+      '/api/organization/users/lookup?email=x%40example.com'
+    )
+  })
+
+  test('rejects with the server message on other failures', async () => {
+    vi.mocked(api.get).mockResolvedValue({ status: 200, ...failure })
+    await expect(lookupOrganizationMember({ username: 'a' })).rejects.toThrow(
+      'nope'
+    )
   })
 })

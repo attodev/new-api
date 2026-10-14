@@ -22,6 +22,7 @@ import {
   Building2,
   RefreshCw,
   Save,
+  Search,
   UserPlus,
   Wallet,
 } from 'lucide-react'
@@ -56,11 +57,11 @@ import {
   createOrganization,
   deleteOrganization,
   exportOrgUsers,
-  getAssignableOrganizationUsers,
   getOrganizationProfile,
   getOrganizationUsers,
   getOrganizationUserSubscriptions,
   getAllOrganizations,
+  lookupOrganizationMember,
   removeOrganizationUserMembership,
   updateOrganization,
   updateOrganizationUser,
@@ -70,7 +71,9 @@ import {
   shouldDisableQuotaForOrganizationSubscription,
 } from '@/features/organizations/lib/organization-subscription-utils'
 import type {
+  ApiResponse,
   Organization,
+  OrganizationMemberLookup,
   OrganizationRole,
   OrganizationUpdatePayload,
   OrganizationUser,
@@ -118,6 +121,9 @@ const ASSIGNABLE_ROLES: AssignableRole[] = [
   ORGANIZATION_ROLE.MEMBER,
   ORGANIZATION_ROLE.ADMIN,
 ]
+// Backend message key for model.ErrOrganizationAssignHasPersonalBalance.
+const PERSONAL_BALANCE_ASSIGN_ERROR =
+  'user still has a personal balance or subscription; it must be cleared before joining an organization'
 const QUICK_QUOTA_AMOUNTS = [1, 5, 10, 100]
 const PAGE_SIZE = 20
 
@@ -126,6 +132,13 @@ function errorMessage(error: unknown, fallback: string): string {
     ?.response?.data?.message
   if (message) return message
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+function isPersonalBalanceAssignError(res: ApiResponse): boolean {
+  return (
+    res.message_key === PERSONAL_BALANCE_ASSIGN_ERROR ||
+    res.message === PERSONAL_BALANCE_ASSIGN_ERROR
+  )
 }
 
 function SortIcon(props: {
@@ -152,9 +165,9 @@ export function OrganizationUsersTable() {
   const [organizationId, setOrganizationId] = useState<number | null>(null)
   const [organizationProfile, setOrganizationProfile] =
     useState<Organization | null>(null)
-  const [candidateUsers, setCandidateUsers] = useState<
-    Array<User | OrganizationUser>
-  >([])
+  // Root's owner picker for new organizations; organization admins never list
+  // users and add members by exact lookup instead.
+  const [candidateUsers, setCandidateUsers] = useState<User[]>([])
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -170,7 +183,15 @@ export function OrganizationUsersTable() {
   const [editingOrganization, setEditingOrganization] =
     useState<Organization | null>(null)
   const [ownerUserId, setOwnerUserId] = useState('')
-  const [assignUsername, setAssignUsername] = useState('')
+  const [assignQuery, setAssignQuery] = useState('')
+  const [lookingUp, setLookingUp] = useState(false)
+  // undefined: not looked up yet; null: no match.
+  const [lookupResult, setLookupResult] = useState<
+    OrganizationMemberLookup | null | undefined
+  >(undefined)
+  const [assignRole, setAssignRole] = useState<AssignableRole>(
+    ORGANIZATION_ROLE.MEMBER
+  )
 
   const currentUserId = currentUser?.id
   const currentOrganizationRole = currentUser?.organization_role
@@ -314,18 +335,14 @@ export function OrganizationUsersTable() {
   }, [currentOrganizationRole])
 
   const loadCandidateUsers = useCallback(async () => {
-    if (!isRoot && !isOrganizationAdmin) return
+    if (!isRoot) return
     setLoadingCandidates(true)
     try {
-      const res = isRoot
-        ? await getUsers({ p: 1, page_size: 50 })
-        : await getAssignableOrganizationUsers({ page: 1, size: 50 })
+      const res = await getUsers({ p: 1, page_size: 50 })
       if (res.success && res.data?.items) {
-        const items = res.data.items.filter((user) => {
-          if (user.role >= ROLE.ADMIN) return false
-          if (isRoot) return (user.organization_id ?? 0) === 0
-          return true
-        })
+        const items = res.data.items.filter(
+          (user) => user.role < ROLE.ADMIN && (user.organization_id ?? 0) === 0
+        )
         setCandidateUsers(items)
       } else {
         toast.error(res.message || t('Failed to load users'))
@@ -335,7 +352,7 @@ export function OrganizationUsersTable() {
     } finally {
       setLoadingCandidates(false)
     }
-  }, [isOrganizationAdmin, isRoot, t])
+  }, [isRoot, t])
 
   useEffect(() => {
     void loadUsers()
@@ -392,27 +409,44 @@ export function OrganizationUsersTable() {
     }
   }
 
-  async function handleAssignUser() {
-    const username = assignUsername.trim()
-    if (!username) {
-      toast.error(t('Username is required'))
-      return
-    }
+  function handleAssignQueryChange(value: string) {
+    setAssignQuery(value)
+    setLookupResult(undefined)
+  }
 
+  async function handleLookupUser() {
+    const query = assignQuery.trim()
+    if (!query) return
+    setLookingUp(true)
+    try {
+      const user = await lookupOrganizationMember(
+        query.includes('@') ? { email: query } : { username: query }
+      )
+      setLookupResult(user)
+      setAssignRole(ORGANIZATION_ROLE.MEMBER)
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, t('Failed to load users')))
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
+  async function handleAssignUser() {
+    if (!lookupResult) return
     setAssigning(true)
     try {
-      const matched = candidateUsers.find((u) => u.username === username)
-      if (!matched) {
-        toast.error(t('User not found'))
-        return
-      }
-      const res = await assignOrganizationUser(matched.id, {
-        organization_role: ORGANIZATION_ROLE.MEMBER,
+      const res = await assignOrganizationUser(lookupResult.id, {
+        organization_role: isOrganizationOwner
+          ? assignRole
+          : ORGANIZATION_ROLE.MEMBER,
       })
       if (res.success) {
         toast.success(t('Organization member assigned'))
-        setAssignUsername('')
-        await Promise.all([loadUsers(), loadCandidateUsers()])
+        setAssignQuery('')
+        setLookupResult(undefined)
+        await loadUsers()
+      } else if (isPersonalBalanceAssignError(res)) {
+        toast.error(t('This user still has a personal balance or subscription'))
       } else {
         toast.error(res.message || t('Failed to assign organization member'))
       }
@@ -815,22 +849,68 @@ export function OrganizationUsersTable() {
               <div className='flex flex-wrap items-center gap-2'>
                 <Input
                   className='min-w-56 flex-1'
-                  placeholder={t('Username')}
-                  value={assignUsername}
-                  onChange={(e) => setAssignUsername(e.target.value)}
+                  placeholder={t('Username or email')}
+                  value={assignQuery}
+                  onChange={(e) => handleAssignQueryChange(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleAssignUser()
+                    if (e.key === 'Enter') void handleLookupUser()
                   }}
-                  disabled={assigning}
+                  disabled={lookingUp || assigning}
                 />
                 <Button
-                  onClick={() => void handleAssignUser()}
-                  disabled={assigning || !assignUsername.trim()}
+                  variant='outline'
+                  onClick={() => void handleLookupUser()}
+                  disabled={lookingUp || assigning || !assignQuery.trim()}
                 >
-                  <UserPlus />
-                  {t('Add')}
+                  <Search />
+                  {t('Look up user')}
                 </Button>
               </div>
+              {lookupResult === null && (
+                <div className='text-muted-foreground text-sm'>
+                  {t('User not found')}
+                </div>
+              )}
+              {lookupResult && (
+                <div className='flex flex-wrap items-center gap-2 rounded-md border px-3 py-2'>
+                  <div className='min-w-0 flex-1 text-sm'>
+                    <div className='truncate font-medium'>
+                      {lookupResult.username}
+                    </div>
+                    {lookupResult.display_name &&
+                      lookupResult.display_name !== lookupResult.username && (
+                        <div className='text-muted-foreground truncate text-xs'>
+                          {lookupResult.display_name}
+                        </div>
+                      )}
+                  </div>
+                  {isOrganizationOwner && (
+                    <NativeSelect
+                      aria-label={t('New member role')}
+                      value={assignRole}
+                      onChange={(event) =>
+                        setAssignRole(
+                          event.currentTarget.value as AssignableRole
+                        )
+                      }
+                      disabled={assigning}
+                    >
+                      {ASSIGNABLE_ROLES.map((r) => (
+                        <NativeSelectOption key={r} value={r}>
+                          {t(r)}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  )}
+                  <Button
+                    onClick={() => void handleAssignUser()}
+                    disabled={assigning}
+                  >
+                    <UserPlus />
+                    {t('Add')}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
