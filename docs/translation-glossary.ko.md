@@ -126,6 +126,18 @@
 | Collapse / Expand | 접기 / 펼치기 | 시드된 `Collapse`, `Expand` 값. "Collapse all"은 "모두 접기", "Expand panel"은 "패널 펼치기". |
 | Discard (changes) | 버리기 | "Discard changes"는 "변경 사항 버리기". 취소(Cancel)와 구분합니다. |
 | Deprecated | 지원 중단됨 | 상태 라벨. |
+| Factory (plugin) | 기본 제공 | 작업 플러그인의 출고 시 내장 버전. 시드된 "기본 제공 v{{factory}}"와 맞춥니다. |
+| Fallback | 폴백 | 시드된 "폴백 티어"와 맞춥니다. "Fallback route"는 "폴백 라우트". |
+| Split (advanced custom) | 분할 | 시드된 "분할 추가"와 맞춥니다. |
+| Incoming path | 수신 경로 | 시드된 "같은 수신 경로에서는…"과 맞춥니다. |
+| Marketplace index / source | 인덱스 / 소스 | 작업 플러그인 마켓플레이스. "Index URL"은 "인덱스 URL", "Marketplace sources"는 "마켓플레이스 소스". |
+| Integrity | 무결성 | "Integrity hash"는 "무결성 해시". 파일 점검이므로 Verify는 "확인"을 씁니다. |
+| Legacy | 레거시 | "Legacy token"은 "레거시 토큰". 시드된 `Legacy Format (JSON Object)` = "이전 형식"은 형식 이름이라 그대로 둡니다. |
+| Hidden / Hide | 숨김 / 숨기기 | 상태 라벨은 "숨김", 버튼은 "숨기기". "Extra visible"(추가 표시)과 짝을 이룹니다. |
+| Model discovery | 모델 검색 | 업스트림에서 모델 목록을 찾는 기능. 시드된 OIDC "검색"과 같은 계열입니다. |
+| Model analytics | 모델 분석 | 대시보드 차트. 배치 2의 "모델 분석" 문장과 맞춥니다. |
+| Invalid X | 유효하지 않은 X | 라벨형 오류 메시지. 시드된 "유효하지 않은 결제 리디렉션 URL"(11회)과 맞춥니다. |
+| Theme preset names | 영문 유지 | Lake View, Forest Whisper 같은 테마 이름은 team에서 영어로 두었고 화면의 `preset.*` 값도 영어라 `MANUAL_SKIP`에 넣었습니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -147,3 +159,5 @@
 | 프리필 그룹 (Prefill group) | 미리 채우기 그룹 | `Create Prefill Group`, `Prefill groups help you keep…` 2회. |
 | 리전 (Region, deployment) | Region, 지역 | `Deployment Region *` = "배포 Region *", `Enter deployment region or JSON mapping:` = "배포 지역". |
 | 패스스루 (Passthrough) | 통과, 전달 | `Enable Request Passthrough` = "요청 통과", `Disable store passthrough` = "매장 통과"(오역), `Field passthrough controls` = "필드 전달". |
+| 모델 마켓플레이스 (Model square) | 모델 스퀘어 | `Collect relay latency and success-rate metrics for the model square.` 1회. |
+| 모델 분석 (Model analytics) | 모델 데이터 분석 | `Model Analytics` 라벨 1회. |
