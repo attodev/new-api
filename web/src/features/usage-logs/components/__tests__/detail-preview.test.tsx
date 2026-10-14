@@ -28,7 +28,7 @@ import { I18nextProvider } from 'react-i18next'
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import en from '@/i18n/locales/en.json'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import {
   DEFAULT_CURRENCY_CONFIG,
   useSystemConfigStore,
@@ -268,7 +268,7 @@ test.each([
 test.each([false, true])(
   'dynamic pricing without a saved tier uses a localized neutral fallback for task=%s',
   async (isTask) => {
-    i18n.addResourceBundle('zh', 'translation', zh.translation)
+    i18n.addResourceBundle('ko', 'translation', ko.translation) // fork: O9
     const preview = renderPreview({
       is_task: isTask,
       billing_mode: 'tiered_expr',
@@ -281,9 +281,9 @@ test.each([false, true])(
     expect(preview.textContent).toBe(
       'Dynamic Pricing · Special billing expression'
     )
-    await act(() => i18n.changeLanguage('zh'))
+    await act(() => i18n.changeLanguage('ko'))
     expect(
-      screen.getByRole('button', { name: '动态计费 · 特殊计费表达式' })
+      screen.getByRole('button', { name: '동적 가격 · 특수 결제 표현식' })
     ).toBeVisible()
   }
 )

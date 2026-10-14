@@ -48,27 +48,26 @@ afterEach(async () => {
   await act(() => i18next.changeLanguage('en'))
 })
 
-test('uses Chinese calendar locales for zhCN and zhTW in both date pickers', async () => {
-  await setInterfaceLanguage('zhCN')
+// fork: O9 — the fork keeps only English and Korean calendar locales.
+test('uses the Korean calendar locale for ko in both date pickers', async () => {
+  await setInterfaceLanguage('ko')
   const datePicker = render(
     <DatePicker selected={selected} onSelect={() => undefined} />
   )
-  expect(await openCalendar()).toHaveTextContent('zh-CN')
+  expect(await openCalendar()).toHaveTextContent('ko')
   datePicker.unmount()
 
-  const dateTimePicker = render(
-    <DateTimePicker value={selected} onChange={() => undefined} />
-  )
-  expect(await openCalendar()).toHaveTextContent('zh-CN')
-  dateTimePicker.unmount()
-
-  await setInterfaceLanguage('zhTW')
-  render(<DatePicker selected={selected} onSelect={() => undefined} />)
-  expect(await openCalendar()).toHaveTextContent('zh-TW')
+  render(<DateTimePicker value={selected} onChange={() => undefined} />)
+  expect(await openCalendar()).toHaveTextContent('ko')
 })
 
-test('keeps French on the French calendar locale', async () => {
-  await setInterfaceLanguage('fr')
-  render(<DatePicker selected={selected} onSelect={() => undefined} />)
-  expect(await openCalendar()).toHaveTextContent('fr')
+test('falls back to the English calendar locale for removed languages', async () => {
+  for (const language of ['zhCN', 'fr']) {
+    await setInterfaceLanguage(language)
+    const picker = render(
+      <DatePicker selected={selected} onSelect={() => undefined} />
+    )
+    expect(await openCalendar()).toHaveTextContent('en-US')
+    picker.unmount()
+  }
 })

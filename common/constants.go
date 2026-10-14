@@ -38,9 +38,9 @@ var CryptoSecret = uuid.New().String()
 var SessionCookieSecure = false
 
 // DefaultLanguage is the DEFAULT_LANGUAGE environment variable: the language of
-// server log lines and of text for a reader who states no language: en, zh-CN,
-// zh-TW or ko. English when empty.
-var DefaultLanguage string // fork: O9 (ko in the doc comment above)
+// server log lines and of text for a reader who states no language: en or ko.
+// English when empty. Server log lines also accept zh-CN.
+var DefaultLanguage string // fork: O9 (en/ko in the doc comment above)
 var SessionCookieTrustedURLs []string
 
 const (

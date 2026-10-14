@@ -36,7 +36,7 @@ import {
 } from 'vitest'
 
 import en from '@/i18n/locales/en.json'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import {
   DEFAULT_CURRENCY_CONFIG,
   useSystemConfigStore,
@@ -102,28 +102,32 @@ const cases = [
     },
     english:
       'Increase quota for user “quota-owner” (ID: 42) · Requested quota: $1 · $1 → $2',
-    chinese: '增加用户「quota-owner」的额度（ID: 42） · 请求数额：$1 · $1 → $2',
+    korean:
+      '사용자 “quota-owner”의 쿼터 증가 (ID: 42) · 요청 쿼터: $1 · $1 → $2',
   },
   {
     action: 'user.quota_add',
     params: { quota: 500000 },
     english:
       'Increase user quota · Target not recorded · Requested quota: $1 · Not recorded → Not recorded',
-    chinese: '增加用户额度 · 目标未记录 · 请求数额：$1 · 未记录 → 未记录',
+    korean:
+      '사용자 쿼터 증가 · 대상이 기록되지 않음 · 요청 쿼터: $1 · 기록되지 않음 → 기록되지 않음',
   },
   {
     action: 'user.quota_subtract',
     params: { quota: 500000 },
     english:
       'Decrease user quota · Target not recorded · Requested quota: $1 · Not recorded → Not recorded',
-    chinese: '减少用户额度 · 目标未记录 · 请求数额：$1 · 未记录 → 未记录',
+    korean:
+      '사용자 쿼터 차감 · 대상이 기록되지 않음 · 요청 쿼터: $1 · 기록되지 않음 → 기록되지 않음',
   },
   {
     action: 'user.quota_override',
     params: { from: 500000, to: 0 },
     english:
       'Override user quota · Target not recorded · Requested quota: $0 · $1 → $0',
-    chinese: '覆盖用户额度 · 目标未记录 · 请求数额：$0 · $1 → $0',
+    korean:
+      '사용자 쿼터 재정의 · 대상이 기록되지 않음 · 요청 쿼터: $0 · $1 → $0',
   },
 ]
 
@@ -153,7 +157,7 @@ describe('quota adjustment log localization', () => {
       await i18n.init({
         lng: 'en',
         fallbackLng: 'en',
-        resources: { en, zh },
+        resources: { en, ko }, // fork: O9
         interpolation: { escapeValue: false },
       })
       const log: UsageLog = {
@@ -194,17 +198,17 @@ describe('quota adjustment log localization', () => {
       expect(
         within(screen.getByRole('dialog')).getByText(scenario.english)
       ).toBeInTheDocument()
-      await act(() => i18n.changeLanguage('zh'))
-      expect(screen.getAllByText(scenario.chinese)).toHaveLength(2)
+      await act(() => i18n.changeLanguage('ko'))
+      expect(screen.getAllByText(scenario.korean)).toHaveLength(2)
       expect(
-        within(screen.getByRole('dialog')).getByText(scenario.chinese)
+        within(screen.getByRole('dialog')).getByText(scenario.korean)
       ).toBeInTheDocument()
       expect(screen.queryByText('English export fallback')).toBeNull()
       if ('target_user_id' in scenario.params) {
         const dialog = within(screen.getByRole('dialog'))
         expect(dialog.getByText('quota-owner')).toBeVisible()
-        expect(dialog.getByText('调整前额度')).toBeVisible()
-        expect(dialog.getByText('调整后额度')).toBeVisible()
+        expect(dialog.getByText('조정 전 쿼터')).toBeVisible()
+        expect(dialog.getByText('조정 후 쿼터')).toBeVisible()
       }
     }
   )

@@ -30,7 +30,7 @@ import type { ReactElement } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import type { PermissionResourceDef } from '@/lib/admin-permissions'
 import { api } from '@/lib/api'
 import dayjs from '@/lib/dayjs'
@@ -82,9 +82,9 @@ it.each([
   [100, 'root'],
   [10, 'admin'],
   [1, 'user'],
-] as const)('keeps role %i as %s in Chinese', async (role, label) => {
+] as const)('keeps role %i as %s in Korean', async (role, label) => {
   const i18n = createInstance()
-  await i18n.init({ lng: 'zh', resources: { zh } })
+  await i18n.init({ lng: 'ko', resources: { ko } })
   const log = {
     ...entry,
     actor_role: role,
@@ -98,8 +98,8 @@ it.each([
       <AuditLogDetailsDialog entry={log} />
     </I18nextProvider>
   )
-  await userEvent.click(screen.getByRole('button', { name: '详情' }))
-  const dialog = await screen.findByRole('dialog', { name: '日志详情' })
+  await userEvent.click(screen.getByRole('button', { name: '세부 정보' }))
+  const dialog = await screen.findByRole('dialog', { name: '로그 상세' })
   expect(within(dialog).getByText(label)).toBeVisible()
   expect(within(dialog).getByText('literal-name (ID: 1)')).toBeVisible()
 })
@@ -114,16 +114,17 @@ it('uses the returned authentication method for personal access records', async 
 })
 
 it.each([
-  ['token.create', '创建 API 令牌「1」（ID: 11）'],
-  ['token.update', '更新 API 令牌「1」（ID: 11）'],
-  ['token.status_update', '更新 API 令牌「1」（ID: 11）'],
-  ['token.delete', '删除 API 令牌「1」（ID: 11）'],
-  ['token.delete_batch', '批量删除 API 令牌'],
-  ['token.key_view', '查看 API 令牌「1」的密钥（ID: 11）'],
-  ['token.key_view_batch', '批量查看 API 令牌密钥'],
+  // fork: O9 — the fork keeps only English and Korean.
+  ['token.create', 'API 키 “1” 생성 (ID: 11)'],
+  ['token.update', 'API 키 “1” 업데이트 (ID: 11)'],
+  ['token.status_update', 'API 키 “1” 업데이트 (ID: 11)'],
+  ['token.delete', 'API 키 “1” 삭제 (ID: 11)'],
+  ['token.delete_batch', 'API 키 일괄 삭제'],
+  ['token.key_view', 'API 키 “1”의 키 값 조회 (ID: 11)'],
+  ['token.key_view_batch', 'API 키 값 일괄 조회'],
 ])('localizes the neutral event summary for %s', async (action, summary) => {
   const i18n = createInstance()
-  await i18n.init({ lng: 'zh', resources: { zh } })
+  await i18n.init({ lng: 'ko', resources: { ko } })
   const detail = buildAuditDetails(
     {
       ...entry,
@@ -637,35 +638,35 @@ it.each([
     '/api/redemption/batch',
     { count: 15 },
     true,
-    '批量删除了 15 个兑换码',
+    '충전 코드 15개를 일괄 삭제했습니다',
   ],
   [
     'redemption.delete_batch',
     '/api/redemption/batch',
     { count: 0 },
     true,
-    '批量删除了 0 个兑换码',
+    '충전 코드 0개를 일괄 삭제했습니다',
   ],
   [
     'redemption.delete',
     '/api/redemption/batch',
     {},
     true,
-    '批量删除兑换码（数量未记录）',
+    '충전 코드를 일괄 삭제했습니다(개수 기록 안 됨)',
   ],
   [
     'redemption.delete_batch',
     '/api/redemption/batch',
     {},
     false,
-    '批量删除兑换码失败',
+    '충전 코드를 일괄 삭제하지 못했습니다',
   ],
-  ['redemption.delete', '/api/redemption/:id', {}, true, '删除了一个兑换码'],
+  ['redemption.delete', '/api/redemption/:id', {}, true, '충전 코드 삭제'],
 ])(
   'renders redemption audit %s at %s with recorded result %j',
   async (action, route, params, success, summary) => {
     const i18n = createInstance()
-    await i18n.init({ lng: 'zh', resources: { zh } })
+    await i18n.init({ lng: 'ko', resources: { ko } })
     const detail = buildAuditDetails(
       {
         ...entry,
@@ -886,7 +887,7 @@ it('loads scope labels for a generated token when its details open', async () =>
     data: { success: true, data: { resources: scopeResources } },
   })
   const i18n = createInstance()
-  await i18n.init({ lng: 'zh', resources: { zh } })
+  await i18n.init({ lng: 'ko', resources: { ko } })
   renderWithQueryClient(
     <I18nextProvider i18n={i18n}>
       <AuditLogDetailsDialog
@@ -900,16 +901,18 @@ it('loads scope labels for a generated token when its details open', async () =>
     </I18nextProvider>
   )
   expect(get).not.toHaveBeenCalled()
-  await userEvent.click(screen.getByRole('button', { name: '详情' }))
-  const dialog = await screen.findByRole('dialog', { name: '日志详情' })
-  expect(await within(dialog).findByText('查看, 编辑')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: '세부 정보' }))
+  const dialog = await screen.findByRole('dialog', { name: '로그 상세' })
+  expect(await within(dialog).findByText('확인, 편집')).toBeVisible()
   expect(get).toHaveBeenCalledWith(
     '/api/user/access_tokens/scopes',
     expect.anything()
   )
-  expect(within(dialog).getByText('个人资料')).toBeVisible()
-  expect(within(dialog).getByText('1 项权限不在当前权限目录中')).toBeVisible()
-  expect(within(dialog).getByText('永不过期')).toBeVisible()
+  expect(within(dialog).getByText('프로필')).toBeVisible()
+  expect(
+    within(dialog).getByText('권한 1개를 더 이상 사용할 수 없습니다')
+  ).toBeVisible()
+  expect(within(dialog).getByText('만료되지 않음')).toBeVisible()
   expect(dialog).not.toHaveTextContent(/profile:|retired/)
 })
 
@@ -918,7 +921,7 @@ it('loads scope labels for a permission change when its details open', async () 
     data: { success: true, data: { resources: scopeResources } },
   })
   const i18n = createInstance()
-  await i18n.init({ lng: 'zh', resources: { zh } })
+  await i18n.init({ lng: 'ko', resources: { ko } })
   renderWithQueryClient(
     <I18nextProvider i18n={i18n}>
       <AuditLogDetailsDialog
@@ -942,15 +945,15 @@ it('loads scope labels for a permission change when its details open', async () 
       />
     </I18nextProvider>
   )
-  await userEvent.click(screen.getByRole('button', { name: '详情' }))
-  const dialog = await screen.findByRole('dialog', { name: '日志详情' })
-  expect(await within(dialog).findByText('查看, 编辑')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: '세부 정보' }))
+  const dialog = await screen.findByRole('dialog', { name: '로그 상세' })
+  expect(await within(dialog).findByText('확인, 편집')).toBeVisible()
   expect(get).toHaveBeenCalledWith(
     '/api/user/access_tokens/scopes',
     expect.anything()
   )
-  expect(within(dialog).getByText('原权限')).toBeVisible()
-  expect(within(dialog).getByText('用户')).toBeVisible()
+  expect(within(dialog).getByText('이전 권한')).toBeVisible()
+  expect(within(dialog).getByText('사용자')).toBeVisible()
   expect(dialog).not.toHaveTextContent(/profile:|user:/)
 })
 

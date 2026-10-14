@@ -32,8 +32,7 @@ import { I18nextProvider } from 'react-i18next'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import zhTW from '@/i18n/locales/zh-TW.json'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import { api } from '@/lib/api'
 
 import { SettingsPageProvider } from '../../components/settings-page-context'
@@ -107,7 +106,7 @@ beforeEach(async () => {
   await testI18n.init({
     lng: 'en',
     fallbackLng: 'en',
-    resources: { en: { translation: {} }, zh, 'zh-TW': zhTW },
+    resources: { en: { translation: {} }, ko }, // fork: O9
     interpolation: { escapeValue: false },
   })
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
@@ -279,7 +278,8 @@ describe('OAuth settings saves', () => {
     )
   })
 
-  it.each(['zh', 'zh-TW'])(
+  // fork: O9 — the fork keeps only English and Korean.
+  it.each(['ko'])(
     'uses the Well-Known technical term in %s validation',
     async (language) => {
       await testI18n.changeLanguage(language)
@@ -298,8 +298,11 @@ describe('OAuth settings saves', () => {
       expect(url).toHaveAccessibleDescription(
         expect.stringContaining('Well-Known URL')
       )
+      expect(url).toHaveAccessibleDescription(
+        expect.stringContaining('시작해야 합니다')
+      )
       expect(url).not.toHaveAccessibleDescription(
-        expect.stringContaining('知名')
+        expect.stringContaining('잘 알려진')
       )
     }
   )

@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	LangZhCN    = "zh-CN"
-	LangZhTW    = "zh-TW"
 	LangEn      = "en"
 	LangKo      = "ko"   // fork: O9
 	DefaultLang = LangEn // Fallback to English if language not supported
@@ -38,11 +36,11 @@ var (
 func Init() error {
 	var initErr error
 	initOnce.Do(func() {
-		bundle = i18n.NewBundle(language.Chinese)
+		bundle = i18n.NewBundle(language.English) // fork: O9
 		bundle.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
 
 		// Load embedded translation files
-		files := []string{"locales/zh-CN.yaml", "locales/zh-TW.yaml", "locales/en.yaml", "locales/ko.yaml"} // fork: O9
+		files := []string{"locales/en.yaml", "locales/ko.yaml"} // fork: O9
 		for _, file := range files {
 			_, err := bundle.LoadMessageFileFS(localeFS, file)
 			if err != nil {
@@ -52,8 +50,6 @@ func Init() error {
 		}
 
 		// Pre-create localizers for supported languages
-		localizers[LangZhCN] = i18n.NewLocalizer(bundle, LangZhCN)
-		localizers[LangZhTW] = i18n.NewLocalizer(bundle, LangZhTW)
 		localizers[LangEn] = i18n.NewLocalizer(bundle, LangEn)
 		localizers[LangKo] = i18n.NewLocalizer(bundle, LangKo) // fork: O9
 
@@ -192,16 +188,11 @@ func ParseAcceptLanguage(header string) string {
 func normalizeLang(lang string) string {
 	lang = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(lang), "_", "-"))
 
-	// Handle common variations. The web console saves its own codes zhCN and
-	// zhTW, and maps zh-HK, zh-MO and zh-Hant to Traditional Chinese.
+	// Handle common variations. The fork keeps only English and Korean; kr is
+	// the legacy team code and every other language is English. // fork: O9
 	switch {
 	case lang == "kr" || lang == "ko" || strings.HasPrefix(lang, "ko-"): // fork: O9
 		return LangKo // fork: O9
-	case lang == "zhtw" || strings.HasPrefix(lang, "zh-tw") || strings.HasPrefix(lang, "zh-hk") ||
-		strings.HasPrefix(lang, "zh-mo") || strings.HasPrefix(lang, "zh-hant"):
-		return LangZhTW
-	case strings.HasPrefix(lang, "zh"):
-		return LangZhCN
 	case strings.HasPrefix(lang, "en"):
 		return LangEn
 	default:
@@ -211,7 +202,7 @@ func normalizeLang(lang string) string {
 
 // SupportedLanguages returns a list of supported language codes
 func SupportedLanguages() []string {
-	return []string{LangZhCN, LangZhTW, LangEn, LangKo} // fork: O9
+	return []string{LangEn, LangKo} // fork: O9
 }
 
 // IsSupported checks if a language code is supported

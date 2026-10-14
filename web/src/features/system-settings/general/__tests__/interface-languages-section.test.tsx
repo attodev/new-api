@@ -27,27 +27,27 @@ import { api } from '@/lib/api'
 import { SettingsPageProvider } from '../../components/settings-page-context'
 import { InterfaceLanguagesSection } from '../interface-languages-section'
 
-function Fixture() {
+function Fixture({ value }: { value: string }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   return (
     <>
       <div ref={setContainer} />
       <SettingsPageProvider actionsContainer={container}>
         <InterfaceLanguagesSection
-          defaultValues={{ InterfaceLanguages: 'en,ko' }}
+          defaultValues={{ InterfaceLanguages: value }}
         />
       </SettingsPageProvider>
     </>
   )
 }
 
-function renderSection() {
+function renderSection(value = 'en,ko') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   render(
     <QueryClientProvider client={client}>
-      <Fixture />
+      <Fixture value={value} />
     </QueryClientProvider>
   )
 }
@@ -57,21 +57,21 @@ beforeEach(() => {
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
 })
 
-test('saves the checked languages as a comma-separated option', async () => {
+test('offers English and Korean and saves the checked ones as a comma-separated option', async () => {
   const user = userEvent.setup()
-  renderSection()
+  renderSection('en')
 
+  expect(screen.getAllByRole('checkbox')).toHaveLength(2)
   expect(screen.getByRole('checkbox', { name: 'English' })).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: '한국어' })).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: '日本語' })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: '한국어' })).not.toBeChecked()
 
-  await user.click(screen.getByRole('checkbox', { name: '日本語' }))
+  await user.click(screen.getByRole('checkbox', { name: '한국어' }))
   await user.click(screen.getByRole('button', { name: 'Save Changes' }))
 
   await waitFor(() =>
     expect(api.put).toHaveBeenCalledWith('/api/option/', {
       key: 'InterfaceLanguages',
-      value: 'en,ko,ja',
+      value: 'en,ko',
     })
   )
 })

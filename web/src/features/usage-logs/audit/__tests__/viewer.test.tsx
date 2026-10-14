@@ -32,12 +32,7 @@ import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import en from '@/i18n/locales/en.json'
-import fr from '@/i18n/locales/fr.json'
-import ja from '@/i18n/locales/ja.json'
-import ru from '@/i18n/locales/ru.json'
-import viLocale from '@/i18n/locales/vi.json'
-import zhTW from '@/i18n/locales/zh-TW.json'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -302,31 +297,12 @@ it.each([
     'Updated channel status (ID: 42)',
     'Batch updated channel status (1/2 changed)',
   ],
-  ['zh', zh, '更新渠道状态（ID: 42）', '批量更新渠道状态（1/2 个已变更）'],
-  ['zh-TW', zhTW, '更新渠道狀態（ID: 42）', '批次更新渠道狀態（1/2 個已變更）'],
+  // fork: O9 — the fork keeps only English and Korean.
   [
-    'fr',
-    fr,
-    'Statut du canal mis à jour (ID : 42)',
-    'Statuts des canaux mis à jour par lot (1/2 modifiés)',
-  ],
-  [
-    'ja',
-    ja,
-    'チャネルの状態を更新（ID: 42）',
-    'チャネルの状態を一括更新（1/2 件変更）',
-  ],
-  [
-    'ru',
-    ru,
-    'Обновлён статус канала (ID: 42)',
-    'Массовое обновление статусов каналов (изменено: 1/2)',
-  ],
-  [
-    'vi',
-    viLocale,
-    'Đã cập nhật trạng thái kênh (ID: 42)',
-    'Đã cập nhật trạng thái kênh hàng loạt (1/2 đã thay đổi)',
+    'ko',
+    ko,
+    '채널 상태 업데이트(ID: 42)',
+    '채널 상태를 일괄 업데이트했습니다(1/2 변경됨)',
   ],
 ] as const)(
   'renders existing channel status audit records in %s',

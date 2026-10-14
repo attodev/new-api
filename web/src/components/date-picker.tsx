@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Calendar as CalendarIcon } from 'lucide-react'
-import { enUS, fr, ja, ko, ru, vi, zhCN, zhTW } from 'react-day-picker/locale' // fork: O9
+import { enUS, ko } from 'react-day-picker/locale' // fork: O9
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -29,16 +29,7 @@ import {
 } from '@/components/ui/popover'
 import dayjs from '@/lib/dayjs'
 
-const calendarLocales = {
-  en: enUS,
-  zhCN,
-  zhTW,
-  fr,
-  ru,
-  ja,
-  ko, // fork: O9
-  vi,
-} as const
+const calendarLocales = { en: enUS, ko } as const // fork: O9
 
 type DatePickerProps = {
   selected: Date | undefined

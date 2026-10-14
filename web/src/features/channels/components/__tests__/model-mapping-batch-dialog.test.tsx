@@ -22,7 +22,7 @@ import { createInstance } from 'i18next'
 import { I18nextProvider } from 'react-i18next'
 import { expect, test, vi } from 'vitest'
 
-import fr from '@/i18n/locales/fr.json'
+import ko from '@/i18n/locales/ko.json'
 
 import { ModelMappingBatchDialog } from '../model-mapping-batch-dialog'
 
@@ -246,7 +246,7 @@ test('cancelling after configuring a rule does not apply mappings', async () => 
 
 test('long translated source labels wrap inside their row without covering the model search', async () => {
   const i18n = createInstance()
-  await i18n.init({ lng: 'fr', resources: { fr }, keySeparator: false })
+  await i18n.init({ lng: 'ko', resources: { ko }, keySeparator: false }) // fork: O9
   render(
     <I18nextProvider i18n={i18n}>
       <ModelMappingBatchDialog
@@ -258,12 +258,10 @@ test('long translated source labels wrap inside their row without covering the m
       />
     </I18nextProvider>
   )
-  const tabs = screen.getByRole('tablist', { name: 'Sélectionner les modèles' })
+  const tabs = screen.getByRole('tablist', { name: '모델 선택' })
   expect(tabs).toHaveClass('grid-cols-2', 'group-data-horizontal/tabs:h-auto')
   for (const tab of within(tabs).getAllByRole('tab')) {
     expect(tab).toHaveClass('whitespace-normal', 'h-auto')
   }
-  expect(
-    screen.getByRole('textbox', { name: 'Rechercher des modèles...' })
-  ).toBeVisible()
+  expect(screen.getByRole('textbox', { name: '모델 검색...' })).toBeVisible()
 })

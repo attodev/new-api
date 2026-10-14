@@ -37,8 +37,7 @@ import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import zhTW from '@/i18n/locales/zh-TW.json'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import { api } from '@/lib/api'
 
 import { CommonLogsFilterBar } from '../common-logs-filter-bar'
@@ -283,12 +282,10 @@ it('collapses only date and statistics while keeping the right-hand quick action
   expect(await screen.findByText('Usage')).toBeVisible()
 })
 
-it.each([
-  { language: 'zh', resources: zh.translation },
-  { language: 'zh-TW', resources: zhTW.translation },
-])(
-  'labels the calendar-month preset as 本月 in $language and selects the complete month',
-  async ({ language, resources }) => {
+// fork: O9 — the fork keeps only English and Korean.
+it.each([{ language: 'ko', resources: ko.translation, label: '이번 달' }])(
+  'labels the calendar-month preset as $label in $language and selects the complete month',
+  async ({ language, resources, label }) => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 8, 8, 12))
     i18next.addResourceBundle(language, 'translation', resources, true, true)
@@ -303,7 +300,7 @@ it.each([
       />
     )
     await user.click(screen.getByRole('button', { name: /^2026/ }))
-    const preset = screen.getByRole('button', { name: '本月' })
+    const preset = screen.getByRole('button', { name: label })
     expect(preset).toBeVisible()
     await user.click(preset)
     expect(onChange).toHaveBeenCalledWith({

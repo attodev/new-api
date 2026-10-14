@@ -192,8 +192,8 @@ it.each([
 )
 
 it.each([
-  { language: 'zhCN', locale: 'zh-CN' },
-  { language: 'zhTW', locale: 'zh-TW' },
+  { language: 'ko', locale: 'ko' }, // fork: O9
+  { language: 'zhCN', locale: 'en' }, // fork: O9 — removed languages format as English
 ])(
   'formats status numbers and timestamps for $language',
   async ({ language, locale }) => {

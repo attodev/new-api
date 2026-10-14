@@ -45,13 +45,20 @@ afterEach(async () => {
 })
 
 test('offers the allowed languages plus the current one', async () => {
-  useSystemConfigStore
-    .getState()
-    .setConfig({ interfaceLanguages: ['en', 'ko'] })
+  useSystemConfigStore.getState().setConfig({ interfaceLanguages: ['en'] })
+  await setInterfaceLanguage('ko') // fork: O9 — only en/ko remain
+  render(<LanguageSwitcher />)
+
+  expect(await openMenuItems()).toEqual(['English', '한국어'])
+})
+
+// fork: O9 — a saved removed language (ja) is shown as English.
+test('treats a removed current language as English', async () => {
+  useSystemConfigStore.getState().setConfig({ interfaceLanguages: ['ko'] })
   await setInterfaceLanguage('ja')
   render(<LanguageSwitcher />)
 
-  expect(await openMenuItems()).toEqual(['English', '한국어', '日本語'])
+  expect(await openMenuItems()).toEqual(['English', '한국어'])
 })
 
 test('offers only the allowed languages when the current one is allowed', async () => {

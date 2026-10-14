@@ -22,7 +22,7 @@ import { createInstance } from 'i18next'
 import { I18nextProvider } from 'react-i18next'
 import { expect, test, vi } from 'vitest'
 
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 
 import type { TaskPluginOption } from '../../api'
 import { ChannelProviderPicker } from '../drawers/channel-provider-picker'
@@ -125,12 +125,13 @@ test('editing an existing legacy Zhipu channel retains its selectable provider',
   expect(select).toHaveBeenCalledWith({ kind: 'builtin', type: 16 })
 })
 
-test('Zhipu GLM uses the renamed Chinese label and remains searchable after changing language', async () => {
+// fork: O9 — the fork keeps only English and Korean.
+test('Zhipu GLM uses the translated label and remains searchable after changing language', async () => {
   const language = createInstance()
   await language.init({
     lng: 'en',
     fallbackLng: 'en',
-    resources: { en: { translation: {} }, zh },
+    resources: { en: { translation: {} }, ko },
   })
   const user = userEvent.setup()
   render(
@@ -151,8 +152,10 @@ test('Zhipu GLM uses the renamed Chinese label and remains searchable after chan
   expect(
     screen.getByRole('option', { name: 'Zhipu GLM Built-in #26' })
   ).toBeVisible()
-  await act(() => language.changeLanguage('zh'))
-  expect(screen.getByRole('option', { name: '智谱GLM 内置 #26' })).toBeVisible()
+  await act(() => language.changeLanguage('ko'))
+  expect(
+    screen.getByRole('option', { name: 'Zhipu GLM 내장 #26' })
+  ).toBeVisible()
 })
 
 test('plugin extensions keep built-in and independent plugin choices distinct in every category', async () => {
@@ -665,7 +668,7 @@ test('every built-in provider has a description and Anthropic includes compatibl
   await language.init({
     lng: 'en',
     fallbackLng: 'en',
-    resources: { en: { translation: {} }, zhCN: zh },
+    resources: { en: { translation: {} }, ko }, // fork: O9
   })
   render(
     <I18nextProvider i18n={language}>
@@ -690,12 +693,12 @@ test('every built-in provider has a description and Anthropic includes compatibl
   expect(anthropic).toHaveAccessibleDescription(
     'Connect to the Anthropic API or compatible services'
   )
-  await act(() => language.changeLanguage('zhCN'))
+  await act(() => language.changeLanguage('ko'))
   expect(anthropic).toHaveAccessibleDescription(
-    '接入 Anthropic API 或兼容其接口的服务'
+    'Anthropic API 또는 호환 서비스에 연결합니다'
   )
   expect(
-    within(anthropic).getByText('接入 Anthropic API 或兼容其接口的服务')
+    within(anthropic).getByText('Anthropic API 또는 호환 서비스에 연결합니다')
   ).toBeVisible()
 })
 

@@ -59,12 +59,12 @@ describe('toInterfaceLanguageList', () => {
 
 describe('parseInterfaceLanguageOption', () => {
   it('maps the option value to interface codes in the admin order', () => {
-    expect(parseInterfaceLanguageOption('ja, kr,EN,zhcn,xx,ko')).toEqual([
-      'ja',
-      'ko',
-      'en',
-      'zhCN',
-    ])
+    expect(parseInterfaceLanguageOption('kr,EN,xx,ko')).toEqual(['ko', 'en'])
     expect(parseInterfaceLanguageOption('')).toEqual([])
+  })
+  it('drops the removed interface languages', () => {
+    expect(parseInterfaceLanguageOption('ja,zhCN,zhTW,fr,ru,vi,ko')).toEqual([
+      'ko',
+    ])
   })
 })

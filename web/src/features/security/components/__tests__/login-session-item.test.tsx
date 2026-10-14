@@ -49,16 +49,16 @@ afterEach(async () => {
   await act(() => i18next.changeLanguage('en'))
 })
 
-test('renders last-active relative time in zhCN and fr instead of English ago', async () => {
-  await setInterfaceLanguage('zhCN')
+// fork: O9 — only en and ko remain; a removed code (zhCN) renders English.
+test('renders last-active relative time in ko instead of English ago, and English for removed languages', async () => {
+  await setInterfaceLanguage('ko')
   const { rerender } = render(
     <LoginSessionItem session={session} onRevoke={() => undefined} />
   )
-  const chinese = screen.getByText(/小时/).textContent ?? ''
-  expect(chinese).not.toMatch(/ago/i)
+  const korean = screen.getByText(/시간/).textContent ?? ''
+  expect(korean).not.toMatch(/ago/i)
 
-  await setInterfaceLanguage('fr')
+  await setInterfaceLanguage('zhCN')
   rerender(<LoginSessionItem session={session} onRevoke={() => undefined} />)
-  const french = screen.getByText(/heure/).textContent ?? ''
-  expect(french).not.toMatch(/ago/i)
+  expect(screen.getByText(/hours? ago/)).toBeVisible()
 })

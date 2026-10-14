@@ -7,17 +7,12 @@ import "strings"
 // always keeps a user's current language selectable.
 
 // interfaceLanguageCodes maps lowercase input to the frontend interface
-// language codes (note the camelCase zh codes). "kr" is the legacy team code.
+// language codes. The fork keeps only English and Korean (team 66d421d13);
+// "kr" is the legacy team code.
 var interfaceLanguageCodes = map[string]string{
-	"en":   "en",
-	"ko":   "ko",
-	"kr":   "ko",
-	"zhcn": "zhCN",
-	"zhtw": "zhTW",
-	"fr":   "fr",
-	"ru":   "ru",
-	"ja":   "ja",
-	"vi":   "vi",
+	"en": "en",
+	"ko": "ko",
+	"kr": "ko",
 }
 
 // ParseInterfaceLanguages turns the comma-separated option value into the
@@ -38,4 +33,10 @@ func ParseInterfaceLanguages(value string) []string {
 		return []string{"en"}
 	}
 	return languages
+}
+
+// NormalizeInterfaceLanguagesOption is the stored form of the option value:
+// the parsed codes joined by commas, "en" when nothing known is left.
+func NormalizeInterfaceLanguagesOption(value string) string {
+	return strings.Join(ParseInterfaceLanguages(value), ",")
 }

@@ -34,7 +34,7 @@ import { I18nextProvider } from 'react-i18next'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import { api } from '@/lib/api'
 
 import { SettingsPageProvider } from '../../components/settings-page-context'
@@ -120,7 +120,7 @@ beforeEach(async () => {
   await testI18n.init({
     lng: 'en',
     fallbackLng: 'en',
-    resources: { en: { translation: {} }, zh },
+    resources: { en: { translation: {} }, ko }, // fork: O9
     interpolation: { escapeValue: false },
   })
   localStorage.clear()
@@ -419,26 +419,29 @@ describe('Passkey website guidance', () => {
     await waitFor(() => expect(fill).toBeEnabled())
   })
 
-  it('uses everyday Chinese in the field and explanation dialog', async () => {
-    await testI18n.changeLanguage('zh')
+  // fork: O9 — the fork keeps only English and Korean.
+  it('uses everyday Korean in the field and explanation dialog', async () => {
+    await testI18n.changeLanguage('ko')
     const user = userEvent.setup()
     render(<Fixture />)
     await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: '主域名' })).not.toHaveClass(
-        'border-amber-500'
-      )
+      expect(
+        screen.getByRole('textbox', { name: '기본 패스키 도메인' })
+      ).not.toHaveClass('border-amber-500')
     )
-    await user.click(screen.getByRole('button', { name: '为什么需要设置？' }))
+    await user.click(screen.getByRole('button', { name: '설정하는 이유' }))
     const dialog = screen.getByRole('dialog', {
-      name: '如何设置通行密钥域名',
+      name: '패스키 도메인 설정 방법',
     })
-    expect(dialog).not.toHaveTextContent(/RP ID|Origins?|依赖方/)
-    expect(within(dialog).getByText('主域名')).toBeVisible()
-    expect(within(dialog).getByText('兼容的通行密钥域名')).toBeVisible()
-    expect(dialog).toHaveTextContent('每行填写一个已有通行密钥使用的域名')
-    expect(dialog).toHaveTextContent('无法在 example.com 使用')
+    expect(dialog).not.toHaveTextContent(/RP ID|Origins?|당사자/)
+    expect(within(dialog).getByText('기본 패스키 도메인')).toBeVisible()
+    expect(within(dialog).getByText('호환 패스키 도메인')).toBeVisible()
+    expect(dialog).toHaveTextContent(
+      '기존 패스키가 사용하는 도메인을 한 줄에 하나씩'
+    )
+    expect(dialog).toHaveTextContent('example.com에서 사용할 수 없습니다')
     expect(
-      within(dialog).getByRole('button', { name: '保留现有域名' })
+      within(dialog).getByRole('button', { name: '기존 도메인 유지' })
     ).toBeVisible()
   })
 

@@ -20,7 +20,7 @@ import { createInstance } from 'i18next'
 import { assert, afterEach, describe, expect, test, vi } from 'vitest'
 
 import { getTieredBillingSummary } from '@/features/usage-logs/lib/format'
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 
 import contract from '../../../../../../pkg/billingexpr/testdata/frontend_simulation.json'
 import {
@@ -130,19 +130,20 @@ describe('local billing expression evaluation', () => {
   })
   test('localizes peak and complement conditions without exposing source code', async () => {
     const translations = createInstance()
-    await translations.init({ lng: 'zh', resources: { zh } })
-    expect(formatBillingCondition(peakCondition, translations.t, 'zh')).toBe(
-      '周一至周五 09:00至12:00或14:00至18:00（Asia/Shanghai）'
+    await translations.init({ lng: 'ko', resources: { ko } }) // fork: O9
+    expect(formatBillingCondition(peakCondition, translations.t, 'ko')).toBe(
+      '월–금 09:00–12:00 또는 14:00–18:00 (Asia/Shanghai)'
     )
     expect(
-      formatBillingCondition(`!(${peakCondition})`, translations.t, 'zh')
-    ).toBe('周一至周五 09:00至12:00或14:00至18:00以外的时段（Asia/Shanghai）')
+      formatBillingCondition(`!(${peakCondition})`, translations.t, 'ko')
+    ).toBe('이 시간 외: 월–금 09:00–12:00 또는 14:00–18:00 (Asia/Shanghai)')
   })
   test.each([
-    ['zhCN', 'weekday("UTC") == 1', '周一 (UTC)'],
-    ['zhTW', 'weekday("UTC") == 1', '週一 (UTC)'],
+    // fork: O9 — only en and ko remain; removed codes format as English.
+    ['ko', 'weekday("UTC") == 1', '월 (UTC)'],
+    ['zhCN', 'weekday("UTC") == 1', 'Mon (UTC)'],
+    ['ko', 'len > 32000', 'Full input length > 32,000'],
     ['zhCN', 'len > 32000', 'Full input length > 32,000'],
-    ['zhTW', 'len > 32000', 'Full input length > 32,000'],
   ])(
     'formats %s condition %s without falling back to source',
     async (language, source, expected) => {

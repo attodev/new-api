@@ -100,7 +100,8 @@ func TestTokenAuthReadOnlyTranslatesErrors(t *testing.T) {
 		acceptLanguage string
 		want           string
 	}{
-		{"zh-CN", "未提供令牌"},
+		{"ko-KR", "API 키가 제공되지 않았습니다"},  // fork: O9
+		{"zh-CN", "Token not provided"}, // fork: O9
 		{"en-US", "Token not provided"},
 	} {
 		recorder := httptest.NewRecorder()

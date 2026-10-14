@@ -43,7 +43,7 @@ import { I18nextProvider } from 'react-i18next'
 import { Toaster, toast } from 'sonner'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import zh from '@/i18n/locales/zh.json'
+import ko from '@/i18n/locales/ko.json'
 import { api } from '@/lib/api'
 import {
   DEFAULT_CURRENCY_CONFIG,
@@ -452,27 +452,27 @@ it('keeps full mobile information without group or quota section headings', asyn
     ...matchMedia(query),
     matches: query.includes('max-width'),
   }))
-  i18n.addResourceBundle('zh', 'translation', zh.translation)
-  await i18n.changeLanguage('zh')
+  i18n.addResourceBundle('ko', 'translation', ko.translation) // fork: O9
+  await i18n.changeLanguage('ko')
   try {
     await renderKeysPage()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    expect(screen.queryByText('额度 ($)')).not.toBeInTheDocument()
+    expect(screen.queryByText('쿼터 ($)')).not.toBeInTheDocument()
     expect(screen.getByText('($)')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /剩余 80;/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /남음 80;/ })).toBeInTheDocument()
     expect(screen.getByText('80')).toBeInTheDocument()
     expect(screen.getByText('120')).toBeInTheDocument()
-    expect(screen.getByText(zh.translation['Created'])).toBeInTheDocument()
-    expect(screen.getByText(zh.translation['Last Used'])).toBeInTheDocument()
-    expect(screen.getByText(zh.translation['Expires'])).toBeInTheDocument()
+    expect(screen.getByText(ko.translation['Created'])).toBeInTheDocument()
+    expect(screen.getByText(ko.translation['Last Used'])).toBeInTheDocument()
+    expect(screen.getByText(ko.translation['Expires'])).toBeInTheDocument()
     expect(
-      screen.queryByText(zh.translation['Group'], { exact: true })
+      screen.queryByText(ko.translation['Group'], { exact: true })
     ).not.toBeInTheDocument()
     expect(screen.getByText('default')).toBeInTheDocument()
     expect(screen.getByText('1x')).toBeInTheDocument()
-    expect(screen.getByText(zh.translation['Models'])).toBeInTheDocument()
+    expect(screen.getByText(ko.translation['Models'])).toBeInTheDocument()
     expect(
-      screen.getByText(zh.translation['IP Restriction'])
+      screen.getByText(ko.translation['IP Restriction'])
     ).toBeInTheDocument()
   } finally {
     await i18n.changeLanguage('en')
