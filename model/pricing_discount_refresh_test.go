@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/stretchr/testify/require"
 )
 
@@ -125,4 +126,28 @@ func TestPublishModelVendorNamesKeepsPreviousOnEmptyRebuild(t *testing.T) {
 	age := time.Since(modelVendorNamePublishedAt)
 	modelVendorNameMu.RUnlock()
 	require.Less(t, age, time.Minute, "the kept snapshot counts as refreshed")
+}
+
+// A rebuild whose vendor query failed still has every model key, but no vendor
+// names: a model that names a vendor keeps the previous snapshot's name rather
+// than dropping its vendor discount.
+func TestApplyPricingDiscountKeepsPreviousVendorWhenVendorsMissing(t *testing.T) {
+	t.Cleanup(resetModelVendorNameCache)
+	require.NoError(t, ratio_setting.UpdateVendorDiscountByJSONString(`{"OpenAI":10}`))
+	t.Cleanup(func() { _ = ratio_setting.UpdateVendorDiscountByJSONString(`{}`) })
+	publishModelVendorNames(map[string]string{"gpt-4o": "OpenAI"})
+
+	building := map[string]string{}
+	withVendor := Pricing{ModelName: "gpt-4o", VendorID: 7}
+	applyPricingDiscount(&withVendor, map[int]string{}, building) // vendor list failed to load
+	noVendor := Pricing{ModelName: "local-model"}
+	applyPricingDiscount(&noVendor, map[int]string{}, building)
+	require.Equal(t, 10.0, withVendor.DiscountPercent)
+	publishModelVendorNames(building)
+
+	name, ok := resolveVendorName("gpt-4o")
+	require.True(t, ok)
+	require.Equal(t, "OpenAI", name)
+	_, ok = resolveVendorName("local-model")
+	require.False(t, ok)
 }

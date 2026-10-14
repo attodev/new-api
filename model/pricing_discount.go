@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/bytedance/gopkg/util/gopool"
 )
 
 // updateDiscountOption stores a discount map and drops the pricing cache so
@@ -109,9 +110,10 @@ func resetModelVendorNameCache() {
 
 // publishModelVendorNames swaps in a fully built snapshot. Called at the end of
 // a successful updatePricing; the map must not be written afterwards. An empty
-// rebuild (models or vendors failed to load) keeps a non-empty previous
-// snapshot rather than dropping every vendor discount; it still counts as a
-// refresh.
+// rebuild (no enabled model at all, e.g. the ability query returned nothing)
+// keeps a non-empty previous snapshot rather than dropping every vendor
+// discount; it still counts as a refresh. A failed vendor query is handled per
+// model in applyPricingDiscount.
 func publishModelVendorNames(names map[string]string) {
 	if names == nil {
 		names = map[string]string{}
@@ -167,10 +169,10 @@ func startVendorNameRefresh() {
 	}
 	vendorNameRefreshLast.Store(time.Now().UnixNano())
 	refresh := getPricingForRefresh
-	go func() {
+	gopool.Go(func() { // gopool recovers and logs a panic
 		defer vendorNameRefreshMu.Unlock()
 		refresh()
-	}()
+	})
 }
 
 func coldBuildModelVendorNames() {
@@ -189,8 +191,17 @@ func coldBuildModelVendorNames() {
 // applyPricingDiscount fills the display discount percent of a pricing row and
 // records the model's vendor name into names, the rebuild's local map that
 // updatePricing publishes after its loop. Called while updatePricingLock is held.
+// A model that names a vendor missing from vendorNameByID (updatePricing
+// ignores a failed vendor query) keeps the previous snapshot's name, so a
+// transient DB error does not drop its vendor discount. Only such rows read
+// the snapshot; it is replaced only by publishModelVendorNames under
+// updatePricingLock, so every read in one rebuild sees the same snapshot.
 func applyPricingDiscount(p *Pricing, vendorNameByID map[int]string, names map[string]string) {
-	vendorName := vendorNameByID[p.VendorID]
+	key := ratio_setting.FormatMatchingModelName(p.ModelName)
+	vendorName, known := vendorNameByID[p.VendorID]
+	if !known && p.VendorID > 0 {
+		vendorName, _ = lookupModelVendorName(key)
+	}
 	p.DiscountPercent = effectiveDiscountPercent(p.ModelName, vendorName)
-	names[ratio_setting.FormatMatchingModelName(p.ModelName)] = vendorName
+	names[key] = vendorName
 }

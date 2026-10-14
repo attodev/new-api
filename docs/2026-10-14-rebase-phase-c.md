@@ -171,7 +171,7 @@
 동작:
 - `doRequest`를 우회하는 어댑터(`DoWssRequest`, AWS Bedrock SDK, coze 완료 폴링, dify·replicate 업로드와 baidu 토큰 같은 보조 호출)는 `llm_ms`가 없거나 일부만 잡힌다(team과 같음). 보조 호출 시간은 `pre_llm_ms`에 들어간다.
 - root의 조직 생성은 owner를 잔액 검사 없이 배정한다(운영자 작업).
-- 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전)은 pending으로 남아 그 사용자의 조직 가입을 막는다(최종 수정 I2). 단계 D 작업 11에서 관리자 `POST /api/user/topup/expire`(1시간 지난 개인 충전 주문 만료, `topup.expire` 감사)를 추가해 DB 직접 수정이 필요 없다(OpenAPI 3.6). 구독 주문(`subscription_orders`)의 버려진 pending은 여전히 대상이 아니다.
+- 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전)은 pending으로 남아 그 사용자의 조직 가입을 막는다(최종 수정 I2). 단계 D 작업 11에서 관리자 `POST /api/user/topup/expire`(1시간 지난 개인 충전 주문과 구독 주문 만료, `topup.expire` 감사)를 추가해 DB 직접 수정이 필요 없다(OpenAPI 3.6).
 - 무료(가격·배율 또는 group ratio 0) 모델은 `EnableFreeModelPreConsume`이 꺼져 있으면 과금 세션을 거치지 않아 정지된 회원·비활성 조직도 막지 않는다. 100% 할인 모델은 더 이상 여기에 해당하지 않는다(최종 수정 M2). 남은 가장자리: tiered 모델의 자동 그룹 재시도가 무료 그룹에서 100% 할인된 유료 그룹으로 바뀌면 `service/tiered_settle.go`가 접힌 `snap.GroupRatio == 0`을 보고 세션을 만들지 않는다(upstream 파일, 드묾). 이미 열린 realtime WebSocket은 정지해도 바로 끊기지 않는다(연결 시작 때만 검사).
 - 단계 B 이전에 조직 관리자가 `users.remark`에 쓴 메모는 `organization_remark`로 옮기지 않았다(root도 쓴 컬럼이라 운영자 결정).
 - WSS 조직 지갑 검사는 읽고-청구하는 사전 검사(예약 없음)라 동시 realtime 세션은 조금 초과할 수 있다(upstream 사용자 잔액 검사와 같음). 레거시 MJ 사전 가드는 조직 지갑 `> 0`만 본다(M7).
