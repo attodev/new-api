@@ -59,12 +59,23 @@ describe('Korean interface language', () => {
     expect(convertDetectedLanguage('ko-KR')).toBe('ko')
     expect(convertDetectedLanguage('ko_KR')).toBe('ko')
     expect(convertDetectedLanguage('kr')).toBe('ko') // legacy team code
+    // ISO 639-3 codes that merely start with `ko` (Konkani, Kosraean) are not Korean
+    expect(convertDetectedLanguage('kok')).toBe('kok')
+    expect(convertDetectedLanguage('kos')).toBe('kos')
   })
   test('normalizes saved Korean codes, including the legacy kr', () => {
     expect(normalizeInterfaceLanguage('ko')).toBe('ko')
     expect(normalizeInterfaceLanguage('ko-KR')).toBe('ko')
     expect(normalizeInterfaceLanguage('kr')).toBe('ko')
     expect(normalizeInterfaceLanguage('pt-BR')).toBe('en')
+    expect(normalizeInterfaceLanguage('kok')).toBe('en')
+  })
+  test('normalizes a saved user language before it reaches i18next (login)', () => {
+    // use-auth-redirect passes the saved value through normalizeInterfaceLanguage
+    expect(normalizeInterfaceLanguage('kr')).toBe('ko')
+    expect(normalizeInterfaceLanguage('zh-CN')).toBe('zhCN')
+    expect(normalizeInterfaceLanguage('zh-TW')).toBe('zhTW')
+    expect(normalizeInterfaceLanguage(undefined)).toBe('en')
   })
   test('lists Korean as an interface language', () => {
     expect(INTERFACE_LANGUAGE_OPTIONS.map((o) => o.code)).toContain('ko')
