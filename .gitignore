@@ -37,6 +37,8 @@ electron/dist
 token_estimator_test.go
 skills-lock.json
 .playwright-mcp
+web/test-results/
+web/playwright-report/
 
 # Local-only live probes and scratch test workspaces.
 .local-tests/
