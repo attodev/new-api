@@ -25,13 +25,10 @@ export type InterfaceLanguageCode =
   (typeof INTERFACE_LANGUAGE_OPTIONS)[number]['code']
 
 // fork: O9 — the fork keeps only English and Korean (team 66d421d13). `kr` is
-// the legacy team code; anything else, including the removed upstream codes
-// (zhCN, zhTW, fr, ru, ja, vi), is English.
-const KOREAN_TAG = /^(kr|ko(-.*)?)$/ // fork: O9
-
-function isKorean(value: string): boolean {
-  return KOREAN_TAG.test(value.trim().replaceAll('_', '-').toLowerCase()) // fork: O9
-}
+// the legacy team code; anything else, including the removed upstream codes // fork: O9
+// (zhCN, zhTW, fr, ru, ja, vi), is English. // fork: O9
+const KOREAN_TAG = /^(kr|ko([-_].*)?)$/i // fork: O9
+const isKorean = (value: string) => KOREAN_TAG.test(value.trim()) // fork: O9
 
 export function normalizeInterfaceLanguage(value?: string | null): string {
   return value && isKorean(value) ? 'ko' : 'en' // fork: O9
@@ -39,10 +36,10 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
 
 /**
  * Map a browser-detected locale onto the interface language codes this project
- * uses with i18next.
+ * uses with i18next. // fork: O9
  *
- * Korean tags (`ko-KR`, `ko_KR`, the legacy `kr`) become `ko`. Every other
- * value is returned unchanged; i18next's `supportedLngs` then falls back to
+ * Korean tags (`ko-KR`, `ko_KR`, the legacy `kr`) become `ko`. Every other // fork: O9
+ * value is returned unchanged; i18next's `supportedLngs` then falls back to // fork: O9
  * English. // fork: O9
  */
 export function convertDetectedLanguage(value: string): string {
@@ -50,12 +47,12 @@ export function convertDetectedLanguage(value: string): string {
 }
 
 /**
- * Convert an interface language code (the values i18next uses) into a valid
- * BCP-47 locale tag that the `Intl.*` APIs accept.
+ * Convert an interface language code (the values i18next uses) into a valid // fork: O9
+ * BCP-47 locale tag that the `Intl.*` APIs accept. // fork: O9
  *
- * Any locale derived from `i18n.language` / `i18n.resolvedLanguage` MUST be
- * run through this before it reaches an `Intl` constructor. Korean yields
- * `ko`, everything else `en`; an empty value falls back to `undefined`, which
+ * Any locale derived from `i18n.language` / `i18n.resolvedLanguage` MUST be // fork: O9
+ * run through this before it reaches an `Intl` constructor. Korean yields // fork: O9
+ * `ko`, everything else `en`; an empty value falls back to `undefined`, which // fork: O9
  * makes `Intl` use the runtime default locale. // fork: O9
  */
 export function toIntlLocale(value?: string | null): string | undefined {
