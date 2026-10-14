@@ -16,7 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export type OrganizationRole = 'member' | 'admin' | 'owner'
+import type { OrganizationRole } from '@/lib/organization-roles'
+
+export type { OrganizationRole }
 
 export interface OrganizationUser {
   id: number
@@ -78,7 +80,7 @@ export interface OrganizationUserUpdatePayload {
 }
 
 export interface AssignOrganizationUserPayload {
-  organization_role: OrganizationRole
+  organization_role: Exclude<OrganizationRole, 'owner'>
 }
 
 export interface OrganizationUpdatePayload {

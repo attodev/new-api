@@ -34,6 +34,7 @@ import type {
   WaffoPaymentResponse,
 } from '@/features/wallet/types'
 import { api } from '@/lib/api'
+import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type {
   ApiResponse,
@@ -83,7 +84,8 @@ export async function updateOrganization(
 export async function deleteOrganization(
   organizationId: number
 ): Promise<void> {
-  await api.delete(`/api/organizations/${organizationId}`)
+  const res = await api.delete(`/api/organizations/${organizationId}`)
+  requireServerSuccess(res.data)
 }
 
 export async function exportOrgUsers(organizationId?: number): Promise<void> {
@@ -91,6 +93,11 @@ export async function exportOrgUsers(organizationId?: number): Promise<void> {
   const res = await api.get(`/api/organization/users/export${params}`, {
     responseType: 'blob',
   })
+  // The backend reports failures as HTTP 200 JSON; don't save that as .xlsx.
+  if (res.data instanceof Blob && res.data.type.includes('application/json')) {
+    const parsed = JSON.parse(await res.data.text())
+    throw new Error(parsed?.message || 'Export failed')
+  }
   const url = URL.createObjectURL(new Blob([res.data as BlobPart]))
   const a = document.createElement('a')
   a.href = url
@@ -111,7 +118,7 @@ export async function importOrgUsers(
   const res = await api.post(`/api/organization/users/import${params}`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
-  return res.data.data as OrgImportResult
+  return requireServerSuccess(res.data).data as OrgImportResult
 }
 
 export async function getOrganizationProfile(): Promise<
