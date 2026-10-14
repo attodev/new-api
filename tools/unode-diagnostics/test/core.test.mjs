@@ -1,0 +1,939 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { Readable, Writable } from 'node:stream';
+import test from 'node:test';
+
+import { loadEnvConfig, parseDotenv } from '../lib/env.mjs';
+import { appendHistory, readHistory, readHistoryById } from '../lib/history.mjs';
+import { prepareOutboundRequest } from '../lib/http-client.mjs';
+import { maskSecrets } from '../lib/masking.mjs';
+import { fetchTargetModels, modelsRequestForTarget, normalizeModelList } from '../lib/models.mjs';
+import { buildPresets } from '../lib/presets.mjs';
+import { summarizeExchange } from '../lib/summary.mjs';
+import { createDiagnosticsServer } from '../server.mjs';
+
+async function dispatch(server, {
+  method = 'GET',
+  url = '/',
+  headers = {},
+  body
+} = {}) {
+  const handler = server.listeners('request')[0];
+  const chunks = body === undefined ? [] : [Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))];
+  const req = Readable.from(chunks);
+  req.method = method;
+  req.url = url;
+  req.headers = {
+    host: '127.0.0.1:5179',
+    ...headers
+  };
+
+  const responseChunks = [];
+  const res = new Writable({
+    write(chunk, _encoding, callback) {
+      responseChunks.push(Buffer.from(chunk));
+      callback();
+    }
+  });
+  res.statusCode = 200;
+  res.headers = {};
+  res.writeHead = (statusCode, responseHeaders = {}) => {
+    res.statusCode = statusCode;
+    res.headers = {
+      ...res.headers,
+      ...responseHeaders
+    };
+    return res;
+  };
+
+  const finished = new Promise((resolve) => res.on('finish', resolve));
+  await handler(req, res);
+  await finished;
+
+  const bodyText = Buffer.concat(responseChunks).toString('utf8');
+  return {
+    status: res.statusCode,
+    headers: res.headers,
+    bodyText,
+    json: bodyText ? JSON.parse(bodyText) : undefined
+  };
+}
+
+async function writeDiagnosticsEnv(dir) {
+  await writeFile(path.join(dir, '.env'), [
+    'UNODE_BASE_URL=https://www.unodetech.xyz',
+    'UNODE_RELAY_API_KEY=sk-unode-secret-123456',
+    'NEW_API_BASE_URL=https://alrouter.ai',
+    'NEW_API_RELAY_API_KEY=sk-router-secret-abcdef',
+    'NEW_API_CHANNEL_ID=4',
+    'NEW_API_ADMIN_ACCESS_TOKEN=admin-access-secret-123456',
+    'NEW_API_ADMIN_USER_ID=99'
+  ].join('\n'));
+}
+
+test('parseDotenv handles comments, quotes, and equals signs', () => {
+  const env = parseDotenv(`
+# comment
+UNODE_BASE_URL=https://www.unodetech.xyz
+NEW_API_RELAY_API_KEY="sk-a=b=c"
+EMPTY=
+`);
+
+  assert.equal(env.UNODE_BASE_URL, 'https://www.unodetech.xyz');
+  assert.equal(env.NEW_API_RELAY_API_KEY, 'sk-a=b=c');
+  assert.equal(env.EMPTY, '');
+});
+
+test('loadEnvConfig returns masked display values and missing names', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-env-'));
+  try {
+    await writeFile(path.join(dir, '.env'), [
+      'UNODE_BASE_URL=https://www.unodetech.xyz',
+      'UNODE_RELAY_API_KEY=sk-unode-secret-123456',
+      'NEW_API_BASE_URL=https://alrouter.ai',
+      'NEW_API_RELAY_API_KEY=sk-router-secret-abcdef',
+      'NEW_API_CHANNEL_ID=4'
+    ].join('\n'));
+
+    const config = await loadEnvConfig(dir, {});
+
+    assert.equal(config.values.UNODE_BASE_URL, 'https://www.unodetech.xyz');
+    assert.equal(config.display.UNODE_RELAY_API_KEY, 'sk-u...3456');
+    assert.equal(config.display.NEW_API_RELAY_API_KEY, 'sk-r...cdef');
+    assert.ok(config.missing.includes('NEW_API_ADMIN_ACCESS_TOKEN'));
+    assert.ok(config.missing.includes('NEW_API_ADMIN_USER_ID'));
+    assert.equal(config.secrets.UNODE_RELAY_API_KEY, 'sk-unode-secret-123456');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadEnvConfig falls back to injected env source', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-env-'));
+  try {
+    await writeFile(path.join(dir, '.env'), [
+      'UNODE_BASE_URL=https://www.unodetech.xyz',
+      'UNODE_RELAY_API_KEY=sk-unode-secret-123456',
+      'NEW_API_BASE_URL=https://alrouter.ai',
+      'NEW_API_RELAY_API_KEY=sk-router-secret-abcdef',
+      'NEW_API_CHANNEL_ID=4'
+    ].join('\n'));
+
+    const config = await loadEnvConfig(dir, {
+      NEW_API_ADMIN_ACCESS_TOKEN: 'admin-access-secret-123456',
+      NEW_API_ADMIN_USER_ID: '99'
+    });
+
+    assert.equal(config.values.NEW_API_ADMIN_ACCESS_TOKEN, 'admin-access-secret-123456');
+    assert.equal(config.display.NEW_API_ADMIN_ACCESS_TOKEN, 'admi...3456');
+    assert.equal(config.values.NEW_API_ADMIN_USER_ID, '99');
+    assert.ok(!config.missing.includes('NEW_API_ADMIN_ACCESS_TOKEN'));
+    assert.ok(!config.missing.includes('NEW_API_ADMIN_USER_ID'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('maskSecrets masks auth headers and token-like body fields', () => {
+  const masked = maskSecrets({
+    request: {
+      headers: {
+        Authorization: 'Bearer sk-secret-123456',
+        'x-api-key': 'sk-key-abcdef',
+        'content-type': 'application/json'
+      },
+      body: {
+        api_key: 'sk-body-123456',
+        nested: {
+          access_token: 'access-secret-abcdef',
+          regular: 'visible'
+        }
+      }
+    }
+  });
+
+  assert.equal(masked.request.headers.Authorization, 'Bearer sk-s...3456');
+  assert.equal(masked.request.headers['x-api-key'], 'sk-k...cdef');
+  assert.equal(masked.request.headers['content-type'], 'application/json');
+  assert.equal(masked.request.body.api_key, 'sk-b...3456');
+  assert.equal(masked.request.body.nested.access_token, 'acce...cdef');
+  assert.equal(masked.request.body.nested.regular, 'visible');
+});
+
+test('maskSecrets preserves arrays and objects under secret-like keys', () => {
+  const masked = maskSecrets({
+    tokens: ['sk-secret-123456', 'sk-secret-abcdef'],
+    'set-cookie': ['session-secret-123456', 'refresh-secret-abcdef'],
+    token: {
+      primary: 'sk-secret-123456',
+      nested: {
+        refresh: 'refresh-secret-abcdef'
+      }
+    }
+  });
+
+  assert.deepEqual(masked.tokens, ['sk-s...3456', 'sk-s...cdef']);
+  assert.deepEqual(masked['set-cookie'], ['sess...3456', 'refr...cdef']);
+  assert.deepEqual(masked.token, {
+    primary: 'sk-s...3456',
+    nested: {
+      refresh: 'refr...cdef'
+    }
+  });
+});
+
+test('maskSecrets leaves token counters visible but masks common secret key shapes', () => {
+  const masked = maskSecrets({
+    usage: {
+      prompt_tokens: 11,
+      completion_tokens: 22,
+      total_tokens: 33,
+      max_tokens: 44
+    },
+    credentials: {
+      apiKey: 'sk-camel-123456',
+      accessToken: 'access-camel-abcdef',
+      refreshToken: 'refresh-camel-abcdef',
+      client_secret: 'client-secret-123456',
+      tokens: ['sk-secret-123456', 'sk-secret-abcdef']
+    }
+  });
+
+  assert.deepEqual(masked.usage, {
+    prompt_tokens: 11,
+    completion_tokens: 22,
+    total_tokens: 33,
+    max_tokens: 44
+  });
+  assert.equal(masked.credentials.apiKey, 'sk-c...3456');
+  assert.equal(masked.credentials.accessToken, 'acce...cdef');
+  assert.equal(masked.credentials.refreshToken, 'refr...cdef');
+  assert.equal(masked.credentials.client_secret, 'clie...3456');
+  assert.deepEqual(masked.credentials.tokens, ['sk-s...3456', 'sk-s...cdef']);
+});
+
+test('history store appends and reads masked JSONL records newest first', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    const first = await appendHistory(filePath, {
+      presetId: 'first',
+      target: 'unode',
+      request: { headers: { Authorization: 'Bearer sk-first-123456' }, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'tool_not_used' }
+    });
+    const second = await appendHistory(filePath, {
+      presetId: 'second',
+      target: 'alrouter',
+      request: { headers: { 'x-api-key': 'sk-second-abcdef' }, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'web_search_used' }
+    });
+
+    const history = await readHistory(filePath);
+    assert.equal(history.length, 2);
+    assert.equal(history[0].id, second.id);
+    assert.equal(history[1].id, first.id);
+    assert.equal(history[0].request.headers['x-api-key'], 'sk-s...cdef');
+
+    const loaded = await readHistoryById(filePath, first.id);
+    assert.equal(loaded.presetId, 'first');
+
+    const raw = await readFile(filePath, 'utf8');
+    assert.equal(raw.includes('sk-first-123456'), false);
+    assert.equal(raw.includes('sk-second-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('history store scrubs token-shaped strings from ordinary text fields', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await appendHistory(filePath, {
+      presetId: 'text-secrets',
+      target: 'alrouter',
+      request: {
+        headers: {},
+        body: {
+          prompt: 'ordinary prompt mentioning sk-prompt-abcdef for reproduction'
+        }
+      },
+      response: {
+        status: 500,
+        headers: {},
+        bodyText: 'upstream returned Bearer sk-bodytext-123456 and sk-response-abcdef',
+        json: { error: 'provider rejected sk-json-abcdef' }
+      },
+      summary: { classification: 'request_error' }
+    });
+
+    const raw = await readFile(filePath, 'utf8');
+    assert.equal(raw.includes('ordinary prompt mentioning'), true);
+    assert.equal(raw.includes('sk-prompt-abcdef'), false);
+    assert.equal(raw.includes('sk-bodytext-123456'), false);
+    assert.equal(raw.includes('sk-response-abcdef'), false);
+    assert.equal(raw.includes('sk-json-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistory returns empty list for missing files', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const history = await readHistory(path.join(dir, 'missing.jsonl'));
+    assert.deepEqual(history, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistory includes request error sentinel for corrupt JSONL lines', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await writeFile(filePath, [
+      JSON.stringify({
+        id: 'valid',
+        createdAt: '2026-07-03T00:00:00.000Z',
+        presetId: 'valid',
+        summary: { classification: 'tool_not_used' }
+      }),
+      '{not-valid-json'
+    ].join('\n'));
+
+    const history = await readHistory(filePath);
+    const sentinel = history.find((record) => record.presetId === 'corrupt-history-line');
+    assert.equal(sentinel.summary.classification, 'request_error');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('readHistoryById returns null for missing records', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-history-'));
+  try {
+    const filePath = path.join(dir, 'history.jsonl');
+    await appendHistory(filePath, {
+      presetId: 'present',
+      target: 'unode',
+      request: { headers: {}, body: {} },
+      response: { status: 200, headers: {}, bodyText: 'ok', json: {} },
+      summary: { classification: 'tool_not_used' }
+    });
+
+    const loaded = await readHistoryById(filePath, 'missing');
+    assert.equal(loaded, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('buildPresets returns four editable diagnostic presets', () => {
+  const presets = buildPresets({
+    UNODE_BASE_URL: 'https://www.unodetech.xyz',
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router',
+    NEW_API_CHANNEL_ID: '4'
+  });
+
+  assert.equal(presets.length, 4);
+  assert.deepEqual(presets.map((preset) => preset.id), [
+    'direct-messages-web-search',
+    'direct-chat-web-search-options',
+    'alrouter-messages-forced-channel',
+    'alrouter-chat-web-search-options'
+  ]);
+  assert.equal(presets[0].path, '/v1/messages');
+  assert.equal(presets[3].body.web_search_options.search_context_size, 'low');
+  assert.equal(presets[3].headers.authorization, 'Bearer ${NEW_API_RELAY_API_KEY}-${NEW_API_CHANNEL_ID}');
+});
+
+test('prepareOutboundRequest expands env placeholders and builds URL', () => {
+  const prepared = prepareOutboundRequest({
+    method: 'POST',
+    baseUrl: '${NEW_API_BASE_URL}',
+    path: '/v1/chat/completions',
+    headers: {
+      authorization: 'Bearer ${NEW_API_RELAY_API_KEY}-${NEW_API_CHANNEL_ID}',
+      'content-type': 'application/json'
+    },
+    body: { model: 'claude-sonnet-4-6' }
+  }, {
+    NEW_API_BASE_URL: 'https://alrouter.ai/',
+    NEW_API_RELAY_API_KEY: 'sk-router',
+    NEW_API_CHANNEL_ID: '4'
+  });
+
+  assert.equal(prepared.url, 'https://alrouter.ai/v1/chat/completions');
+  assert.equal(prepared.headers.authorization, 'Bearer sk-router-4');
+  assert.equal(prepared.bodyText, '{"model":"claude-sonnet-4-6"}');
+});
+
+test('normalizeModelList supports common provider model list shapes', () => {
+  assert.deepEqual(normalizeModelList({
+    data: [
+      { id: 'gpt-4.1', owned_by: 'openai' },
+      { id: 'claude-sonnet-4-20250514', display_name: 'Claude Sonnet 4' },
+      { id: 'gpt-4.1', owned_by: 'duplicate' }
+    ]
+  }), [
+    { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', created: '', ownedBy: '' },
+    { id: 'gpt-4.1', label: 'gpt-4.1', created: '', ownedBy: 'openai' }
+  ]);
+
+  assert.deepEqual(normalizeModelList({
+    models: ['model-b', { name: 'model-a', provider: 'provider-a' }]
+  }), [
+    { id: 'model-a', label: 'model-a', created: '', ownedBy: 'provider-a' },
+    { id: 'model-b', label: 'model-b', created: '', ownedBy: '' }
+  ]);
+});
+
+test('modelsRequestForTarget builds target-scoped model list requests', () => {
+  const unode = modelsRequestForTarget('unode', {
+    UNODE_BASE_URL: 'https://www.unodetech.xyz/',
+    UNODE_RELAY_API_KEY: 'sk-unode'
+  });
+  const alrouter = modelsRequestForTarget('alrouter', {
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router'
+  });
+
+  assert.equal(unode.url, 'https://www.unodetech.xyz/v1/models');
+  assert.equal(unode.headers.authorization, 'Bearer sk-unode');
+  assert.equal(unode.headers['x-api-key'], 'sk-unode');
+  assert.equal(alrouter.url, 'https://alrouter.ai/v1/models');
+  assert.equal(alrouter.headers.authorization, 'Bearer sk-router');
+  assert.throws(() => modelsRequestForTarget('attacker', {}), /target must be one of/);
+});
+
+test('fetchTargetModels returns normalized model ids without exposing auth', async () => {
+  const result = await fetchTargetModels('alrouter', {
+    NEW_API_BASE_URL: 'https://alrouter.ai',
+    NEW_API_RELAY_API_KEY: 'sk-router-secret-abcdef'
+  }, async (url, init) => {
+    assert.equal(url, 'https://alrouter.ai/v1/models');
+    assert.equal(init.headers.authorization, 'Bearer sk-router-secret-abcdef');
+    return new Response(JSON.stringify({
+      data: [
+        { id: 'claude-sonnet-4-20250514', display_name: 'Claude Sonnet 4' }
+      ]
+    }), { status: 200 });
+  });
+
+  assert.deepEqual(result, {
+    target: 'alrouter',
+    url: 'https://alrouter.ai/v1/models',
+    status: 200,
+    models: [
+      { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', created: '', ownedBy: '' }
+    ]
+  });
+  assert.equal(JSON.stringify(result).includes('sk-router-secret-abcdef'), false);
+});
+
+test('diagnostics server config route does not expose raw secrets', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl')
+    });
+
+    const response = await dispatch(server, { url: '/api/config' });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(Object.keys(response.json).sort(), ['display', 'missing']);
+    const payload = JSON.stringify(response.json);
+    assert.equal(payload.includes('sk-unode-secret-123456'), false);
+    assert.equal(payload.includes('sk-router-secret-abcdef'), false);
+    assert.equal(payload.includes('admin-access-secret-123456'), false);
+    assert.equal(response.json.display.NEW_API_RELAY_API_KEY, 'sk-r...cdef');
+    assert.equal(response.json.display.NEW_API_ADMIN_ACCESS_TOKEN, 'admi...3456');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server models route fetches selected target models', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  const seen = [];
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async (url, init) => {
+        seen.push({ url, init });
+        return new Response(JSON.stringify({
+          data: [
+            { id: 'model-z' },
+            { id: 'model-a', display_name: 'Model A' }
+          ]
+        }), { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, { url: '/api/models?target=alrouter' });
+
+    assert.equal(response.status, 200);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].url, 'https://alrouter.ai/v1/models');
+    assert.equal(seen[0].init.headers.authorization, 'Bearer sk-router-secret-abcdef');
+    assert.deepEqual(response.json.models.map((model) => model.id), ['model-a', 'model-z']);
+    assert.equal(JSON.stringify(response.json).includes('sk-router-secret-abcdef'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server models route rejects unknown targets before fetch', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, { url: '/api/models?target=attacker' });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.json.error, 'invalid_target');
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route rejects disallowed outbound origins before fetch', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const response = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: 'https://attacker.invalid/steal?token=${NEW_API_ADMIN_ACCESS_TOKEN}',
+        headers: {
+          authorization: 'Bearer ${NEW_API_RELAY_API_KEY}'
+        },
+        body: { prompt: 'hello' }
+      }
+    });
+    const ignoredBaseUrl = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: 'https://attacker.invalid',
+        path: '${NEW_API_BASE_URL}/v1/messages',
+        headers: {},
+        body: { prompt: 'hello' }
+      }
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(ignoredBaseUrl.status, 400);
+    assert.equal(response.json.error, 'invalid_request');
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route rejects malformed request payloads', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  let fetchCalls = 0;
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath: path.join(dir, 'history.jsonl'),
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response('{}', { status: 200 });
+      }
+    });
+
+    const nullPayload = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: 'null'
+    });
+    const invalidMethod = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'TRACE',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: {}
+      }
+    });
+    const invalidHeaders = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: []
+      }
+    });
+    const missingPath = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        headers: {}
+      }
+    });
+
+    assert.equal(nullPayload.status, 400);
+    assert.equal(invalidMethod.status, 400);
+    assert.equal(invalidHeaders.status, 400);
+    assert.equal(missingPath.status, 400);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server send route redacts exact non-sk env secrets from returned and stored history', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  const historyPath = path.join(dir, 'history.jsonl');
+  try {
+    await writeDiagnosticsEnv(dir);
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      historyPath,
+      fetchImpl: async (_url, init) => {
+        assert.equal(String(init.body).includes('admin-access-secret-123456'), true);
+        return new Response(JSON.stringify({
+          echoed: 'admin-access-secret-123456',
+          nested: {
+            note: 'response mentioned admin-access-secret-123456'
+          }
+        }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'x-oneapi-request-id': 'admin-access-secret-123456'
+          }
+        });
+      }
+    });
+
+    const response = await dispatch(server, {
+      method: 'POST',
+      url: '/api/send',
+      body: {
+        presetId: 'redaction-probe',
+        target: 'alrouter',
+        method: 'POST',
+        baseUrl: '${NEW_API_BASE_URL}',
+        path: '/v1/messages',
+        headers: {
+          authorization: 'Bearer ${NEW_API_RELAY_API_KEY}',
+          'x-admin-token': '${NEW_API_ADMIN_ACCESS_TOKEN}',
+          'content-type': 'application/json'
+        },
+        body: {
+          prompt: 'send admin-access-secret-123456',
+          tokenCopy: '${NEW_API_ADMIN_ACCESS_TOKEN}'
+        }
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(JSON.stringify(response.json).includes('admin-access-secret-123456'), false);
+    const raw = await readFile(historyPath, 'utf8');
+    assert.equal(raw.includes('admin-access-secret-123456'), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('diagnostics server static route rejects traversal outside public directory', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'unode-diag-server-'));
+  try {
+    const server = createDiagnosticsServer({
+      repoRoot: dir,
+      publicDir: path.join(dir, 'public'),
+      historyPath: path.join(dir, 'history.jsonl')
+    });
+
+    const response = await dispatch(server, { url: '/%2e%2e/server.mjs' });
+
+    assert.ok(response.status === 403 || response.status === 404);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('summarizeExchange detects Claude Code session and web search usage', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {
+        'x-cc-session-id': 'session-1',
+        'x-oneapi-request-id': 'rid-1'
+      },
+      json: {
+        content: [
+          { type: 'server_tool_use', name: 'web_search' },
+          { type: 'bash_code_execution_tool_result', content: { error_code: 'too_many_requests' } },
+          { type: 'text', text: 'Claude Web Search called 1 times, cost: 4500' }
+        ],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 1
+          }
+        }
+      },
+      bodyText: 'Claude Web Search called 1 times, cost: 4500'
+    }
+  });
+
+  assert.equal(summary.hasCcSessionId, true);
+  assert.equal(summary.requestId, 'rid-1');
+  assert.deepEqual(summary.contentTypes, ['server_tool_use', 'bash_code_execution_tool_result', 'text']);
+  assert.deepEqual(summary.toolErrorCodes, ['too_many_requests']);
+  assert.equal(summary.webSearchRequests, 1);
+  assert.equal(summary.classification, 'tool_rate_limited');
+});
+
+test('summarizeExchange classifies plain tool-unavailable text as suspected Claude Code session', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-cc-session-id': 'session-2' },
+      json: {
+        content: [{ type: 'text', text: '저는 웹 검색 도구를 사용할 수 없습니다.' }]
+      },
+      bodyText: '저는 웹 검색 도구를 사용할 수 없습니다.'
+    }
+  });
+
+  assert.equal(summary.classification, 'claude_code_session_suspected');
+});
+
+test('summarizeExchange classifies request errors before tool and session signals', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 500,
+      headers: { 'x-cc-session-id': 'session-3' },
+      json: {
+        content: [
+          { type: 'server_tool_use', name: 'web_search' },
+          { type: 'tool_result', content: { error_code: 'too_many_requests' } }
+        ],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 1
+          }
+        }
+      },
+      bodyText: 'Claude Web Search called 1 times, cost: 4500'
+    }
+  });
+
+  assert.equal(summary.classification, 'request_error');
+});
+
+test('summarizeExchange classifies web search usage from usage counters', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '검색 결과입니다.' }],
+        usage: {
+          server_tool_use: {
+            web_search_requests: 2
+          }
+        }
+      }
+    }
+  });
+
+  assert.equal(summary.webSearchRequests, 2);
+  assert.equal(summary.classification, 'web_search_used');
+});
+
+test('summarizeExchange classifies OpenAI Responses web_search_call output as used', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-request-id': 'req-openai-search' },
+      json: {
+        object: 'response',
+        status: 'completed',
+        output: [
+          { type: 'reasoning', content: [] },
+          { type: 'web_search_call', status: 'completed', action: { type: 'search', query: 'OpenAI blog' } },
+          { type: 'web_search_call', status: 'completed', action: { type: 'open_page', url: 'https://openai.com/news/' } },
+          { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'OpenAI News - https://openai.com/news/' }] }
+        ]
+      },
+      bodyText: ''
+    }
+  });
+
+  assert.equal(summary.requestId, 'req-openai-search');
+  assert.deepEqual(summary.contentTypes, ['reasoning', 'web_search_call', 'web_search_call', 'message']);
+  assert.equal(summary.webSearchRequests, 2);
+  assert.equal(summary.classification, 'web_search_used');
+});
+
+test('summarizeExchange does not treat OpenAI chat tool_calls as completed web search', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: { 'x-request-id': 'req-chat-tool-call' },
+      json: {
+        choices: [
+          {
+            finish_reason: 'tool_calls',
+            message: {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'web_search', arguments: '{}' }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      bodyText: ''
+    }
+  });
+
+  assert.deepEqual(summary.contentTypes, ['function']);
+  assert.equal(summary.webSearchRequests, 0);
+  assert.equal(summary.classification, 'tool_not_used');
+});
+
+test('summarizeExchange classifies successful responses without tool signals as not used', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '일반 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.classification, 'tool_not_used');
+});
+
+test('summarizeExchange classifies records without status or signals as unknown', () => {
+  const summary = summarizeExchange({
+    response: {
+      headers: {},
+      json: {
+        content: [{ type: 'text', text: '상태 코드가 없는 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.classification, 'unknown');
+});
+
+test('summarizeExchange reads mixed-case request id headers', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {
+        'X-OneAPI-Request-ID': 'rid-mixed'
+      },
+      json: {
+        content: [{ type: 'text', text: '일반 응답입니다.' }]
+      }
+    }
+  });
+
+  assert.equal(summary.requestId, 'rid-mixed');
+});
+
+test('summarizeExchange extracts OpenAI message content for classification', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: 'I cannot use web search from this session.'
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  assert.deepEqual(summary.contentTypes, ['message_text']);
+  assert.equal(summary.classification, 'claude_code_session_suspected');
+});
+
+test('summarizeExchange recursively extracts nested tool error codes', () => {
+  const summary = summarizeExchange({
+    response: {
+      status: 200,
+      headers: {},
+      json: {
+        content: [
+          {
+            type: 'tool_result',
+            content: [
+              {
+                type: 'json',
+                payload: {
+                  details: {
+                    error_code: 'too_many_requests'
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  });
+
+  assert.deepEqual(summary.toolErrorCodes, ['too_many_requests']);
+  assert.equal(summary.classification, 'tool_rate_limited');
+});
