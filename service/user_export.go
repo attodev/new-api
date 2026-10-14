@@ -119,7 +119,8 @@ type ImportResult struct {
 
 // ImportUsersFromFile parses an Excel file and creates new users.
 // Existing usernames are skipped, and rows whose role the caller cannot manage
-// (root may import any role; others only roles below their own) are rejected.
+// (root may import any role below admin; others only roles below their own) are rejected;
+// admin and root rows are never imported.
 // Returns a result summary.
 func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error) {
 	result := &ImportResult{
@@ -234,6 +235,12 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 		}
 
 		role := stringToRole(getCell(row, "role"))
+		// Privileged accounts need CreateUser's step-up proof and audit trail, which an
+		// Excel import cannot provide; promote them after import instead.
+		if role >= common.RoleAdminUser {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): privileged role %q cannot be imported; promote the account after import", lineNum, username, getCell(row, "role")))
+			continue
+		}
 		if !(callerRole == common.RoleRootUser || callerRole > role) {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): role %q is not permitted for the importing admin", lineNum, username, getCell(row, "role")))
 			continue
@@ -251,6 +258,12 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 			AffQuota:    affQuota,
 			InviterId:   inviterId,
 			Remark:      getCell(row, "remark"),
+		}
+
+		// Same struct validation CreateUser applies (username/display name/email length, password length).
+		if err := common.Validate.Struct(user); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid user: %v", lineNum, username, err))
+			continue
 		}
 
 		// Pass inviterId=0 to avoid triggering referral reward logic during import.
