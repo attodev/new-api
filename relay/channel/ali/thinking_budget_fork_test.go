@@ -2,6 +2,7 @@ package ali
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	relayhelper "github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/service"
@@ -54,10 +56,11 @@ func newAliRelayContext() *gin.Context {
 	return c
 }
 
-// sendAliChat runs one Ali attempt the way relay/compatible_handler.go does:
-// model mapping, ConvertOpenAIRequest, common.Marshal, optional body edit
-// (stands in for RemoveDisabledFields/ParamOverride), then DoRequest.
-func sendAliChat(t *testing.T, c *gin.Context, u *aliUpstream, clientModel, mapping, rawBody string, editBody func([]byte) []byte) []byte {
+// convertAliChat runs the convert half of one Ali attempt the way
+// relay/compatible_handler.go does: model mapping, ConvertOpenAIRequest,
+// common.Marshal, an optional body edit (stands in for RemoveDisabledFields),
+// then the channel's real ParamOverride when setup gives it one.
+func convertAliChat(t *testing.T, c *gin.Context, u *aliUpstream, clientModel, mapping, rawBody string, editBody func([]byte) []byte, setup ...func(*relaycommon.RelayInfo)) (*relaycommon.RelayInfo, []byte) {
 	t.Helper()
 	c.Set("model_mapping", mapping)
 
@@ -65,11 +68,15 @@ func sendAliChat(t *testing.T, c *gin.Context, u *aliUpstream, clientModel, mapp
 	require.NoError(t, common.Unmarshal([]byte(rawBody), &request))
 	info := &relaycommon.RelayInfo{
 		OriginModelName: clientModel,
+		RelayMode:       relayconstant.RelayModeChatCompletions,
 		ChannelMeta: &relaycommon.ChannelMeta{
 			UpstreamModelName: clientModel,
 			ChannelBaseUrl:    u.server.URL,
 			ApiKey:            "sk-test",
 		},
+	}
+	for _, f := range setup {
+		f(info)
 	}
 	require.NoError(t, relayhelper.ModelMappedHelper(c, info, &request))
 
@@ -80,13 +87,29 @@ func sendAliChat(t *testing.T, c *gin.Context, u *aliUpstream, clientModel, mapp
 	if editBody != nil {
 		body = editBody(body)
 	}
+	if len(info.ParamOverride) > 0 {
+		body, err = relaycommon.ApplyParamOverrideWithRelayInfo(body, info)
+		require.NoError(t, err)
+	}
+	return info, body
+}
 
+// doAliSend runs the DoRequest half and returns what the upstream received.
+func doAliSend(t *testing.T, c *gin.Context, u *aliUpstream, info *relaycommon.RelayInfo, body []byte) []byte {
+	t.Helper()
 	respValue, err := (&Adaptor{}).DoRequest(c, info, bytes.NewReader(body))
 	require.NoError(t, err)
 	resp, ok := respValue.(*http.Response)
 	require.True(t, ok)
 	_ = resp.Body.Close()
 	return u.last(t)
+}
+
+// sendAliChat runs one whole Ali chat attempt.
+func sendAliChat(t *testing.T, c *gin.Context, u *aliUpstream, clientModel, mapping, rawBody string, editBody func([]byte) []byte, setup ...func(*relaycommon.RelayInfo)) []byte {
+	t.Helper()
+	info, body := convertAliChat(t, c, u, clientModel, mapping, rawBody, editBody, setup...)
+	return doAliSend(t, c, u, info, body)
 }
 
 // A Qwen client model mapped to a custom deployment name keeps an explicit
@@ -167,12 +190,13 @@ func TestAliThinkingBudgetStashDoesNotLeakAcrossAttempts(t *testing.T) {
 	request.Model = "my-qwen-deploy"
 	info := &relaycommon.RelayInfo{
 		OriginModelName: "qwen3-max",
+		RelayMode:       relayconstant.RelayModeChatCompletions,
 		ChannelMeta:     &relaycommon.ChannelMeta{UpstreamModelName: "my-qwen-deploy", ChannelBaseUrl: u.server.URL},
 	}
 	_, err := (&Adaptor{}).ConvertOpenAIRequest(c, info, &request)
 	require.NoError(t, err)
 	info.ChannelSetting.PassThroughBodyEnabled = true
-	raw := []byte(`{"model":"qwen3-max","messages":[]}`)
+	raw := []byte(`{"model":"my-qwen-deploy","messages":[]}`)
 	respValue, err := (&Adaptor{}).DoRequest(c, info, bytes.NewReader(raw))
 	require.NoError(t, err)
 	_ = respValue.(*http.Response).Body.Close()
@@ -184,6 +208,77 @@ func TestAliThinkingBudgetStashDoesNotLeakAcrossAttempts(t *testing.T) {
 	require.NoError(t, err)
 	_ = respValue.(*http.Response).Body.Close()
 	assert.JSONEq(t, string(raw), string(u.last(t)))
+}
+
+const aliQwenChatBody = `{"model":"qwen3-max","messages":[{"role":"user","content":"hi"}],"thinking_budget":32}`
+
+// The channel's ParamOverride runs before DoRequest; an override that deletes
+// thinking_budget must not be undone by the re-insertion.
+func TestAliThinkingBudgetParamOverrideDeleteStaysDeleted(t *testing.T) {
+	u := newAliUpstream(t)
+	c := newAliRelayContext()
+	withDelete := func(info *relaycommon.RelayInfo) {
+		info.ParamOverride = map[string]any{
+			"operations": []any{map[string]any{"mode": "delete", "path": "thinking_budget"}},
+		}
+	}
+	got := sendAliChat(t, c, u, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`, aliQwenChatBody, nil, withDelete)
+
+	assert.Equal(t, "my-qwen-deploy", gjson.GetBytes(got, "model").String())
+	assert.False(t, gjson.GetBytes(got, "thinking_budget").Exists(), string(got))
+	value, _ := c.Get(aliThinkingBudgetContextKey)
+	assert.Empty(t, value)
+}
+
+// An override that sets thinking_budget wins: the body already has the field.
+func TestAliThinkingBudgetParamOverrideSetWins(t *testing.T) {
+	u := newAliUpstream(t)
+	withSet := func(info *relaycommon.RelayInfo) {
+		info.ParamOverride = map[string]any{"thinking_budget": 7}
+	}
+	got := sendAliChat(t, newAliRelayContext(), u, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`, aliQwenChatBody, nil, withSet)
+
+	assert.Equal(t, "7", gjson.GetBytes(got, "thinking_budget").Raw, string(got))
+}
+
+// A stale stash (convert ran, DoRequest did not) never reaches a body that is
+// not this attempt's chat request: chat completions sent via Responses switch
+// RelayMode to Responses around DoRequest, and a chat body naming another
+// model is not the converted request either.
+func TestAliThinkingBudgetStaleStashSkipsNonChatBodies(t *testing.T) {
+	u := newAliUpstream(t)
+	c := newAliRelayContext()
+
+	info, _ := convertAliChat(t, c, u, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`, aliQwenChatBody, nil)
+	info.RelayMode = relayconstant.RelayModeResponses
+	responsesBody := []byte(`{"model":"my-qwen-deploy","input":"hi"}`)
+	assert.JSONEq(t, string(responsesBody), string(doAliSend(t, c, u, info, responsesBody)))
+
+	info, _ = convertAliChat(t, c, u, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`, aliQwenChatBody, nil)
+	otherBody := []byte(`{"model":"other-deploy","messages":[]}`)
+	assert.JSONEq(t, string(otherBody), string(doAliSend(t, c, u, info, otherBody)))
+}
+
+// ConvertOpenAIRequest resets the stash: a stash left by an attempt that never
+// reached DoRequest is not re-inserted into a later Qwen-upstream attempt
+// whose own budget was removed after marshal.
+func TestAliThinkingBudgetConvertResetsStaleStash(t *testing.T) {
+	u := newAliUpstream(t)
+	c := newAliRelayContext()
+
+	_, _ = convertAliChat(t, c, u, "qwen3-max", `{"qwen3-max":"my-qwen-deploy"}`, aliQwenChatBody, nil)
+	value, _ := c.Get(aliThinkingBudgetContextKey)
+	require.Equal(t, json.RawMessage(`32`), value)
+
+	removeBudget := func(b []byte) []byte {
+		out, err := sjson.DeleteBytes(b, "thinking_budget")
+		require.NoError(t, err)
+		return out
+	}
+	info, body := convertAliChat(t, c, u, "qwen3-max", `{"qwen3-max":"qwen-plus"}`, aliQwenChatBody, removeBudget)
+	got := doAliSend(t, c, u, info, body)
+	assert.Equal(t, "qwen-plus", gjson.GetBytes(got, "model").String())
+	assert.False(t, gjson.GetBytes(got, "thinking_budget").Exists(), string(got))
 }
 
 func TestAliKeepsThinkingBudgetEitherName(t *testing.T) {

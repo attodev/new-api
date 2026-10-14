@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/gin-gonic/gin"
@@ -45,11 +47,26 @@ func stashAliThinkingBudget(c *gin.Context, info *relaycommon.RelayInfo, request
 		return keep
 	}
 	var stash json.RawMessage
-	if keep && len(request.ThinkingBudget) > 0 && !dto.IsQwenThinkingBudgetModel(request.Model) {
+	if keep && len(request.ThinkingBudget) > 0 && !dto.IsQwenThinkingBudgetModel(request.Model) && !paramOverrideMentionsThinkingBudget(info) {
 		stash = append(json.RawMessage(nil), request.ThinkingBudget...)
 	}
 	c.Set(aliThinkingBudgetContextKey, stash)
 	return keep
+}
+
+// paramOverrideMentionsThinkingBudget reports whether the channel's
+// ParamOverride touches thinking_budget anywhere. Re-insertion runs after the
+// override, so such a channel is left alone: an override that deletes the
+// field must stay deleted, and one that sets it already wins because a body
+// carrying the field is never changed. The check is a substring match on the
+// marshaled override, so an unrelated mention (a condition, a value) also
+// disables re-insertion — the conservative side for an operator rule.
+func paramOverrideMentionsThinkingBudget(info *relaycommon.RelayInfo) bool {
+	if len(info.ParamOverride) == 0 {
+		return false
+	}
+	encoded, err := common.Marshal(info.ParamOverride)
+	return err != nil || bytes.Contains(encoded, []byte("thinking_budget"))
 }
 
 // doAliRequest re-inserts a stashed thinking_budget after the generic request
@@ -63,9 +80,12 @@ func doAliRequest(a *Adaptor, c *gin.Context, info *relaycommon.RelayInfo, body 
 		return channel.DoApiRequest(a, c, info, body)
 	}
 	c.Set(aliThinkingBudgetContextKey, json.RawMessage(nil))
-	// A pass-through body skipped ConvertOpenAIRequest, so the stash belongs
-	// to an earlier attempt that never reached DoRequest.
-	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
+	// A pass-through body, or a body that is not this attempt's chat request
+	// (e.g. chat completions sent via Responses, which switches RelayMode to
+	// Responses around DoRequest), skipped ConvertOpenAIRequest: the stash
+	// belongs to an earlier attempt that never reached DoRequest.
+	if info.RelayMode != relayconstant.RelayModeChatCompletions ||
+		model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
 		return channel.DoApiRequest(a, c, info, body)
 	}
 
@@ -73,7 +93,7 @@ func doAliRequest(a *Adaptor, c *gin.Context, info *relaycommon.RelayInfo, body 
 	if err != nil {
 		return nil, err
 	}
-	if !gjson.GetBytes(data, "thinking_budget").Exists() {
+	if gjson.GetBytes(data, "model").String() == info.UpstreamModelName && !gjson.GetBytes(data, "thinking_budget").Exists() {
 		if data, err = sjson.SetRawBytes(data, "thinking_budget", raw); err != nil {
 			return nil, err
 		}
