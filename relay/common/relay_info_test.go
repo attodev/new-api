@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -397,4 +398,35 @@ func TestInitChannelMetaResetsPerAttemptStreamStateAndPreservesRequestState(t *t
 
 func ptr[T any](value T) *T {
 	return &value
+}
+
+// fork: O7 — upstream timing timestamps (ported from team).
+func TestRelayInfoSetUpstreamRequestStart(t *testing.T) {
+	info := &RelayInfo{}
+	require.True(t, info.UpstreamRequestStartTime.IsZero())
+
+	info.SetUpstreamRequestStart()
+
+	require.False(t, info.UpstreamRequestStartTime.IsZero())
+}
+
+func TestRelayInfoSetUpstreamResponseEnd(t *testing.T) {
+	info := &RelayInfo{}
+	require.True(t, info.UpstreamResponseEndTime.IsZero())
+
+	info.SetUpstreamResponseEnd()
+
+	require.False(t, info.UpstreamResponseEndTime.IsZero())
+}
+
+func TestRelayInfoUpstreamTimestamps_LatestAttemptWins(t *testing.T) {
+	info := &RelayInfo{}
+
+	info.SetUpstreamRequestStart()
+	first := info.UpstreamRequestStartTime
+
+	time.Sleep(time.Millisecond)
+	info.SetUpstreamRequestStart() // simulates a retry attempt
+
+	require.True(t, info.UpstreamRequestStartTime.After(first))
 }

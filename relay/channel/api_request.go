@@ -560,12 +560,15 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	info.SetUpstreamRequestStart() // fork: O7
 	resp, err := relayClient.Do(req)
 	if err != nil {
+		info.SetUpstreamResponseEnd() // fork: O7
 		logger.LogError(c, common2.LogText("do request failed: %s", err.Error()))
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
+		info.SetUpstreamResponseEnd() // fork: O7
 		return nil, errors.New("resp is nil")
 	}
 	if common2.DebugEnabled {
@@ -581,6 +584,7 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}
+	resp.Body = newTimingReadCloser(resp.Body, info.SetUpstreamResponseEnd) // fork: O7
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()

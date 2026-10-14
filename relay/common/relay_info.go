@@ -91,6 +91,9 @@ type RelayInfo struct {
 	StartTime         time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
+	// fork: O7 — upstream call window for the e2e/llm/gateway timing breakdown
+	UpstreamRequestStartTime time.Time // fork: O7 — set just before client.Do; latest attempt wins
+	UpstreamResponseEndTime  time.Time // fork: O7 — set at body EOF/Close or on Do error
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -994,6 +997,20 @@ func (info *RelayInfo) SetFirstResponseTime() {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
 	}
+}
+
+// SetUpstreamRequestStart records when the outbound HTTP call to the model
+// provider began. Safe to call multiple times across retries; the latest
+// call wins.
+func (info *RelayInfo) SetUpstreamRequestStart() { // fork: O7
+	info.UpstreamRequestStartTime = time.Now()
+}
+
+// SetUpstreamResponseEnd records when the model provider's response body was
+// fully read (EOF) or the call failed. Safe to call multiple times across
+// retries; the latest call wins.
+func (info *RelayInfo) SetUpstreamResponseEnd() { // fork: O7
+	info.UpstreamResponseEndTime = time.Now()
 }
 
 func (info *RelayInfo) HasSendResponse() bool {
