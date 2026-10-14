@@ -256,6 +256,7 @@ func formatLogOtherJSON(value string, visibility logOtherVisibility) string {
 				changed = true
 			}
 		}
+		changed = deleteLogOtherKeys(values, forkUserHiddenLogOtherKeys) || changed // fork: O8
 	} else {
 		changed = normalizeLegacyRejectReason(values)
 		if visibility == logOtherVisibilityAdmin {

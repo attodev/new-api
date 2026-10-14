@@ -331,6 +331,10 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 		}
 		return
 	}
+	if err := enforceOIDCEmailDomain(provider, oauthUser); err != nil { // fork: O8
+		common.ApiErrorT(c, err.Error())
+		return
+	}
 
 	// 8. Check user status
 	if user.Status != common.UserStatusEnabled {
