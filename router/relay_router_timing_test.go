@@ -23,10 +23,11 @@ import (
 // Routes registered before it (SetApiRouter/SetDashboardRouter run earlier
 // in SetRouter) are deliberately untouched, as on team.
 //
-// Approach: a probe route is registered on the same engine AFTER
-// SetRelayRouter, and its handler asserts the wrapped writer and entry key.
-// A real relay path is also exercised to show the middleware runs even when
-// the handler chain aborts at auth.
+// Approach: only a probe route is exercised. It is registered on the same
+// engine AFTER SetRelayRouter, and its handler asserts the wrapped writer and
+// the entry key. Real relay routes are not requested here; they share the
+// same engine-level handler chain (RequestTiming first) that the probe
+// inherits, because they are registered after the same Use() call.
 func TestRequestTimingAppliesEngineWide(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

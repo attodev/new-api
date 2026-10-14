@@ -28,6 +28,14 @@ func newTimingTestContext(t *testing.T, wrap bool) *gin.Context {
 	return c
 }
 
+// adminInfo returns the admin-scoped keys of a LogOther snapshot.
+func adminInfo(t *testing.T, snap map[string]any) map[string]any {
+	t.Helper()
+	admin, ok := snap["admin_info"].(map[string]any)
+	require.True(t, ok, "admin_info must be present")
+	return admin
+}
+
 func TestGenerateTextOtherInfo_TimingBreakdown_FullPipeline(t *testing.T) {
 	c := newTimingTestContext(t, true)
 	entry := time.Now()
@@ -55,8 +63,12 @@ func TestGenerateTextOtherInfo_TimingBreakdown_FullPipeline(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, e2eMs-llmMs, gatewayMs)
 
-	require.Contains(t, snap, "pre_llm_ms")
-	require.Contains(t, snap, "post_llm_ms")
+	// Internal phases are admin-only.
+	require.NotContains(t, snap, "pre_llm_ms")
+	require.NotContains(t, snap, "post_llm_ms")
+	admin := adminInfo(t, snap)
+	require.Contains(t, admin, "pre_llm_ms")
+	require.Contains(t, admin, "post_llm_ms")
 }
 
 func TestGenerateTextOtherInfo_TimingBreakdown_OmitsLlmWhenNoUpstreamCall(t *testing.T) {
@@ -64,14 +76,38 @@ func TestGenerateTextOtherInfo_TimingBreakdown_OmitsLlmWhenNoUpstreamCall(t *tes
 	common.SetContextKey(c, constant.ContextKeyGatewayEntryTime, time.Now())
 
 	relayInfo := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}} // no upstream call happened
+	_, err := c.Writer.Write([]byte(`{"error":"rejected"}`))
+	require.NoError(t, err)
 
 	snap := GenerateTextOtherInfo(c, relayInfo, 1, 1, 1, 0, 0, 0, 0).Snapshot()
 
 	require.Contains(t, snap, "e2e_ms")
 	require.NotContains(t, snap, "llm_ms")
 	require.NotContains(t, snap, "gateway_ms")
-	require.NotContains(t, snap, "pre_llm_ms")
-	require.NotContains(t, snap, "post_llm_ms")
+	admin, _ := snap["admin_info"].(map[string]any)
+	require.NotContains(t, admin, "pre_llm_ms")
+	require.NotContains(t, admin, "post_llm_ms")
+}
+
+// Realtime (WSS) logs reach GenerateTextOtherInfo after the connection was
+// hijacked, so nothing is written through the timing writer; e2e_ms would
+// otherwise be the session age.
+func TestGenerateTextOtherInfo_TimingBreakdown_OmitsAllWhenNothingWritten(t *testing.T) {
+	c := newTimingTestContext(t, true)
+	common.SetContextKey(c, constant.ContextKeyGatewayEntryTime, time.Now().Add(-time.Minute))
+
+	relayInfo := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+	relayInfo.SetUpstreamRequestStart()
+	relayInfo.SetUpstreamResponseEnd()
+
+	snap := GenerateTextOtherInfo(c, relayInfo, 1, 1, 1, 0, 0, 0, 0).Snapshot()
+
+	require.NotContains(t, snap, "e2e_ms")
+	require.NotContains(t, snap, "llm_ms")
+	require.NotContains(t, snap, "gateway_ms")
+	admin, _ := snap["admin_info"].(map[string]any)
+	require.NotContains(t, admin, "pre_llm_ms")
+	require.NotContains(t, admin, "post_llm_ms")
 }
 
 func TestGenerateTextOtherInfo_TimingBreakdown_OmitsE2eWhenNoGatewayEntry(t *testing.T) {
@@ -140,5 +176,5 @@ func TestAppendTimingBreakdown_NegativeGatewayFloorsToZero(t *testing.T) {
 	snap := other.Snapshot()
 	require.Equal(t, int64(0), snap["gateway_ms"])
 	require.GreaterOrEqual(t, snap["llm_ms"].(int64), int64(5000))
-	require.Equal(t, int64(0), snap["post_llm_ms"], "negative post_llm_ms is floored too")
+	require.Equal(t, int64(0), adminInfo(t, snap)["post_llm_ms"], "negative post_llm_ms is floored too")
 }

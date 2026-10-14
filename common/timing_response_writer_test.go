@@ -60,17 +60,27 @@ func TestTimingResponseWriter_WriteStringUpdatesTimestamp(t *testing.T) {
 	require.False(t, writer.LastWriteTime().IsZero())
 }
 
-func TestGetLastWriteTime_FallsBackWhenNotWrapped(t *testing.T) {
+func TestGetLastWriteTime_NotOkWhenNotWrapped(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 
-	before := time.Now()
-	got := GetLastWriteTime(c)
-	after := time.Now()
+	got, ok := GetLastWriteTime(c)
+	require.False(t, ok)
+	require.True(t, got.IsZero())
+}
 
-	require.False(t, got.Before(before))
-	require.False(t, got.After(after))
+// A wrapped writer with no writes (e.g. a hijacked realtime WebSocket whose
+// frames bypass c.Writer) must not report an end point.
+func TestGetLastWriteTime_NotOkWhenNothingWritten(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	writer := &TimingResponseWriter{ResponseWriter: c.Writer}
+	c.Writer = writer
+
+	got, ok := GetLastWriteTime(c)
+	require.False(t, ok)
+	require.True(t, got.IsZero())
+	require.False(t, writer.HasWritten())
 }
 
 func TestGetLastWriteTime_ReturnsWrappedValue(t *testing.T) {
@@ -83,5 +93,46 @@ func TestGetLastWriteTime_ReturnsWrappedValue(t *testing.T) {
 	_, err := c.Writer.Write([]byte("x"))
 	require.NoError(t, err)
 
-	require.Equal(t, writer.LastWriteTime(), GetLastWriteTime(c))
+	got, ok := GetLastWriteTime(c)
+	require.True(t, ok)
+	require.True(t, writer.HasWritten())
+	require.Equal(t, writer.LastWriteTime(), got)
+}
+
+// noUnwrapTimingWriter mirrors TimingResponseWriter without Unwrap, to show
+// what the Unwrap method protects against.
+type noUnwrapTimingWriter struct {
+	gin.ResponseWriter
+}
+
+// TestTimingResponseWriter_KeepsWriteDeadlineSupport runs a real HTTP server
+// whose gin engine wraps c.Writer exactly like middleware.RequestTiming and
+// checks that http.ResponseController can still set write deadlines (used by
+// relay/helper.ExtendWriteDeadline for every stream write and ping).
+func TestTimingResponseWriter_KeepsWriteDeadlineSupport(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var wrappedErr, unwrappedErr error
+	engine := gin.New()
+	engine.GET("/wrapped", func(c *gin.Context) {
+		c.Writer = &TimingResponseWriter{ResponseWriter: c.Writer}
+		wrappedErr = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(time.Second))
+		c.String(http.StatusOK, "ok")
+	})
+	engine.GET("/no-unwrap", func(c *gin.Context) {
+		c.Writer = &noUnwrapTimingWriter{ResponseWriter: c.Writer}
+		unwrappedErr = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(time.Second))
+		c.String(http.StatusOK, "ok")
+	})
+	server := httptest.NewServer(engine)
+	defer server.Close()
+
+	for _, path := range []string{"/wrapped", "/no-unwrap"} {
+		resp, err := http.Get(server.URL + path)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	require.NoError(t, wrappedErr)
+	require.ErrorIs(t, unwrappedErr, http.ErrNotSupported, "without Unwrap the deadline cannot reach the connection")
 }

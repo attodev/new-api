@@ -1,6 +1,7 @@
 package common
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,21 +32,39 @@ func (w *TimingResponseWriter) WriteString(s string) (int, error) {
 	return n, err
 }
 
+// Unwrap exposes the wrapped writer to http.ResponseController. Without it,
+// SetWriteDeadline/SetReadDeadline/EnableFullDuplex cannot reach gin's own
+// (*responseWriter).Unwrap and return http.ErrNotSupported, which would
+// silently disable the per-write stream deadline (relay/helper
+// ExtendWriteDeadline) on every relay route.
+func (w *TimingResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 // LastWriteTime returns the timestamp of the last Write()/WriteString()
 // call. Zero value means nothing has been written yet.
 func (w *TimingResponseWriter) LastWriteTime() time.Time {
 	return w.lastWrite
 }
 
+// HasWritten reports whether any body bytes were written through this
+// writer. It stays false for hijacked connections (e.g. realtime WebSocket
+// sessions), whose frames bypass the writer.
+func (w *TimingResponseWriter) HasWritten() bool {
+	return !w.lastWrite.IsZero()
+}
+
 // GetLastWriteTime returns the last-write timestamp recorded by a
-// TimingResponseWriter installed on c.Writer. If c.Writer was never wrapped
-// (e.g. non-relay routes), it falls back to time.Now() so callers always get
-// a usable (if slightly less precise) value.
-func GetLastWriteTime(c *gin.Context) time.Time {
-	if w, ok := c.Writer.(*TimingResponseWriter); ok {
-		if !w.LastWriteTime().IsZero() {
-			return w.LastWriteTime()
-		}
+// TimingResponseWriter installed on c.Writer. ok is false when c.Writer was
+// never wrapped (non-relay routes) or nothing was written through it (e.g. a
+// hijacked WebSocket); callers must then skip end-to-end metrics instead of
+// guessing an end point.
+func GetLastWriteTime(c *gin.Context) (time.Time, bool) {
+	if c == nil {
+		return time.Time{}, false
 	}
-	return time.Now()
+	if w, ok := c.Writer.(*TimingResponseWriter); ok && w.HasWritten() {
+		return w.LastWriteTime(), true
+	}
+	return time.Time{}, false
 }

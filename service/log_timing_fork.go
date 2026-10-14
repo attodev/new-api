@@ -23,7 +23,12 @@ import (
 // was recorded (e.g. the request was rejected before reaching a channel, or
 // the adaptor bypassed relay/channel.doRequest), so "blocked before reaching
 // a provider" stays distinguishable from "provider was slow" in the stored
-// data. All values are int64 milliseconds and negative values are floored
+// data. Nothing is recorded when no response byte went through the
+// TimingResponseWriter (unwrapped writer, or a hijacked realtime WebSocket
+// whose frames bypass it) — "now - entry" would be session age, not latency.
+// e2e_ms/llm_ms/gateway_ms are public; pre_llm_ms/post_llm_ms are internal
+// phases and go to the admin scope. All values are int64 milliseconds and
+// negative values are floored
 // to zero (e.g. a client that disconnects makes the last client Write happen
 // before the upstream body is closed).
 //
@@ -44,7 +49,10 @@ func appendTimingBreakdown(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, o
 	if gatewayEntryTime.IsZero() {
 		return
 	}
-	gatewayExitTime := common.GetLastWriteTime(ctx)
+	gatewayExitTime, ok := common.GetLastWriteTime(ctx)
+	if !ok {
+		return
+	}
 
 	e2eMs := nonNegativeMs(gatewayExitTime.Sub(gatewayEntryTime).Milliseconds())
 	other.SetPublic("e2e_ms", e2eMs)
@@ -56,8 +64,9 @@ func appendTimingBreakdown(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, o
 	llmMs := nonNegativeMs(relayInfo.UpstreamResponseEndTime.Sub(relayInfo.UpstreamRequestStartTime).Milliseconds())
 	other.SetPublic("llm_ms", llmMs)
 	other.SetPublic("gateway_ms", nonNegativeMs(e2eMs-llmMs))
-	other.SetPublic("pre_llm_ms", nonNegativeMs(relayInfo.UpstreamRequestStartTime.Sub(gatewayEntryTime).Milliseconds()))
-	other.SetPublic("post_llm_ms", nonNegativeMs(gatewayExitTime.Sub(relayInfo.UpstreamResponseEndTime).Milliseconds()))
+	// Internal phases: admin scope only.
+	other.SetAdmin("pre_llm_ms", nonNegativeMs(relayInfo.UpstreamRequestStartTime.Sub(gatewayEntryTime).Milliseconds()))
+	other.SetAdmin("post_llm_ms", nonNegativeMs(gatewayExitTime.Sub(relayInfo.UpstreamResponseEndTime).Milliseconds()))
 }
 
 func nonNegativeMs(ms int64) int64 {
