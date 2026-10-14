@@ -102,10 +102,10 @@ const MANUAL_SKIP = new Set([
   'Zhipu V4',
 ])
 
-// Sentence fragments that the UI joins with other keys. Korean word order moves
-// all hangul into the neighbouring fragment, so these values may have none
-// (they must still differ from the english value).
-const HANGUL_OPTIONAL = new Set(['Supports `-thinking`, `-thinking-'])
+// Values that may carry no hangul (they must still differ from the english
+// value): sentence fragments whose hangul moved into the neighbouring fragment
+// in Korean word order, and the symbol-only range separator `to` (~).
+const HANGUL_OPTIONAL = new Set(['Supports `-thinking`, `-thinking-', 'to'])
 
 // en.json stores this key with a unicode escape (see sync-i18n.mjs); keep the
 // same on-disk spelling so ko.json matches the other locales.

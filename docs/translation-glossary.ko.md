@@ -166,6 +166,10 @@
 | Worker / Master (instance) | 워커 / 마스터 | 다중 인스턴스 배포의 역할. 시드된 "마스터 인스턴스"와 맞춥니다. 감사 로그의 Operator(작업자)와 구분합니다. |
 | Unauthorized (auth error) | 인증되지 않았습니다 | 백엔드 오류 "Unauthorized, …"는 "인증되지 않았습니다. …" 두 문장으로 옮깁니다. 라벨 `Unauthorized`는 시드된 "인증되지 않음". |
 | Tier (pricing) | 등급 | 가격·할인 단계. 기존 값에서 "등급"(17개 키)이 "티어"(11개 키)보다 많고 가격 단계를 가리키는 한국어로도 자연스러워 "등급"을 씁니다. "Tier name"은 "등급 이름", "Tiered price table"은 "등급별 가격표". 소수 표기 "티어"는 단계 8에서 통일했습니다(아래 "통일 완료"). |
+| Transfer (balance) | 전송 | 추천 보상을 잔액으로 옮기는 동작. `Transfer to Balance`는 "잔액으로 전송", `Transfer failed`는 "전송 실패". 공급업체 할당을 옮기는 transfer는 "이전". |
+| Endpoint | 엔드포인트 | "끝점"은 쓰지 않습니다. "token endpoint"는 "토큰 엔드포인트". |
+| Upstream (adjective) | 업스트림 | "상위"는 쓰지 않습니다(`upstream provider` = "업스트림 제공자"). |
+| Token: access token (audit) vs API key | 토큰 / API 키 | 감사 로그의 액세스 토큰 필터(`All tokens`, `Current token`, `Historical tokens`)는 "토큰". 사용 로그 열 `Token`, `Token Name`, 토큰 작업 상세, API 키 모듈 이름(`Token management`)은 "API 키". |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -209,3 +213,4 @@
 | API 키 (API token) | API 토큰 | `API token management`, `Create, revoke, and audit API tokens.` 2개. |
 | 격식체 | ~신가요?, ~할까요?, ~나요? | 11개 키(`Already have an account?` = "이미 계정이 있으십니까?" 등). |
 | 한국어 (영문 섞임) | System, Global Model, Webhook | 화면 점검에서 찾은 6개 키(`System Name` = "System 이름", `System Settings`, `Global Model Configuration`, Webhook 문구 3개). "시스템", "전역 모델", "웹훅"으로 옮겼습니다. |
+| 리뷰 1차 보완 | 제공업체, 공급업체(Provider), 상위, 끝점, 하십시오, 반쪽 영문 | 단계 8 리뷰에서 찾은 74개 키: Provider 계열 7개, `Vendor` 열, 브랜드 "New API"(AlRouter·새로운 API 오역 2개), Token 계열 10개, 반쪽 영문 29개(`Header 이름`, `Save SSRF 설정` 등), Transfer·Endpoint·Upstream 통일. |
