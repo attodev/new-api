@@ -116,7 +116,7 @@
 | Reset credits (Codex) | 초기화 크레딧 | 업스트림 사용량 창을 초기화하는 크레딧. 충전(Credit)과 다른 개념입니다. |
 | Model square | 모델 마켓플레이스 | 시드된 `Model Square` 라벨이 "모델 마켓플레이스"라 문장 안에서도 같은 이름을 씁니다. |
 | credit (usage unit) | 크레딧 | 작업 플러그인 과금 단위로 쓰이는 소문자 `credit`(예: "{{amount}}/credit"). 충전(Credit)과 다른 개념이며 "초기화 크레딧"과 같은 표기입니다. |
-| Prefill group | 프리필 그룹 | 시드된 값 "프리필 그룹"(5회)이 "미리 채우기 그룹"(1회)보다 많습니다. |
+| Prefill group | 프리필 그룹 | 시드된 값 "프리필 그룹"(5회)이 "미리 채우기 그룹"(2회)보다 많습니다. |
 | Passthrough | 패스스루 | 시드된 값 "패스스루 허용"과 맞춥니다. "Request body passthrough"는 "요청 본문 패스스루". |
 | Stale (instance, record) | 오래된 | 더 이상 보고하지 않는 인스턴스. "Delete stale instances"는 "오래된 인스턴스 삭제". |
 | Region (deployment) | 리전 | 클라우드 배포 지역. "Deployment region"은 "배포 리전". 추론 지역(inference geography)은 시드된 "지역"을 그대로 씁니다. |
@@ -143,5 +143,7 @@
 | 쿼터 (Quota) | 할당량 | 시드된 값 30회. `Quota` 라벨 키를 포함합니다. |
 | 공급업체 (Vendor) | 공급자 | 시드된 값 29회. Provider(제공자) 번역과 헷갈리지 않게 구분합니다. |
 | 출력 비율 (Completion ratio) | 최종 비율, 완성 비율 | 각 1회. |
-| 접기 / 펼치기 (Collapse / Expand) | 축소, 확장 | `Collapse All` = "모두 축소", `Expand All` = "모두 확장" 각 1회. |
-| 프리필 그룹 (Prefill group) | 미리 채우기 그룹 | `Create Prefill Group` 1회. |
+| 접기 / 펼치기 (Collapse / Expand) | 축소, 확장 | `Collapse All` = "모두 축소", `Expand All` = "모두 확장", `Choose between default expanded…` = "기본 확장". |
+| 프리필 그룹 (Prefill group) | 미리 채우기 그룹 | `Create Prefill Group`, `Prefill groups help you keep…` 2회. |
+| 리전 (Region, deployment) | Region, 지역 | `Deployment Region *` = "배포 Region *", `Enter deployment region or JSON mapping:` = "배포 지역". |
+| 패스스루 (Passthrough) | 통과, 전달 | `Enable Request Passthrough` = "요청 통과", `Disable store passthrough` = "매장 통과"(오역), `Field passthrough controls` = "필드 전달". |
