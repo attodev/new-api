@@ -64,6 +64,8 @@ const MANUAL_SKIP = new Set([
   'ChatGPT Subscription (Codex)',
   'contact@yourcompany.com',
   'Doubao',
+  'Epay Alipay',
+  'Epay WeChat Pay',
   'footer.columns.related.links.midjourney',
   'MjProxy',
   'MjProxyPlus',
