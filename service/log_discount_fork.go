@@ -19,5 +19,16 @@ func appendDiscountInfo(other *model.LogOther, relayInfo *relaycommon.RelayInfo)
 	}
 	other.SetPublic("discount_multiplier", g.DiscountMultiplier)
 	other.SetPublic("discount_source", g.DiscountSource)
-	other.SetPublic("group_ratio", g.BaseGroupRatio)
+	other.SetPublic("group_ratio", discountBaseGroupRatio(relayInfo))
+}
+
+// discountBaseGroupRatio is the group ratio shown in logs: the pre-discount
+// base when a discount was folded in, otherwise the group ratio itself (also
+// for PriceData not built by HandleGroupRatio, where BaseGroupRatio is unset).
+func discountBaseGroupRatio(relayInfo *relaycommon.RelayInfo) float64 {
+	g := relayInfo.PriceData.GroupRatioInfo
+	if g.DiscountSource == "" {
+		return g.GroupRatio
+	}
+	return g.BaseGroupRatio
 }

@@ -95,3 +95,47 @@ func TestUpdateModelDiscountRejectsNonNumeric(t *testing.T) {
 	require.True(t, ok)
 	require.InDelta(t, 0.75, mul, 1e-9) // 이전 값 유지
 }
+
+func TestEffectiveDiscountForPrefersOriginThenBilling(t *testing.T) {
+	require.NoError(t, UpdateModelDiscountByJSONString(`{"origin-only-thinking":30,"billing-only":20}`))
+	require.NoError(t, UpdateVendorDiscountByJSONString(`{"origin-vendor":40,"billing-vendor":10}`))
+	prev := SetVendorResolver(func(model string) (string, bool) {
+		switch model {
+		case "vendor-origin-thinking":
+			return "origin-vendor", true
+		case "vendor-billing":
+			return "billing-vendor", true
+		}
+		return "", false
+	})
+	t.Cleanup(func() {
+		SetVendorResolver(prev)
+		_ = UpdateModelDiscountByJSONString(`{}`)
+		_ = UpdateVendorDiscountByJSONString(`{}`)
+	})
+
+	cases := []struct {
+		origin, billing string
+		mul             float64
+		source          string
+	}{
+		// discount listed on the origin name (marketplace key) wins
+		{"origin-only-thinking", "origin-only", 0.7, "model"},
+		// origin has none -> billing-name discount applies
+		{"billing-only-thinking", "billing-only", 0.8, "model"},
+		// origin model discount beats a billing-name discount
+		{"origin-only-thinking", "billing-only", 0.7, "model"},
+		// origin vendor beats billing model
+		{"vendor-origin-thinking", "billing-only", 0.6, "vendor"},
+		// billing vendor is the last resort
+		{"nothing-thinking", "vendor-billing", 0.9, "vendor"},
+		{"nothing-thinking", "nothing", 1, ""},
+		{"nothing", "", 1, ""},
+	}
+	for _, tc := range cases {
+		mul, source := GetEffectiveDiscountFor(tc.origin, tc.billing)
+		require.InDelta(t, tc.mul, mul, 1e-9, "%s/%s", tc.origin, tc.billing)
+		require.Equal(t, tc.source, source, "%s/%s", tc.origin, tc.billing)
+		require.InDelta(t, tc.mul, GetEffectiveDiscountMultiplierFor(tc.origin, tc.billing), 1e-9)
+	}
+}

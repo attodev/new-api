@@ -7,18 +7,16 @@ import (
 
 // foldDiscountIntoGroupRatio applies the effective model/vendor discount once,
 // at the single point every billing path (pre-consume, settlement, tiered,
-// per-call, retry) reads GroupRatioInfo from.
-func foldDiscountIntoGroupRatio(info *hosttypes.GroupRatioInfo, modelName string) {
+// per-call, retry) reads GroupRatioInfo from. The discount is looked up by the
+// origin model name first (the marketplace key) and then by the billing model
+// name.
+func foldDiscountIntoGroupRatio(info *hosttypes.GroupRatioInfo, originName, billingName string) {
 	info.BaseGroupRatio = info.GroupRatio
-	mul := ratio_setting.GetEffectiveDiscountMultiplier(modelName)
+	mul, source := ratio_setting.GetEffectiveDiscountFor(originName, billingName)
 	info.DiscountMultiplier = mul
 	if mul == 1 {
 		return
 	}
-	if _, ok := ratio_setting.GetModelDiscountMultiplier(modelName); ok {
-		info.DiscountSource = "model"
-	} else {
-		info.DiscountSource = "vendor"
-	}
+	info.DiscountSource = source
 	info.GroupRatio *= mul
 }

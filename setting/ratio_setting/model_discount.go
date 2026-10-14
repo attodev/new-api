@@ -79,24 +79,57 @@ func GetVendorDiscountPercent(vendorName string) (float64, bool) {
 // vendorResolver: 모델명 -> 벤더명. model 패키지가 init 시 주입(순환 의존 회피).
 var vendorResolver func(modelName string) (string, bool)
 
-func SetVendorResolver(fn func(modelName string) (string, bool)) {
+// SetVendorResolver installs the model -> vendor resolver and returns the
+// previous one so tests can restore it.
+func SetVendorResolver(fn func(modelName string) (string, bool)) func(modelName string) (string, bool) {
+	prev := vendorResolver
 	vendorResolver = fn
+	return prev
 }
 
-// GetEffectiveDiscountMultiplier: 모델 할인 > 벤더 할인 > 1.0.
-func GetEffectiveDiscountMultiplier(modelName string) float64 {
-	if mul, ok := GetModelDiscountMultiplier(modelName); ok {
-		return mul
+// vendorDiscountFor: 모델이 속한 벤더의 할인 배수.
+// 벤더 할인이 하나도 설정돼 있지 않으면 벤더 해석(모델→벤더 캐시/조회)을 아예
+// 건너뛴다. 일반적인(할인 없는) 과금 경로의 불필요한 비용을 피하고, 벤더 resolver가
+// 의존하는 pricing 캐시가 준비되지 않은 환경(예: 단위 테스트)에서의 호출도 막는다.
+func vendorDiscountFor(modelName string) (float64, bool) {
+	if vendorResolver == nil || vendorDiscountMap.Len() == 0 {
+		return 1, false
 	}
-	// 벤더 할인이 하나도 설정돼 있지 않으면 벤더 해석(모델→벤더 캐시/조회)을 아예
-	// 건너뛴다. 일반적인(할인 없는) 과금 경로의 불필요한 비용을 피하고, 벤더 resolver가
-	// 의존하는 pricing 캐시가 준비되지 않은 환경(예: 단위 테스트)에서의 호출도 막는다.
-	if vendorResolver != nil && vendorDiscountMap.Len() > 0 {
-		if vendor, ok := vendorResolver(modelName); ok {
-			if mul, ok := GetVendorDiscountMultiplier(vendor); ok {
-				return mul
-			}
+	vendor, ok := vendorResolver(modelName)
+	if !ok {
+		return 1, false
+	}
+	return GetVendorDiscountMultiplier(vendor)
+}
+
+// GetEffectiveDiscountFor resolves a request's discount. The marketplace keys
+// discounts by the origin model name, so the origin name is tried first and the
+// billing model name (e.g. a reasoning-suffix model billed as its base) is the
+// fallback. For each name a model discount wins over its vendor's discount:
+// origin model > origin vendor > billing model > billing vendor > (1, "").
+// source is "model" or "vendor" when a discount entry was found.
+func GetEffectiveDiscountFor(originName, billingName string) (mul float64, source string) {
+	for i, name := range [2]string{originName, billingName} {
+		if name == "" || (i == 1 && name == originName) {
+			continue
+		}
+		if mul, ok := GetModelDiscountMultiplier(name); ok {
+			return mul, "model"
+		}
+		if mul, ok := vendorDiscountFor(name); ok {
+			return mul, "vendor"
 		}
 	}
-	return 1
+	return 1, ""
+}
+
+// GetEffectiveDiscountMultiplierFor is GetEffectiveDiscountFor without the source.
+func GetEffectiveDiscountMultiplierFor(originName, billingName string) float64 {
+	mul, _ := GetEffectiveDiscountFor(originName, billingName)
+	return mul
+}
+
+// GetEffectiveDiscountMultiplier: 모델 할인 > 벤더 할인 > 1.0 (단일 모델명).
+func GetEffectiveDiscountMultiplier(modelName string) float64 {
+	return GetEffectiveDiscountMultiplierFor(modelName, "")
 }

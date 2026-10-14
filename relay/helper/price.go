@@ -60,7 +60,7 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
-	foldDiscountIntoGroupRatio(&groupRatioInfo, relayInfo.GetBillingModelName()) // fork: O6
+	foldDiscountIntoGroupRatio(&groupRatioInfo, relayInfo.OriginModelName, relayInfo.GetBillingModelName()) // fork: O6
 	return groupRatioInfo
 }
 

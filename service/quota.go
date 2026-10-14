@@ -119,7 +119,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
-	actualGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(relayInfo.GetBillingModelName()) // fork: O6
+	actualGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplierFor(relayInfo.OriginModelName, relayInfo.GetBillingModelName()) // fork: O6
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{
@@ -214,12 +214,12 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 			"completion_ratio":       fmt.Sprintf("%.2f", completionRatio.InexactFloat64()),
 			"audio_ratio":            fmt.Sprintf("%.2f", audioRatio.InexactFloat64()),
 			"audio_completion_ratio": fmt.Sprintf("%.2f", audioCompletionRatio.InexactFloat64()),
-			"group_ratio":            fmt.Sprintf("%.2f", groupRatio),
+			"group_ratio":            fmt.Sprintf("%.2f", discountBaseGroupRatio(relayInfo)), // fork: O6
 		}))
 	} else {
 		logContent = append(logContent, common.NewMessage("Model price {{model_price}}, group ratio {{group_ratio}}", map[string]any{
 			"model_price": fmt.Sprintf("%.2f", modelPrice),
-			"group_ratio": fmt.Sprintf("%.2f", groupRatio),
+			"group_ratio": fmt.Sprintf("%.2f", discountBaseGroupRatio(relayInfo)), // fork: O6
 		}))
 	}
 
@@ -354,12 +354,12 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 			"completion_ratio":       fmt.Sprintf("%.2f", completionRatio.InexactFloat64()),
 			"audio_ratio":            fmt.Sprintf("%.2f", audioRatio.InexactFloat64()),
 			"audio_completion_ratio": fmt.Sprintf("%.2f", audioCompletionRatio.InexactFloat64()),
-			"group_ratio":            fmt.Sprintf("%.2f", groupRatio),
+			"group_ratio":            fmt.Sprintf("%.2f", discountBaseGroupRatio(relayInfo)), // fork: O6
 		}))
 	} else {
 		logContent = append(logContent, common.NewMessage("Model price {{model_price}}, group ratio {{group_ratio}}", map[string]any{
 			"model_price": fmt.Sprintf("%.2f", modelPrice),
-			"group_ratio": fmt.Sprintf("%.2f", groupRatio),
+			"group_ratio": fmt.Sprintf("%.2f", discountBaseGroupRatio(relayInfo)), // fork: O6
 		}))
 	}
 
