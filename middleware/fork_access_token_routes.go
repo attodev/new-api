@@ -6,6 +6,8 @@ package middleware
 // append to this map.
 var forkAccessTokenRouteRules = map[string]accessTokenRouteRule{
 	"POST /api/admin/test-email": accessTokenScopeRule("option:write"), // O5 admin SMTP test mail
+	"GET /api/user/export":       accessTokenScopeRule("user:read"),    // O4 user Excel export
+	"POST /api/user/import":      accessTokenScopeRule("user:write"),   // O4 user Excel import
 }
 
 func init() {

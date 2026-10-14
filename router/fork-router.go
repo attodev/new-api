@@ -21,5 +21,8 @@ func registerForkPublicRoutes(apiRouter *gin.RouterGroup) {
 // registerForkSelfRoutes: user-authenticated endpoints (filled by O2).
 func registerForkSelfRoutes(selfRoute *gin.RouterGroup) {}
 
-// registerForkAdminUserRoutes: admin endpoints under /api/user (filled by O4).
-func registerForkAdminUserRoutes(adminRoute *gin.RouterGroup) {}
+// registerForkAdminUserRoutes: admin endpoints under /api/user (O4 user Excel export/import).
+func registerForkAdminUserRoutes(adminRoute *gin.RouterGroup) {
+	adminRoute.GET("/export", controller.ExportUsers)
+	adminRoute.POST("/import", controller.ImportUsers)
+}
