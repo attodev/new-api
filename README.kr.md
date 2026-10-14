@@ -11,8 +11,8 @@
   <a href="./README.zh_TW.md">繁體中文</a> |
   <a href="./README.md">English</a> |
   <a href="./README.fr.md">Français</a> |
-  <a href="./README.ja.md">日本語</a> |
-  <strong>한국어</strong>
+  <strong>한국어</strong> |
+  <a href="./README.ja.md">日本語</a>
 </p>
 
 <p align="center">
@@ -61,7 +61,7 @@
 
 New API는 애플리케이션, 에이전트, 팀을 위한 자체 호스팅 AI 게이트웨이입니다. 업스트림 모델 서비스를 연결하고 클라이언트에는 일관된 API를 제공하며, 라우팅·접근·사용량·비용을 한곳에서 관리합니다.
 
-팀 안에서 승인된 모델 접근을 공유하거나, 클라이언트마다 다시 설정하지 않고 공급자를 바꾸거나, 웹 콘솔로 비공개 멀티 모델 서비스를 운영하는 데 사용할 수 있습니다. 업스트림으로 OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, Vertex AI, DeepSeek, Qwen 및 기타 호환 서비스를 지원합니다.
+팀 안에서 승인된 모델 접근을 공유하거나, 클라이언트마다 다시 설정하지 않고 제공자를 바꾸거나, 웹 콘솔로 비공개 멀티 모델 서비스를 운영하는 데 사용할 수 있습니다. 업스트림으로 OpenAI, Anthropic, Google Gemini, Azure OpenAI, AWS Bedrock, Vertex AI, DeepSeek, Qwen 및 기타 호환 서비스를 지원합니다.
 
 > [!IMPORTANT]
 > - 본 프로젝트는 합법적이고 승인된 AI API 게이트웨이, 조직 단위 인증, 멀티 모델 관리, 사용량 분석, 비용 정산, 비공개 배포 용도로만 사용해야 합니다.
@@ -85,8 +85,8 @@ New API는 애플리케이션, 에이전트, 팀을 위한 자체 호스팅 AI �
 | 사용량 대시보드 | 플러그인 마켓플레이스 |
 | --- | --- |
 | [![모의 요청, 비용, 성능 지표가 표시된 사용량 대시보드](assets/screenshots/dashboard.en.jpg)](assets/screenshots/dashboard.en.jpg) | [![모의 설치 상태가 표시된 공식 플러그인 마켓플레이스](assets/screenshots/plugin-marketplace.en.jpg)](assets/screenshots/plugin-marketplace.en.jpg) |
-| **모델 광장** | **사용 로그** |
-| [![모의 모델 가격과 사용 가능 여부가 표시된 모델 광장](assets/screenshots/models.en.jpg)](assets/screenshots/models.en.jpg) | [![모의 토큰, 비용, 응답 시간이 표시된 사용 로그](assets/screenshots/usage-logs.en.jpg)](assets/screenshots/usage-logs.en.jpg) |
+| **모델 마켓플레이스** | **사용 로그** |
+| [![모의 모델 가격과 사용 가능 여부가 표시된 모델 마켓플레이스](assets/screenshots/models.en.jpg)](assets/screenshots/models.en.jpg) | [![모의 토큰, 비용, 응답 시간이 표시된 사용 로그](assets/screenshots/usage-logs.en.jpg)](assets/screenshots/usage-logs.en.jpg) |
 
 ---
 
@@ -137,7 +137,7 @@ New API는 애플리케이션, 에이전트, 팀을 위한 자체 호스팅 AI �
 | 영역 | 할 수 있는 일 |
 | --- | --- |
 | 모델 접근 | OpenAI Chat Completions, Responses, Anthropic Messages, Gemini API를 사용합니다. 지원되는 경우 응답 스트리밍과 도구, 추론, 멀티모달 입력을 사용할 수 있습니다 |
-| 라우팅 | 모델 매핑, 채널 우선순위와 가중치, 재시도, 채널 어피니티, 여러 업스트림 키를 설정합니다 |
+| 라우팅 | 모델 매핑, 채널 우선순위와 가중치, 재시도, 채널 친화성, 여러 업스트림 키를 설정합니다 |
 | 사용량과 비용 | 쿼터, 구독, 사용 로그, 캐시 과금, 사용량 구간별 표현식 기반 가격을 관리합니다 |
 | 접근 제어 | 사용자, 그룹, 세분화된 권한, API 키 제한을 관리하고 OAuth/OIDC, 패스키, 2단계 인증, 로그인 세션 관리를 사용합니다 |
 | 비동기 작업 | JavaScript 플러그인으로 이미지, 동영상 등 작업 API를 확장하며, 작업 상태와 결과 조회를 포함합니다 |
@@ -297,7 +297,7 @@ bun run dev -- --port 5173
 | 버그와 기능 요청 | [GitHub Issues](https://github.com/QuantumNous/new-api/issues) |
 | 보안 신고 | [보안 정책](./.github/SECURITY.md)에 따라 비공개로 신고하세요 |
 
-버그를 신고할 때는 버전, 배포 방식, 재현 단계, 민감 정보를 가린 로그를 포함해 주세요. 문서, 번역, 공급자 연동, 범위를 좁힌 회귀 테스트 등 모든 기여를 환영합니다.
+버그를 신고할 때는 버전, 배포 방식, 재현 단계, 민감 정보를 가린 로그를 포함해 주세요. 문서, 번역, 제공자 연동, 범위를 좁힌 회귀 테스트 등 모든 기여를 환영합니다.
 
 ---
 
@@ -354,6 +354,6 @@ contributors.`를 유지해야 합니다.
 
 **[공식 문서](https://docs.newapi.ai/en/docs)** • **[이슈 피드백](https://github.com/Calcium-Ion/new-api/issues)** • **[최신 릴리스](https://github.com/Calcium-Ion/new-api/releases)**
 
-<sub>❤️로 제작된 QuantumNous</sub>
+<sub>QuantumNous가 ❤️를 담아 만들었습니다</sub>
 
 </div>
