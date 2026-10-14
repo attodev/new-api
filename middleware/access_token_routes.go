@@ -173,9 +173,6 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/ratio_sync/channels":              accessTokenScopeRule("option:read"),
 	"POST /api/ratio_sync/fetch":                accessTokenScopeRule("option:write"),
 
-	// router/fork-router.go (fork: O5 admin SMTP test mail)
-	"POST /api/admin/test-email": accessTokenScopeRule("option:write"),
-
 	// router/api-router.go: /api/performance, /api/system-task, /api/system-info
 	"GET /api/performance/stats":                   accessTokenScopeRule("ops:read"),
 	"DELETE /api/performance/disk_cache":           accessTokenScopeRule("ops:write"),

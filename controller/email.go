@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
@@ -21,8 +22,13 @@ func TestEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid parameters"})
 		return
 	}
+	req.To = strings.TrimSpace(req.To)
 	if req.To == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Recipient address is required"})
+		return
+	}
+	if common.Validate.Var(req.To, "required,email,max=254") != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Recipient address is invalid"})
 		return
 	}
 	subject := fmt.Sprintf("[%s] SMTP test email", common.SystemName)

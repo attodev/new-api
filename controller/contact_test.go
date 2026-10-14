@@ -78,3 +78,16 @@ func TestTestEmailRequiresRecipient(t *testing.T) {
 	TestEmail(ctx)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+func TestTestEmailRejectsInvalidRecipient(t *testing.T) {
+	oldSend := sendTestMail
+	sendTestMail = func(string, string, string) error { return nil }
+	t.Cleanup(func() { sendTestMail = oldSend })
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/admin/test-email", strings.NewReader(`{"to":"not-an-email"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	TestEmail(ctx)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
