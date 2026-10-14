@@ -85,7 +85,9 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 과금 | service/midjourney.go:50 | `PrepareMidjourneyTaskBilling` 구독 거부 조건에 `\|\| isOrganizationSubscriptionSource(relayInfo.BillingSource)` | service/billing_session_organization.go |
 | O3 조직 과금 | service/midjourney.go:53-55 | `PrepareMidjourneyTaskBilling` 구독 거부 뒤 `if err := prepareMidjourneyOrganizationBilling(relayInfo); err != nil { return false, err }` (조직 고정 → `postConsumeOrganizationQuota`가 회원 한도 + 조직 지갑 차감; 조직 플랜 회원은 거부) | service/midjourney_organization.go |
 | O3 조직 과금 | service/midjourney.go:109 | `RefundMidjourneyQuota` 사용자 환급 성공 뒤 `refundMidjourneyOrganizationQuota(task.UserId, quota)` (조직 지갑·used_quota만 복원, 현재 소속 기준) | service/midjourney_organization.go |
-| O3 조직 과금 | relay/mjproxy_handler.go:298, 678 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `service.UpdateOrganizationUsedQuotaForUser(…UserId, midjourneyTask.Quota)` (2곳) | service/funding_source_organization.go |
+| O3 조직 과금 | relay/mjproxy_handler.go:301, 684 | `UpdateUserUsedQuotaAndRequestCount` 뒤 `service.UpdateOrganizationUsedQuotaForUser(…UserId, midjourneyTask.Quota)` (2곳) | service/funding_source_organization.go |
+| O3 조직 과금 | relay/mjproxy_handler.go:229-231 | `RelaySwapFace` 회원 한도 검사 뒤, 업스트림 호출 전 `if err := service.CheckMidjourneyOrganizationBilling(info.UserId); err != nil { return &dto.MidjourneyResponse{Code: 4, Description: err.Error()} }` (조직 플랜 회원·빈 조직 지갑 거부) | service/midjourney_organization.go |
+| O3 조직 과금 | relay/mjproxy_handler.go:556-558 | `RelayMidjourneySubmit` 회원 한도 검사 뒤, 업스트림 호출 전 같은 가드 (`consumeQuota && err != nil`일 때만 거부 — upstream 한도 검사와 같은 조건) | service/midjourney_organization.go |
 | O3 조직 과금 | service/task_billing_test.go:66-68, 90-93 | TestMain AutoMigrate 뒤 `model.MigrateForkOrganizationTables(db)` 3줄, `truncate`에 조직 테이블 4개 `DELETE` 4줄 | service/organization_billing_test.go, service/funding_source_organization_test.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.

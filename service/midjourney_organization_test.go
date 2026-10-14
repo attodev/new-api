@@ -79,3 +79,21 @@ func TestRefundMidjourneyOrganizationQuota(t *testing.T) {
 	require.Equal(t, int64(1000), org.Quota)
 	require.Equal(t, int64(0), org.UsedQuota)
 }
+
+func TestCheckMidjourneyOrganizationBilling(t *testing.T) {
+	truncate(t)
+	seedUser(t, 4, 500)
+	seedOrganizationUser(t, 2, "member", 500, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 3, "plan-member", 500, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	_, err := createOrganizationPlanAndAssign(t, 1, 3, 1000)
+	require.NoError(t, err)
+	seedOrganizationUser(t, 5, "empty-wallet-member", 500, 2, model.OrganizationRoleMember)
+	empty := &model.Organization{Id: 2, Name: "org-empty", OwnerUserId: 5, Status: model.OrganizationStatusEnabled, Quota: 0}
+	require.NoError(t, model.DB.Create(empty).Error)
+
+	require.NoError(t, CheckMidjourneyOrganizationBilling(4), "non-member")
+	require.NoError(t, CheckMidjourneyOrganizationBilling(2), "member without plan, wallet > 0")
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(3), "does not support organization plans")
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(5), "organization quota insufficient")
+}

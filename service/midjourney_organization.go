@@ -12,6 +12,35 @@ import (
 // is pinned here. postConsumeOrganizationQuota then charges the member limit
 // and the organization wallet together.
 
+// CheckMidjourneyOrganizationBilling is the pre-call guard for legacy
+// Midjourney (relay/mjproxy_handler.go). Billing is prepared only after the
+// upstream call, so organization plan members and empty organization wallets
+// must be rejected before the request is sent.
+func CheckMidjourneyOrganizationBilling(userId int) error {
+	user, err := model.GetUserById(userId, false)
+	if err != nil {
+		return err
+	}
+	if user.OrganizationId <= 0 {
+		return nil
+	}
+	hasPlan, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, userId)
+	if err != nil {
+		return err
+	}
+	if hasPlan {
+		return errors.New("legacy Midjourney billing does not support organization plans")
+	}
+	organizationQuota, err := model.GetOrganizationQuota(user.OrganizationId)
+	if err != nil {
+		return err
+	}
+	if organizationQuota <= 0 {
+		return errors.New("organization quota insufficient")
+	}
+	return nil
+}
+
 // prepareMidjourneyOrganizationBilling pins the member's organization on the
 // relay info. Organization plan members are rejected: legacy Midjourney cannot
 // bill a plan and a plan member must not fall back to personal quota.
