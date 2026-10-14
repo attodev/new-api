@@ -30,6 +30,7 @@ const defaultOperationsSettings: OperationsSettings = {
   DefaultCollapseSidebar: false,
   DemoSiteEnabled: false,
   SelfUseModeEnabled: false,
+  InterfaceLanguages: 'en,ko', // fork: O8
   QuotaRemindThreshold: '',
   SMTPServer: '',
   SMTPPort: '',

@@ -196,6 +196,19 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 (백엔드) | i18n/locales/ko.yaml | 신규 locale 파일(upstream 파일 아님). `en.yaml` 66키 전부, 같은 순서·주석 구조. team `i18n/locales/ko.yaml`에 같은 키가 있는 19개는 그 값, 나머지 47개는 용어집으로 번역 | docs/translation-glossary.ko.md |
 | O9 한글 (fork 메시지) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json (끝 66키), web/src/i18n/locales/ko.json | fork 조직·결제·문의 파일이 `common.NewMessage`/`ApiErrorT`로 보내는 `message_key` 66개를 `Subscription status expired` 뒤에 추가. en은 키와 같은 값, ko는 용어집 번역, 나머지 6개 locale은 영어 placeholder(이번 단계에서 번역하지 않음) | controller/organization_i18n_test.go (`forkMessageSources`의 소스에서 키를 읽어 en.json에 있는지 검사) |
 | O9 한글 (fork 메시지) | web/src/lib/server-error-message.test.ts:22,99-123 | `ko.json` import 한 줄과 조직 `message_key`(`organization target permission denied`, `{{field}} is required` + params)가 ko에서 한국어로 렌더되는 테스트 한 건 | web/src/i18n/locales/ko.json |
+| O8 인터페이스 언어 | common/constants.go:17 | `var InterfaceLanguages = "en,ko"` 한 줄 (언어 메뉴에 표시할 언어, 쉼표 구분 코드) | common/interface_languages_fork.go, common/interface_languages_fork_test.go |
+| O8 인터페이스 언어 | model/option.go:82 | InitOptionMap `OptionMap["InterfaceLanguages"]` 한 줄 | common/interface_languages_fork.go |
+| O8 인터페이스 언어 | model/option.go:619-620 | updateOptionMap `case "InterfaceLanguages":` | common/interface_languages_fork.go |
+| O8 인터페이스 언어 | controller/misc.go:86 | `/api/status`에 `"interface_languages": common.ParseInterfaceLanguages(common.InterfaceLanguages)` 한 줄 (`en, ko, zhCN, zhTW, fr, ru, ja, vi`만 허용, 대소문자 무시, `kr`→`ko`, 관리자 순서 유지, 중복·미지원 제거, 비면 `["en"]`) | common/interface_languages_fork.go |
+| O8 인터페이스 언어 (프런트) | web/src/lib/status-query.ts:23, 99 | `toInterfaceLanguageList` import, `mapStatusDataToConfig`에 `interfaceLanguages` 한 줄 (문자열 배열로 정규화, 기본 `[]`) | web/src/lib/interface-languages.ts |
+| O8 인터페이스 언어 (프런트) | web/src/stores/system-config-store.ts:45, 79 | `SystemConfig.interfaceLanguages?: string[]` 필드, 기본 config에 `interfaceLanguages: []` | web/src/lib/interface-languages.ts |
+| O8 인터페이스 언어 (프런트) | web/src/features/system-settings/hooks/use-update-option.ts:50 | `STATUS_RELATED_KEYS`에 `'InterfaceLanguages'` (저장 후 `/api/status` 갱신) | — |
+| O8 인터페이스 언어 (프런트) | web/src/components/language-switcher.tsx:30, 32, 40, 64-65 | `INTERFACE_LANGUAGE_OPTIONS` import 제거(import 한 줄로 합침), `useInterfaceLanguageOptions` import, `const languageOptions = useInterfaceLanguageOptions(currentLanguage)`, 메뉴가 `languageOptions.map`을 사용 (oxfmt가 `// fork: O8`을 다음 줄 :65로 옮김) | web/src/lib/interface-languages.ts, web/src/components/__tests__/language-switcher.test.tsx |
+| O8 인터페이스 언어 (프런트) | web/src/features/profile/components/language-preferences-card.tsx:26, 28, 52, 118-119 | 위와 같은 4곳: import 정리, hook import, `languageOptions` 한 줄, Combobox `options={languageOptions.map(...)}` (표식은 :119) | web/src/lib/interface-languages.ts |
+| O8 인터페이스 언어 (프런트) | web/src/features/system-settings/operations/section-registry.tsx:19, 44-53 | `InterfaceLanguagesSection` import, `behavior` 다음 섹션 `{ id: 'interface-languages', titleKey: 'Interface languages', ... }` | web/src/features/system-settings/general/interface-languages-section.tsx (+ `general/__tests__/interface-languages-section.test.tsx`) |
+| O8 인터페이스 언어 (프런트) | web/src/features/system-settings/operations/index.tsx:33 | `defaultOperationsSettings.InterfaceLanguages: 'en,ko'` | — |
+| O8 인터페이스 언어 (프런트) | web/src/features/system-settings/types.ts:372 | `OperationsSettings.InterfaceLanguages: string` | — |
+| O8 인터페이스 언어 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json, web/src/i18n/locales/ko.json | 키 3개 `Interface languages`, `Languages offered in the language menu. The current language of a user stays available.`, `Select at least one language.` (`Failed to send the test email` 뒤). ko는 번역, 나머지 6개는 영어 placeholder | — |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

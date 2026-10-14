@@ -27,11 +27,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  INTERFACE_LANGUAGE_OPTIONS,
-  normalizeInterfaceLanguage,
-} from '@/i18n/languages'
+import { normalizeInterfaceLanguage } from '@/i18n/languages' // fork: O8
 import { api } from '@/lib/api'
+import { useInterfaceLanguageOptions } from '@/lib/interface-languages' // fork: O8
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -39,6 +37,7 @@ export function LanguageSwitcher() {
   const { i18n, t } = useTranslation()
   const user = useAuthStore((s) => s.auth.user)
   const currentLanguage = normalizeInterfaceLanguage(i18n.language)
+  const languageOptions = useInterfaceLanguageOptions(currentLanguage) // fork: O8
   const handleChangeLanguage = useCallback(
     async (code: string) => {
       await i18n.changeLanguage(code)
@@ -62,7 +61,8 @@ export function LanguageSwitcher() {
         <span className='sr-only'>{t('Change language')}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end'>
-        {INTERFACE_LANGUAGE_OPTIONS.map((lang) => (
+        {languageOptions.map((lang) => (
+          // fork: O8
           <DropdownMenuItem
             key={lang.code}
             onClick={() => handleChangeLanguage(lang.code)}

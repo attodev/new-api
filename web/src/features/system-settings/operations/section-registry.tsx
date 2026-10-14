@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { InterfaceLanguagesSection } from '../general/interface-languages-section' // fork: O8
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
@@ -37,6 +38,16 @@ const OPERATIONS_SECTIONS = [
           DemoSiteEnabled: settings.DemoSiteEnabled,
           SelfUseModeEnabled: settings.SelfUseModeEnabled,
         }}
+      />
+    ),
+  },
+  // fork: O8
+  {
+    id: 'interface-languages',
+    titleKey: 'Interface languages',
+    build: (settings: OperationsSettings) => (
+      <InterfaceLanguagesSection
+        defaultValues={{ InterfaceLanguages: settings.InterfaceLanguages }}
       />
     ),
   },

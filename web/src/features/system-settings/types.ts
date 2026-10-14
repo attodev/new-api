@@ -369,6 +369,7 @@ export type OperationsSettings = {
   DefaultCollapseSidebar: boolean
   DemoSiteEnabled: boolean
   SelfUseModeEnabled: boolean
+  InterfaceLanguages: string // fork: O8
   QuotaRemindThreshold: string
   SMTPServer: string
   SMTPPort: string

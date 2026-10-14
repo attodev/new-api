@@ -7534,6 +7534,9 @@
     "Contact email is not configured": "Contact email is not configured",
     "Recipient address is required": "Recipient address is required",
     "Recipient address is invalid": "Recipient address is invalid",
-    "Failed to send the test email": "Failed to send the test email"
+    "Failed to send the test email": "Failed to send the test email",
+    "Interface languages": "Interface languages",
+    "Languages offered in the language menu. The current language of a user stays available.": "Languages offered in the language menu. The current language of a user stays available.",
+    "Select at least one language.": "Select at least one language."
   }
 }

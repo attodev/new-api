@@ -42,6 +42,7 @@ export interface SystemConfig {
   systemName: string
   logo: string
   footerHtml?: string
+  interfaceLanguages?: string[] // fork: O8
   demoSiteEnabled?: boolean
   displayTokenStatEnabled?: boolean
   currency: CurrencyConfig
@@ -75,6 +76,7 @@ export const useSystemConfigStore = create<SystemConfigState>()(
       config: {
         systemName: DEFAULT_SYSTEM_NAME,
         logo: DEFAULT_LOGO,
+        interfaceLanguages: [], // fork: O8
         currency: { ...DEFAULT_CURRENCY_CONFIG },
       },
       loading: true,

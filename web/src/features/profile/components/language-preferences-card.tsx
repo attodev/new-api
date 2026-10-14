@@ -23,11 +23,9 @@ import { toast } from 'sonner'
 
 import { Combobox } from '@/components/ui/combobox'
 import { TitledCard } from '@/components/ui/titled-card'
-import {
-  INTERFACE_LANGUAGE_OPTIONS,
-  normalizeInterfaceLanguage,
-} from '@/i18n/languages'
+import { normalizeInterfaceLanguage } from '@/i18n/languages' // fork: O8
 import { handleServerError } from '@/lib/handle-server-error'
+import { useInterfaceLanguageOptions } from '@/lib/interface-languages' // fork: O8
 import { createServerError } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -51,6 +49,7 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
   }, [props.profile?.setting, i18n.language])
 
   const [currentLanguage, setCurrentLanguage] = useState(savedLanguage)
+  const languageOptions = useInterfaceLanguageOptions(currentLanguage) // fork: O8
 
   useEffect(() => {
     setCurrentLanguage(savedLanguage)
@@ -116,7 +115,8 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
         </div>
         <div className='flex items-center gap-2 sm:min-w-48'>
           <Combobox
-            options={INTERFACE_LANGUAGE_OPTIONS.map((language) => ({
+            options={languageOptions.map((language) => ({
+              // fork: O8
               value: language.code,
               label: language.label,
             }))}
