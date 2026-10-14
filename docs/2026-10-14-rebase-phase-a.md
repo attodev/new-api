@@ -11,7 +11,10 @@
 - 의존성: `GOWORK=off go get github.com/xuri/excelize/v2@v2.10.1`. 아직 import하는 코드가 없어 `go mod tidy`가 줄을 지우므로 tidy는 돌리지 않았고, go.mod에는 `// indirect`로 들어갔다. excelize를 처음 import하는 Task에서 `go mod tidy`로 direct 승격한다. `relaykit`/`tokenkit` replace 줄은 그대로.
 
 ## 2. 스키마 리허설 (Task 3)
-(Task 3에서 채운다)
+로컬 실행 안 함 — 이 개발 장비에 컨테이너 런타임이 없다. 실행 명령: `./scripts/schema-rehearsal/run.sh all` (Docker 있는 장비) 또는 운영 사본에 `LEGACY_SKIP=1 SQL_DSN=... ./scripts/schema-rehearsal/run.sh <dialect>`. 통과 기준은 scripts/schema-rehearsal/README.md.
+- 이 장비에서 확인한 것: `bash -n run.sh` 통과, Docker 없이 `run.sh mysql`은 `docker: command not found`로 즉시 실패(예상 동작), team 트리(placeholder dist 포함)와 리베이스 트리 모두 `GOWORK=off go build`로 바이너리 빌드 성공 (go1.27.1 darwin/arm64).
+- Task 2의 DSN 테스트(`TestUserQuotaColumnsSurviveAutoMigrate`)도 컨테이너가 있는 장비에서 `TEST_MYSQL_DSN`/`TEST_POSTGRES_DSN`을 주고 돌려야 한다 (기대: PASS x2).
+- 운영 사본 리허설: 미실행(운영자 작업).
 
 ## 3. 커밋 표
 | Task | 커밋 | 내용 |
