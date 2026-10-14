@@ -18,6 +18,9 @@ func getTokenCacheFenceKey(key string) string {
 }
 
 func quotaCacheTTLSeconds() int {
+	if common.QuotaCacheTTL > 0 {
+		return common.QuotaCacheTTL
+	}
 	ttl := common.RedisKeyCacheSeconds()
 	if ttl <= 0 {
 		return 60

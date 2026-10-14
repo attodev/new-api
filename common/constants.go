@@ -192,6 +192,10 @@ var RequestInterval time.Duration
 
 var SyncFrequency int // unit is second
 
+// QuotaCacheTTL overrides user/token Redis cache TTL in seconds (default: 600).
+// Non-positive values retain the legacy SyncFrequency-based TTL.
+var QuotaCacheTTL = 600
+
 var BatchUpdateEnabled = false
 var BatchUpdateInterval int
 

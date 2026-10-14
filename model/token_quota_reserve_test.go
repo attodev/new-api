@@ -18,14 +18,17 @@ func useTokenQuotaMiniRedis(t *testing.T) *miniredis.Miniredis {
 	oldRedisEnabled := common.RedisEnabled
 	oldRDB := common.RDB
 	oldSyncFrequency := common.SyncFrequency
+	oldQuotaCacheTTL := common.QuotaCacheTTL
 	common.RedisEnabled = true
 	common.SyncFrequency = 2
+	common.QuotaCacheTTL = 0
 	common.RDB = redis.NewClient(&redis.Options{Addr: server.Addr()})
 	t.Cleanup(func() {
 		_ = common.RDB.Close()
 		common.RedisEnabled = oldRedisEnabled
 		common.RDB = oldRDB
 		common.SyncFrequency = oldSyncFrequency
+		common.QuotaCacheTTL = oldQuotaCacheTTL
 	})
 	return server
 }
