@@ -26,8 +26,10 @@ func registerForkSelfRoutes(selfRoute *gin.RouterGroup) {
 	selfRoute.POST("/paypal/amount", controller.RequestPayPalAmount)
 }
 
-// registerForkAdminUserRoutes: admin endpoints under /api/user (O4 user Excel export/import).
+// registerForkAdminUserRoutes: admin endpoints under /api/user (O4 user Excel export/import,
+// O3 expiry of abandoned personal top-up orders).
 func registerForkAdminUserRoutes(adminRoute *gin.RouterGroup) {
 	adminRoute.GET("/export", controller.ExportUsers)
 	adminRoute.POST("/import", controller.ImportUsers)
+	adminRoute.POST("/topup/expire", controller.AdminExpirePendingTopUps)
 }
