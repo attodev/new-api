@@ -74,6 +74,21 @@ test('rejects a value that is not a string', () => {
   assert.ok(validateEntry('Save', 42, { skip: false }).length > 0)
 })
 
+test('lets a sentence fragment carry no hangul but not stay english', () => {
+  const en = 'Supports `-thinking`, `-thinking-'
+  assert.deepEqual(
+    validateEntry(en, '`-thinking`, `-thinking-', {
+      skip: false,
+      fragment: true,
+    }),
+    []
+  )
+  assert.ok(
+    validateEntry(en, '`-thinking`, `-thinking-', { skip: false }).length > 0
+  )
+  assert.ok(validateEntry(en, en, { skip: false, fragment: true }).length > 0)
+})
+
 test('rejects newline drift', () => {
   assert.ok(
     validateEntry('Line one\nLine two', '첫째 줄 둘째 줄', { skip: false })

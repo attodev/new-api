@@ -16,7 +16,7 @@
 
 | English | 한국어 | 비고 |
 |---|---|---|
-| Quota | 쿼터 | 시드된 값에서 "쿼터"(51회)가 "할당량"(30회)보다 많아 "쿼터"를 씁니다. 정확히 `Quota` 키만 team에서 "할당량"이라 그 라벨과 소수 표기는 단계 8 점검에서 "쿼터"로 통일합니다(아래 "통일 예정"). 새 번역은 "쿼터"만 씁니다. |
+| Quota | 쿼터 | 시드된 값에서 "쿼터"(51회)가 "할당량"(30회)보다 많아 "쿼터"를 씁니다. 정확히 `Quota` 키만 team에서 "할당량"이라 그 라벨과 소수 표기는 단계 8 점검에서 "쿼터"로 통일했습니다(아래 "통일 완료"). 새 번역은 "쿼터"만 씁니다. |
 | Balance | 잔액 | team 42회, 다른 표현 없음. |
 | Credit | 충전 | team의 `Credit` 키가 "충전". 명사로 쓰이는 금액은 "충전 쿼터", 동사 "credit to user"는 "지급"(예: "사용자 계정에 지급할 쿼터"). |
 | Top up | 충전 | 동사·명사 모두 "충전". "Top-up order"는 "충전 주문". |
@@ -30,11 +30,11 @@
 | Group | 그룹 | |
 | Ratio | 비율 | team 79회, "배율" 14회. 새 번역은 "비율"로 통일합니다. |
 | Model ratio | 모델 비율 | |
-| Completion ratio | 출력 비율 | 출력(completion) 토큰에 적용하는 비율이라 "출력 비율"을 씁니다. "Completion price"는 "출력 가격", "Audio completion ratio"는 "오디오 출력 비율". team의 "최종 비율"/"완성 비율"은 시드된 값에 1회씩 남아 있어 통일 대상입니다. |
+| Completion ratio | 출력 비율 | 출력(completion) 토큰에 적용하는 비율이라 "출력 비율"을 씁니다. "Completion price"는 "출력 가격", "Audio completion ratio"는 "오디오 출력 비율". team의 "최종 비율"/"완성 비율"은 시드된 값에 1회씩 남아 있었고 단계 8에서 통일했습니다. |
 | Group ratio | 그룹 비율 | |
 | Price | 가격 | team의 `Price` 키는 "가격 책정"이지만 이는 "Pricing"에 가깝습니다. "Pricing"은 "가격 책정", "Price"는 "가격"을 씁니다. |
 | Discount | 할인 | "Discount rate"는 "할인율". |
-| Vendor | 공급업체 | 모델 제작사(OpenAI 등)를 가리킬 때. 시드된 값에는 "공급자"(29회)도 섞여 있어 통일 대상입니다. Provider와 구분하려고 Vendor는 "공급업체"로 정합니다. |
+| Vendor | 공급업체 | 모델 제작사(OpenAI 등)를 가리킬 때. 시드된 값에는 "공급자"(29회)도 섞여 있었고 단계 8에서 통일했습니다. Provider와 구분하려고 Vendor는 "공급업체"로 정합니다. |
 | Model | 모델 | |
 | Usage log | 사용 로그 | team의 `Usage logs`가 "사용 로그". 일반 "Logs"는 "로그". |
 | Request | 요청 | "Requests"는 "요청 수". 단위로 쓰인 소문자 `request`는 team에서 "회". |
@@ -127,7 +127,7 @@
 | Discard (changes) | 버리기 | "Discard changes"는 "변경 사항 버리기". 취소(Cancel)와 구분합니다. |
 | Deprecated | 지원 중단됨 | 상태 라벨. |
 | Factory (plugin) | 기본 제공 | 작업 플러그인의 출고 시 내장 버전. 시드된 "기본 제공 v{{factory}}"와 맞춥니다. |
-| Fallback | 폴백 | "Fallback route"는 "폴백 라우트". 시드된 "폴백 티어"는 Tier 통일 대상입니다("폴백 등급"). |
+| Fallback | 폴백 | "Fallback route"는 "폴백 라우트". 시드된 "폴백 티어"는 단계 8에서 "폴백 등급"으로 통일했습니다. |
 | Split (advanced custom) | 분할 | 시드된 "분할 추가"와 맞춥니다. |
 | Incoming path | 수신 경로 | 시드된 "같은 수신 경로에서는…"과 맞춥니다. |
 | Marketplace index / source | 인덱스 / 소스 | 작업 플러그인 마켓플레이스. "Index URL"은 "인덱스 URL", "Marketplace sources"는 "마켓플레이스 소스". |
@@ -165,7 +165,7 @@
 | Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. 배치 6에서 같은 이유로 `Xunfei`, `Zhipu`, `Zhipu GLM`, `Zhipu V4`, `VolcEngine`, `WeChat`, `WeChat Pay`(Epay WeChat Pay와 같음)와 테마 이름 `Underground`를 넣었습니다. |
 | Worker / Master (instance) | 워커 / 마스터 | 다중 인스턴스 배포의 역할. 시드된 "마스터 인스턴스"와 맞춥니다. 감사 로그의 Operator(작업자)와 구분합니다. |
 | Unauthorized (auth error) | 인증되지 않았습니다 | 백엔드 오류 "Unauthorized, …"는 "인증되지 않았습니다. …" 두 문장으로 옮깁니다. 라벨 `Unauthorized`는 시드된 "인증되지 않음". |
-| Tier (pricing) | 등급 | 가격·할인 단계. 기존 값에서 "등급"(17개 키)이 "티어"(11개 키)보다 많고 가격 단계를 가리키는 한국어로도 자연스러워 "등급"을 씁니다. "Tier name"은 "등급 이름", "Tiered price table"은 "등급별 가격표". 소수 표기 "티어"는 아래 "통일 예정"에 있습니다. |
+| Tier (pricing) | 등급 | 가격·할인 단계. 기존 값에서 "등급"(17개 키)이 "티어"(11개 키)보다 많고 가격 단계를 가리키는 한국어로도 자연스러워 "등급"을 씁니다. "Tier name"은 "등급 이름", "Tiered price table"은 "등급별 가격표". 소수 표기 "티어"는 단계 8에서 통일했습니다(아래 "통일 완료"). |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -173,9 +173,9 @@
 - 같은 영어 단어가 라벨과 문장에서 다르게 번역되지 않게 합니다(예: 라벨 "쿼터", 문장 "쿼터가 부족합니다").
 - 이 표에 없는 용어를 새로 정하면 이 표에 한 줄 추가하고 같은 PR에서 사용합니다.
 
-## 통일 예정
+## 통일 완료 (단계 8)
 
-`ko.json`에 team 값을 그대로 시드했기 때문에 아래 소수 표기가 재사용된 번역에 남아 있습니다. 단계 8 점검에서 용어집 표기로 통일합니다. 새 번역에는 쓰지 않습니다.
+`ko.json`에 team 값을 그대로 시드했기 때문에 아래 소수 표기가 재사용된 번역에 남아 있었습니다. 단계 8 점검(배치 6 이후 전체 검수)에서 모두 용어집 표기로 통일했습니다. 영어 키가 그 용어를 뜻할 때만 바꿨고, 다른 뜻인 값(예: `Start collecting payments…`의 "제품에 집중", 메모리 통계 `Total Allocated` = "총 할당량")은 그대로 두었습니다. 새 번역에는 왼쪽 열의 소수 표기를 쓰지 않습니다.
 
 | 용어집 표기 | 통일할 소수 표기 | 비고 |
 |---|---|---|
@@ -189,11 +189,23 @@
 | 패스스루 (Passthrough) | 통과, 전달 | `Enable Request Passthrough` = "요청 통과", `Disable store passthrough` = "매장 통과"(오역), `Field passthrough controls` = "필드 전달". |
 | 모델 마켓플레이스 (Model square) | 모델 스퀘어 | `Collect relay latency and success-rate metrics for the model square.` 1회. |
 | 모델 분석 (Model analytics) | 모델 데이터 분석 | `Model Analytics` 라벨 1회. |
-| 캐시 지우기 완료 토스트 (…cache cleared) | 지워짐 | 시드된 `Disk cache cleared` = "디스크 캐시 지워짐". 배치 3의 `Inactive disk cache cleared` = "비활성 디스크 캐시를 지웠습니다"처럼 "…지웠습니다"로 통일합니다. |
+| 캐시 지우기 완료 토스트 (…cache cleared) | 지워짐 | 시드된 `Disk cache cleared` = "디스크 캐시 지워짐". 배치 3의 `Inactive disk cache cleared` = "비활성 디스크 캐시를 지웠습니다"처럼 "…지웠습니다"로 통일했습니다. |
 | 리디렉션 (Redirect) | 리다이렉션 | `From model redirect, not yet added to models list`, `Redirecting to GitHub...` 2회. |
 | 릴리스 (Release) | 릴리즈 | `No release notes provided.`, `Open release` 2회. |
-| 상품 (Product, payment) | 제품 | Waffo Pancake·Creem 설명문 18회(`Select a product`, `Bound product:` 등). 라벨이 "상품"이라 "상품"으로 통일합니다. |
+| 상품 (Product, payment) | 제품 | Waffo Pancake·Creem 설명문 18회(`Select a product`, `Bound product:` 등). 라벨이 "상품"이라 "상품"으로 통일했습니다. 그중 마케팅 문구 `Start collecting payments…`의 "제품에 집중"은 개발자 자신의 제품을 뜻해 그대로 두었습니다(17개 키 변경). |
 | Turnstile (영문 유지) | 회전문 | `Enable Turnstile` = "회전문 활성화"(오역). 다른 Turnstile 키는 모두 영문을 유지합니다. |
 | 폐기 (Revoke) | 취소 | 배치 1의 `Access token revoked` = "액세스 토큰 취소됨", `A token that never expires stays valid until you revoke it…` = "취소할 때까지", 시드된 `Create, revoke, and audit API tokens.` = "취소" 3회. |
 | Telegram (영문 유지) | 텔레그램 | 시드된 `Enable Telegram OAuth` = "텔레그램 OAuth 활성화" 1회. |
 | 등급 (Tier) | 티어 | 11개 키: `Fallback tier` = "폴백 티어", `Tiered pricing` = "티어별 가격", `Tiered (billing expression)` = "티어드", `Pricing tier {{name}}`, `Tier conditions`, `tiers`, 그리고 "이 티어…", "각 티어…"로 시작하는 설명문 5개. |
+| 제공자 (Provider) | 공급자 | 16개 키(사용자 지정 OAuth 제공자, 업스트림 제공자 등). 가격 페이지의 provider 필터 문구 2개는 공급업체 필터(`All Vendors`)를 가리켜 "공급업체"로 바꿨습니다. |
+| 충전 코드 (Redemption code) | 교환 코드, 상환 코드, 쿠폰 사용 코드 | 22개 키. |
+| 플랜 (Plan) | 패키지, 요금제 | `e.g. Basic Plan`, `Update plan info` 2개. `e.g., Basic Package`는 키가 Package라 "기본 패키지"로 둡니다. |
+| 멤버 (Member) | 구성원 | 4개 키. |
+| 2단계 인증 (Two-factor) | 이중 인증 | 2개 키. |
+| 속도 제한 (Rate limit) | 비율 제한 | 2개 키. |
+| 사전 차감 (Pre-consume) | 사전 소비, 미리 소비 | 3개 키. |
+| 체크인 (Check-in) | 출석, 출석 체크 | 12개 키. |
+| 배율 (Multiplier) / 충전 (Recharge) | 승수 / 재충전 | 5개 키, 3개 키(겹침 포함). |
+| API 키 (API token) | API 토큰 | `API token management`, `Create, revoke, and audit API tokens.` 2개. |
+| 격식체 | ~신가요?, ~할까요?, ~나요? | 11개 키(`Already have an account?` = "이미 계정이 있으십니까?" 등). |
+| 한국어 (영문 섞임) | System, Global Model, Webhook | 화면 점검에서 찾은 6개 키(`System Name` = "System 이름", `System Settings`, `Global Model Configuration`, Webhook 문구 3개). "시스템", "전역 모델", "웹훅"으로 옮겼습니다. |

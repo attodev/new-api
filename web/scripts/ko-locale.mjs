@@ -102,6 +102,11 @@ const MANUAL_SKIP = new Set([
   'Zhipu V4',
 ])
 
+// Sentence fragments that the UI joins with other keys. Korean word order moves
+// all hangul into the neighbouring fragment, so these values may have none
+// (they must still differ from the english value).
+const HANGUL_OPTIONAL = new Set(['Supports `-thinking`, `-thinking-'])
+
 // en.json stores this key with a unicode escape (see sync-i18n.mjs); keep the
 // same on-disk spelling so ko.json matches the other locales.
 const OBFUSCATED_KEYS = [
@@ -111,12 +116,12 @@ const OBFUSCATED_KEYS = [
   },
 ]
 
-export function validateEntry(en, ko, { skip }) {
+export function validateEntry(en, ko, { skip, fragment = false }) {
   const issues = []
   if (typeof ko !== 'string') return ['value is not a string']
   if (skip) return en === ko ? [] : ['skip key must keep the english value']
   if (ko === en) issues.push('untranslated (equals english)')
-  if (!HANGUL.test(ko)) issues.push('no hangul')
+  if (!fragment && !HANGUL.test(ko)) issues.push('no hangul')
   const a = (en.match(INTERP) ?? []).map((s) => s.replaceAll(/\s/g, '')).sort()
   const b = (ko.match(INTERP) ?? []).map((s) => s.replaceAll(/\s/g, '')).sort()
   if (a.join('|') !== b.join('|')) {
@@ -280,7 +285,10 @@ async function check(batchId) {
       bad.push([k, ['missing']])
       continue
     }
-    const issues = validateEntry(en[k], ko[k], { skip: skip.has(k) })
+    const issues = validateEntry(en[k], ko[k], {
+      skip: skip.has(k),
+      fragment: HANGUL_OPTIONAL.has(k),
+    })
     if (issues.length) bad.push([k, issues])
   }
   for (const [k, issues] of bad) {
