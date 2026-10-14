@@ -242,7 +242,7 @@ HEAD 6275fd416 + 이 단계 Task 12의 도구·테스트 변경(`web/e2e/korean.
 
 ## 8. 최종 수정 (whole-branch 리뷰, 2026-10-15)
 
-최종 리뷰(`.superpowers/sdd/2026-10-15-rebase-phase-d/final-review.md`)의 Important 3건과 Minor 중 controller가 고른 것을 고쳤다.
+최종 리뷰(`docs/reviews/2026-10-15-rebase-phase-d-final-review.md`)의 Important 3건과 Minor 중 controller가 고른 것을 고쳤다.
 
 | 커밋 | 내용 |
 |---|---|
