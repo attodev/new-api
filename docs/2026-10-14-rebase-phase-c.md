@@ -129,11 +129,11 @@
 
 | 커밋 | 항목 | 내용 |
 |---|---|---|
-| 55cd4692d | I1 | `updatePricing`이 모델→벤더 맵을 지역 맵으로 만들고 루프 뒤 `publishModelVendorNames`로 한 번에 교체한다. `InvalidatePricingCache`는 맵을 지우지 않는다. resolver는 스냅숏만 읽고, 스냅숏이 아직 없을 때(첫 시작)만 1분에 한 번 `GetPricing()`을 부른다(음수 캐시 타임스탬프) |
-| e9033aaf3 | I2·M4 | 가입 거부에 결제 대기 개인 주문 추가(`top_ups`의 pending이면서 조직 지갑이 아닌 것, `subscription_orders`의 pending). 메시지 `…subscription or pending orders…`, 화면 안내 `This user still has a personal balance, subscription or pending orders`(7개 locale). Excel 기존 사용자 배정 + 회원 필드를 한 트랜잭션(`AssignUserToOrganizationWithMemberFields`)으로 |
-| 6754b2b08 | M1·M2·M5 | 출석 테스트의 비회원 경로를 가드 직접 검사로 바꿔 `-race` 경합 제거. 무료 모델 판정 4곳이 할인 전 group ratio(`freeModelGroupRatio`)를 본다. `/api/organization/*` 비-GET 가드가 actor 행을 한 번 읽어 gin context에 두고 `getOrganizationActor`가 재사용(회원 정보 읽기 3 → 1) |
-| 662e9e2b1 | M3 | 사용 로그 목록(데스크톱 토큰 칸·요약 세그먼트·모바일 카드)의 group ratio 옆에 `−{percent}%` |
-| (이 문서 커밋) | M6 | `details-dialog.tsx:170`, `group-ratio-form.tsx:69`(oxfmt가 줄 끝 주석을 옮기므로 export 바로 앞 줄), `relay_info_test.go:8`(줄 끝)에 `fork:` 표식. 관리 매뉴얼 문제 해결 제목이 화면 안내 문구를 인용하게 한 것은 I2 문구 변경과 함께 e9033aaf3에 들어갔다 |
+| 2cb7cd7a7 | I1 | `updatePricing`이 모델→벤더 맵을 지역 맵으로 만들고 루프 뒤 `publishModelVendorNames`로 한 번에 교체한다. `InvalidatePricingCache`는 맵을 지우지 않는다. resolver는 스냅숏만 읽고, 스냅숏이 아직 없을 때(첫 시작)만 1분에 한 번 `GetPricing()`을 부른다(음수 캐시 타임스탬프) |
+| dc1d30110 | I2·M4 | 가입 거부에 결제 대기 개인 주문 추가(`top_ups`의 pending이면서 조직 지갑이 아닌 것, `subscription_orders`의 pending). 메시지 `…subscription or pending orders…`, 화면 안내 `This user still has a personal balance, subscription or pending orders`(7개 locale). Excel 기존 사용자 배정 + 회원 필드를 한 트랜잭션(`AssignUserToOrganizationWithMemberFields`)으로 |
+| b07f61b42 | M1·M2·M5 | 출석 테스트의 비회원 경로를 가드 직접 검사로 바꿔 `-race` 경합 제거. 무료 모델 판정 4곳이 할인 전 group ratio(`freeModelGroupRatio`)를 본다. `/api/organization/*` 비-GET 가드가 actor 행을 한 번 읽어 gin context에 두고 `getOrganizationActor`가 재사용(회원 정보 읽기 3 → 1) |
+| 675e797ae | M3 | 사용 로그 목록(데스크톱 토큰 칸·요약 세그먼트·모바일 카드)의 group ratio 옆에 `−{percent}%` |
+| (이 문서 커밋) | M6 | `details-dialog.tsx:170`, `group-ratio-form.tsx:69`(oxfmt가 줄 끝 주석을 옮기므로 export 바로 앞 줄), `relay_info_test.go:8`(줄 끝)에 `fork:` 표식. 관리 매뉴얼 문제 해결 제목이 화면 안내 문구를 인용하게 한 것은 I2 문구 변경과 함께 dc1d30110에 들어갔다 |
 
 ## 4. 결정 사항
 
@@ -200,7 +200,7 @@ HEAD 005b796ca(이 문서 커밋 직전)에서 실행.
 
 ### 최종 수정 웨이브 검증 (2026-10-15)
 
-HEAD 662e9e2b1 + 이 문서 커밋의 표식 변경(주석만)에서 실행.
+HEAD 675e797ae + 이 문서 커밋의 표식 변경(주석만)에서 실행.
 - `GOWORK=off go vet ./...`: 종료 코드 0. `GOWORK=off go test ./... -count=1`: 종료 코드 0, `ok` 44 / `no test files` 39 / FAIL 0.
 - `GOWORK=off go test -race ./controller/ -run 'CheckIn|Organization' -count=1`: ok. 수정 전에는 같은 명령을 `-count=3`으로 돌리면 `TestOrganizationMemberCannotCheckIn`이 `race detected`로 실패했고, 수정 뒤 `-count=3`도 ok.
 - `bun run typecheck`: 종료 코드 0. `bun run test`: 209 파일 / 2398 테스트 pass(Task 11의 207 / 2384에서 +2 / +14). `bun run build`: 성공, `routeTree.gen.ts` 변경 없음. 바뀐 프런트 파일의 `oxlint`·`oxfmt --check`: 새 문제 없음.
