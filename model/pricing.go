@@ -48,14 +48,16 @@ type Pricing struct {
 	BillingUsageSchema     map[string]jsplugin.UsageFieldSchema `json:"billing_usage_schema,omitempty"`
 	BillingUsageExamples   []jsplugin.UsageExample              `json:"billing_usage_examples,omitempty"`
 	PricingVersion         string                               `json:"pricing_version,omitempty"`
-	DiscountPercent        float64                              `json:"discount_percent,omitempty"` // fork: O6
+
+	DiscountPercent float64 `json:"discount_percent,omitempty"` // fork: O6
 }
 
 type PricingVendor struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	Description     string  `json:"description,omitempty"`
-	Icon            string  `json:"icon,omitempty"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Icon        string `json:"icon,omitempty"`
+
 	DiscountPercent float64 `json:"discount_percent,omitempty"` // fork: O6
 }
 
@@ -98,7 +100,7 @@ func InvalidatePricingCache() {
 	pricingMap = nil
 	vendorsList = nil
 	lastGetPricingTime = time.Time{}
-	modelVendorNameCache = nil // fork: O6
+	resetModelVendorNameCache() // fork: O6
 }
 
 // GetVendors 返回当前定价接口使用到的供应商信息
@@ -225,10 +227,11 @@ func updatePricing() {
 	for _, v := range vendorMap {
 		vendorNameByID[v.Id] = v.Name // fork: O6
 		vendorsList = append(vendorsList, PricingVendor{
-			ID:              v.Id,
-			Name:            v.Name,
-			Description:     v.Description,
-			Icon:            v.Icon,
+			ID:          v.Id,
+			Name:        v.Name,
+			Description: v.Description,
+			Icon:        v.Icon,
+
 			DiscountPercent: vendorDiscountPercent(v.Name), // fork: O6
 		})
 	}

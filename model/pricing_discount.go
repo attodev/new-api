@@ -1,6 +1,8 @@
 package model
 
 import (
+	"sync"
+
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 )
 
@@ -40,23 +42,45 @@ func vendorDiscountPercent(name string) float64 {
 	return pct
 }
 
-// modelVendorNameCache maps modelName -> vendor name. It is written only from
-// updatePricing (which holds updatePricingLock) and read under updatePricingLock.
-var modelVendorNameCache map[string]string
+// modelVendorNameCache maps FormatMatchingModelName(modelName) -> vendor name.
+// It has its own lock so the billing-path resolver never takes updatePricingLock:
+// writers (updatePricing via applyPricingDiscount, InvalidatePricingCache) already
+// hold updatePricingLock and take modelVendorNameMu inside it.
+var (
+	modelVendorNameCache map[string]string
+	modelVendorNameMu    sync.RWMutex
+)
 
 func init() {
 	ratio_setting.SetVendorResolver(resolveVendorName)
 }
 
+func resetModelVendorNameCache() {
+	modelVendorNameMu.Lock()
+	modelVendorNameCache = nil
+	modelVendorNameMu.Unlock()
+}
+
+// lookupModelVendorName returns the cached vendor name and whether the cache
+// has been built at all.
+func lookupModelVendorName(key string) (name string, built bool) {
+	modelVendorNameMu.RLock()
+	defer modelVendorNameMu.RUnlock()
+	return modelVendorNameCache[key], modelVendorNameCache != nil
+}
+
 // resolveVendorName answers the vendor name of a model for vendor discounts.
-// It reads the pricing cache (refreshing it if stale) and must not be called
-// while channelSyncLock is held (lock order: updatePricingLock -> channelSyncLock).
+// It never takes updatePricingLock; when the cache has not been built it calls
+// GetPricing() once to build it (which takes updatePricingLock itself), so it must
+// not be called while channelSyncLock is held (lock order: updatePricingLock -> channelSyncLock).
 func resolveVendorName(modelName string) (string, bool) {
-	GetPricing()
-	updatePricingLock.Lock() // sync.Mutex (model/pricing.go)
-	defer updatePricingLock.Unlock()
-	name, ok := modelVendorNameCache[modelName]
-	return name, ok && name != ""
+	key := ratio_setting.FormatMatchingModelName(modelName)
+	name, built := lookupModelVendorName(key)
+	if !built {
+		GetPricing()
+		name, _ = lookupModelVendorName(key)
+	}
+	return name, name != ""
 }
 
 // applyPricingDiscount fills the display discount percent of a pricing row and
@@ -65,8 +89,10 @@ func resolveVendorName(modelName string) (string, bool) {
 func applyPricingDiscount(p *Pricing, vendorNameByID map[int]string) {
 	vendorName := vendorNameByID[p.VendorID]
 	p.DiscountPercent = effectiveDiscountPercent(p.ModelName, vendorName)
+	modelVendorNameMu.Lock()
+	defer modelVendorNameMu.Unlock()
 	if modelVendorNameCache == nil {
 		modelVendorNameCache = map[string]string{}
 	}
-	modelVendorNameCache[p.ModelName] = vendorName
+	modelVendorNameCache[ratio_setting.FormatMatchingModelName(p.ModelName)] = vendorName
 }

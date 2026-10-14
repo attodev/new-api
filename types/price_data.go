@@ -8,9 +8,10 @@ import (
 )
 
 type GroupRatioInfo struct {
-	GroupRatio         float64
-	GroupSpecialRatio  float64
-	HasSpecialRatio    bool
+	GroupRatio        float64
+	GroupSpecialRatio float64
+	HasSpecialRatio   bool
+
 	BaseGroupRatio     float64 `json:"base_group_ratio,omitempty"`    // fork: O6 — 할인 접기 전 GroupRatio
 	DiscountMultiplier float64 `json:"discount_multiplier,omitempty"` // fork: O6
 	DiscountSource     string  `json:"discount_source,omitempty"`     // fork: O6 — "model" | "vendor" | ""

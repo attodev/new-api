@@ -136,11 +136,11 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 e2e | .gitignore:40-41 | `web/test-results/`, `web/playwright-report/` 2줄 (Playwright 산출물 무시) | web/playwright.config.ts, web/e2e/ |
 | O3 조직 e2e | web/package.json:19-21, 93; web/bun.lock | scripts `e2e`·`e2e:headed`·`e2e:install` 3줄, devDependency `@playwright/test` 한 줄; lockfile은 `bun install`이 갱신 (충돌 시 upstream lockfile을 받고 `bun install`을 다시 돌린다) | web/playwright.config.ts, web/e2e/organization.e2e.ts, web/e2e/README.md |
 | 공통 (i18n) | web/src/i18n/locales/*.json (en, fr, ja, ru, vi, zh, zh-TW) | fork 화면의 영문 키를 `en.json`에 추가하고 `bun run i18n:sync`로 다른 locale에 영문 fallback을 채움 (O2·O3·O4·O5). 충돌 시 upstream 쪽을 받고 fork 키를 `en.json`에 다시 넣은 뒤 sync | — |
-| O6 할인 | types/price_data.go:14-16 | `GroupRatioInfo.BaseGroupRatio/DiscountMultiplier/DiscountSource` 필드 3개 (gofmt가 이웃 필드 정렬을 바꿈 — 공백만) | setting/ratio_setting/model_discount.go |
+| O6 할인 | types/price_data.go:15-17 | `GroupRatioInfo.BaseGroupRatio/DiscountMultiplier/DiscountSource` 필드 3개 (빈 줄로 분리해 이웃 필드 정렬 유지) | setting/ratio_setting/model_discount.go |
 | O6 할인 | model/option.go:162-163 | InitOptionMap `OptionMap["ModelDiscount"]`, `OptionMap["VendorDiscount"]` 두 줄 | setting/ratio_setting/model_discount.go, model/pricing_discount.go |
 | O6 할인 | model/option.go:662-663 | updateOptionMap `case "ModelDiscount", "VendorDiscount": err = updateDiscountOption(key, value)` | model/pricing_discount.go |
-| O6 할인 | model/pricing.go:51,59 | `Pricing.DiscountPercent`, `PricingVendor.DiscountPercent` 필드 (gofmt가 PricingVendor 이웃 필드 정렬을 바꿈 — 공백만) | model/pricing_discount.go |
-| O6 할인 | model/pricing.go:101,224,226,232,434 | `InvalidatePricingCache`의 `modelVendorNameCache = nil`, `updatePricing`의 `vendorNameByID` 선언·채우기, 벤더 `DiscountPercent: vendorDiscountPercent(v.Name)`, `applyPricingDiscount(&pricing, vendorNameByID)` (각 한 줄) | model/pricing_discount.go |
+| O6 할인 | model/pricing.go:52,61 | `Pricing.DiscountPercent`, `PricingVendor.DiscountPercent` 필드 (각각 빈 줄로 분리해 이웃 필드 정렬 유지) | model/pricing_discount.go |
+| O6 할인 | model/pricing.go:103,226,228,235,437 | `InvalidatePricingCache`의 `resetModelVendorNameCache()`, `updatePricing`의 `vendorNameByID` 선언·채우기, 벤더 리터럴 `DiscountPercent: vendorDiscountPercent(v.Name)` (빈 줄로 분리), `applyPricingDiscount(&pricing, vendorNameByID)` (각 한 줄) | model/pricing_discount.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
