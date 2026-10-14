@@ -34,6 +34,51 @@ type Organization struct {
 	UpdatedAt   int64  `json:"updated_at" gorm:"autoUpdateTime;column:updated_at"`
 }
 
+// ErrOrganizationDisabled is returned wherever a disabled organization would
+// otherwise be used: relay billing, organization top-ups and organization
+// admin mutations. Root manages disabled organizations normally.
+var ErrOrganizationDisabled = common.NewMessage("organization is disabled")
+
+// GetOrganizationStatus reads only the status column.
+func GetOrganizationStatus(organizationId int) (int, error) {
+	var org Organization
+	if err := DB.Select("status").Where("id = ?", organizationId).First(&org).Error; err != nil {
+		return 0, err
+	}
+	return org.Status, nil
+}
+
+// RequireActiveOrganization returns ErrOrganizationDisabled unless the
+// organization is enabled.
+func RequireActiveOrganization(organizationId int) error {
+	status, err := GetOrganizationStatus(organizationId)
+	if err != nil {
+		return err
+	}
+	if status != OrganizationStatusEnabled {
+		return ErrOrganizationDisabled
+	}
+	return nil
+}
+
+// IsUserOrganizationDisabled reports whether the user belongs to an
+// organization that exists and is not enabled. Users without an organization
+// (or whose organization row is gone) are not affected.
+func IsUserOrganizationDisabled(userId int) (bool, error) {
+	organizationId, err := GetUserOrganizationId(userId)
+	if err != nil || organizationId <= 0 {
+		return false, err
+	}
+	status, err := GetOrganizationStatus(organizationId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return status != OrganizationStatusEnabled, nil
+}
+
 func IsValidOrganizationRole(role string) bool {
 	return role == OrganizationRoleMember || role == OrganizationRoleAdmin || role == OrganizationRoleOwner
 }

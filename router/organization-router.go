@@ -11,7 +11,8 @@ import (
 
 // fork: O3 — organization routes. Platform administration (/api/organizations)
 // is casbin-guarded; member/organization-admin routes (/api/organization) keep
-// the fork's organization-role checks inside the handlers.
+// the fork's organization-role checks inside the handlers, and writes from a
+// disabled organization are refused by RejectDisabledOrganizationMutation.
 var organizationPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/", permission: authz.OrganizationRead, handler: controller.ListOrganizations},
 	{method: http.MethodPost, path: "/", permission: authz.OrganizationWrite, handler: controller.CreateOrganization},
@@ -28,6 +29,7 @@ func registerForkOrganizationRoutes(apiRouter *gin.RouterGroup) {
 
 	organizationRoute := apiRouter.Group("/organization")
 	organizationRoute.Use(middleware.UserAuth())
+	organizationRoute.Use(controller.RejectDisabledOrganizationMutation())
 	{
 		organizationRoute.GET("/", controller.GetOrganizationProfile)
 		organizationRoute.GET("/dashboard", controller.GetOrganizationDashboard)

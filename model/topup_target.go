@@ -40,15 +40,19 @@ func (topUp *TopUp) EffectiveTargetId() int {
 var errOrganizationTopUpWithoutTarget = errors.New("organization top-up order has no target organization")
 
 // ValidateOrganizationWalletCapacity is the pre-payment check for an
-// organization wallet, mirroring ValidateTopUpQuotaCapacity.
+// organization wallet, mirroring ValidateTopUpQuotaCapacity. A disabled
+// organization cannot be topped up.
 func ValidateOrganizationWalletCapacity(orgId int, creditedQuota int) error {
 	maxCurrentQuota, err := topUpQuotaMaxCurrent(creditedQuota)
 	if err != nil {
 		return err
 	}
 	var org Organization
-	if err := DB.Select("quota").Where("id = ?", orgId).First(&org).Error; err != nil {
+	if err := DB.Select("quota", "status").Where("id = ?", orgId).First(&org).Error; err != nil {
 		return err
+	}
+	if org.Status != OrganizationStatusEnabled {
+		return ErrOrganizationDisabled
 	}
 	if org.Quota > int64(maxCurrentQuota) {
 		return ErrTopUpQuotaLimitExceeded

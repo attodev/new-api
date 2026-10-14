@@ -1,0 +1,53 @@
+package service
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/stretchr/testify/require"
+)
+
+// fork: O3 — a disabled organization cannot be used: its members' relay
+// requests are refused before anything is charged.
+
+func disableOrganizationForTest(t *testing.T, organizationId int) {
+	t.Helper()
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", organizationId).
+		Update("status", model.OrganizationStatusDisabled).Error)
+}
+
+func TestDisabledOrganizationMemberRelayIsRefused(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 3, "plan-member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	_, err := createOrganizationPlanAndAssign(t, 1, 3, 1000)
+	require.NoError(t, err)
+	disableOrganizationForTest(t, 1)
+
+	for _, userId := range []int{2, 3} {
+		relayInfo := &relaycommon.RelayInfo{UserId: userId, OriginModelName: "test-model", IsPlayground: true, ForcePreConsume: true}
+		session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+		require.Nil(t, session)
+		require.NotNil(t, apiErr)
+		require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
+		require.Contains(t, apiErr.Error(), "organization is disabled")
+	}
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 1).Quota)
+	sub, err := model.GetActiveOrganizationUserSubscription(1, 3)
+	require.NoError(t, err)
+	require.Zero(t, sub.AmountUsed)
+}
+
+func TestDisabledOrganizationMidjourneyIsRefused(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 500, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	disableOrganizationForTest(t, 1)
+
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(2), "organization is disabled")
+}

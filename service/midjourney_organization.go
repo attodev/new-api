@@ -24,6 +24,9 @@ func CheckMidjourneyOrganizationBilling(userId int) error {
 	if user.OrganizationId <= 0 {
 		return nil
 	}
+	if err := model.RequireActiveOrganization(user.OrganizationId); err != nil {
+		return err
+	}
 	hasPlan, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, userId)
 	if err != nil {
 		return err

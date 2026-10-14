@@ -44,6 +44,19 @@ func requireOrganizationQuota(c *gin.Context, organizationId int, need int64) *t
 	return nil
 }
 
+// requireActiveOrganization refuses relay requests of a disabled organization's
+// members with 403 before anything is charged.
+func requireActiveOrganization(organizationId int) *types.NewAPIError {
+	if err := model.RequireActiveOrganization(organizationId); err != nil {
+		if errors.Is(err, model.ErrOrganizationDisabled) {
+			return types.NewErrorWithStatusCode(err, types.ErrorCodeAccessDenied, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
+		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+	}
+	return nil
+}
+
 // newOrganizationBillingSession returns handled=false for users without an
 // organization so NewBillingSession continues with upstream's preference logic.
 func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError, bool) {
@@ -53,6 +66,9 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 	}
 	if user.OrganizationId <= 0 {
 		return nil, nil, false
+	}
+	if apiErr := requireActiveOrganization(user.OrganizationId); apiErr != nil {
+		return nil, apiErr, true
 	}
 	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, relayInfo.UserId)
 	if err != nil {
