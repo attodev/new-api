@@ -22,10 +22,10 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
-import type { ChannelAffinityInfo } from '../types'
+import type { ChannelAffinityInfo, UsageLogsScope } from '../types' // fork: O3
 
 export type LogsViewScope = 'all' | 'self'
-export type LogsViewAccess = 'self' | 'admin' | 'root'
+export type LogsViewAccess = 'self' | 'admin' | 'root' | 'organization' // fork: O3
 
 export function resolveLogsViewAccess(
   role: number,
@@ -48,13 +48,28 @@ interface UsageLogsContextValue {
   setSensitiveVisible: (visible: boolean) => void
   viewScope: LogsViewScope
   setViewScope: (scope: LogsViewScope) => void
+  // fork: O3 — organization scope lists the members of one organization
+  logsScope: UsageLogsScope
+  organizationId?: number
+  waitForOrganization: boolean
 }
 
 const UsageLogsContext = createContext<UsageLogsContextValue | undefined>(
   undefined
 )
 
-export function UsageLogsProvider({ children }: { children: ReactNode }) {
+// fork: O3 — logsScope/organizationId/waitForOrganization props
+export function UsageLogsProvider({
+  children,
+  logsScope = 'user',
+  organizationId,
+  waitForOrganization = false,
+}: {
+  children: ReactNode
+  logsScope?: UsageLogsScope
+  organizationId?: number
+  waitForOrganization?: boolean
+}) {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [userInfoDialogOpen, setUserInfoDialogOpen] = useState(false)
   const [affinityTarget, setAffinityTarget] =
@@ -78,6 +93,9 @@ export function UsageLogsProvider({ children }: { children: ReactNode }) {
         setSensitiveVisible,
         viewScope,
         setViewScope,
+        logsScope, // fork: O3
+        organizationId, // fork: O3
+        waitForOrganization, // fork: O3
       }}
     >
       {children}
@@ -103,9 +121,14 @@ export function useUsageLogsContext() {
  */
 export function useLogsViewScope() {
   const role = useAuthStore((state) => state.auth.user?.role ?? ROLE.GUEST)
-  const { viewScope, setViewScope } = useUsageLogsContext()
-  const canManageScope = role >= ROLE.ADMIN
-  const viewAccess = resolveLogsViewAccess(role, viewScope)
+  const { viewScope, setViewScope, logsScope } = useUsageLogsContext()
+  // fork: O3 — organization scope is an admin view of the organization's
+  // members (admin filters, no all/self toggle, no root-only columns).
+  const isOrganizationScope = logsScope === 'organization'
+  const canManageScope = role >= ROLE.ADMIN && !isOrganizationScope
+  const viewAccess: LogsViewAccess = isOrganizationScope
+    ? 'organization'
+    : resolveLogsViewAccess(role, viewScope)
   const isAdminView = viewAccess !== 'self'
   const isRootView = viewAccess === 'root'
 

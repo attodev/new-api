@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { getRouteApi } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -50,9 +49,12 @@ import type { LogCategory } from '../types'
 import { CommonLogsFilterBar } from './common-logs-filter-bar'
 import { TaskLogsFilterBar } from './task-logs-filter-bar'
 import { UsageLogsMobileList } from './usage-logs-mobile-card'
-import { useLogsViewScope, type LogsViewAccess } from './usage-logs-provider'
-
-const route = getRouteApi('/_authenticated/usage-logs/$section')
+import {
+  useLogsViewScope,
+  useUsageLogsContext, // fork: O3
+  type LogsViewAccess,
+} from './usage-logs-provider'
+import { useUsageLogsRoute } from './usage-logs-route' // fork: O3
 
 const logTypeRowTint: Record<number, string> = {
   [LOG_TYPE_ENUM.ERROR]: 'bg-rose-50/40 dark:bg-rose-950/20',
@@ -96,11 +98,16 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     viewAccess,
   } = useLogsViewScope()
   const isMobile = useMediaQuery('(max-width: 640px)')
-  const searchParams = route.useSearch()
+  const { search: searchParams, navigate } = useUsageLogsRoute() // fork: O3
+  const { logsScope, organizationId, waitForOrganization } =
+    useUsageLogsContext() // fork: O3
   const userId = useAuthStore((state) => state.auth.user?.id)
   const { data: showBillingSource = false } = useQuery({
     queryKey: ['usage-log-billing-source', isAdmin, userId],
-    enabled: logCategory === 'common' && userId != null,
+    enabled:
+      logCategory === 'common' &&
+      userId != null &&
+      logsScope !== 'organization', // fork: O3 — admin plans need a site admin
     queryFn: async () => {
       if (isAdmin) {
         const plansResult = await getAdminPlans()
@@ -129,8 +136,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     onPaginationChange,
     ensurePageInRange,
   } = useTableUrlState({
-    search: route.useSearch(),
-    navigate: route.useNavigate(),
+    search: searchParams, // fork: O3
+    navigate, // fork: O3
     pagination: { defaultPage: 1, defaultPageSize: isMobile ? 20 : 100 },
     globalFilter: { enabled: false },
     columnFilters: [
@@ -170,6 +177,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       columnFilters,
       searchParams,
       t,
+      organizationId, // fork: O3
     ],
     queryFn: async () => {
       const result = await fetchLogsByCategory({
@@ -179,6 +187,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
         pageSize: pagination.pageSize,
         searchParams,
         columnFilters,
+        logsScope, // fork: O3
+        organizationId, // fork: O3
       })
 
       if (!result?.success) {
@@ -196,6 +206,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       }
       return undefined
     },
+    enabled: !waitForOrganization || organizationId !== undefined, // fork: O3
   })
 
   const logs = data?.items || []

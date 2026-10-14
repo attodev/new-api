@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient, useIsFetching } from '@tanstack/react-query'
-import { useNavigate, getRouteApi } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router' // fork: O3
 import { type Table } from '@tanstack/react-table'
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,8 +32,7 @@ import {
   LogsFilterToolbar,
 } from './logs-filter-toolbar'
 import { useLogsViewScope } from './usage-logs-provider'
-
-const route = getRouteApi('/_authenticated/usage-logs/$section')
+import { useUsageLogsRoute } from './usage-logs-route' // fork: O3
 
 type TaskLikeLogCategory = Extract<LogCategory, 'drawing' | 'task'>
 type TaskLogsFilters = DrawingLogFilters | TaskLogFilters
@@ -68,7 +67,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const searchParams = route.useSearch()
+  const { search: searchParams, routeTo } = useUsageLogsRoute() // fork: O3
   const { isAdminView: isAdmin } = useLogsViewScope()
   const fetchingLogs = useIsFetching({ queryKey: ['logs'] })
 
@@ -118,7 +117,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const handleApply = useCallback(() => {
     const filterParams = buildSearchParams(filters, props.logCategory)
     navigate({
-      to: '/usage-logs/$section',
+      to: routeTo, // fork: O3
       params: { section: props.logCategory },
       search: {
         ...filterParams,
@@ -126,7 +125,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
       },
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
-  }, [filters, navigate, props.logCategory, queryClient])
+  }, [filters, navigate, props.logCategory, queryClient, routeTo]) // fork: O3
 
   const handleReset = useCallback(() => {
     const { start, end } = getDefaultTimeRange()
@@ -134,7 +133,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
     setFilters(resetFilters)
 
     navigate({
-      to: '/usage-logs/$section',
+      to: routeTo, // fork: O3
       params: { section: props.logCategory },
       search: {
         page: 1,
@@ -143,7 +142,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
       },
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
-  }, [navigate, props.logCategory, queryClient])
+  }, [navigate, props.logCategory, queryClient, routeTo]) // fork: O3
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

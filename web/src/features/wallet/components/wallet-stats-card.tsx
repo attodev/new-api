@@ -28,6 +28,8 @@ import type { UserWalletData } from '../types'
 interface WalletStatsCardProps {
   user: UserWalletData | null
   loading?: boolean
+  // fork: O3 — replaces the balance figure (e.g. "Organization plan in use")
+  balanceDisplay?: { value: string; description: string }
 }
 
 export function WalletStatsCard(props: WalletStatsCardProps) {
@@ -55,8 +57,8 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
   }[] = [
     {
       label: t('Current Balance'),
-      value: formatQuota(props.user?.quota ?? 0),
-      description: t('Remaining quota'),
+      value: props.balanceDisplay?.value ?? formatQuota(props.user?.quota ?? 0), // fork: O3
+      description: props.balanceDisplay?.description ?? t('Remaining quota'), // fork: O3
       icon: WalletCards,
       tone: 'success',
     },

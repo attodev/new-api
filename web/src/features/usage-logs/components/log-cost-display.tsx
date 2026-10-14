@@ -80,7 +80,9 @@ function ToolSurchargeMarker() {
 
 export function LogCostDisplay(props: LogCostDisplayProps) {
   const { t } = useTranslation()
-  const isSubscription = props.other?.billing_source === 'subscription'
+  const isSubscription =
+    props.other?.billing_source === 'subscription' ||
+    props.other?.billing_source === 'organization_subscription' // fork: O3
   const showToolSurcharge = hasToolSurcharge(props.other)
   const quota = isSubscription
     ? (props.other?.subscription_consumed ?? props.quota)

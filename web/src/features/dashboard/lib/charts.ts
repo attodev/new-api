@@ -706,15 +706,47 @@ const USER_COLORS = [
   '#5D7092',
 ]
 
+// fork: O3 — when a theme preset key is passed, user series follow the
+// active theme's --chart-1..5 colours; the key also lets callers re-run the
+// memoized processing when the preset changes. Without a key (upstream
+// callers) the fixed USER_COLORS palette is kept.
+const THEME_CHART_COLOR_VARIABLES = [
+  '--chart-1',
+  '--chart-2',
+  '--chart-3',
+  '--chart-4',
+  '--chart-5',
+] as const
+
+function getUserChartColors(limit: number, themeKey?: string): string[] {
+  if (themeKey === undefined || typeof document === 'undefined') {
+    return USER_COLORS
+  }
+  const bodyStyle = window.getComputedStyle(document.body)
+  const rootStyle = window.getComputedStyle(document.documentElement)
+  const themeColors = THEME_CHART_COLOR_VARIABLES.map((name) =>
+    (
+      bodyStyle.getPropertyValue(name) || rootStyle.getPropertyValue(name)
+    ).trim()
+  ).filter(Boolean)
+  if (themeColors.length === 0) return USER_COLORS
+  return Array.from(
+    { length: Math.max(limit, themeColors.length) },
+    (_, index) => themeColors[index % themeColors.length]
+  )
+}
+
 export function processUserChartData(
   data: QuotaDataItem[],
   timeGranularity: TimeGranularity = 'day',
   t?: TFunction,
-  limit = 10
+  limit = 10,
+  themeKey?: string // fork: O3
 ): ProcessedUserChartData {
   const tt: TFunction = t ?? ((x) => x)
   const { config } = getCurrencyDisplay()
   const quotaPerUnit = config.quotaPerUnit
+  const userColors = getUserChartColors(limit, themeKey) // fork: O3
 
   const formatVal = (raw: number) => renderQuotaCompat(raw, 2)
 
@@ -732,7 +764,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: false },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors }, // fork: O3
       background: { fill: 'transparent' },
     },
     spec_user_trend: {
@@ -747,7 +779,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: true, selectMode: 'single' },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors }, // fork: O3
       point: { visible: false },
       background: { fill: 'transparent' },
     },
@@ -775,7 +807,7 @@ export function processUserChartData(
 
   const userColorMap = topUsers.reduce<Record<string, string>>(
     (acc, user, i) => {
-      acc[user] = USER_COLORS[i % USER_COLORS.length]
+      acc[user] = userColors[i % userColors.length] // fork: O3
       return acc
     },
     {}

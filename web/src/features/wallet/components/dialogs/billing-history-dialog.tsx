@@ -54,15 +54,27 @@ import {
   getPaymentMethodName,
   formatTimestamp,
 } from '../../lib/billing'
+import type { ApiResponse, BillingHistoryResponse } from '../../types' // fork: O3
 
 interface BillingHistoryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  // fork: O3 — organization wallets pass their own history loader
+  getBillingHistory?: (
+    page: number,
+    pageSize: number,
+    keyword?: string
+  ) => Promise<ApiResponse<BillingHistoryResponse>>
+  forceSelfHistory?: boolean
+  description?: string
 }
 
 export function BillingHistoryDialog({
   open,
   onOpenChange,
+  getBillingHistory, // fork: O3
+  forceSelfHistory, // fork: O3
+  description, // fork: O3
 }: BillingHistoryDialogProps) {
   const { t } = useTranslation()
   const {
@@ -78,7 +90,7 @@ export function BillingHistoryDialog({
     handlePageSizeChange,
     handleSearch,
     handleCompleteOrder,
-  } = useBillingHistory()
+  } = useBillingHistory({ getBillingHistory, forceSelfHistory }) // fork: O3
 
   const [confirmTradeNo, setConfirmTradeNo] = useState<string | null>(null)
   const { copyToClipboard, copiedText } = useCopyToClipboard({ notify: false })
@@ -100,9 +112,11 @@ export function BillingHistoryDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={t('Billing History')}
-        description={t(
-          'View your topup transaction records and payment history'
-        )}
+        description={
+          // fork: O3
+          description ??
+          t('View your topup transaction records and payment history')
+        }
         contentClassName='flex max-h-(--dialog-available-height) flex-col max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:p-4 sm:max-w-4xl'
         contentHeight='auto'
         bodyClassName='space-y-3'

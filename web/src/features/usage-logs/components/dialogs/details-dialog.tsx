@@ -488,7 +488,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const isConsume = props.log.type === 2
   const isTopup = props.log.type === 1
   const isManage = props.log.type === 3
-  const isSubscription = other?.billing_source === 'subscription'
+  const isSubscription =
+    other?.billing_source === 'subscription' ||
+    other?.billing_source === 'organization_subscription' // fork: O3
   const isTieredBilling =
     isConsume &&
     !isViolation &&
@@ -1278,6 +1280,14 @@ export function DetailsDialog(props: DetailsDialogProps) {
               <DetailRow
                 label={t('Instance')}
                 value={`#${other.subscription_id}`}
+                mono
+              />
+            )}
+            {/* fork: O3 */}
+            {other.organization_user_subscription_id != null && (
+              <DetailRow
+                label={t('Organization plan')}
+                value={`#${other.organization_user_subscription_id}`}
                 mono
               />
             )}

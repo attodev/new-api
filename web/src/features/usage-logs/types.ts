@@ -32,6 +32,9 @@ import type { UsageLog } from './data/schema'
  */
 export type LogCategory = 'common' | 'drawing' | 'task'
 
+// fork: O3 — whose logs a usage-logs view lists
+export type UsageLogsScope = 'user' | 'organization'
+
 // ============================================================================
 // Filter Types
 // ============================================================================
@@ -276,6 +279,7 @@ export interface LogOtherData {
   subscription_consumed?: number
   subscription_remain?: number
   subscription_total?: number
+  organization_user_subscription_id?: number // fork: O3
 }
 
 /**
@@ -437,6 +441,7 @@ export interface GetLogsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  organization_id?: number // fork: O3
 }
 
 export interface GetLogsResponse {
@@ -480,6 +485,7 @@ export interface GetMidjourneyLogsParams {
   mj_id?: string
   start_timestamp?: number
   end_timestamp?: number
+  organization_id?: number // fork: O3
 }
 
 // ============================================================================
@@ -493,6 +499,7 @@ export interface GetTaskLogsParams {
   task_id?: string
   start_timestamp?: number
   end_timestamp?: number
+  organization_id?: number // fork: O3
 }
 
 // ============================================================================
@@ -509,6 +516,8 @@ export interface FetchLogsConfig {
   pageSize: number
   searchParams: Record<string, unknown>
   columnFilters: Array<{ id: string; value: unknown }>
+  logsScope?: UsageLogsScope // fork: O3
+  organizationId?: number // fork: O3
 }
 
 // ============================================================================

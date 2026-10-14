@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo } from 'react'
+import { useNavigate } from '@tanstack/react-router' // fork: O3
+import { useCallback, useMemo, type ReactNode } from 'react' // fork: O3
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
@@ -27,20 +27,23 @@ import { CacheStatsDialog } from '@/features/system-settings/general/channel-aff
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
+import { OrganizationLogsSelector } from './components/organization-logs-selector' // fork: O3
 import {
   type LogsViewScope,
   UsageLogsProvider,
   useLogsViewScope,
   useUsageLogsContext,
 } from './components/usage-logs-provider'
+import { useUsageLogsRoute } from './components/usage-logs-route' // fork: O3
 import { UsageLogsTable } from './components/usage-logs-table'
+import { useOrganizationLogsSelection } from './lib/organization-logs-selection' // fork: O3
 import {
   isUsageLogsSectionId,
   USAGE_LOGS_DEFAULT_SECTION,
   type UsageLogsSectionId,
 } from './section-registry'
+import type { UsageLogsScope } from './types' // fork: O3
 
-const route = getRouteApi('/_authenticated/usage-logs/$section')
 const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
 const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
@@ -55,10 +58,17 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   },
 }
 
-function UsageLogsContent() {
+// fork: O3 — organization scope titles
+const ORGANIZATION_TITLE_KEYS = {
+  common: 'Organization Usage Logs',
+  task: 'Organization Task Logs',
+} as const
+
+function UsageLogsContent(props: { organizationSelector?: ReactNode }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const params = route.useParams()
+  const { section, routeTo } = useUsageLogsRoute() // fork: O3
+  const params = { section } // fork: O3
   const activeCategory: UsageLogsSectionId =
     params.section && isUsageLogsSectionId(params.section)
       ? params.section
@@ -70,6 +80,7 @@ function UsageLogsContent() {
     affinityTarget,
     affinityDialogOpen,
     setAffinityDialogOpen,
+    logsScope, // fork: O3
   } = useUsageLogsContext()
   const { canManageScope, viewScope, setViewScope } = useLogsViewScope()
   const tabNavGroups = useMemo<NavGroup[]>(
@@ -101,11 +112,11 @@ function UsageLogsContent() {
   const handleSectionChange = useCallback(
     (section: string) => {
       void navigate({
-        to: '/usage-logs/$section',
+        to: routeTo, // fork: O3
         params: { section: section as UsageLogsSectionId },
       })
     },
-    [navigate]
+    [navigate, routeTo] // fork: O3
   )
 
   const handleViewScopeChange = useCallback(
@@ -119,6 +130,11 @@ function UsageLogsContent() {
 
   const pageMeta =
     activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
+  // fork: O3
+  const titleKey =
+    logsScope === 'organization'
+      ? ORGANIZATION_TITLE_KEYS[activeCategory === 'common' ? 'common' : 'task']
+      : pageMeta.titleKey
   const showTaskSwitcher =
     activeCategory !== 'common' && visibleSections.length > 1
 
@@ -126,7 +142,7 @@ function UsageLogsContent() {
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>
-          {t(pageMeta.titleKey)}
+          {t(titleKey) /* fork: O3 */}
         </SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           {canManageScope && (
@@ -137,6 +153,7 @@ function UsageLogsContent() {
               </TabsList>
             </Tabs>
           )}
+          {props.organizationSelector /* fork: O3 */}
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
@@ -185,10 +202,26 @@ function UsageLogsContent() {
   )
 }
 
-export function UsageLogs() {
+// fork: O3 — logsScope='organization' lists an organization's members' logs
+export function UsageLogs({
+  logsScope = 'user',
+}: {
+  logsScope?: UsageLogsScope
+}) {
+  const selection = useOrganizationLogsSelection(logsScope)
   return (
-    <UsageLogsProvider>
-      <UsageLogsContent />
+    <UsageLogsProvider
+      logsScope={logsScope}
+      organizationId={selection.organizationId}
+      waitForOrganization={selection.enabled}
+    >
+      <UsageLogsContent
+        organizationSelector={
+          selection.enabled ? (
+            <OrganizationLogsSelector selection={selection} />
+          ) : null
+        }
+      />
     </UsageLogsProvider>
   )
 }

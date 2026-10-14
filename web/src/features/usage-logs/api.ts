@@ -169,6 +169,51 @@ export const getAllTaskLogs = (params: GetTaskLogsParams) =>
 export const getUserTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, false)
 
+// ============================================================================
+// fork: O3 — Organization-scoped log APIs. The backend accepts the same
+// filters as the admin lists plus organization_id (required for root, ignored
+// for organization members, whose organization comes from the session).
+// ============================================================================
+
+function withOrganizationId<T extends object>(
+  params: T,
+  organizationId?: number
+): T & { organization_id?: number } {
+  return organizationId === undefined
+    ? params
+    : { ...params, organization_id: organizationId }
+}
+
+export const getOrganizationLogs = (
+  params: GetLogsParams = {},
+  organizationId?: number
+) =>
+  fetchLogs(
+    '/api/organization/logs',
+    withOrganizationId(params, organizationId),
+    true
+  )
+
+export const getOrganizationMidjourneyLogs = (
+  params: GetMidjourneyLogsParams,
+  organizationId?: number
+) =>
+  fetchLogs(
+    '/api/organization/mj',
+    withOrganizationId(params, organizationId),
+    true
+  )
+
+export const getOrganizationTaskLogs = (
+  params: GetTaskLogsParams,
+  organizationId?: number
+) =>
+  fetchLogs(
+    '/api/organization/task',
+    withOrganizationId(params, organizationId),
+    true
+  )
+
 const taskArtifactRequestConfig = {
   skipBusinessError: true,
   skipErrorHandler: true,

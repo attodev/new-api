@@ -81,6 +81,7 @@ interface RechargeFormCardProps {
   waffoMinTopup?: number
   onWaffoMethodSelect?: (method: WaffoPayMethod, index: number) => void
   enableWaffoPancakeTopup?: boolean
+  showRedemption?: boolean // fork: O3 — organization wallets hide redemption
 }
 
 export function RechargeFormCard({
@@ -111,6 +112,7 @@ export function RechargeFormCard({
   waffoMinTopup,
   onWaffoMethodSelect,
   enableWaffoPancakeTopup,
+  showRedemption = true, // fork: O3
 }: RechargeFormCardProps) {
   const { t } = useTranslation()
   const [localAmount, setLocalAmount] = useState(topupAmount.toString())
@@ -515,7 +517,8 @@ export function RechargeFormCard({
         )}
 
       {/* Redemption Code Section */}
-      {redemptionEnabled ? (
+      {/* fork: O3 — showRedemption gates both the form and the notice */}
+      {showRedemption && redemptionEnabled ? (
         <div className='space-y-2.5 border-t pt-4 sm:space-y-3 sm:pt-6'>
           <div className='flex items-center gap-2'>
             <IconBadge tone='warning' size='xs'>
@@ -561,7 +564,9 @@ export function RechargeFormCard({
             </p>
           )}
         </div>
-      ) : (
+      ) : null}
+      {/* fork: O3 */}
+      {showRedemption && !redemptionEnabled ? (
         <Alert className='border-t'>
           <AlertDescription>
             {t(
@@ -569,7 +574,7 @@ export function RechargeFormCard({
             )}
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
     </TitledCard>
   )
 }

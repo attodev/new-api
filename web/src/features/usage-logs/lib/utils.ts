@@ -26,6 +26,9 @@ import {
   getUserMidjourneyLogs,
   getAllTaskLogs,
   getUserTaskLogs,
+  getOrganizationLogs, // fork: O3
+  getOrganizationMidjourneyLogs, // fork: O3
+  getOrganizationTaskLogs, // fork: O3
 } from '../api'
 import {
   LOG_TYPES,
@@ -38,6 +41,7 @@ import type {
   FetchLogsConfig,
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
+  UsageLogsScope, // fork: O3
 } from '../types'
 
 export { buildQueryParams } from './query-params'
@@ -233,6 +237,22 @@ export function buildApiParams(config: {
   return params
 }
 
+/**
+ * fork: O3 — add the organization filter to organization-scope log params.
+ * User-scope params, and organization scope before one is chosen (members
+ * are scoped by their session), are returned unchanged.
+ */
+export function buildOrganizationLogsParams<T extends object>(
+  params: T,
+  logsScope: UsageLogsScope,
+  organizationId?: number
+): T & { organization_id?: number } {
+  if (logsScope !== 'organization' || organizationId === undefined) {
+    return params
+  }
+  return { ...params, organization_id: organizationId }
+}
+
 // ============================================================================
 // Data Fetching
 // ============================================================================
@@ -245,15 +265,25 @@ export async function fetchLogsByCategory(
 ): Promise<GetLogsResponse> {
   const { logCategory, isAdmin, page, pageSize, searchParams, columnFilters } =
     config
+  // fork: O3 — organization scope lists members' logs through the
+  // organization endpoints, which accept the admin filters.
+  const { logsScope = 'user', organizationId } = config
+  const isOrganizationScope = logsScope === 'organization'
+  const useAdminParams = isAdmin || isOrganizationScope
 
   if (logCategory === 'common') {
-    const params = buildApiParams({
-      page,
-      pageSize,
-      searchParams,
-      columnFilters,
-      isAdmin,
-    })
+    const params = buildOrganizationLogsParams(
+      buildApiParams({
+        page,
+        pageSize,
+        searchParams,
+        columnFilters,
+        isAdmin: useAdminParams,
+      }),
+      logsScope,
+      organizationId
+    ) // fork: O3
+    if (isOrganizationScope) return await getOrganizationLogs(params) // fork: O3
     return isAdmin ? await getAllLogs(params) : await getUserLogs(params)
   }
 
@@ -265,23 +295,37 @@ export async function fetchLogsByCategory(
     useMilliseconds: logCategory === 'drawing',
   })
 
-  const paramsWithFilter = {
-    ...baseParams,
-    ...(logCategory === 'drawing'
-      ? { mj_id: searchParams.filter as string | undefined }
-      : {}),
-    ...(logCategory === 'task'
-      ? { task_id: searchParams.filter as string | undefined }
-      : {}),
-  }
+  const paramsWithFilter = buildOrganizationLogsParams(
+    {
+      ...baseParams,
+      ...(logCategory === 'drawing'
+        ? { mj_id: searchParams.filter as string | undefined }
+        : {}),
+      ...(logCategory === 'task'
+        ? { task_id: searchParams.filter as string | undefined }
+        : {}),
+    },
+    logsScope,
+    organizationId
+  ) // fork: O3
 
   if (logCategory === 'drawing') {
+    // fork: O3
+    if (isOrganizationScope) {
+      return await getOrganizationMidjourneyLogs(
+        paramsWithFilter as GetMidjourneyLogsParams
+      )
+    }
     return isAdmin
       ? await getAllMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
       : await getUserMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
   }
 
   // task logs
+  // fork: O3
+  if (isOrganizationScope) {
+    return await getOrganizationTaskLogs(paramsWithFilter as GetTaskLogsParams)
+  }
   return isAdmin
     ? await getAllTaskLogs(paramsWithFilter as GetTaskLogsParams)
     : await getUserTaskLogs(paramsWithFilter as GetTaskLogsParams)

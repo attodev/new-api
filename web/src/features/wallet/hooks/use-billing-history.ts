@@ -30,7 +30,7 @@ import {
   completeOrder,
   isApiSuccess,
 } from '../api'
-import type { TopupRecord } from '../types'
+import type { ApiResponse, BillingHistoryResponse, TopupRecord } from '../types' // fork: O3
 
 // ============================================================================
 // Billing History Hook
@@ -41,11 +41,25 @@ interface UseBillingHistoryOptions {
   initialPage?: number
   /** Initial page size */
   initialPageSize?: number
+  // fork: O3 — scoped wallets (organizations) load their own history and
+  // never fall back to the admin-wide list or manual order completion.
+  getBillingHistory?: (
+    page: number,
+    pageSize: number,
+    keyword?: string
+  ) => Promise<ApiResponse<BillingHistoryResponse>>
+  forceSelfHistory?: boolean
 }
 
 export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
-  const { initialPage = 1, initialPageSize = 10 } = options
-  const isAdmin = useIsAdmin()
+  const {
+    initialPage = 1,
+    initialPageSize = 10,
+    getBillingHistory, // fork: O3
+    forceSelfHistory = false, // fork: O3
+  } = options
+  const userIsAdmin = useIsAdmin() // fork: O3
+  const isAdmin = forceSelfHistory ? false : userIsAdmin // fork: O3
 
   const [records, setRecords] = useState<TopupRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -64,9 +78,11 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
     const requestId = ++requestIdRef.current
     setLoading(true)
     try {
-      const response = isAdmin
-        ? await getAllBillingHistory(page, pageSize, debouncedKeyword)
-        : await getUserBillingHistory(page, pageSize, debouncedKeyword)
+      // fork: O3 — a scoped loader wins over the user/admin choice
+      const loadHistory =
+        getBillingHistory ??
+        (isAdmin ? getAllBillingHistory : getUserBillingHistory)
+      const response = await loadHistory(page, pageSize, debouncedKeyword)
 
       if (requestId !== requestIdRef.current) return
 
@@ -88,7 +104,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
         setLoading(false)
       }
     }
-  }, [debouncedKeyword, isAdmin, page, pageSize])
+  }, [debouncedKeyword, getBillingHistory, isAdmin, page, pageSize]) // fork: O3
 
   /**
    * Complete a pending order (admin only)

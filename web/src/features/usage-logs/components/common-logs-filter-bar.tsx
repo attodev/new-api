@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient, useIsFetching, useQuery } from '@tanstack/react-query'
-import { useNavigate, getRouteApi } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router' // fork: O3
 import type { Table } from '@tanstack/react-table'
 import { Eye, EyeOff } from 'lucide-react'
 import { useState, useCallback, useMemo } from 'react'
@@ -57,8 +57,7 @@ import {
   LogsFilterToolbar,
 } from './logs-filter-toolbar'
 import { useLogsViewScope, useUsageLogsContext } from './usage-logs-provider'
-
-const route = getRouteApi('/_authenticated/usage-logs/$section')
+import { useUsageLogsRoute } from './usage-logs-route' // fork: O3
 
 type LogTypeValue = (typeof LOG_TYPE_FILTERS)[number]['value']
 const logTypeValueSet = new Set<string>(
@@ -123,28 +122,33 @@ export function CommonLogsFilterBar<TData>(
   const isMobile = useMediaQuery('(max-width: 640px)')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const searchParams = route.useSearch()
+  const { search: searchParams, routeTo } = useUsageLogsRoute() // fork: O3
   const { isAdminView: isAdmin } = useLogsViewScope()
-  const { sensitiveVisible, setSensitiveVisible } = useUsageLogsContext()
+  const { sensitiveVisible, setSensitiveVisible, logsScope } =
+    useUsageLogsContext() // fork: O3
+  // fork: O3 — organization admins are not site admins: no site-wide group
+  // list, /api/log stats or export in the organization scope.
+  const isOrganizationScope = logsScope === 'organization'
+  const useAdminGroups = isAdmin && !isOrganizationScope
   const fetchingLogs = useIsFetching({ queryKey: ['logs'] })
   const { data: adminGroups } = useQuery({
     queryKey: ['groups'],
     queryFn: async () => requireServerSuccess(await getGroups()),
-    enabled: isAdmin,
+    enabled: useAdminGroups, // fork: O3
   })
   const { data: userGroups } = useQuery({
     queryKey: ['user-groups'],
     queryFn: async () => requireServerSuccess(await getUserGroups()),
-    enabled: !isAdmin,
+    enabled: !useAdminGroups, // fork: O3
   })
   const groupOptions = useMemo(() => {
-    const groups = isAdmin
+    const groups = useAdminGroups // fork: O3
       ? (adminGroups?.data ?? [])
       : Object.keys(userGroups?.data ?? {})
     return groups
       .filter((group) => group !== 'auto')
       .map((group) => ({ label: group, value: group }))
-  }, [isAdmin, adminGroups, userGroups])
+  }, [useAdminGroups, adminGroups, userGroups]) // fork: O3
 
   const searchState = useMemo<CommonLogDraft>(() => {
     const { start, end } = getDefaultTimeRange()
@@ -215,7 +219,7 @@ export function CommonLogsFilterBar<TData>(
     (nextFilters: CommonLogFilters = filters) => {
       const filterParams = buildSearchParams(nextFilters, 'common')
       navigate({
-        to: '/usage-logs/$section',
+        to: routeTo, // fork: O3
         params: { section: 'common' },
         search: {
           ...filterParams,
@@ -226,7 +230,7 @@ export function CommonLogsFilterBar<TData>(
       queryClient.invalidateQueries({ queryKey: ['logs'] })
       queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
     },
-    [filters, logType, navigate, queryClient]
+    [filters, logType, navigate, queryClient, routeTo] // fork: O3
   )
 
   const handleReset = useCallback(() => {
@@ -244,7 +248,7 @@ export function CommonLogsFilterBar<TData>(
     })
 
     navigate({
-      to: '/usage-logs/$section',
+      to: routeTo, // fork: O3
       params: { section: 'common' },
       search: {
         page: 1,
@@ -253,7 +257,7 @@ export function CommonLogsFilterBar<TData>(
     })
     queryClient.invalidateQueries({ queryKey: ['logs'] })
     queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
-  }, [navigate, queryClient])
+  }, [navigate, queryClient, routeTo]) // fork: O3
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -297,7 +301,7 @@ export function CommonLogsFilterBar<TData>(
     'Only used to find historical logs. New records are available in Audit Logs.'
   )
 
-  const statsBar = <CommonLogsStats />
+  const statsBar = isOrganizationScope ? null : <CommonLogsStats /> // fork: O3
   const sensitiveToggle = (
     <Tooltip>
       <TooltipTrigger
@@ -490,7 +494,7 @@ export function CommonLogsFilterBar<TData>(
       compactMobile
       stats={statsBar}
       actionStart={sensitiveToggle}
-      actionEnd={<ExportLogsDialog />}
+      actionEnd={isOrganizationScope ? null : <ExportLogsDialog />} // fork: O3
       primaryFilters={
         <>
           {dateRangeFilter}
