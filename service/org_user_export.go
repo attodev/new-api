@@ -307,10 +307,9 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 				if listedUsernames[member.Username] {
 					continue
 				}
-				if err := model.DB.Model(&model.User{}).
-					Select("organization_id", "organization_role").
-					Where("id = ?", member.Id).
-					Updates(model.User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
+				// Leaving zeroes the member quota cap (model.ClearOrganizationMembership),
+				// so an imported cap never survives as a personal balance.
+				if _, err := model.ClearOrganizationMembership(member.Id); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("remove-absent (%s): failed to remove: %v", member.Username, err))
 					continue
 				}

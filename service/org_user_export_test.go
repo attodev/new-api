@@ -192,3 +192,24 @@ func TestImportOrgUsersIgnoresGroupColumn(t *testing.T) {
 	require.NoError(t, model.DB.Where("username = ?", "brand_new").First(&created).Error)
 	require.Equal(t, "default", created.Group)
 }
+
+// fork: O3 — remove-absent zeroes the member quota cap like every other
+// organization exit, so an imported cap never survives as a personal balance.
+func TestImportOrgUsersRemoveAbsentZeroesMemberQuota(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 700, 1, model.OrganizationRoleAdmin)
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role"},
+		{"owner_20", "member"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, true)
+	require.NoError(t, err)
+	require.Equal(t, []string{"member_21"}, result.RemovedUsernames)
+	var member model.User
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.Zero(t, member.OrganizationId)
+	require.Empty(t, member.OrganizationRole)
+	require.Zero(t, member.Quota)
+}

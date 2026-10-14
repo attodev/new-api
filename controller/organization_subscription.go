@@ -170,6 +170,9 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 		common.ApiErrorT(c, "organization target permission denied")
 		return
 	}
+	if rejectOrganizationOwnerTarget(c, actor, target) {
+		return
+	}
 
 	var req assignOrganizationSubscriptionRequest
 	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
@@ -212,6 +215,14 @@ func CancelOrganizationUserSubscription(c *gin.Context) {
 	targetId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	target, err := model.GetUserById(targetId, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if target.OrganizationId == organizationId && rejectOrganizationOwnerTarget(c, actor, target) {
 		return
 	}
 	if _, err := model.CancelActiveOrganizationUserSubscriptionForUser(organizationId, targetId); err != nil {

@@ -60,6 +60,19 @@ func prepareOrganizationTopUpTarget(c *gin.Context) (*model.User, *model.Organiz
 	return actor, org, true
 }
 
+// prepareOrganizationPaymentTarget is prepareOrganizationTopUpTarget for the
+// pay/amount wrappers: a rejection uses the payment flows' error shape
+// (paymentError), whose data field the pay-flow frontend reads.
+func prepareOrganizationPaymentTarget(c *gin.Context) bool {
+	_, org, err := getOrganizationWalletActor(c)
+	if err != nil {
+		paymentError(c, err)
+		return false
+	}
+	setTopUpTarget(c, model.TopUpTargetTypeOrganization, org.Id)
+	return true
+}
+
 // validateTopUpTargetCapacity checks the wallet this order settles into.
 func validateTopUpTargetCapacity(c *gin.Context, userId int, creditedQuota int) error {
 	targetType := getTopUpTargetType(c)

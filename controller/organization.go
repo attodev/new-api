@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type createOrganizationRequest struct {
@@ -38,6 +39,58 @@ type updateOrganizationRequest struct {
 	Description *string `json:"description,omitempty"`
 	Quota       *int64  `json:"quota,omitempty"`
 	Status      *int    `json:"status,omitempty"`
+}
+
+// organizationUserView is the user shape organization admins see (the web
+// OrganizationUser type). It never carries password, access token, email,
+// payment-customer or setting columns.
+type organizationUserView struct {
+	Id               int    `json:"id"`
+	Username         string `json:"username"`
+	DisplayName      string `json:"display_name"`
+	Role             int    `json:"role"`
+	Status           int    `json:"status"`
+	Quota            int    `json:"quota"`
+	UsedQuota        int    `json:"used_quota"`
+	Group            string `json:"group"`
+	OrganizationId   int    `json:"organization_id"`
+	OrganizationRole string `json:"organization_role"`
+	Remark           string `json:"remark"`
+}
+
+var organizationUserViewColumns = []string{
+	"id", "username", "display_name", "role", "status", "quota", "used_quota",
+	"group", "organization_id", "organization_role", "remark",
+}
+
+func newOrganizationUserView(user *model.User) organizationUserView {
+	return organizationUserView{
+		Id: user.Id, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role,
+		Status: user.Status, Quota: user.Quota, UsedQuota: user.UsedQuota, Group: user.Group,
+		OrganizationId: user.OrganizationId, OrganizationRole: user.OrganizationRole, Remark: user.Remark,
+	}
+}
+
+// rejectOrganizationSelfOrOwnerTarget enforces two rules for member mutations:
+// an organization admin (the owner included) cannot modify their own
+// membership, quota or status here (root does that through /api/organizations),
+// and only the owner may act on the member who holds the owner role.
+func rejectOrganizationSelfOrOwnerTarget(c *gin.Context, actor *model.User, target *model.User) bool {
+	if target.Id == actor.Id {
+		common.ApiErrorT(c, "organization admins cannot modify their own membership")
+		return true
+	}
+	return rejectOrganizationOwnerTarget(c, actor, target)
+}
+
+// rejectOrganizationOwnerTarget rejects acting on the owner unless the actor is
+// that owner.
+func rejectOrganizationOwnerTarget(c *gin.Context, actor *model.User, target *model.User) bool {
+	if model.HasOrganizationOwnerRole(target.OrganizationRole) && target.Id != actor.Id {
+		common.ApiErrorT(c, "only the organization owner can manage the owner")
+		return true
+	}
+	return false
 }
 
 func CreateOrganization(c *gin.Context) {
@@ -253,7 +306,7 @@ func GetOrganizationLogs(c *gin.Context) {
 	}
 
 	pageInfo := common.GetPageQuery(c)
-	logs, total, err := model.GetLogsByUserIDs(userIDs, logFilterFromQuery(c, false), pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	logs, total, err := model.GetLogsByUserIDs(userIDs, logFilterFromQuery(c, true), pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -359,77 +412,77 @@ func GetOrganizationTopUps(c *gin.Context) {
 }
 
 func RequestOrganizationAmount(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestAmount(c)
 }
 
 func RequestOrganizationEpay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestEpay(c)
 }
 
 func RequestOrganizationStripeAmount(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestStripeAmount(c)
 }
 
 func RequestOrganizationStripePay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestStripePay(c)
 }
 
 func RequestOrganizationPayPalAmount(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestPayPalAmount(c)
 }
 
 func RequestOrganizationPayPalPay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestPayPalPay(c)
 }
 
 func RequestOrganizationCreemPay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestCreemPay(c)
 }
 
 func RequestOrganizationWaffoAmount(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestWaffoAmount(c)
 }
 
 func RequestOrganizationWaffoPay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestWaffoPay(c)
 }
 
 func RequestOrganizationWaffoPancakeAmount(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestWaffoPancakeAmount(c)
 }
 
 func RequestOrganizationWaffoPancakePay(c *gin.Context) {
-	if _, _, ok := prepareOrganizationTopUpTarget(c); !ok {
+	if !prepareOrganizationPaymentTarget(c) {
 		return
 	}
 	RequestWaffoPancakePay(c)
@@ -526,7 +579,7 @@ func ListOrganizationUsers(c *gin.Context) {
 		orderDir = "asc"
 	}
 
-	query := model.DB.
+	query := model.DB.Model(&model.User{}).
 		Where("organization_id = ?", organizationId).
 		Where("role < ?", common.RoleAdminUser)
 
@@ -535,14 +588,17 @@ func ListOrganizationUsers(c *gin.Context) {
 			"%"+keyword+"%", "%"+keyword+"%")
 	}
 
+	query = query.Session(&gorm.Session{})
+
 	var total int64
-	if err := query.Model(&model.User{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
 
-	var users []model.User
-	if err := query.Order(orderBy + " " + orderDir).
+	users := []organizationUserView{}
+	if err := query.Select(organizationUserViewColumns).
+		Order(clause.OrderByColumn{Column: clause.Column{Name: orderBy}, Desc: orderDir == "desc"}).
 		Offset(pageInfo.GetStartIdx()).
 		Limit(pageInfo.GetPageSize()).
 		Find(&users).Error; err != nil {
@@ -567,18 +623,19 @@ func ListAssignableOrganizationUsers(c *gin.Context) {
 	}
 
 	pageInfo := common.GetPageQuery(c)
-	var users []model.User
-	query := model.DB.
+	users := []organizationUserView{}
+	query := model.DB.Model(&model.User{}).
 		Where("role < ?", common.RoleAdminUser).
 		Where("id <> ?", actor.Id).
-		Where("organization_id = ? OR organization_id = 0", actor.OrganizationId)
+		Where("organization_id = ? OR organization_id = 0", actor.OrganizationId).
+		Session(&gorm.Session{})
 
 	var total int64
-	if err := query.Model(&model.User{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	if err := query.Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&users).Error; err != nil {
+	if err := query.Select(organizationUserViewColumns).Order("id").Offset(pageInfo.GetStartIdx()).Limit(pageInfo.GetPageSize()).Find(&users).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -608,7 +665,7 @@ func GetOrganizationUser(c *gin.Context) {
 		common.ApiErrorT(c, "organization target permission denied")
 		return
 	}
-	common.ApiSuccess(c, target)
+	common.ApiSuccess(c, newOrganizationUserView(target))
 }
 
 func UpdateOrganizationUser(c *gin.Context) {
@@ -634,6 +691,9 @@ func UpdateOrganizationUser(c *gin.Context) {
 	}
 	if !model.CanManageOrganizationTarget(*actor, *target) {
 		common.ApiErrorT(c, "organization target permission denied")
+		return
+	}
+	if rejectOrganizationSelfOrOwnerTarget(c, actor, target) {
 		return
 	}
 
@@ -713,9 +773,12 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiErrorT(c, "organization admins cannot reassign themselves")
 		return
 	}
+	if rejectOrganizationOwnerTarget(c, actor, target) {
+		return
+	}
 
 	var req assignOrganizationUserRequest
-	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+	if err := common.DecodeJsonStrict(c.Request.Body, &req); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -723,8 +786,8 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.ApiErrorT(c, "invalid organization role")
 		return
 	}
-	if model.HasOrganizationOwnerRole(req.OrganizationRole) && !model.HasOrganizationOwnerRole(actor.OrganizationRole) {
-		common.ApiErrorT(c, "only the organization owner can assign the owner role")
+	if model.HasOrganizationOwnerRole(req.OrganizationRole) {
+		common.ApiErrorT(c, "ownership is assigned when the organization is created")
 		return
 	}
 
@@ -766,6 +829,10 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.ApiErrorT(c, "global admin users cannot be managed by organization admins")
 		return
 	}
+	if target.Id == actor.Id {
+		common.ApiErrorT(c, "organization admins cannot modify their own membership")
+		return
+	}
 	if target.OrganizationId != actor.OrganizationId {
 		common.ApiErrorT(c, "user does not belong to your organization")
 		return
@@ -775,10 +842,8 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(map[string]interface{}{
-		"organization_id":   0,
-		"organization_role": "",
-	}).Error; err != nil {
+	previousQuota, err := model.ClearOrganizationMembership(target.Id)
+	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -786,8 +851,8 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.SysLog("failed to invalidate cache after membership removal: " + err.Error())
 	}
 	recordOrganizationAudit(c, "organization.user.remove",
-		fmt.Sprintf("Removed user %d (role %s) from organization %d", target.Id, target.OrganizationRole, actor.OrganizationId),
-		map[string]any{"organization_id": actor.OrganizationId, "user_id": target.Id, "organization_role": target.OrganizationRole})
+		fmt.Sprintf("Removed user %d (role %s) from organization %d and cleared member quota %d", target.Id, target.OrganizationRole, actor.OrganizationId, previousQuota),
+		map[string]any{"organization_id": actor.OrganizationId, "user_id": target.Id, "organization_role": target.OrganizationRole, "previous_quota": previousQuota})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
@@ -803,7 +868,8 @@ func DeleteOrganization(c *gin.Context) {
 		return
 	}
 
-	if err := model.DeleteOrganization(organizationId); err != nil {
+	ownerUserId, ownerPreviousQuota, err := model.DeleteOrganizationClearingOwner(organizationId)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "organization not found"})
 			return
@@ -812,9 +878,14 @@ func DeleteOrganization(c *gin.Context) {
 		return
 	}
 
+	if ownerUserId > 0 {
+		if err := model.InvalidateUserCache(ownerUserId); err != nil {
+			common.SysLog("failed to invalidate owner cache after organization deletion: " + err.Error())
+		}
+	}
 	recordOrganizationAudit(c, "organization.delete",
-		fmt.Sprintf("Deleted organization %d", organizationId),
-		map[string]any{"organization_id": organizationId})
+		fmt.Sprintf("Deleted organization %d (owner %d, cleared member quota %d)", organizationId, ownerUserId, ownerPreviousQuota),
+		map[string]any{"organization_id": organizationId, "owner_user_id": ownerUserId, "previous_quota": ownerPreviousQuota})
 	common.ApiSuccess(c, nil)
 }
 

@@ -245,8 +245,17 @@ func UpdateOrganizationFields(id int, updates map[string]interface{}) error {
 var errOrganizationDeleteOwnerChanged = errors.New("organization owner changed during deletion")
 
 func DeleteOrganization(id int) error {
+	_, _, err := DeleteOrganizationClearingOwner(id)
+	return err
+}
+
+// DeleteOrganizationClearingOwner deletes an organization without members and
+// returns the owner whose membership (and member quota) was cleared, with that
+// owner's quota before it was zeroed. ownerUserId is 0 when no owner row was
+// cleared.
+func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuota int, err error) {
 	if id <= 0 {
-		return errors.New("invalid organization id")
+		return 0, 0, errors.New("invalid organization id")
 	}
 	// Reading the owner before taking locks is safe only when it is verified
 	// again under the organization lock. If an owner transfer wins that race,
@@ -302,6 +311,18 @@ func DeleteOrganization(id int) error {
 			// 4. Clear org membership from remaining users (owner). The owner row
 			// was locked before the organization, so this write cannot invert a
 			// concurrent checkout, recovery, or user-deletion lifecycle.
+			// The owner leaves through clearOrganizationMembershipTx so the member
+			// quota cap does not survive as a personal balance.
+			ownerUserId, ownerPreviousQuota = 0, 0
+			if org.OwnerUserId > 0 {
+				previousQuota, cleared, err := clearOrganizationMembershipTx(tx, org.OwnerUserId, id)
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				if cleared {
+					ownerUserId, ownerPreviousQuota = org.OwnerUserId, previousQuota
+				}
+			}
 			// Use Select to force-update zero-value fields that GORM might otherwise skip.
 			if err := tx.Model(&User{}).
 				Select("organization_id", "organization_role").
@@ -322,8 +343,58 @@ func DeleteOrganization(id int) error {
 			return nil
 		})
 		if !errors.Is(err, errOrganizationDeleteOwnerChanged) {
-			return err
+			if err != nil {
+				return 0, 0, err
+			}
+			return ownerUserId, ownerPreviousQuota, nil
 		}
 	}
-	return errors.New("organization owner changed concurrently, retry deletion")
+	return 0, 0, errors.New("organization owner changed concurrently, retry deletion")
+}
+
+// ClearOrganizationMembership removes a user from their organization and zeroes
+// users.quota in the same transaction: inside an organization the user quota is
+// the member spending cap set by organization admins, so it must not survive as
+// a personal balance once the user leaves. Returns the quota before clearing.
+func ClearOrganizationMembership(userId int) (previousQuota int, err error) {
+	if userId <= 0 {
+		return 0, errors.New("invalid organization member")
+	}
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var cleared bool
+		var clearErr error
+		previousQuota, cleared, clearErr = clearOrganizationMembershipTx(tx, userId, 0)
+		if clearErr != nil {
+			return clearErr
+		}
+		if !cleared {
+			return errors.New("user does not belong to an organization")
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return previousQuota, nil
+}
+
+// clearOrganizationMembershipTx locks the user and clears organization_id,
+// organization_role and quota. organizationId > 0 restricts the clear to members
+// of that organization; cleared is false when the user was not such a member.
+func clearOrganizationMembershipTx(tx *gorm.DB, userId int, organizationId int) (previousQuota int, cleared bool, err error) {
+	var user User
+	if err := lockForUpdate(tx).Select("id", "quota", "organization_id").Where("id = ?", userId).First(&user).Error; err != nil {
+		return 0, false, err
+	}
+	if user.OrganizationId == 0 || (organizationId > 0 && user.OrganizationId != organizationId) {
+		return 0, false, nil
+	}
+	if err := tx.Model(&User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+		"organization_id":   0,
+		"organization_role": "",
+		"quota":             0,
+	}).Error; err != nil {
+		return 0, false, err
+	}
+	return user.Quota, true, nil
 }
