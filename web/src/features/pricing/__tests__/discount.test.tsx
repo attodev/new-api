@@ -165,6 +165,41 @@ describe('discount display', () => {
     expect(screen.getByText('$4.5')).toBeVisible()
   })
 
+  it.each([
+    ['zero', 0],
+    ['absent', undefined],
+  ])('shows plain prices on a card when the discount is %s', (_, percent) => {
+    const { container } = render(
+      <ModelCard
+        model={pricingModel({ discount_percent: percent })}
+        tokenUnit='M'
+      />
+    )
+    expect(container.querySelector('s')).toBeNull()
+    expect(screen.queryByText(/% off/)).not.toBeInTheDocument()
+    expect(screen.getByText('$2')).toBeVisible()
+    expect(screen.getByText('$6')).toBeVisible()
+  })
+
+  it.each([
+    ['zero', 0],
+    ['absent', undefined],
+  ])(
+    'shows plain prices in the table cell when the discount is %s',
+    (_, percent) => {
+      const { container } = render(
+        <ModelPriceCell
+          model={pricingModel({ discount_percent: percent })}
+          options={{ tokenUnit: 'M' }}
+        />
+      )
+      expect(container.querySelector('s')).toBeNull()
+      expect(screen.queryByText(/% off/)).not.toBeInTheDocument()
+      expect(screen.getByText('2')).toBeVisible()
+      expect(screen.getByText('6')).toBeVisible()
+    }
+  )
+
   it('shows only the badge on a dynamic-priced model card', () => {
     const { container } = render(
       <ModelCard
