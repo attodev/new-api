@@ -245,6 +245,7 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 			TotalTokens:      relayInfo.GetEstimatePromptTokens(),
 		}
 	}
+	usage = capGeminiImagePromptTokens(usage, true, operation_setting.GetGeminiInputAudioPricePerMillionTokens(summary.ModelName) > 0) // fork: O11
 
 	summary.PromptTokens = usage.PromptTokens
 	summary.CompletionTokens = usage.CompletionTokens

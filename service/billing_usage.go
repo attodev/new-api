@@ -18,7 +18,7 @@ const (
 
 func effectiveBillingUsage(usage *dto.Usage) *dto.Usage {
 	if billingUsage, ok := usageFromBillingUsage(usage); ok {
-		return capGeminiImagePromptTokens(billingUsage) // fork: O11
+		return billingUsage
 	}
 	return usage
 }

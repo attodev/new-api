@@ -245,9 +245,10 @@ upstream에 없는 과금 정확성 수정(team에서 옮김). 로직은 fork �
 
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
-| O11 Gemini 이미지 토큰 상한 | service/billing_usage.go:21 | `effectiveBillingUsage`가 canonical usage를 `capGeminiImagePromptTokens(billingUsage)`로 감싸 돌려줌 (`// fork: O11`; Gemini 의미의 usage만 `ImageTokens`를 `max(PromptTokens - CachedTokens - AudioTokens, 0)`로 자르고 남는 양을 `TextTokens`로 돌림. `usageBillingPathForLog`는 그대로) — team af1eddc8e, c20c6d664 | service/gemini_image_cap_fork.go, service/gemini_image_cap_fork_test.go |
+| O11 Gemini 이미지 토큰 상한 (정률) | service/text_quota.go:248 | `calculateTextQuotaSummary`에서 usage를 `capGeminiImagePromptTokens(usage, true, operation_setting.GetGeminiInputAudioPricePerMillionTokens(summary.ModelName) > 0)`로 바꿈 (`// fork: O11`; 캐시는 항상, 오디오는 :329-331처럼 모델에 Gemini 오디오 입력 단가가 있을 때만 base에서 빠지므로 그 몫만 상한에서 뺌) — team af1eddc8e, c20c6d664 | service/gemini_image_cap_fork.go, service/gemini_image_cap_fork_test.go |
+| O11 Gemini 이미지 토큰 상한 (티어) | service/tiered_settle.go:27 | `BuildTieredTokenParams` 첫 줄 `usage = capGeminiImagePromptTokens(usage, usedVars["cr"], usedVars["ai"])` (`// fork: O11`; pkg/billingexpr/expr.md의 p 자동 제외 규칙대로 식이 `cr`을 쓸 때만 캐시, `ai`를 쓸 때만 오디오를 상한에서 뺌) | service/gemini_image_cap_fork.go, service/gemini_image_cap_fork_test.go |
 
-O11 메모: 상한은 `effectiveBillingUsage`를 거치는 텍스트 정산(`PostTextConsumeQuota` → `calculateTextQuotaSummary`, `BuildTieredTokenParams`)에만 걸린다. `PostAudioConsumeQuota`처럼 raw usage를 쓰는 경로와 BillingUsage 스냅샷이 없는 Gemini usage에는 걸리지 않는다. 티어 과금식의 `img` 변수도 잘린 값을 본다.
+O11 메모: 상한은 Gemini canonical usage(`UsageSemantic` gemini, `BillingUsage.CanonicalUsage()`가 만든 값)에만 걸리고 `ImageTokens`를 `max(PromptTokens - [CachedTokens] - [AudioTokens], 0)`로 자른다(대괄호는 그 경로가 따로 값을 매길 때만). 잘린 사본을 돌려주고 원본은 건드리지 않으므로 `effectiveBillingUsage`(service/billing_usage.go)와 `usageBillingPathForLog`는 upstream 그대로다. 잘린 양은 `TextTokens = max(TextTokens, PromptTokens - AudioTokens - ImageTokens)`로 옮긴다(TextTokens는 두 정산 모두 읽지 않음). raw usage로 과금하는 `PostAudioConsumeQuota`(service/quota.go)와 채널 테스트 정산(`controller/channel-test.go:544` `settleTestQuota`)은 정률 계산에 상한이 걸리지 않는다. 두 곳의 티어 분기도 `BuildTieredTokenParams`를 거치지만 raw Gemini usage에는 `UsageSemantic`이 없어 상한이 걸리지 않는다. 티어 식의 `img` 변수는 잘린 값을 본다.
 
 ## 삭제한 upstream 파일
 
