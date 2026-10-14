@@ -125,6 +125,14 @@ func DeleteOrganizationSubscriptionPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
+// organizationUserSubscriptionView is the list item organization admins see: the
+// user is the restricted organizationUserView, never the full model.User row.
+type organizationUserSubscriptionView struct {
+	Subscription *model.OrganizationUserSubscription `json:"subscription"`
+	User         *organizationUserView               `json:"user"`
+	Plan         *model.OrganizationSubscriptionPlan `json:"plan"`
+}
+
 func ListOrganizationUserSubscriptions(c *gin.Context) {
 	organizationId, ok := resolveOrganizationAdminTarget(c)
 	if !ok {
@@ -135,7 +143,16 @@ func ListOrganizationUserSubscriptions(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	common.ApiSuccess(c, items)
+	views := make([]organizationUserSubscriptionView, 0, len(items))
+	for _, item := range items {
+		view := organizationUserSubscriptionView{Subscription: item.Subscription, Plan: item.Plan}
+		if item.User != nil {
+			userView := newOrganizationUserView(item.User)
+			view.User = &userView
+		}
+		views = append(views, view)
+	}
+	common.ApiSuccess(c, views)
 }
 
 func AssignOrganizationUserSubscription(c *gin.Context) {

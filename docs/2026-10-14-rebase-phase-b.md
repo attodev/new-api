@@ -150,7 +150,7 @@ Task 13에서 추가:
 단계 A §7에서 넘어온 조직 내보내기, PayPal 조직 target, `TopUp.TargetType/TargetId`, `getPaymentIcon` PayPal case는 단계 B에서 처리했다.
 
 먼저 고칠 것:
-- **구독 할당 목록의 민감 컬럼 노출**: `GET /api/organization/subscription/users`(`model.ListOrganizationUserSubscriptions`)가 `user`로 `users` 행 전체(비밀번호 해시 포함)를 돌려준다. `organizationUserView`/제한 컬럼으로 바꾸고 테스트를 추가한다. `GET /api/organization/subscription/self`도 호출자 본인의 `User` 전체를 싣는다(본인 데이터라 위험은 낮다). 단계 C 전에 처리하기를 권한다.
+- **구독 할당 목록의 민감 컬럼 노출**: `GET /api/organization/subscription/users`가 `users` 행 전체(비밀번호 해시 포함)를 돌려주던 문제는 본 단계에서 수정(`fix(organization): stop returning full user rows from the subscription users list`)했다. 남은 것: `GET /api/organization/subscription/self`도 호출자 본인의 `User` 전체를 싣는다(본인 데이터라 위험은 낮다). 단계 C 전에 처리하기를 권한다.
 
 범위·환경:
 - 조직 할인 표시(spec §4.6 O6, 단계 C).

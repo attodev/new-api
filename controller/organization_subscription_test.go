@@ -533,6 +533,39 @@ func TestOrganizationAdminCanListSubscriptionPlans(t *testing.T) {
 	require.Contains(t, body, `"Pro"`)
 }
 
+func TestOrganizationListUserSubscriptionsDoesNotLeakUserSecrets(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	owner := model.User{Username: "owner", Password: "owner-password-hash", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-sub-leak"}
+	accessToken := "member-secret-access-token"
+	member := model.User{Username: "member", Password: "member-password-hash", Email: "member@example.com", AccessToken: &accessToken, Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-sub-leak"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	plan := model.OrganizationSubscriptionPlan{OrganizationId: 1, Title: "Team Basic", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 500, Enabled: true}
+	require.NoError(t, model.DB.Create(&owner).Error)
+	require.NoError(t, model.DB.Create(&member).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+	require.NoError(t, model.DB.Create(&plan).Error)
+	sub := model.OrganizationUserSubscription{OrganizationId: 1, UserId: member.Id, PlanId: plan.Id, AmountTotal: 500, StartTime: time.Now().Unix(), EndTime: time.Now().Add(24 * time.Hour).Unix(), Status: "active"}
+	require.NoError(t, model.DB.Create(&sub).Error)
+
+	res := performOrganizationRequest(
+		ListOrganizationUserSubscriptions,
+		owner,
+		http.MethodGet,
+		"/api/organization/subscription/users",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	require.Contains(t, body, `"success":true`)
+	require.Contains(t, body, `"subscription"`)
+	require.Contains(t, body, `"username":"member"`)
+	require.Contains(t, body, `"Team Basic"`)
+	for _, leaked := range []string{`"password"`, `"access_token"`, `"email"`, "member-password-hash", "member-secret-access-token", "member@example.com"} {
+		require.NotContains(t, body, leaked)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // UpdateOrganization — missing branches
 // ---------------------------------------------------------------------------
