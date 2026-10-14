@@ -133,6 +133,8 @@
     "#1 Model": "#1 模型",
     "% off": "折",
     "{{percent}}% off": "優惠 {{percent}}%",
+    "Model discount": "模型折扣",
+    "Vendor discount": "廠商折扣",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`、`-nothinking` 以及 `-high` 等推理強度後綴，同時路由到正確的 Gemini 變體。關閉後模型名原樣傳送給上游。",
     "© 2025 Your Company. All rights reserved.": "© 2025 您的公司。保留所有權利。",
     "+{{count}} more": "還有 {{count}} 項",

@@ -165,7 +165,7 @@ function quotaSaturationKindLabel(
   return t('Invalid (NaN)')
 }
 
-function BillingBreakdown(props: {
+export function BillingBreakdown(props: {
   log: UsageLog
   other: LogOtherData
   isAdmin: boolean
@@ -237,6 +237,20 @@ function BillingBreakdown(props: {
     rows.push({
       label: isUserGR ? t('User Exclusive Ratio') : t('Group Ratio'),
       value: `${formatRatio(effectiveGR)}x`,
+    })
+  }
+  // fork: O6 — group_ratio is the pre-discount base value; show the discount separately
+  if (
+    other.discount_multiplier != null &&
+    other.discount_multiplier !== 1 &&
+    other.discount_source
+  ) {
+    rows.push({
+      label:
+        other.discount_source === 'vendor'
+          ? t('Vendor discount')
+          : t('Model discount'),
+      value: `×${formatRatio(other.discount_multiplier)}`,
     })
   }
 

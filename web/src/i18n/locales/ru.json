@@ -133,6 +133,8 @@
     "#1 Model": "#1 Модель",
     "% off": "скидка",
     "{{percent}}% off": "скидка {{percent}}%",
+    "Model discount": "Скидка на модель",
+    "Vendor discount": "Скидка вендора",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "суффиксы `, `-nothinking` и суффиксы усилия, такие как `-high`, при маршрутизации к правильному варианту Gemini. При отключении имена моделей отправляются вверх по потоку без изменений.",
     "© 2025 Your Company. All rights reserved.": "© 2025 Ваша Компания. Все права защищены.",
     "+{{count}} more": "ещё {{count}}",

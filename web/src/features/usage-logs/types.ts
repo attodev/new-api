@@ -200,6 +200,8 @@ export interface LogOtherData {
   model_price?: number
   group_ratio?: number
   user_group_ratio?: number
+  discount_multiplier?: number // fork: O6
+  discount_source?: 'model' | 'vendor' | string // fork: O6
   cache_ratio?: number
   cache_creation_ratio?: number
   cache_creation_ratio_5m?: number

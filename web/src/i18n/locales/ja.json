@@ -133,6 +133,8 @@
     "#1 Model": "#1 モデル",
     "% off": "% OFF",
     "{{percent}}% off": "{{percent}}% OFF",
+    "Model discount": "モデル割引",
+    "Vendor discount": "ベンダー割引",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`、`-nothinking`、および `-high` などの推論強度サフィックスを、正しい Gemini バリアントにルーティングする際に使用します。オフの場合、モデル名はそのまま上流に送信されます。",
     "© 2025 Your Company. All rights reserved.": "© 2025 Your Company. 全著作権所有。",
     "+{{count}} more": "他 {{count}} 件",
