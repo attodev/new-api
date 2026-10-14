@@ -25,7 +25,7 @@
 | Subscription | 구독 | |
 | Plan | 플랜 | team 52회. "패키지"(2회), "요금제"(1회)는 쓰지 않습니다. |
 | Token (API key) | API 키 | 자격 증명으로서의 토큰. team에서 `API Key`는 "API 키". Access Token, Bot Token처럼 이름에 token이 들어간 자격 증명은 "토큰"을 씁니다. |
-| Token (usage unit) | 토큰 | 모델이 처리하는 텍스트 단위. team 154회. `token (unit)` 같은 단위 설명은 "토큰(단위)". |
+| Token (usage unit) | 토큰 | 모델이 처리하는 텍스트 단위. team 154회. `token (unit)` 키는 영어 값이 `token`이고 단위 열·가격 단위("$1/token")에 그대로 표시되므로 값은 "토큰"입니다. 키 이름의 "(unit)"은 구분용이라 옮기지 않습니다. |
 | Channel | 채널 | team 146회. |
 | Group | 그룹 | |
 | Ratio | 비율 | team 79회, "배율" 14회. 새 번역은 "비율"로 통일합니다. |
@@ -162,7 +162,9 @@
 | Task (plugin, async) | 작업 | "Task plugin"은 "작업 플러그인", "Task billing"은 "작업 과금", "Task pricing"은 "작업 가격". |
 | Target / Source (audit, vendor merge) | 대상 / 원본 | 감사 로그의 대상, 공급업체 병합의 "Source vendors"(원본 공급업체)와 "Target vendor"(대상 공급업체). 플러그인·마켓플레이스의 Source는 "소스", 설정값의 출처 표시는 "출처". |
 | Telegram | 영문 유지 | 시드된 "Telegram 계정 연결" 등과 맞춥니다. |
-| Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. |
+| Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. 배치 6에서 같은 이유로 `Xunfei`, `Zhipu`, `Zhipu GLM`, `Zhipu V4`, `VolcEngine`, `WeChat`, `WeChat Pay`(Epay WeChat Pay와 같음)와 테마 이름 `Underground`를 넣었습니다. |
+| Worker / Master (instance) | 워커 / 마스터 | 다중 인스턴스 배포의 역할. 시드된 "마스터 인스턴스"와 맞춥니다. 감사 로그의 Operator(작업자)와 구분합니다. |
+| Unauthorized (auth error) | 인증되지 않았습니다 | 백엔드 오류 "Unauthorized, …"는 "인증되지 않았습니다. …" 두 문장으로 옮깁니다. 라벨 `Unauthorized`는 시드된 "인증되지 않음". |
 | Tier (pricing) | 등급 | 가격·할인 단계. 기존 값에서 "등급"(17개 키)이 "티어"(11개 키)보다 많고 가격 단계를 가리키는 한국어로도 자연스러워 "등급"을 씁니다. "Tier name"은 "등급 이름", "Tiered price table"은 "등급별 가격표". 소수 표기 "티어"는 아래 "통일 예정"에 있습니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현

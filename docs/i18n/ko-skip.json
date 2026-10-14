@@ -159,6 +159,7 @@
   "TTFT P95",
   "TTFT P99",
   "TTL",
+  "Underground",
   "Uptime Kuma",
   "Uptime Kuma URL",
   "URL",
@@ -167,11 +168,18 @@
   "Vidu",
   "vip",
   "vLLM",
+  "VolcEngine",
   "Waffo",
+  "WeChat",
+  "WeChat Pay",
   "Well-Known URL",
   "whsec_xxx",
   "Worker URL",
   "x",
   "xAI",
-  "Xinference"
+  "Xinference",
+  "Xunfei",
+  "Zhipu",
+  "Zhipu GLM",
+  "Zhipu V4"
 ]

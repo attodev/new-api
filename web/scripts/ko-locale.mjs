@@ -91,7 +91,15 @@ const MANUAL_SKIP = new Set([
   'Sunset Glow',
   'Tencent',
   'Top P',
+  'Underground',
   'vLLM',
+  'VolcEngine',
+  'WeChat',
+  'WeChat Pay',
+  'Xunfei',
+  'Zhipu',
+  'Zhipu GLM',
+  'Zhipu V4',
 ])
 
 // en.json stores this key with a unicode escape (see sync-i18n.mjs); keep the
