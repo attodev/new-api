@@ -127,7 +127,7 @@
 | Discard (changes) | 버리기 | "Discard changes"는 "변경 사항 버리기". 취소(Cancel)와 구분합니다. |
 | Deprecated | 지원 중단됨 | 상태 라벨. |
 | Factory (plugin) | 기본 제공 | 작업 플러그인의 출고 시 내장 버전. 시드된 "기본 제공 v{{factory}}"와 맞춥니다. |
-| Fallback | 폴백 | 시드된 "폴백 티어"와 맞춥니다. "Fallback route"는 "폴백 라우트". |
+| Fallback | 폴백 | "Fallback route"는 "폴백 라우트". 시드된 "폴백 티어"는 Tier 통일 대상입니다("폴백 등급"). |
 | Split (advanced custom) | 분할 | 시드된 "분할 추가"와 맞춥니다. |
 | Incoming path | 수신 경로 | 시드된 "같은 수신 경로에서는…"과 맞춥니다. |
 | Marketplace index / source | 인덱스 / 소스 | 작업 플러그인 마켓플레이스. "Index URL"은 "인덱스 URL", "Marketplace sources"는 "마켓플레이스 소스". |
@@ -163,7 +163,7 @@
 | Target / Source (audit, vendor merge) | 대상 / 원본 | 감사 로그의 대상, 공급업체 병합의 "Source vendors"(원본 공급업체)와 "Target vendor"(대상 공급업체). 플러그인·마켓플레이스의 Source는 "소스", 설정값의 출처 표시는 "출처". |
 | Telegram | 영문 유지 | 시드된 "Telegram 계정 연결" 등과 맞춥니다. |
 | Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. |
-| Tier (pricing) | 티어 | 가격·할인 단계. 시드된 "폴백 티어", "티어별 가격"과 맞춥니다. "Tier name"은 "티어 이름". 기존 값에는 "등급"이 더 많지만(아래 "통일 예정") 새 번역은 "티어"만 씁니다. 사용자 등급(user level)은 "등급"을 그대로 씁니다. |
+| Tier (pricing) | 등급 | 가격·할인 단계. 기존 값에서 "등급"(17개 키)이 "티어"(11개 키)보다 많고 가격 단계를 가리키는 한국어로도 자연스러워 "등급"을 씁니다. "Tier name"은 "등급 이름", "Tiered price table"은 "등급별 가격표". 소수 표기 "티어"는 아래 "통일 예정"에 있습니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -194,4 +194,4 @@
 | Turnstile (영문 유지) | 회전문 | `Enable Turnstile` = "회전문 활성화"(오역). 다른 Turnstile 키는 모두 영문을 유지합니다. |
 | 폐기 (Revoke) | 취소 | 배치 1의 `Access token revoked` = "액세스 토큰 취소됨", `A token that never expires stays valid until you revoke it…` = "취소할 때까지", 시드된 `Create, revoke, and audit API tokens.` = "취소" 3회. |
 | Telegram (영문 유지) | 텔레그램 | 시드된 `Enable Telegram OAuth` = "텔레그램 OAuth 활성화" 1회. |
-| 티어 (Tier) | 등급, 등급제 | 시드된 값과 이전 배치 16개 키(`Tier`, `Tier name`, `Add tier`, `Remove tier`, `Hit tier`, `Matched Tier`, `{{count}} tiers`, `Tiered` = "등급제", `Tiered price table`, 할인 등급 3개 등). `Allow service_tier passthrough` = "서비스등급 패스스루"도 함께 점검합니다. |
+| 등급 (Tier) | 티어 | 11개 키: `Fallback tier` = "폴백 티어", `Tiered pricing` = "티어별 가격", `Tiered (billing expression)` = "티어드", `Pricing tier {{name}}`, `Tier conditions`, `tiers`, 그리고 "이 티어…", "각 티어…"로 시작하는 설명문 5개. |

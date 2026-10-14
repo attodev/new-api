@@ -6033,7 +6033,7 @@
     "Switch to visual editor": "시각 편집기로 전환",
     "Switch to visual mode to add rules or apply templates.": "규칙을 추가하거나 템플릿을 적용하려면 시각 모드로 전환하세요.",
     "Switch to visual pricing?": "시각 가격 편집으로 전환하시겠습니까?",
-    "Switching regenerates the expression from the price table and replaces its original formatting and tier names. Changes apply only after saving.": "전환하면 가격표에서 표현식을 다시 생성하며 원래 서식과 티어 이름이 바뀝니다. 변경 사항은 저장한 후에만 적용됩니다.",
+    "Switching regenerates the expression from the price table and replaces its original formatting and tier names. Changes apply only after saving.": "전환하면 가격표에서 표현식을 다시 생성하며 원래 서식과 등급 이름이 바뀝니다. 변경 사항은 저장한 후에만 적용됩니다.",
     "Sync": "동기",
     "Sync Endpoint": "엔드포인트 동기화",
     "Sync Endpoints": "엔드포인트 동기화",
