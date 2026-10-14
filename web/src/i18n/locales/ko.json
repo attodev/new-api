@@ -7485,7 +7485,7 @@
     "invalid start_timestamp": "유효하지 않은 start_timestamp",
     "invalid end_timestamp": "유효하지 않은 end_timestamp",
     "start_timestamp must be before end_timestamp": "start_timestamp는 end_timestamp보다 앞서야 합니다",
-    "only the organization owner can manage the owner": "소유자는 조직 소유자만 관리할 수 있습니다",
+    "only the organization owner can manage the owner": "조직 소유자만 소유자를 관리할 수 있습니다",
     "global admin users cannot be managed by organization admins": "조직 관리자는 전역 관리자 사용자를 관리할 수 없습니다",
     "organization admins cannot modify their own membership": "조직 관리자는 자신의 멤버십을 변경할 수 없습니다",
     "organization admins cannot reassign themselves": "조직 관리자는 자신을 다시 배정할 수 없습니다",

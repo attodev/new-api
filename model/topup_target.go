@@ -96,7 +96,7 @@ func creditOrganizationQuota(tx *gorm.DB, orgId int, creditedQuota int) error {
 		return err
 	}
 	if count == 0 {
-		return errors.New("organization not found")
+		return common.NewMessage("organization not found")
 	}
 	return ErrTopUpQuotaLimitExceeded
 }
