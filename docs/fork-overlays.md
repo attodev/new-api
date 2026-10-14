@@ -5,7 +5,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
-| 공통(quota) | model/user.go:97-98,103-104 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint (gofmt가 이웃 줄 94-96, 99의 주석 정렬을 바꿈 — 공백만) | model/user_quota_columns_fork_test.go |
+| 공통(quota) | model/user.go:97-98,105-106 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint (gofmt가 이웃 줄 94-96, 99의 주석 정렬을 바꿈 — 공백만) | model/user_quota_columns_fork_test.go |
 | O5 문의 메일 | common/constants.go:113 | `var ContactEmail = ""` | controller/contact.go, controller/email.go, middleware/fork_access_token_routes.go |
 | O5 문의 메일 | model/option.go:77 | InitOptionMap `OptionMap["ContactEmail"]` 한 줄 | controller/contact.go |
 | O5 문의 메일 | model/option.go:495-496 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
@@ -49,6 +49,15 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O8 가격 페이지 모델 상세 숨김 | web/src/routes/pricing/$modelId/index.tsx | `beforeLoad`가 `/pricing`으로 리다이렉트, `ModelDetails` 컴포넌트 연결 제거 | — |
 | O8 가격 페이지 모델 상세 숨김 | web/src/features/rankings/components/entity-links.tsx | `ModelLink`가 링크 대신 일반 텍스트 렌더링 | — |
 | O8 큰 수 약어 | web/src/lib/currency.ts, web/src/lib/format.ts | `SUFFIX_TIERS` (k/M/B/T), `formatTokens` K/M/B/T 구간 (`web/src/lib/__tests__/number-suffix.test.ts`) | web/src/lib/__tests__/number-suffix.test.ts |
+| O3 조직 | model/user.go:101-102 | `User.OrganizationId`, `User.OrganizationRole` 필드 (Group 다음) | model/organization.go, model/organization_migrate.go |
+| O3 조직 | model/user.go:537 | `GetSelfUserById` Select 목록에 `"organization_id", "organization_role"` 한 줄 | model/organization.go |
+| O3 조직 | model/topup.go:27-28 | `TopUp.TargetType`, `TopUp.TargetId` 필드 (gofmt가 26행 O2 주석 정렬을 바꿈 — 공백만) | model/organization.go |
+| O3 조직 | model/task.go:112 | `TaskPrivateData.OrganizationId` 필드 | model/organization.go |
+| O3 조직 | model/task.go:262 | `InitTask`에서 `privateData.OrganizationId = relayInfo.BillingOrganizationId` (`relayInfo != nil` 검사 안) | model/organization.go |
+| O3 조직 | relay/common/relay_info.go:148 | `RelayInfo.BillingOrganizationId` 필드 (SubscriptionId 다음, 빈 줄로 gofmt 정렬 분리) | model/organization.go |
+| O3 조직 | model/main.go:383 | `migrateDB` AutoMigrate 오류 검사 뒤 `MigrateForkOrganizationTables(DB)` | model/organization_migrate.go |
+| O3 조직 | controller/user.go:512-513 | `buildSelfUserData`에 `"organization_id"`, `"organization_role"` 두 줄 | model/organization.go |
+| O3 조직 | model/task_cas_test.go:63,97 | TestMain AutoMigrate에 조직 모델 4개, `truncateTables`에 `organizations` | model/organization_quota_reserve_test.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

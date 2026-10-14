@@ -109,6 +109,7 @@ func (m Properties) Value() (driver.Value, error) {
 }
 
 type TaskPrivateData struct {
+	OrganizationId int    `json:"organization_id,omitempty"` // fork: O3 pinned billing organization
 	Key            string `json:"key,omitempty"`
 	UpstreamTaskID string `json:"upstream_task_id,omitempty"` // 上游真实 task ID
 	ResultURL      string `json:"result_url,omitempty"`       // 任务成功后的结果 URL（视频地址等）
@@ -255,6 +256,10 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 		if relayInfo.OriginModelName != "" {
 			properties.OriginModelName = relayInfo.OriginModelName
 		}
+	}
+
+	if relayInfo != nil {
+		privateData.OrganizationId = relayInfo.BillingOrganizationId // fork: O3
 	}
 
 	// 使用预生成的公开 ID（如果有），否则新生成

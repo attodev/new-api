@@ -23,7 +23,9 @@ type TopUp struct {
 	CreateTime      int64   `json:"create_time"`
 	CompleteTime    int64   `json:"complete_time"`
 	Status          string  `json:"status"`
-	ProviderOrderId string  `json:"provider_order_id" gorm:"type:varchar(255);index"` // fork: O2 PayPal order id
+	ProviderOrderId string  `json:"provider_order_id" gorm:"type:varchar(255);index"`   // fork: O2 PayPal order id
+	TargetType      string  `json:"target_type" gorm:"type:varchar(32);default:'user'"` // fork: O3 wallet target
+	TargetId        int     `json:"target_id" gorm:"default:0;index"`                   // fork: O3
 }
 
 const (

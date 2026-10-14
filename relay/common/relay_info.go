@@ -144,6 +144,8 @@ type RelayInfo struct {
 	BillingSource string
 	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
 	SubscriptionId int
+
+	BillingOrganizationId int // fork: O3 organization charged for this request (0 = none)
 	// SubscriptionPreConsumed is the amount pre-consumed on subscription item (quota units or 1)
 	SubscriptionPreConsumed int64
 	// SubscriptionPostDelta is the post-consume delta applied to amount_used (quota units; can be negative).

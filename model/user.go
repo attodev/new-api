@@ -98,6 +98,8 @@ type User struct {
 	UsedQuota            int                        `json:"used_quota" gorm:"type:bigint;default:0;column:used_quota"` // fork: bigint
 	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`                  // request number
 	Group                string                     `json:"group" gorm:"type:varchar(64);default:'default'"`
+	OrganizationId       int                        `json:"organization_id" gorm:"type:int;default:0;column:organization_id;index"`        // fork: O3
+	OrganizationRole     string                     `json:"organization_role" gorm:"type:varchar(16);default:'';column:organization_role"` // fork: O3
 	AffCode              string                     `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	AffCount             int                        `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
 	AffQuota             int                        `json:"aff_quota" gorm:"type:bigint;default:0;column:aff_quota"`           // fork: bigint
@@ -532,6 +534,7 @@ func GetSelfUserById(id int) (*User, error) {
 		"id", "username", "display_name", "role", "status", "email",
 		"github_id", "discord_id", "oidc_id", "wechat_id", "telegram_id",
 		"group", "quota", "used_quota", "request_count", "aff_code", "aff_count",
+		"organization_id", "organization_role", // fork: O3
 		"aff_quota", "aff_history", "inviter_id", "linux_do_id", "setting",
 		"stripe_customer", "auth_version",
 		"CASE WHEN password <> '' THEN 1 ELSE 0 END AS has_password",
