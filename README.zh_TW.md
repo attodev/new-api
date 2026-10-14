@@ -11,6 +11,7 @@
   <strong>繁體中文</strong> |
   <a href="./README.md">English</a> |
   <a href="./README.fr.md">Français</a> |
+  <a href="./README.kr.md">한국어</a> | <!-- fork: O9 -->
   <a href="./README.ja.md">日本語</a>
 </p>
 

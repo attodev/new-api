@@ -182,6 +182,13 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/common-log-mobile-card.tsx:37, 212 | import 한 줄, 모바일 카드의 `useTimeSec={effectiveUseTimeSec(other, log.use_time)}` (tokens/s 계산의 `use_time`은 그대로) | web/src/features/usage-logs/lib/timing-breakdown.ts |
 | O7 타이밍 분해 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json | `Timing Breakdown`, `Model Provider`, `Gateway Overhead` 키 3개 (`Vendor discount` 뒤) | — |
 | O9 한글 | web/package.json:27 | scripts에 `"i18n:ko": "node scripts/ko-locale.mjs"` 한 줄 (JSON이라 `// fork: O9` 주석을 달 수 없어 이 표로만 표시) | web/scripts/ko-locale.mjs, web/scripts/ko-locale.test.mjs |
+| O9 한글 (README) | README.md:14 | 언어 nav `<p align="center">`에 `  <a href="./README.kr.md">한국어</a> \| <!-- fork: O9 -->` 한 줄 (마지막 항목 `日本語` 앞에 넣어 구분자 `\|`가 유효하게 유지) | README.kr.md |
+| O9 한글 (README) | README.en.md:14 | 같은 nav 한 줄 | README.kr.md |
+| O9 한글 (README) | README.zh_CN.md:14 | 같은 nav 한 줄 | README.kr.md |
+| O9 한글 (README) | README.zh_TW.md:14 | 같은 nav 한 줄 | README.kr.md |
+| O9 한글 (README) | README.fr.md:14 | 같은 nav 한 줄 | README.kr.md |
+| O9 한글 (README) | README.ja.md:14 | 같은 nav 한 줄 (마지막 항목 `<strong>日本語</strong>` 앞) | README.kr.md |
+| O9 한글 (README) | README.kr.md | 신규 파일(upstream 파일 아님). `README.md`(upstream 신판)를 절 단위로 번역. team `README.kr.md`(구판)와 같은 절(파트너·특별 감사·관련 프로젝트·라이선스·스타 히스토리·맺음말)은 그 문장을 재사용. 링크·배지·이미지·코드 블록은 원문 그대로. upstream이 README를 고치면 이 파일도 같은 절을 따라 고친다 | — |
 | O9 한글 | web/src/i18n/locales/ko.json | 신규 locale 파일(upstream 파일 아님). `node scripts/ko-locale.mjs seed`가 en.json 키 순서로 team `kr.json`의 한글 값과 영어 placeholder를 채우고, 이후 배치 번역으로 placeholder를 없앤다. `_extras`/`_reports`는 `sync-i18n.mjs` 관리 영역이라 쓰지 않는다 | docs/translation-glossary.ko.md, docs/i18n/ko-batches.json, docs/i18n/ko-skip.json |
 | O9 한글 | web/src/i18n/languages.ts:22,49,68 | `INTERFACE_LANGUAGE_OPTIONS`에 `ko`(한국어) 추가, `normalizeInterfaceLanguage`와 `convertDetectedLanguage`에 `kr`/`ko*` → `ko` 한 줄씩 (`kr`은 레거시 team 코드; Intl이 Kanuri로 읽으므로 내부 코드는 `ko`) | web/src/i18n/languages.test.ts |
 | O9 한글 | web/src/i18n/config.ts:27,39,50 | `ko.json` import, `resources.ko`, `supportedLngs`에 `'ko'` | web/src/i18n/locales/ko.json |
