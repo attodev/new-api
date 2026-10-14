@@ -151,6 +151,7 @@
 | Node (flow, instance) | 노드 | 시드된 "모든 노드", "노드 이름"과 맞춥니다. |
 | Other X (flow overflow) | 기타 X | 흐름 차트에서 상위 항목 밖을 묶은 이름. "Other tokens"은 "기타 API 키". |
 | Peak | 피크 | 시드된 "피크 처리량"과 맞춥니다. "Peak KV cache usage"는 "피크 KV 캐시 사용량". |
+| Passive recovery | 패시브 복구 | 채널 상태 점검 모드. "Passive recovery only"는 "패시브 복구만". "수동"은 manually disabled(수동으로 비활성화한)와 겹치므로 쓰지 않습니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
