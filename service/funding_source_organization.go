@@ -75,6 +75,12 @@ func refundMemberLimit(userId int, organizationId int, refund int) (bool, error)
 	return credited, nil
 }
 
+// ErrInsufficientOrganizationWalletQuota reports that the shared organization
+// wallet (not the member limit) cannot cover a reservation. It does not wrap
+// ErrInsufficientWalletQuota, which upstream maps to the personal-balance
+// message; organizationPreConsumeError names the organization wallet instead.
+var ErrInsufficientOrganizationWalletQuota = errors.New("organization wallet quota insufficient")
+
 func reserveWalletQuotaForOrganization(userId int, organizationId int, amount int) error {
 	reserved, err := model.TryReserveUserQuota(userId, amount)
 	if err != nil {
@@ -91,7 +97,7 @@ func reserveWalletQuotaForOrganization(userId int, organizationId int, amount in
 		if err != nil {
 			return err
 		}
-		return ErrInsufficientWalletQuota
+		return ErrInsufficientOrganizationWalletQuota
 	}
 	return nil
 }
@@ -201,7 +207,7 @@ func (o *OrganizationSubscriptionFunding) PreConsume(_ int) error {
 		if err != nil {
 			return err
 		}
-		return ErrInsufficientWalletQuota
+		return ErrInsufficientOrganizationWalletQuota
 	}
 	o.organizationWalletConsumed = o.preConsumed
 	return nil

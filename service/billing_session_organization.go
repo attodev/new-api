@@ -128,6 +128,28 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 	return session, nil, true
 }
 
+// organizationPreConsumeError maps an organization wallet shortfall from
+// FundingSource.PreConsume to a 403 that names the organization wallet; upstream
+// preConsume would otherwise report the member's personal balance. Hook:
+// BillingSession.preConsume, before its ErrInsufficientWalletQuota branch.
+func organizationPreConsumeError(funding FundingSource, err error) *types.NewAPIError {
+	if !errors.Is(err, ErrInsufficientOrganizationWalletQuota) {
+		return nil
+	}
+	organizationId := 0
+	switch f := funding.(type) {
+	case *OrganizationWalletFunding:
+		organizationId = f.organizationId
+	case *OrganizationSubscriptionFunding:
+		organizationId = f.organizationId
+	}
+	remaining, quotaErr := model.GetOrganizationQuota(organizationId)
+	if quotaErr != nil {
+		remaining = 0
+	}
+	return orgQuotaError(nil, fmt.Sprintf("organization quota insufficient, remaining: %s", logger.FormatQuota(int(remaining))))
+}
+
 func orgReserveInsufficientError(err error) *types.NewAPIError {
 	return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 		types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
@@ -142,8 +164,11 @@ func reserveOrganizationFunding(funding FundingSource, delta int, requireAvailab
 	case *OrganizationWalletFunding:
 		if requireAvailableQuota {
 			if err := reserveWalletQuotaForOrganization(f.memberId, f.organizationId, delta); err != nil {
+				if errors.Is(err, ErrInsufficientOrganizationWalletQuota) {
+					return orgReserveInsufficientError(err)
+				}
 				if errors.Is(err, ErrInsufficientWalletQuota) {
-					return orgReserveInsufficientError(fmt.Errorf("organization wallet quota insufficient: %w", err))
+					return orgReserveInsufficientError(fmt.Errorf("member quota insufficient: %w", err))
 				}
 				return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
@@ -188,7 +213,7 @@ func reserveOrganizationSubscriptionAtomically(f *OrganizationSubscriptionFundin
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
-		return orgReserveInsufficientError(fmt.Errorf("organization wallet quota insufficient: %w", ErrInsufficientWalletQuota))
+		return orgReserveInsufficientError(ErrInsufficientOrganizationWalletQuota)
 	}
 	f.organizationWalletConsumed += d
 	return nil

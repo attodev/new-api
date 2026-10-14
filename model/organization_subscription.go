@@ -449,41 +449,57 @@ func downgradeUserGroupForOrganizationSubscriptionTx(tx *gorm.DB, sub *Organizat
 	return prevGroup, nil
 }
 
+// cancelActiveOrganizationUserSubscriptionsTx cancels every active plan of the
+// user in the organization (restoring an upgraded group) and returns how many
+// were cancelled and the group the user was moved back to, if any.
+func cancelActiveOrganizationUserSubscriptionsTx(tx *gorm.DB, organizationId int, userId int) (int, string, error) {
+	now := common.GetTimestamp()
+	cacheGroup := ""
+	var subs []OrganizationUserSubscription
+	if err := lockForUpdate(tx).
+		Where("organization_id = ? AND user_id = ? AND status = ?", organizationId, userId, "active").
+		Order("end_time desc, id desc").
+		Find(&subs).Error; err != nil {
+		return 0, "", err
+	}
+	if len(subs) == 0 {
+		return 0, "", nil
+	}
+	for _, sub := range subs {
+		targetGroup, err := downgradeUserGroupForOrganizationSubscriptionTx(tx, &sub, now)
+		if err != nil {
+			return 0, "", err
+		}
+		if targetGroup != "" {
+			cacheGroup = targetGroup
+		}
+	}
+	if err := tx.Model(&OrganizationUserSubscription{}).
+		Where("organization_id = ? AND user_id = ? AND status = ?", organizationId, userId, "active").
+		Updates(map[string]interface{}{
+			"status":     "cancelled",
+			"end_time":   now,
+			"updated_at": now,
+		}).Error; err != nil {
+		return 0, "", err
+	}
+	return len(subs), cacheGroup, nil
+}
+
 func CancelActiveOrganizationUserSubscriptionForUser(organizationId int, userId int) (string, error) {
 	if organizationId <= 0 || userId <= 0 {
 		return "", errors.New("invalid organization subscription user")
 	}
-	now := common.GetTimestamp()
 	cacheGroup := ""
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var subs []OrganizationUserSubscription
-		if err := lockForUpdate(tx).
-			Where("organization_id = ? AND user_id = ? AND status = ?", organizationId, userId, "active").
-			Order("end_time desc, id desc").
-			Find(&subs).Error; err != nil {
+		cancelled, targetGroup, err := cancelActiveOrganizationUserSubscriptionsTx(tx, organizationId, userId)
+		if err != nil {
 			return err
 		}
-		if len(subs) == 0 {
+		if cancelled == 0 {
 			return gorm.ErrRecordNotFound
 		}
-		for _, sub := range subs {
-			targetGroup, err := downgradeUserGroupForOrganizationSubscriptionTx(tx, &sub, now)
-			if err != nil {
-				return err
-			}
-			if targetGroup != "" {
-				cacheGroup = targetGroup
-			}
-		}
-		if err := tx.Model(&OrganizationUserSubscription{}).
-			Where("organization_id = ? AND user_id = ? AND status = ?", organizationId, userId, "active").
-			Updates(map[string]interface{}{
-				"status":     "cancelled",
-				"end_time":   now,
-				"updated_at": now,
-			}).Error; err != nil {
-			return err
-		}
+		cacheGroup = targetGroup
 		return nil
 	})
 	if err != nil {

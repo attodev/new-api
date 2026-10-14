@@ -212,3 +212,30 @@ func TestGetOrganizationDashboardScopesQuotaDataToOrganization(t *testing.T) {
 		{Date: "2026-01-03", UserID: member.Id, Username: member.Username, DisplayName: "Member Display", Quota: 200, Requests: 3},
 	}, dashboard.UserUsage)
 }
+
+// fork: O3 (review M5) — leaving an organization cancels the member's active
+// organization plan, so a later re-assignment never silently resumes it.
+func TestClearOrganizationMembershipCancelsActiveOrganizationPlan(t *testing.T) {
+	setupOrganizationModelTestDB(t)
+	require.NoError(t, DB.AutoMigrate(&OrganizationUserSubscription{}))
+	member := User{Id: 2, Username: "member", Password: "password", Role: common.RoleCommonUser, Quota: 300, OrganizationId: 1, OrganizationRole: OrganizationRoleMember, AffCode: "member-m5"}
+	other := User{Id: 3, Username: "other", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: OrganizationRoleMember, AffCode: "other-m5"}
+	require.NoError(t, DB.Create(&member).Error)
+	require.NoError(t, DB.Create(&other).Error)
+	now := time.Now().Unix()
+	subs := []OrganizationUserSubscription{
+		{OrganizationId: 1, UserId: 2, PlanId: 1, AmountTotal: 500, StartTime: now, EndTime: now + 3600, Status: "active"},
+		{OrganizationId: 1, UserId: 3, PlanId: 1, AmountTotal: 500, StartTime: now, EndTime: now + 3600, Status: "active"},
+	}
+	require.NoError(t, DB.Create(&subs).Error)
+
+	previousQuota, err := ClearOrganizationMembership(2, 1)
+	require.NoError(t, err)
+	require.Equal(t, 300, previousQuota)
+
+	var removed, kept OrganizationUserSubscription
+	require.NoError(t, DB.First(&removed, subs[0].Id).Error)
+	require.Equal(t, "cancelled", removed.Status)
+	require.NoError(t, DB.First(&kept, subs[1].Id).Error)
+	require.Equal(t, "active", kept.Status, "other members' plans are untouched")
+}

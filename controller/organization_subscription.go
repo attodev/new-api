@@ -90,6 +90,9 @@ func UpdateOrganizationSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "no subscription plan fields to update")
 		return
 	}
+	if !requireOrganizationSubscriptionPlan(c, organizationId, planId) {
+		return
+	}
 	if err := model.DB.Model(&model.OrganizationSubscriptionPlan{}).
 		Where("id = ? AND organization_id = ?", planId, organizationId).
 		Updates(updates).Error; err != nil {
@@ -113,6 +116,9 @@ func DeleteOrganizationSubscriptionPlan(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if !requireOrganizationSubscriptionPlan(c, organizationId, planId) {
+		return
+	}
 	if err := model.DB.Model(&model.OrganizationSubscriptionPlan{}).
 		Where("id = ? AND organization_id = ?", planId, organizationId).
 		Update("enabled", false).Error; err != nil {
@@ -123,6 +129,25 @@ func DeleteOrganizationSubscriptionPlan(c *gin.Context) {
 		fmt.Sprintf("Disabled organization %d subscription plan %d", organizationId, planId),
 		map[string]any{"organization_id": organizationId, "plan_id": planId})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+// requireOrganizationSubscriptionPlan answers 404 (and the caller writes no
+// audit row) when planId is not a plan of organizationId. It reads the row
+// rather than trusting RowsAffected, which MySQL reports as 0 for an update
+// that changes nothing.
+func requireOrganizationSubscriptionPlan(c *gin.Context, organizationId int, planId int) bool {
+	var count int64
+	if err := model.DB.Model(&model.OrganizationSubscriptionPlan{}).
+		Where("id = ? AND organization_id = ?", planId, organizationId).
+		Count(&count).Error; err != nil {
+		common.ApiError(c, err)
+		return false
+	}
+	if count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "subscription plan not found"})
+		return false
+	}
+	return true
 }
 
 // organizationUserSubscriptionView is the list item organization admins see: the
@@ -284,9 +309,12 @@ func GetMyOrganizationSubscription(c *gin.Context) {
 		return
 	}
 	plan, _ := model.GetOrganizationSubscriptionPlanById(actor.OrganizationId, sub.PlanId)
-	common.ApiSuccess(c, model.OrganizationUserSubscriptionSummary{
+	// Same shape as the list items: the caller through organizationUserView,
+	// never the full users row.
+	userView := newOrganizationUserView(actor)
+	common.ApiSuccess(c, organizationUserSubscriptionView{
 		Subscription: sub,
-		User:         actor,
+		User:         &userView,
 		Plan:         plan,
 	})
 }

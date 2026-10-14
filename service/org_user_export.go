@@ -127,6 +127,10 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		headerIdx[strings.TrimSpace(strings.ToLower(h))] = i
 	}
 
+	hasColumn := func(key string) bool {
+		_, ok := headerIdx[key]
+		return ok
+	}
 	getCell := func(row []string, key string) string {
 		idx, ok := headerIdx[key]
 		if !ok || idx >= len(row) {
@@ -209,13 +213,17 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				if st := getCell(row, "status"); st != "" {
 					updates["status"] = stringToStatus(st)
 				}
-				updates["remark"] = getCell(row, "remark")
-				if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
-					continue
+				if hasColumn("remark") {
+					updates["remark"] = getCell(row, "remark")
+				}
+				if len(updates) > 0 {
+					if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
+						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
+						continue
+					}
 				}
 				if importedQuota != nil {
-					if err := setImportedUserQuota(existingUser.Id, existingUser.Quota, *importedQuota); err != nil {
+					if err := model.SetOrganizationMemberQuota(existingUser.Id, organizationId, *importedQuota); err != nil {
 						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
 					}
 				}
@@ -295,8 +303,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		}
 
 		if quotaProvided {
-			if err := setImportedUserQuota(newUser.Id, newUser.Quota, quota); err != nil {
+			if err := model.SetOrganizationMemberQuota(newUser.Id, organizationId, quota); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+			}
+			if err := model.InvalidateUserCache(newUser.Id); err != nil {
+				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
 			}
 		}
 

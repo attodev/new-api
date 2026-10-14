@@ -154,7 +154,7 @@ func TestOrganizationWalletFundingRollsBackMemberWhenOrganizationInsufficient(t 
 	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 10).Error)
 
 	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
-	require.ErrorIs(t, funding.PreConsume(25), ErrInsufficientWalletQuota)
+	require.ErrorIs(t, funding.PreConsume(25), ErrInsufficientOrganizationWalletQuota)
 	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
 	require.Equal(t, int64(10), getOrganizationForBillingTest(t, 1).Quota)
 }
@@ -564,11 +564,35 @@ func TestOrganizationSubscriptionPreConsumeIsAtomicOnOrganizationWallet(t *testi
 	first := &OrganizationSubscriptionFunding{requestId: "atomic-1", organizationId: 1, userId: 2, modelName: "m", amount: 60}
 	require.NoError(t, first.PreConsume(60))
 	second := &OrganizationSubscriptionFunding{requestId: "atomic-2", organizationId: 1, userId: 2, modelName: "m", amount: 60}
-	require.ErrorIs(t, second.PreConsume(60), ErrInsufficientWalletQuota)
+	require.ErrorIs(t, second.PreConsume(60), ErrInsufficientOrganizationWalletQuota)
 	require.Equal(t, int64(0), second.preConsumed)
 
 	require.Equal(t, int64(40), getOrganizationForBillingTest(t, 1).Quota)
 	var reloaded model.OrganizationUserSubscription
 	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
 	require.Equal(t, int64(60), reloaded.AmountUsed, "the second pre-consume's plan usage is refunded")
+}
+
+// Review M4: an organization wallet shortfall at pre-consume names the
+// organization wallet, not the member's personal balance.
+func TestOrganizationWalletShortfallNamesTheOrganizationWallet(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 10).Error)
+	_, err := createOrganizationPlanAndAssign(t, 1, 2, 1000)
+	require.NoError(t, err)
+
+	for _, funding := range []FundingSource{
+		&OrganizationSubscriptionFunding{requestId: "m4-plan", organizationId: 1, userId: 2, modelName: "m", amount: 50},
+		&OrganizationWalletFunding{memberId: 2, organizationId: 1},
+	} {
+		session := &BillingSession{relayInfo: &relaycommon.RelayInfo{UserId: 2, IsPlayground: true}, funding: funding}
+		apiErr := session.preConsume(newOrganizationBillingContext(), 50)
+		require.NotNil(t, apiErr, funding.Source())
+		require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
+		require.Contains(t, apiErr.Error(), "organization quota insufficient", funding.Source())
+	}
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(10), getOrganizationForBillingTest(t, 1).Quota)
 }

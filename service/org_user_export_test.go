@@ -256,3 +256,51 @@ func TestImportOrgUsersRemoveAbsentNeverRemovesTheActor(t *testing.T) {
 	require.Equal(t, 1, admin.OrganizationId)
 	require.Equal(t, 500, admin.Quota)
 }
+
+// fork: O3 (review I7, partial) — the import writes remark only when the sheet
+// has a remark column; a sheet without it keeps the existing remark.
+func TestImportOrgUsersKeepsRemarkWhenColumnIsAbsent(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Update("remark", "root note").Error)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "display_name"},
+		{"member_21", "Renamed"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Empty(t, result.Errors)
+	var member model.User
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.Equal(t, "Renamed", member.DisplayName)
+	require.Equal(t, "root note", member.Remark)
+
+	// With the column present the remark is written (an empty cell clears it).
+	f = newImportWorkbook(t, [][]any{
+		{"username", "remark"},
+		{"member_21", "sheet note"},
+	})
+	_, err = ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.Equal(t, "sheet note", member.Remark)
+}
+
+// fork: O3 (review M9) — an imported cap is written as one absolute value, not
+// as a delta from a quota read earlier in the import.
+func TestSetImportedOrganizationMemberQuotaIsAbsolute(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+	// Concurrent spend after the import read the row: the stored quota is 40 now.
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Update("quota", 40).Error)
+
+	require.NoError(t, model.SetOrganizationMemberQuota(21, 1, 500))
+	require.Equal(t, 500, getUserQuotaForBillingTest(t, 21))
+	// Not a member of organization 2: nothing is written.
+	require.NoError(t, model.SetOrganizationMemberQuota(21, 2, 900))
+	require.Equal(t, 500, getUserQuotaForBillingTest(t, 21))
+}

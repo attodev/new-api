@@ -232,6 +232,9 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 			s.tokenConsumed = 0
 		}
 		// TODO: model 层应定义哨兵错误（如 ErrNoActiveSubscription），用 errors.Is 替代字符串匹配
+		if apiErr := organizationPreConsumeError(s.funding, err); apiErr != nil { // fork: O3
+			return apiErr
+		}
 		if errors.Is(err, ErrInsufficientWalletQuota) {
 			userQuota, quotaErr := model.GetUserQuota(s.relayInfo.UserId, false)
 			if quotaErr != nil {

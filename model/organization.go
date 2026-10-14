@@ -370,6 +370,18 @@ func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuot
 				return fmt.Errorf("organization has %d non-owner members, remove them first", memberCount)
 			}
 
+			// A pending organization top-up would settle into a deleted wallet
+			// ("organization not found") and strand a paid order.
+			var pendingTopUps int64
+			if err := tx.Model(&TopUp{}).
+				Where("target_type = ? AND target_id = ? AND status = ?", TopUpTargetTypeOrganization, id, common.TopUpStatusPending).
+				Count(&pendingTopUps).Error; err != nil {
+				return err
+			}
+			if pendingTopUps > 0 {
+				return fmt.Errorf("organization has %d pending top-up orders, wait for them to settle or expire first", pendingTopUps)
+			}
+
 			// 2. Delete user subscriptions
 			if err := tx.Where("organization_id = ?", id).
 				Delete(&OrganizationUserSubscription{}).Error; err != nil {
@@ -476,5 +488,25 @@ func clearOrganizationMembershipTx(tx *gorm.DB, userId int, organizationId int) 
 	if result.RowsAffected == 0 {
 		return 0, ErrOrganizationMembershipChanged
 	}
+	// The member's organization plan ends with the membership; a later
+	// re-assignment must not silently resume it.
+	if _, _, err := cancelActiveOrganizationUserSubscriptionsTx(tx, organizationId, userId); err != nil {
+		return 0, err
+	}
 	return user.Quota, nil
+}
+
+// SetOrganizationMemberQuota writes a member limit as one absolute value
+// (the import's cap column), scoped to the organization; it never derives the
+// value from an earlier read, so concurrent spend cannot skew it.
+func SetOrganizationMemberQuota(userId int, organizationId int, quota int) error {
+	if userId <= 0 || organizationId <= 0 {
+		return errors.New("invalid organization member")
+	}
+	if err := common.ValidateWalletQuota(quota); err != nil {
+		return err
+	}
+	return DB.Model(&User{}).
+		Where("id = ? AND organization_id = ?", userId, organizationId).
+		Update("quota", quota).Error
 }
