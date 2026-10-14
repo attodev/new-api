@@ -6,7 +6,7 @@
 
 team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 갈라진 뒤 628개의 fork 고유 커밋을 쌓았고, upstream은 같은 기간 705개 커밋으로 변환 계층(`relaykit`), 프런트엔드(`web/src`), 인증, 과금을 재편했다. 2026-10 동기화에서 확인한 대로 지금 구조에서는 upstream 수정을 매번 수동으로 번역해야 하고, 그 비용은 커지고 있다.
 
-이 설계는 방향을 뒤집는다. **upstream 최신(`qn/main` `63cecab82`, 2026-10-13)을 베이스로 새 브랜치를 만들고, 우리가 만든 기능을 그 위에 다시 얹는다.** Toss 결제 계열은 가져가지 않는다.
+이 설계는 방향을 뒤집는다. **upstream 최신(`qn/main` `7de10f2c6`, 2026-10-14; 설계 작성 시점에는 `63cecab82`였고 이후 커밋 3개가 더 들어왔다)을 베이스로 새 브랜치를 만들고, 우리가 만든 기능을 그 위에 다시 얹는다.** Toss 결제 계열은 가져가지 않는다.
 
 성공 기준:
 1. 새 브랜치가 upstream 전체 테스트와 우리 기능 테스트를 모두 통과한다.
@@ -27,7 +27,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 | O5 | 문의 메일(`POST /api/contact`), 관리자 테스트 메일, ContactEmail 옵션 | `controller/contact.go`, `controller/email.go`, `common/email.go` 일부 | 323 |
 | O6 | 모델/벤더 할인 계층(percent → multiplier, model > vendor), 가격 API·로그·설정 UI 노출 | `setting/ratio_setting/model_discount.go`, `relay/helper/price.go` 훅, `model/pricing.go`, usage-log 표시 | 102 + 훅 |
 | O7 | 요청 타이밍 분해(e2e/llm/gateway ms)와 로그 표시 | `middleware/request_timing.go`, `common/timing_response_writer.go`, `relay/common/relay_info.go` 필드, `service/log_info_generate.go` | 117 + 훅 |
-| O8 | 소형 설정: OIDC 이메일 도메인 화이트리스트(가입+로그인), OpenRouter 로그 vendor 이름 제거 옵션, 인터페이스 언어 en/ko 제한, 기본 첫 화면 콘솔, 가격 페이지 모델 상세 숨김, 정적 자산 rate limit 제외·캐시 헤더 | 각 수십 줄 | ~300 |
+| O8 | 소형 설정: OIDC 이메일 도메인 화이트리스트(가입+로그인), OpenRouter 로그 vendor 이름 제거 옵션, 인터페이스 언어 en/ko 제한, 기본 첫 화면 콘솔, 가격 페이지 모델 상세 숨김, 정적 자산 rate limit 제외·캐시 헤더 (단계 A 결과: 인터페이스 언어 제한은 단계 D로, 기본 첫 화면 콘솔은 team에서 되돌려져 제외, 64-bit 옵션 파싱은 no-op) | 각 수십 줄 | ~300 |
 | O9 | 한글화: 프런트 `ko` locale(4,795 키 중 4,489 재사용 + upstream 신규 2,778 키 번역), 백엔드 `ko.yaml`(upstream 키 67개), `README.kr.md` | `web/default/src/i18n/locales/kr.json` | — |
 | O10 | unode 진단 도구 | `tools/unode-diagnostics/` | 3,424(독립) |
 | O11 | fork 고유 수정 중 upstream에 없는 것: Epay 콜백 트랜잭션 정산 + "fail" 응답 재시도, PayPal·조직 지갑 충전 전 수용량 검증, Gemini 프롬프트 IMAGE/VIDEO/DOCUMENT 귀속과 캐시·오디오 캡, Ali `thinking_budget` either-name 규칙 | 2026-10 동기화 기록 두 건 | 소 |
@@ -53,16 +53,17 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 ## 4. 컴포넌트별 설계
 
 ### 4.1 베이스와 브랜치
-- 브랜치 `rebase/upstream-2026-10`를 `qn/main` `63cecab82`에서 만든다. `team`은 손대지 않고, 전환 시점에 `team-legacy-2026-10`로 이름을 바꿔 보존한다.
+- 브랜치 `rebase/upstream-2026-10`를 `qn/main` `7de10f2c6`에서 만든다. `team`은 손대지 않고, 전환 시점에 `team-legacy-2026-10`로 이름을 바꿔 보존한다.
 - `go.mod`는 upstream 것을 쓰고 fork 의존성(excelize, waffo-pancake-sdk는 upstream에도 있음, miniredis 테스트용)을 더한다. 모듈 경로는 upstream과 동일(`github.com/QuantumNous/new-api`)하게 유지한다(CLAUDE.md Rule 5).
 
 ### 4.2 O1 랜딩·가이드
-- 템플릿은 `web/templates/`, 정적 자산은 `web/public/landing/…`(upstream `web/public`이 SPA 자산 경로이므로 하위 디렉터리로 격리). `main.go`에 `//go:embed web/templates`와 `web/public` 추가, `router/web-router.go`에는 `registerLandingRoutes(router, templatesFS, publicFS)` 한 줄, 본문은 `router/landing-router.go`로 분리(현 team의 web-router.go +220줄을 그대로 옮긴다).
+- 템플릿은 `web/landing/templates/`, 정적 자산은 `web/landing/public/`(upstream `web/public`은 rsbuild가 dist로 복사해 209 MB를 이중 embed하므로 분리). `main.go`에 embed 2개, `router/web-router.go`에 `registerLandingRoutes`·`landingStatic` 훅 2줄, 본문은 `router/landing-router.go`. 로그인 표시는 upstream 세션 힌트 쿠키만 쓰며 사용자명·역할 배지와 로그아웃은 없앤다.
+- 실제 구현에서 페이지 4개는 명시 라우트가 아니라 NoRoute 체인의 `landingPages`(웹 rate limiter 뒤)와 `landingStatic`(앞)으로 서빙한다. 그래서 task 플러그인 디스패처가 우선권을 유지한다.
 - GTM/GA4 주입은 upstream의 `analyticsInject` placeholder 방식(`main.go:265`)과 충돌하지 않도록 랜딩 템플릿에만 둔다. SPA 쪽 GA4는 upstream 메커니즘으로 설정한다.
 
 ### 4.3 O2 PayPal
-- backend는 team 파일 그대로. `controller/topup.go`에 대한 의존(`getPayMoney`, `LockOrder`, `rejectInvalidTopUpQuota`)은 upstream에도 같은 이름으로 존재함을 확인했다. 조직 target은 O3에서 추가되는 `TopUp.TargetType`을 쓴다.
-- 프런트: upstream `features/wallet`에 `hooks/use-paypal-payment.ts`, `recharge-form-card`의 provider 분기, settings의 PayPal 섹션을 추가(team의 해당 조각을 경로만 바꿔 이식).
+- backend는 team 파일 그대로. `controller/topup.go`에 대한 의존(`rejectInvalidCreditedQuota`, `LockOrder`, `UnlockOrder`)은 upstream에도 같은 이름으로 존재함을 확인했다. `TopUp.ProviderOrderId` 컬럼을 추가한다(`// fork: O2`). 조직 target은 O3에서 추가되는 `TopUp.TargetType`을 쓴다.
+- 프런트: upstream `features/wallet`에 `hooks/use-payment.ts`의 PayPal 분기, `recharge-form-card`의 provider 분기, settings의 PayPal 섹션을 추가(team의 해당 조각을 경로만 바꿔 이식).
 
 ### 4.4 O3 조직 관리
 - 데이터: `organizations`, `organization_subscription_plans`, `organization_user_subscriptions`, `organization_subscription_pre_consume_records` 테이블(team 모델 그대로), `users.organization_id`/`organization_role` 컬럼, `topups.target_type`/`target_id`.
@@ -72,6 +73,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 ### 4.5 O4·O5·O10
 - 파일 복사 + 라우트 등록 한 줄. excelize 의존성 추가. 테스트 동반.
+- 가져오기는 어떤 호출자에게도 관리자·root 계정을 만들지 않고, 행은 `common.Validate.Struct`로 검증한다. 내보내기·가져오기 오류는 UI에 표시한다.
 
 ### 4.6 O6 할인 계층
 - 설정 저장(`ModelDiscount`/`VendorDiscount` 옵션, JSON map)과 `HandleGroupRatio`의 multiplier 적용은 team 코드를 그대로 쓴다(upstream `relay/helper/price.go`에 같은 함수가 있고 `GroupRatioInfo`도 유지됨).
