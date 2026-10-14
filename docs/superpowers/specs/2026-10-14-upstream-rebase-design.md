@@ -37,7 +37,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 - **Toss 결제 전부**: 일반 충전, 정기결제·빌링키(`UserBillingKey`), webhook·reconciliation, 지갑 자동충전(임계값/정기, 프리셋)과 그 cron, 조직 지갑의 Toss 라우트, `web/classic`의 Toss 패리티. backend 23파일 27,087 LOC, 프런트 21파일.
 - **`web/classic` 테마**: upstream이 삭제했다. classic 사용자가 있으면 이 설계는 보류한다(§8 결정 사항).
-- **우리 quota 상한 설계(`common.MaxQuota`=5e14, 요청 단위 bigint)**: upstream 설계(요청 단위 int32 포화 + 지갑 도메인 2^53, `ensureUserQuotaColumns`)를 채택한다. DB 컬럼은 이미 bigint라 호환된다.
+- **우리 quota 상한 구현의 코드 형태**(`common.MaxQuota`=5e14 상수, 자체 saturating 변환): upstream이 같은 문제를 64-bit 지갑 도메인으로 풀었으므로(`MaxWalletQuota`=2^53-1, 기본 단가 기준 약 180억 달러; 기동 시 `ensureUserQuotaColumns`가 bigint 컬럼을 요구) 그 구현을 쓴다. **큰 잔액을 저장·충전·표시하는 능력은 유지되고 상한은 오히려 올라간다.** 우리 DB 컬럼은 이미 bigint라 그대로 통과한다. 단일 요청 과금의 int32 포화는 양쪽 모두 같다. 이 변경의 나머지 조각은 overlay로 가져간다: 조직 쿼터 상한(`MaxOrganizationQuota`, O3), 프런트 큰 수 약어 표기(O8; upstream `currency.ts`는 `k` 단위만 있어 10억 단위 표기 확인 필요), 옵션 값의 64-bit 파싱(O8). 패리티 검증에 "2^31 이상 잔액을 관리자 수정·충전·환급 코드·조직 지갑·내보내기/가져오기·화면 표시에서 MySQL과 PostgreSQL 모두 확인"을 둔다(§7).
 - **2026-10 동기화에서 포팅한 upstream 커밋 34건과 2-A 중 upstream에 이미 있는 것**(Claude 5.x thinking 표, 충전 가드의 upstream 부분 등): 베이스에 포함되므로 재적용하지 않는다.
 - **web/classic 관련 백엔드 분기**(`theme` 설정의 classic 옵션): upstream 상태를 따른다.
 
@@ -112,7 +112,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 1. 베이스 브랜치에서 upstream 테스트 전부 통과(기준선 기록).
 2. overlay마다 team 테스트 이식 + 통과. 과금 overlay(O3, O6, O11)는 SQLite 외에 MySQL/PostgreSQL 컨테이너에서도 1회 실행.
 3. 프런트: `bun run typecheck`, `bun test`, `bun run build`; 조직 e2e(playwright, team `web/default/e2e`)를 새 UI에 맞춰 이식.
-4. 패리티 체크리스트: `docs/manuals/organization-*.md`, `docs/discount/admin-guide.md`, 랜딩 릴리스 체크리스트(`docs/landing-release-checklist.md`)를 수동 시나리오로 실행.
+4. 패리티 체크리스트: `docs/manuals/organization-*.md`, `docs/discount/admin-guide.md`, 랜딩 릴리스 체크리스트(`docs/landing-release-checklist.md`)를 수동 시나리오로 실행. 큰 잔액 시나리오(2^31 초과, 예: 50억 quota)를 관리자 사용자 수정·조직 쿼터 수정·충전 정산·환급 코드·내보내기/가져오기·대시보드 표시에서 MySQL과 PostgreSQL 각각 확인한다(`docs/quota-ceiling-and-bigint-migration.md` §2.1의 원래 증상이 재발하지 않아야 한다).
 5. 스키마 리허설(§5).
 6. 전환 전 1주 스테이징 운영(실 트래픽 미러 또는 내부 사용).
 
