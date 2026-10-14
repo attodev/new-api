@@ -132,6 +132,7 @@
     "access token not found": "Không tìm thấy token truy cập",
     "#1 Model": "#1 Mô hình",
     "% off": "% giảm giá",
+    "{{percent}}% off": "giảm {{percent}}%",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`, `-nothinking` và các hậu tố mức suy luận như `-high` khi định tuyến đến biến thể Gemini đúng. Khi tắt, tên mô hình được gửi nguyên vẹn lên upstream.",
     "© 2025 Your Company. All rights reserved.": "© 2025 Công ty của bạn. Mọi quyền được bảo lưu.",
     "+{{count}} more": "thêm {{count}} mục",

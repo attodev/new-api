@@ -24,6 +24,7 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { useBillingTime } from '../hooks/use-billing-time'
+import { withDiscount } from '../lib/discount-color' // fork: O6
 import {
   getDynamicDisplayGroupRatio,
   getDynamicPriceUnitLabelKey,
@@ -34,6 +35,7 @@ import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskUsageUnitLabel } from '../lib/task-price-display'
 import type { PricingModel, TokenUnit } from '../types'
+import { DiscountBadge } from './discount-badge' // fork: O6
 
 export type ModelPriceCellOptions = {
   tokenUnit?: TokenUnit
@@ -83,7 +85,7 @@ export function ModelPriceCell(props: {
       currency,
     ]
   )
-  let metrics: Array<{ label: string; value: string }>
+  let metrics: Array<{ label: string; value: string; original?: string }> // fork: O6 original
   const providerCaption = dynamic?.providerCount
     ? t('{{count}} providers', { count: dynamic.providerCount })
     : ''
@@ -191,28 +193,36 @@ export function ModelPriceCell(props: {
       metrics = [
         {
           label: t('Input'),
-          value: formatPrice(
-            props.model,
-            'input',
-            tokenUnit,
-            options.showRechargePrice,
-            options.priceRate,
-            options.usdExchangeRate,
-            options.selectedGroup,
-            false
+          // fork: O6
+          ...withDiscount(props.model.discount_percent, (discountPercent) =>
+            formatPrice(
+              props.model,
+              'input',
+              tokenUnit,
+              options.showRechargePrice,
+              options.priceRate,
+              options.usdExchangeRate,
+              options.selectedGroup,
+              false,
+              discountPercent
+            )
           ),
         },
         {
           label: t('Output'),
-          value: formatPrice(
-            props.model,
-            'output',
-            tokenUnit,
-            options.showRechargePrice,
-            options.priceRate,
-            options.usdExchangeRate,
-            options.selectedGroup,
-            false
+          // fork: O6
+          ...withDiscount(props.model.discount_percent, (discountPercent) =>
+            formatPrice(
+              props.model,
+              'output',
+              tokenUnit,
+              options.showRechargePrice,
+              options.priceRate,
+              options.usdExchangeRate,
+              options.selectedGroup,
+              false,
+              discountPercent
+            )
           ),
         },
       ]
@@ -220,13 +230,17 @@ export function ModelPriceCell(props: {
       metrics = [
         {
           label: t('Per-request'),
-          value: formatRequestPrice(
-            props.model,
-            options.showRechargePrice,
-            options.priceRate,
-            options.usdExchangeRate,
-            options.selectedGroup,
-            false
+          // fork: O6
+          ...withDiscount(props.model.discount_percent, (discountPercent) =>
+            formatRequestPrice(
+              props.model,
+              options.showRechargePrice,
+              options.priceRate,
+              options.usdExchangeRate,
+              options.selectedGroup,
+              false,
+              discountPercent
+            )
           ),
         },
       ]
@@ -253,6 +267,12 @@ export function ModelPriceCell(props: {
               className='min-w-0 font-mono text-sm break-words whitespace-normal tabular-nums'
               title={metric.value}
             >
+              {/* fork: O6 */}
+              {metric.original && (
+                <s className='text-muted-foreground/60 mr-1'>
+                  {metric.original}
+                </s>
+              )}
               {metric.value}
             </span>
           </span>
@@ -264,6 +284,8 @@ export function ModelPriceCell(props: {
       >
         {caption}
       </span>
+      {/* fork: O6 */}
+      <DiscountBadge percent={props.model.discount_percent} />
     </span>
   )
 }

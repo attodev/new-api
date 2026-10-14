@@ -39,6 +39,7 @@ import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskPriceLabel, taskUsageUnitLabel } from '../lib/task-price-display'
 import type { PricingModel, PriceType, TokenUnit } from '../types'
+import { DiscountBadge, DiscountedPrice } from './discount-badge' // fork: O6
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
 
@@ -226,15 +227,22 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <div key={price.type} className='flex min-w-0 flex-col gap-1'>
         <span className='text-muted-foreground text-xs'>{price.label}</span>
         <span className='font-mono text-sm font-semibold tabular-nums'>
-          {formatPrice(
-            props.model,
-            price.type,
-            tokenUnit,
-            showRechargePrice,
-            priceRate,
-            usdExchangeRate,
-            props.selectedGroup
-          )}
+          <DiscountedPrice
+            percent={props.model.discount_percent} // fork: O6
+            format={(discountPercent) =>
+              formatPrice(
+                props.model,
+                price.type,
+                tokenUnit,
+                showRechargePrice,
+                priceRate,
+                usdExchangeRate,
+                props.selectedGroup,
+                true,
+                discountPercent
+              )
+            }
+          />
           <span className='text-muted-foreground text-xs font-normal'>
             {' '}
             / {tokenUnitLabel}
@@ -246,13 +254,20 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     priceSummary = (
       <div className='col-span-full flex min-w-0 flex-col gap-1'>
         <span className='font-mono text-sm font-semibold tabular-nums'>
-          {formatRequestPrice(
-            props.model,
-            showRechargePrice,
-            priceRate,
-            usdExchangeRate,
-            props.selectedGroup
-          )}
+          <DiscountedPrice
+            percent={props.model.discount_percent} // fork: O6
+            format={(discountPercent) =>
+              formatRequestPrice(
+                props.model,
+                showRechargePrice,
+                priceRate,
+                usdExchangeRate,
+                props.selectedGroup,
+                true,
+                discountPercent
+              )
+            }
+          />
           <span className='text-muted-foreground text-xs font-normal'>
             {' '}
             / {t('request')}
@@ -327,6 +342,8 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           className='mt-auto flex min-w-0 flex-col gap-1.5'
         >
           <ModelBillingModeBadge model={props.model} appearance='caption' />
+          {/* fork: O6 */}
+          <DiscountBadge percent={props.model.discount_percent} />
           {dynamicSummary?.providerCount && (
             <span className='text-muted-foreground text-xs break-words'>
               {t('{{count}} providers', {

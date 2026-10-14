@@ -25,6 +25,7 @@ export type PricingVendor = {
   name: string
   icon?: string
   description?: string
+  discount_percent?: number // fork: O6 vendor discount percent (0-100)
 }
 
 export type BillingUsageUnit = 'second' | 'count' | 'token' | 'credit'
@@ -89,6 +90,7 @@ export type PricingModel = {
   billing_usage_examples?: BillingUsageExample[]
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
+  discount_percent?: number // fork: O6 effective discount percent (model beats vendor)
   /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.

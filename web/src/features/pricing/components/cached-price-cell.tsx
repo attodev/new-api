@@ -136,7 +136,9 @@ export function CachedPriceCell(props: {
       showRechargePrice,
       priceRate,
       usdExchangeRate,
-      selectedGroup
+      selectedGroup,
+      true,
+      model.discount_percent // fork: O6
     )
   )
 

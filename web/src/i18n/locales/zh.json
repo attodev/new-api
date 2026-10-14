@@ -132,6 +132,7 @@
     "access token not found": "未找到访问令牌",
     "#1 Model": "#1 模型",
     "% off": "折",
+    "{{percent}}% off": "优惠 {{percent}}%",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`、`-nothinking` 以及 `-high` 等推理强度后缀，同时路由到正确的 Gemini 变体。关闭后模型名原样发送给上游。",
     "© 2025 Your Company. All rights reserved.": "© 2025 您的公司。保留所有权利。",
     "+{{count}} more": "还有 {{count}} 项",

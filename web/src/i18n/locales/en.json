@@ -132,6 +132,7 @@
     "access token not found": "access token not found",
     "#1 Model": "#1 Model",
     "% off": "% off",
+    "{{percent}}% off": "{{percent}}% off",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.",
     "© 2025 Your Company. All rights reserved.": "© 2025 Your Company. All rights reserved.",
     "+{{count}} more": "+{{count}} more",

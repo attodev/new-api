@@ -40,6 +40,7 @@ import {
 import { hasTaskUsageSchema } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import type { PricingModel, PricingVendor } from '../types'
+import { DiscountBadge } from './discount-badge' // fork: O6
 
 type FilterOption = {
   value: string
@@ -47,6 +48,7 @@ type FilterOption = {
   count?: number
   suffix?: string
   icon?: ReactNode
+  discountPercent?: number // fork: O6 vendor discount badge
 }
 
 type FilterSectionProps = {
@@ -104,6 +106,8 @@ function FilterChip(props: {
         <span className='shrink-0'>{props.option.icon}</span>
       )}
       <span className='truncate'>{props.option.label}</span>
+      {/* fork: O6 */}
+      <DiscountBadge percent={props.option.discountPercent} />
       {(props.option.suffix || props.option.count != null) && (
         <span
           className={cn(
@@ -197,6 +201,7 @@ export const PricingSidebar = memo(function PricingSidebar(
         label: vendor.name,
         count: counts.vendors.get(vendor.name) ?? 0,
         icon: vendor.icon ? getLobeIcon(vendor.icon, 14) : undefined,
+        discountPercent: vendor.discount_percent, // fork: O6
       }))
       .filter((vendor) => vendor.count > 0),
   ]

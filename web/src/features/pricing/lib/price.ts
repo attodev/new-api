@@ -149,7 +149,8 @@ export function formatPrice(
   priceRate = 1,
   usdExchangeRate = 1,
   selectedGroup?: string,
-  showCurrencySymbol = true
+  showCurrencySymbol = true,
+  discountPercent = 0 // fork: O6
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -164,6 +165,7 @@ export function formatPrice(
     priceRate,
     usdExchangeRate
   )
+  priceInUSD *= 1 - discountPercent / 100 // fork: O6
 
   const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
   return formatBillingCurrencyFromUSD(price, {
@@ -185,7 +187,8 @@ export function formatGroupPrice(
   showWithRecharge = false,
   priceRate = 1,
   usdExchangeRate = 1,
-  groupRatio: Record<string, number>
+  groupRatio: Record<string, number>,
+  discountPercent = 0 // fork: O6
 ): string {
   if (model.quota_type === QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -200,6 +203,7 @@ export function formatGroupPrice(
     priceRate,
     usdExchangeRate
   )
+  priceInUSD *= 1 - discountPercent / 100 // fork: O6
 
   const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
   return formatBillingCurrencyFromUSD(price, {
@@ -218,7 +222,8 @@ export function formatFixedPrice(
   showWithRecharge = false,
   priceRate = 1,
   usdExchangeRate = 1,
-  groupRatio: Record<string, number>
+  groupRatio: Record<string, number>,
+  discountPercent = 0 // fork: O6
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -233,6 +238,7 @@ export function formatFixedPrice(
     priceRate,
     usdExchangeRate
   )
+  priceInUSD *= 1 - discountPercent / 100 // fork: O6
 
   return formatBillingCurrencyFromUSD(priceInUSD, {
     digitsLarge: 4,
@@ -250,7 +256,8 @@ export function formatRequestPrice(
   priceRate = 1,
   usdExchangeRate = 1,
   selectedGroup?: string,
-  showCurrencySymbol = true
+  showCurrencySymbol = true,
+  discountPercent = 0 // fork: O6
 ): string {
   if (model.quota_type !== QUOTA_TYPE_VALUES.REQUEST) {
     return '-'
@@ -266,6 +273,7 @@ export function formatRequestPrice(
     priceRate,
     usdExchangeRate
   )
+  priceInUSD *= 1 - discountPercent / 100 // fork: O6
 
   return formatBillingCurrencyFromUSD(priceInUSD, {
     showSymbol: showCurrencySymbol,

@@ -132,6 +132,7 @@
     "access token not found": "Jeton d’accès introuvable",
     "#1 Model": "#1 Modèle",
     "% off": "% de réduction",
+    "{{percent}}% off": "{{percent}} % de réduction",
     "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.": "`, `-nothinking` et les suffixes d’effort tels que `-high` lors du routage vers la variante Gemini correcte. Désactivé, les noms de modèle sont envoyés en amont tels quels.",
     "© 2025 Your Company. All rights reserved.": "© 2025 Votre entreprise. Tous droits réservés.",
     "+{{count}} more": "+{{count}} de plus",

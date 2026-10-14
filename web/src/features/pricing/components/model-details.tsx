@@ -100,6 +100,7 @@ import type {
   PricingModel,
   TokenUnit,
 } from '../types'
+import { DiscountBadge } from './discount-badge' // fork: O6
 import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
@@ -623,6 +624,8 @@ function ModelHeader(props: { model: PricingModel }) {
         )}
         <span className='text-muted-foreground/30'>·</span>
         <ModelBillingModeBadge model={model} />
+        {/* fork: O6 */}
+        <DiscountBadge percent={model.discount_percent} />
       </div>
       {description && (
         <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
@@ -854,7 +857,8 @@ function PriceSection(props: {
               props.showRechargePrice,
               props.priceRate,
               props.usdExchangeRate,
-              baseGroupRatioMap
+              baseGroupRatioMap,
+              props.model.discount_percent // fork: O6
             )}
           </span>
         </div>
@@ -873,7 +877,8 @@ function PriceSection(props: {
         props.showRechargePrice,
         props.priceRate,
         props.usdExchangeRate,
-        baseGroupRatioMap
+        baseGroupRatioMap,
+        props.model.discount_percent // fork: O6
       )}
       <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
         / {tokenUnitLabel}
@@ -1361,7 +1366,8 @@ function ProviderGroupPricingSection(
       showRechargePrice,
       props.priceRate,
       props.usdExchangeRate,
-      props.groupRatio
+      props.groupRatio,
+      props.model.discount_percent // fork: O6
     )
   const renderFixedGroupPrice = (group: string) =>
     formatFixedPrice(
@@ -1370,7 +1376,8 @@ function ProviderGroupPricingSection(
       showRechargePrice,
       props.priceRate,
       props.usdExchangeRate,
-      props.groupRatio
+      props.groupRatio,
+      props.model.discount_percent // fork: O6
     )
 
   return (
