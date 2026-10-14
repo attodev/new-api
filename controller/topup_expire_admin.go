@@ -16,16 +16,20 @@ type adminExpirePendingTopUpsRequest struct {
 	UserId int `json:"user_id"`
 }
 
-// AdminExpirePendingTopUps (POST /api/user/topup/expire, admin) marks pending
-// personal top-up and subscription orders older than an hour expired — for
-// body user_id, or for every user when the body or user_id is omitted — so an
-// abandoned checkout no longer refuses the user's organization join. Younger
+// AdminExpirePendingTopUps (POST /api/user/topup/expire, admin) marks the
+// body user_id's pending personal top-up and subscription orders older than a
+// day expired, so an abandoned checkout no longer refuses the user's
+// organization join. user_id is required: there is no all-users sweep. Younger
 // orders are counted in skipped_recent / skipped_recent_subscriptions;
 // organization top-ups are never touched.
 func AdminExpirePendingTopUps(c *gin.Context) {
 	var req adminExpirePendingTopUpsRequest
 	if err := common.DecodeJson(c.Request.Body, &req); (err != nil && !errors.Is(err, io.EOF)) || req.UserId < 0 {
-		common.ApiErrorT(c, "Invalid parameters") // an empty body means every user
+		common.ApiErrorT(c, "Invalid parameters")
+		return
+	}
+	if req.UserId == 0 {
+		common.ApiErrorT(c, "user_id is required")
 		return
 	}
 
@@ -34,13 +38,9 @@ func AdminExpirePendingTopUps(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	scope := "all users"
-	if req.UserId > 0 {
-		scope = fmt.Sprintf("user %d", req.UserId)
-	}
 	model.RecordOperationAuditLog(c.GetInt("id"), c.GetInt("role"),
-		fmt.Sprintf("Expired %d pending personal top-up orders and %d pending subscription orders of %s (%d and %d recent orders kept)",
-			result.ExpiredTopUps, result.ExpiredSubscriptions, scope, result.SkippedRecentTopUps, result.SkippedRecentSubscriptions),
+		fmt.Sprintf("Expired %d pending personal top-up orders and %d pending subscription orders of user %d (%d and %d recent orders kept)",
+			result.ExpiredTopUps, result.ExpiredSubscriptions, req.UserId, result.SkippedRecentTopUps, result.SkippedRecentSubscriptions),
 		c.ClientIP(), "topup.expire",
 		map[string]any{
 			"user_id":                      req.UserId,

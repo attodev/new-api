@@ -28,6 +28,8 @@ var forkMessageSources = []string{
 	"setting/ratio_setting/model_discount.go",
 	"model/log_organization.go",
 	"model/topup_paypal.go",
+	"controller/topup_expire_admin.go",
+	"model/topup_expire_fork.go",
 }
 
 // forkMessageConstants are message keys the fork files pass to NewMessage as

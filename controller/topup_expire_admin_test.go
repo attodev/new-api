@@ -56,19 +56,21 @@ func TestAdminExpiresAbandonedPersonalTopUpsThenUserCanJoinOrganization(t *testi
 	}
 	payer := mkUser("payer")
 	other := mkUser("other")
+	// A Stripe checkout session stays payable for 24 hours, so only orders
+	// older than a day are abandoned; a two-hour-old one may still be paid.
+	dayAgo := common.GetTimestamp() - 25*3600
 	twoHoursAgo := common.GetTimestamp() - 2*3600
-	tenMinutesAgo := common.GetTimestamp() - 10*60
 
-	old := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusPending, "personal-old", twoHoursAgo)
-	recent := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusPending, "personal-recent", tenMinutesAgo)
+	old := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusPending, "personal-old", dayAgo)
+	recent := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusPending, "personal-recent", twoHoursAgo)
 	// a legacy row with an empty target type is personal too
 	require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", recent.Id).Update("target_type", "").Error)
-	orgOrder := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-old", twoHoursAgo)
-	settled := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusSuccess, "personal-settled", twoHoursAgo)
-	otherOld := seedOrganizationTopUp(t, other.Id, model.TopUpTargetTypeUser, other.Id, common.TopUpStatusPending, "other-old", twoHoursAgo)
-	subOld := seedSubscriptionOrder(t, payer.Id, "sub-old", twoHoursAgo)
-	subRecent := seedSubscriptionOrder(t, payer.Id, "sub-recent", tenMinutesAgo)
-	otherSubOld := seedSubscriptionOrder(t, other.Id, "other-sub-old", twoHoursAgo)
+	orgOrder := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-old", dayAgo)
+	settled := seedOrganizationTopUp(t, payer.Id, model.TopUpTargetTypeUser, payer.Id, common.TopUpStatusSuccess, "personal-settled", dayAgo)
+	otherOld := seedOrganizationTopUp(t, other.Id, model.TopUpTargetTypeUser, other.Id, common.TopUpStatusPending, "other-old", dayAgo)
+	subOld := seedSubscriptionOrder(t, payer.Id, "sub-old", dayAgo)
+	subRecent := seedSubscriptionOrder(t, payer.Id, "sub-recent", twoHoursAgo)
+	otherSubOld := seedSubscriptionOrder(t, other.Id, "other-sub-old", dayAgo)
 
 	payload := expirePersonalTopUpsAsAdmin(t, fmt.Sprintf(`{"user_id": %d}`, payer.Id))
 	require.Equal(t, model.PersonalOrderExpiry{ExpiredTopUps: 1, SkippedRecentTopUps: 1, ExpiredSubscriptions: 1, SkippedRecentSubscriptions: 1}, payload)
@@ -89,20 +91,20 @@ func TestAdminExpiresAbandonedPersonalTopUpsThenUserCanJoinOrganization(t *testi
 	requireOrgSecurityAuditParam(t, audits[0], "expired_subscriptions", "1")
 	requireOrgSecurityAuditParam(t, audits[0], "skipped_recent_subscriptions", "1")
 
-	// The ten-minute-old orders may still be in checkout: they keep refusing the join.
+	// The two-hour-old orders may still be in checkout: they keep refusing the join.
 	res := orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(payer.Id))
 	requireOrgSecurityResult(t, res, false, orgAssignPersonalBalanceMessage)
 
 	// Once the recent top-up is abandoned too, the recent subscription order
 	// alone still refuses the join.
-	require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", recent.Id).Update("create_time", twoHoursAgo).Error)
+	require.NoError(t, f.db.Model(&model.TopUp{}).Where("id = ?", recent.Id).Update("create_time", dayAgo).Error)
 	payload = expirePersonalTopUpsAsAdmin(t, fmt.Sprintf(`{"user_id": %d}`, payer.Id))
 	require.Equal(t, model.PersonalOrderExpiry{ExpiredTopUps: 1, SkippedRecentSubscriptions: 1}, payload)
 	res = orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(payer.Id))
 	requireOrgSecurityResult(t, res, false, orgAssignPersonalBalanceMessage)
 
 	// Once it is abandoned too, a third expiry clears the way.
-	require.NoError(t, f.db.Model(&model.SubscriptionOrder{}).Where("id = ?", subRecent.Id).Update("create_time", twoHoursAgo).Error)
+	require.NoError(t, f.db.Model(&model.SubscriptionOrder{}).Where("id = ?", subRecent.Id).Update("create_time", dayAgo).Error)
 	payload = expirePersonalTopUpsAsAdmin(t, fmt.Sprintf(`{"user_id": %d}`, payer.Id))
 	require.Equal(t, model.PersonalOrderExpiry{ExpiredSubscriptions: 1}, payload)
 	res = orgSecurityRequest(AssignOrganizationUser, f.admin, http.MethodPut, "/", `{"organization_role":"member"}`, orgSecurityIdParam(payer.Id))
@@ -111,13 +113,35 @@ func TestAdminExpiresAbandonedPersonalTopUpsThenUserCanJoinOrganization(t *testi
 	require.NoError(t, err)
 	require.Equal(t, f.org.Id, orgId)
 	requireTopUpStatuses(t, map[int]string{orgOrder.Id: common.TopUpStatusPending, otherOld.Id: common.TopUpStatusPending})
+	requireSubscriptionOrderStatuses(t, map[int]string{otherSubOld.Id: common.TopUpStatusPending})
+}
 
-	// Without user_id every user's abandoned personal order is expired; the
-	// organization order is still untouched.
-	payload = expirePersonalTopUpsAsAdmin(t, "")
-	require.Equal(t, model.PersonalOrderExpiry{ExpiredTopUps: 1, ExpiredSubscriptions: 1}, payload)
-	requireTopUpStatuses(t, map[int]string{orgOrder.Id: common.TopUpStatusPending, otherOld.Id: common.TopUpStatusExpired})
-	requireSubscriptionOrderStatuses(t, map[int]string{otherSubOld.Id: common.TopUpStatusExpired})
+// There is no all-users sweep: an admin who forgets the body must not expire
+// every user's open checkout.
+func TestAdminExpirePendingTopUpsRequiresUserId(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	admin := model.User{Id: 9998, Role: common.RoleAdminUser}
+	dayAgo := common.GetTimestamp() - 25*3600
+	order := seedOrganizationTopUp(t, f.member.Id, model.TopUpTargetTypeUser, f.member.Id, common.TopUpStatusPending, "personal-abandoned", dayAgo)
+	subscription := seedSubscriptionOrder(t, f.member.Id, "sub-abandoned", dayAgo)
+
+	for _, body := range []string{``, `{}`, `{"user_id": 0}`} {
+		res := orgSecurityRequest(AdminExpirePendingTopUps, admin, http.MethodPost, "/api/user/topup/expire", body)
+		requireOrgSecurityResult(t, res, false, "user_id is required")
+		require.Contains(t, res.Body.String(), `"message_key":"user_id is required"`, body)
+	}
+	requireTopUpStatuses(t, map[int]string{order.Id: common.TopUpStatusPending})
+	requireSubscriptionOrderStatuses(t, map[int]string{subscription.Id: common.TopUpStatusPending})
+
+	var audits int64
+	require.NoError(t, f.db.Model(&model.AuditLog{}).Where("action = ?", "topup.expire").Count(&audits).Error)
+	require.Zero(t, audits)
+
+	// The model refuses a missing user too, with a translatable message.
+	_, err := model.ExpirePendingPersonalTopUps(0)
+	var message *common.Message
+	require.ErrorAs(t, err, &message)
+	require.Equal(t, "Invalid user ID", message.Key)
 }
 
 func TestAdminExpirePendingTopUpsRejectsInvalidUserId(t *testing.T) {

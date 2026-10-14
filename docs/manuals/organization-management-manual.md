@@ -150,7 +150,7 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 
 구성원이 남아 있으면 `organization has N non-owner members, remove them first` 오류로 거부된다. 삭제되면 owner는 조직에서 빠지고 owner의 사용자 quota는 0이 된다.
 
-대기(pending) 중인 조직 충전 주문이 있어도 삭제가 거부된다. 결제창을 열고 떠난 주문은 전체 관리자가 API `POST /api/organizations/:id/topups/expire`로 만료시킨 뒤 삭제한다. 활성 조직에서는 만든 지 1시간이 지난 주문만 만료되고(응답의 `skipped_recent`가 남은 수), 비활성(`status=2`) 조직은 모두 만료된다. 만료된 주문은 뒤늦게 결제 완료 웹훅이 와도 적립되지 않으므로, 결제가 진행 중인지 provider에서 먼저 확인한다(`docs/openapi/organization-rest-api.md` §3.5). 화면 버튼은 없다.
+대기(pending) 중인 조직 충전 주문이 있어도 삭제가 거부된다. 결제창을 열고 떠난 주문은 전체 관리자가 API `POST /api/organizations/:id/topups/expire`로 만료시킨 뒤 삭제한다. 활성 조직에서는 만든 지 24시간이 지난 주문만 만료되고(Stripe 결제 세션이 24시간 동안 결제 가능하므로; 응답의 `skipped_recent`가 남은 수), 비활성(`status=2`) 조직은 나이와 관계없이 모두 만료된다(비활성화 전에 연 결제 창이 나중에 결제되면 그 돈은 적립되지 않으므로 수동 대사가 필요하다). 만료된 주문은 뒤늦게 결제 완료 웹훅이 와도 적립되지 않으므로, 결제가 진행 중인지 provider에서 먼저 확인한다(`docs/openapi/organization-rest-api.md` §3.5). 화면 버튼은 없다.
 
 ## 6. 조직 관리자/소유자로 사용자 추가하기
 

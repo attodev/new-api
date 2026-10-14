@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -11,10 +10,12 @@ import (
 // fork: O3 — admin expiry of abandoned personal orders.
 
 // personalTopUpExpireAge is the safety age below which a pending personal
-// order is kept: the user may still be in the provider checkout.
-const personalTopUpExpireAge = time.Hour
+// order is kept: the user may still be in the provider checkout. A Stripe
+// checkout session stays payable for 24 hours, and settlement only credits
+// pending orders, so expiring an order earlier could drop a real payment.
+const personalTopUpExpireAge = 24 * time.Hour
 
-var errPersonalTopUpExpireUser = errors.New("invalid user id")
+var errPersonalTopUpExpireUser = common.NewMessage("Invalid user ID")
 
 // PersonalOrderExpiry counts what ExpirePendingPersonalTopUps changed: expired
 // orders and pending orders kept because they are younger than
@@ -29,31 +30,25 @@ type PersonalOrderExpiry struct {
 // ExpirePendingPersonalTopUps marks the abandoned personal orders that
 // hasPendingPersonalOrderTx counts — pending top-ups for any target other than
 // an organization wallet, and pending subscription orders (always personal) —
-// expired when they are older than personalTopUpExpireAge, for one user or
-// for every user when userId is 0, in one transaction. Organization top-ups
+// expired when they are older than personalTopUpExpireAge, for one user
+// (userId > 0; there is no all-users sweep) in one transaction. Organization top-ups
 // are never touched (see ExpirePendingOrganizationTopUps). Such an order
 // otherwise refuses the user's organization join until it settles; settlement
 // only credits pending orders, so a late provider callback for an expired
 // order credits nothing. Subscription orders follow ExpireSubscriptionOrder:
 // status expired and complete_time set.
 func ExpirePendingPersonalTopUps(userId int) (result PersonalOrderExpiry, err error) {
-	if userId < 0 {
+	if userId <= 0 {
 		return PersonalOrderExpiry{}, errPersonalTopUpExpireUser
 	}
 	cutoff := time.Now().Add(-personalTopUpExpireAge).Unix()
 	err = DB.Transaction(func(tx *gorm.DB) error {
-		forUser := func(query *gorm.DB) *gorm.DB {
-			if userId > 0 {
-				return query.Where("user_id = ?", userId)
-			}
-			return query
-		}
 		pendingTopUps := func() *gorm.DB {
-			return forUser(tx.Model(&TopUp{}).Where("status = ? AND (target_type IS NULL OR target_type <> ?)",
-				common.TopUpStatusPending, TopUpTargetTypeOrganization))
+			return tx.Model(&TopUp{}).Where("user_id = ? AND status = ? AND (target_type IS NULL OR target_type <> ?)",
+				userId, common.TopUpStatusPending, TopUpTargetTypeOrganization)
 		}
 		pendingSubscriptions := func() *gorm.DB {
-			return forUser(tx.Model(&SubscriptionOrder{}).Where("status = ?", common.TopUpStatusPending))
+			return tx.Model(&SubscriptionOrder{}).Where("user_id = ? AND status = ?", userId, common.TopUpStatusPending)
 		}
 
 		topUps := pendingTopUps().Where("create_time < ?", cutoff).Update("status", common.TopUpStatusExpired)

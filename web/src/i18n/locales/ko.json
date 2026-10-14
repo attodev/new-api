@@ -7537,6 +7537,7 @@
     "Failed to send the test email": "테스트 이메일을 보내지 못했습니다",
     "Interface languages": "인터페이스 언어",
     "Languages offered in the language menu. The current language of a user stays available.": "언어 메뉴에 표시할 언어입니다. 사용자가 현재 사용 중인 언어는 계속 선택할 수 있습니다.",
-    "Select at least one language.": "언어를 하나 이상 선택하세요."
+    "Select at least one language.": "언어를 하나 이상 선택하세요.",
+    "user_id is required": "user_id는 필수입니다"
   }
 }

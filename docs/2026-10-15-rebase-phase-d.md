@@ -101,7 +101,7 @@
 
 - README: `README.kr.md`(359줄)는 upstream 신판 `README.md`를 절 단위로 옮겼다(team 구판의 같은 절 문장은 재사용; 링크·배지·코드 블록은 원문 그대로, "New API"/"QuantumNous" 출현 수 같음). 6개 README의 nav 14행에 한 줄씩(`<!-- fork: O9 -->`, `日本語` 앞).
 - 이월 1 — 벤더명 스냅숏 신선도(단계 C 최종 재리뷰 잔여): 스냅숏이 1분보다 오래되면 `resolveVendorName`이 비차단 재구축(`gopool.Go`, `TryLock`, 시도 창 1분)을 걸고 이전 스냅숏을 바로 돌려준다. 빈 맵 재구축은 이전 스냅숏을 지우지 않는다. 벤더 조회가 실패해 `VendorID`의 이름이 없으면 이전 스냅숏의 이름을 쓴다(수정 라운드).
-- 이월 2 — 버려진 개인 주문: 관리자 `POST /api/user/topup/expire`(body `{"user_id": n}` 선택, 없으면 전체). 1시간 지난 pending 개인 충전 주문과 pending 구독 주문(수정 라운드)을 만료하고 `{expired, skipped_recent, expired_subscriptions, skipped_recent_subscriptions}`를 돌려준다. 감사 `topup.expire`, 접근 토큰 `billing:write`. 라우트는 기존 `registerForkAdminUserRoutes` 훅(`router/api-router.go:157`)에 등록해 upstream 새 줄이 없다(ruling, §5). OpenAPI §3.6.
+- 이월 2 — 버려진 개인 주문: 관리자 `POST /api/user/topup/expire`(body `{"user_id": n}` 필수 — 최종 수정 I3에서 전체 사용자 기본값을 없앰). 24시간(최종 수정 I3, 처음은 1시간) 지난 pending 개인 충전 주문과 pending 구독 주문(수정 라운드)을 만료하고 `{expired, skipped_recent, expired_subscriptions, skipped_recent_subscriptions}`를 돌려준다. 감사 `topup.expire`, 접근 토큰 `billing:write`. 라우트는 기존 `registerForkAdminUserRoutes` 훅(`router/api-router.go:157`)에 등록해 upstream 새 줄이 없다(ruling, §5). OpenAPI §3.6.
 - 이월 3 — 모바일 카드 tokens/s가 `effectiveUseTimeSec`(`e2e_ms` 우선)으로 나눈다(`common-log-mobile-card.tsx:83, 204-205`).
 - 이월 4 — 모바일 카드 `showUserInfo` 조건에 `/* fork: O3 */` 표식(`:382`, 단계 C §5 테스트 공백).
 

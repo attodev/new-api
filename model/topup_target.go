@@ -150,16 +150,21 @@ func SearchOrganizationTopUps(organizationId int, keyword string, pageInfo *comm
 
 // organizationTopUpExpireAge is the safety age below which a pending order of
 // an enabled organization is kept: the owner may still be in the provider
-// checkout.
-const organizationTopUpExpireAge = time.Hour
+// checkout. A Stripe checkout session stays payable for 24 hours, and
+// settlement only credits pending orders, so expiring an order earlier could
+// drop a real payment.
+const organizationTopUpExpireAge = 24 * time.Hour
 
 // ExpirePendingOrganizationTopUps marks an organization's pending top-up
 // orders expired (root action for abandoned checkouts, which otherwise block
 // DeleteOrganizationClearingOwner). For an enabled organization only orders
 // older than organizationTopUpExpireAge are expired and the younger ones are
-// counted in skippedRecent; a disabled organization cannot be paid into, so
-// all of its pending orders are expired. Settlement only credits pending
-// orders, so a late provider callback for an expired order credits nothing.
+// counted in skippedRecent. For a disabled organization (root's explicit
+// wind-down) all of its pending orders are expired regardless of age: a
+// checkout opened before the organization was disabled may still be paid, and
+// that payment is then captured but credited nothing (manual reconciliation).
+// Settlement only credits pending orders, so a late provider callback for any
+// expired order credits nothing.
 func ExpirePendingOrganizationTopUps(organizationId int) (expired int64, skippedRecent int64, err error) {
 	if organizationId <= 0 {
 		return 0, 0, errOrganizationTopUpWithoutTarget

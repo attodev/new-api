@@ -178,7 +178,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 11. O8 인터페이스 언어 제한은 옵션 `InterfaceLanguages`(기본 `en,ko`)로 한다. 리소스는 모두 로드하고 메뉴만 거르며, 사용자의 현재 언어는 유지한다(§4.8).
 12. 백엔드 `ko.yaml`은 develop `en.yaml`의 66키 기준이다. fork 파일의 사용자 대상 오류만 message_key 경로로 옮기고, upstream 파일의 같은 패턴은 손대지 않는다. Excel 조직 가져오기의 행 오류(포맷 문자열)는 구조화된 행 오류가 필요해 영어로 남긴다.
 13. 용어: Quota = 쿼터, Reset = 초기화, Vendor = 공급업체(Provider = 제공자와 구분), Tier = 등급, Revoke = 폐기, sk- 자격 증명 Token = API 키(개인 액세스 토큰 = 액세스 토큰), Redemption code = 충전 코드, 문체는 합쇼체·명사형 라벨(`docs/translation-glossary.ko.md`).
-14. 버려진 개인 충전·구독 주문은 관리자 `POST /api/user/topup/expire`(1시간 지난 pending만, 감사 `topup.expire`)로 만료한다. 조직 주문 만료(`POST /api/organizations/:id/topups/expire`)와 분리한다.
+14. 버려진 개인 충전·구독 주문은 관리자 `POST /api/user/topup/expire`(`user_id` 필수 — 전체 사용자 만료 없음, 24시간 지난 pending만, 감사 `topup.expire`)로 만료한다. 조직 주문 만료(`POST /api/organizations/:id/topups/expire`)와 분리한다. 두 만료 모두 나이 기준은 24시간이다: Stripe 결제 세션이 24시간 동안 결제 가능하고 정산은 pending 주문만 적립하므로, 더 일찍 만료시키면 실제 결제가 적립되지 않을 수 있다(단계 D 최종 수정, 처음 결정은 1시간). 비활성 조직의 전체 만료는 root의 명시적 정리로 유지하되, 비활성화 전에 연 결제가 나중에 결제되면 수동 대사가 필요하다.
 
 ## 10. 리스크
 

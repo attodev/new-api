@@ -108,7 +108,7 @@
 ### Task 10 — 소형 강화
 | # | 항목 | 내용 |
 |---|---|---|
-| 1 | M6 조직 충전 만료 | root 전용 `POST /api/organizations/:id/topups/expire`(새 fork 파일 `controller/organization_topup_admin.go`, casbin `organization:write`, 감사 `organization.topup.expire`). 활성 조직은 1시간 지난 pending 주문만 만료하고 나머지는 `skipped_recent`로 센다. 비활성 조직은 모두 만료. 라우트 수 38 → 39 |
+| 1 | M6 조직 충전 만료 | root 전용 `POST /api/organizations/:id/topups/expire`(새 fork 파일 `controller/organization_topup_admin.go`, casbin `organization:write`, 감사 `organization.topup.expire`). 활성 조직은 1시간 지난 pending 주문만 만료하고(단계 D 최종 수정에서 24시간으로 올림 — Stripe 세션 유효 기간) 나머지는 `skipped_recent`로 센다. 비활성 조직은 모두 만료. 라우트 수 38 → 39 |
 | 2 | M10 추천·출석 유입 | `controller/user.go:427-429`(`TransferAffQuota`), `controller/checkin.go:51-53`(`DoCheckin`)에서 조직 회원 거부 |
 | 3 | M7 WSS 조직 지갑 | `service/quota.go:145-147` — realtime 사전 검사가 세션에 고정한 과금 조직(`BillingOrganizationId`)의 지갑 잔액도 본다(새 fork 파일 `service/quota_organization.go`) |
 | 4 | LIKE 이스케이프 | 조직 사용자 검색 `keyword`의 `%`·`_`·`!`를 `ESCAPE '!'`로 문자 그대로 검색(`model/organization_keyword.go`) |
@@ -149,7 +149,7 @@
 - (최종 수정 I1) 벤더명 맵은 불변 스냅숏이다. 재구축은 지역 맵을 채운 뒤 한 번에 바꾸고, `InvalidatePricingCache`는 맵을 nil로 만들지 않는다. 대가: 스냅숏은 기동 시와 `GetPricing()`이 불릴 때(`/api/pricing`, `/api/rankings`, 모델 메타 목록)만 다시 만들어진다. relay 요청만 받는 노드에서는 그 뒤로 재구축이 일어나지 않으므로, 벤더 소속이 바뀌거나 새로 추가된 모델은 그 노드에서 다음 `GetPricing()` 호출까지 이전(또는 없는) 벤더 할인으로 청구된다. 최종 재리뷰가 지적한 잔여 항목으로, 스냅숏이 1분 넘게 오래되면 비차단 `go GetPricing()`(TryLock)으로 갱신하는 보완을 단계 D 후보로 둔다(§5). 첫 시작에 가격 재구축이 실패하면 1분 동안은 벤더 할인 없이 청구된다(음수 캐시, DB 장애 때 재구축 폭주 방지).
 - (최종 수정 I2) 결제 대기 중인 개인 충전·구독 주문이 있으면 조직 가입을 거부한다(정산은 가입 여부를 다시 보지 않으므로, 가입 전에 연 결제가 가입 뒤 끝나면 사용자 돈이 조직 한도가 된다). 대가: 결제사가 만료시키지 않는 버려진 주문(예: Epay 충전)은 만료될 때까지 가입을 막는다(§5; 단계 D 작업 11 이후 관리자 API로 만료).
 - (최종 수정 M2) 할인(100% 포함)은 `FreeModel`을 바꾸지 않는다. 무료 모델 판정은 할인 전 group ratio로 한다. 100% 할인 모델도 결제 세션을 거쳐 0을 예약하므로 정지된 회원·비활성 조직은 막히고, 로그에는 `discount_multiplier` 0이 남는다.
-- (Task 10) root가 만료시킨 "결제 완료됐지만 아직 pending인" 조직 주문은 뒤늦은 웹훅으로도 적립되지 않는다(upstream Stripe 만료와 같음). 1시간 나이 기준과 OpenAPI §3.5의 운영자 안내로 경합을 좁힌다. 대가: 만료 호출 중에 결제된 주문은 provider 환불로만 복구된다.
+- (Task 10) root가 만료시킨 "결제 완료됐지만 아직 pending인" 조직 주문은 뒤늦은 웹훅으로도 적립되지 않는다(upstream Stripe 만료와 같음). 1시간 나이 기준(단계 D 최종 수정에서 24시간)과 OpenAPI §3.5의 운영자 안내로 경합을 좁힌다. 대가: 만료 호출 중에 결제된 주문은 provider 환불로만 복구된다.
 
 이미 확정해 둔 사실(재확인):
 - 할인 조회 우선순위는 요청 모델 → 요청 모델의 벤더 → 과금 모델 → 과금 모델의 벤더이고, 처음 찾은 값 하나만 쓴다(0%도 값으로 친다).
@@ -157,7 +157,7 @@
 - `pre_llm_ms`/`post_llm_ms`는 admin 전용, hijack된 WSS 로그에는 타이밍 키가 없다.
 - `TimingResponseWriter.Unwrap()`이 write deadline 공백을 막는다. 같은 공백이 team에도 있다 — team으로 역이식할 버그다.
 - 결정 6·7은 Task 8·9로 구현됐다: 초대 흐름 없음, 정확 조회, quota·aff_quota·활성 구독·결제 대기 개인 주문(최종 수정 I2)이면 거부, 조직 범위 `organization_member_status`·`organization_remark`, 정지된 회원은 relay·MJ·`/api/organization/*`의 모든 비-GET에서 차단.
-- 조직 충전 만료 엔드포인트는 조직이 비활성이 아니면 1시간 나이 기준이 있다.
+- 조직 충전 만료 엔드포인트는 조직이 비활성이 아니면 1시간 나이 기준이 있다(단계 D 최종 수정에서 24시간).
 
 ## 5. 단계 D로 넘기는 것
 
@@ -171,7 +171,7 @@
 동작:
 - `doRequest`를 우회하는 어댑터(`DoWssRequest`, AWS Bedrock SDK, coze 완료 폴링, dify·replicate 업로드와 baidu 토큰 같은 보조 호출)는 `llm_ms`가 없거나 일부만 잡힌다(team과 같음). 보조 호출 시간은 `pre_llm_ms`에 들어간다.
 - root의 조직 생성은 owner를 잔액 검사 없이 배정한다(운영자 작업).
-- 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전)은 pending으로 남아 그 사용자의 조직 가입을 막는다(최종 수정 I2). 단계 D 작업 11에서 관리자 `POST /api/user/topup/expire`(1시간 지난 개인 충전 주문과 구독 주문 만료, `topup.expire` 감사)를 추가해 DB 직접 수정이 필요 없다(OpenAPI 3.6).
+- 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전)은 pending으로 남아 그 사용자의 조직 가입을 막는다(최종 수정 I2). 단계 D 작업 11에서 관리자 `POST /api/user/topup/expire`(사용자 한 명의 24시간 지난 개인 충전 주문과 구독 주문 만료 — 단계 D 최종 수정에서 1시간·전체 사용자 기본값을 고침, `topup.expire` 감사)를 추가해 DB 직접 수정이 필요 없다(OpenAPI 3.6).
 - 무료(가격·배율 또는 group ratio 0) 모델은 `EnableFreeModelPreConsume`이 꺼져 있으면 과금 세션을 거치지 않아 정지된 회원·비활성 조직도 막지 않는다. 100% 할인 모델은 더 이상 여기에 해당하지 않는다(최종 수정 M2). 남은 가장자리: tiered 모델의 자동 그룹 재시도가 무료 그룹에서 100% 할인된 유료 그룹으로 바뀌면 `service/tiered_settle.go`가 접힌 `snap.GroupRatio == 0`을 보고 세션을 만들지 않는다(upstream 파일, 드묾). 이미 열린 realtime WebSocket은 정지해도 바로 끊기지 않는다(연결 시작 때만 검사).
 - 단계 B 이전에 조직 관리자가 `users.remark`에 쓴 메모는 `organization_remark`로 옮기지 않았다(root도 쓴 컬럼이라 운영자 결정).
 - WSS 조직 지갑 검사는 읽고-청구하는 사전 검사(예약 없음)라 동시 realtime 세션은 조금 초과할 수 있다(upstream 사용자 잔액 검사와 같음). 레거시 MJ 사전 가드는 조직 지갑 `> 0`만 본다(M7).

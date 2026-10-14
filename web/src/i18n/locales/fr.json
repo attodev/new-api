@@ -7537,6 +7537,7 @@
     "Failed to send the test email": "Failed to send the test email",
     "Interface languages": "Interface languages",
     "Languages offered in the language menu. The current language of a user stays available.": "Languages offered in the language menu. The current language of a user stays available.",
-    "Select at least one language.": "Select at least one language."
+    "Select at least one language.": "Select at least one language.",
+    "user_id is required": "user_id is required"
   }
 }

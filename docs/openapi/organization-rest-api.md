@@ -1,7 +1,7 @@
 # 조직 관련 Backend REST API 명세
 
 작성일: 2026-06-15  
-최종 수정: 2026-10-15 (단계 D 작업 11: 대기 개인 충전·구독 주문 만료 API 3.6(관리자, `POST /api/user/topup/expire`). 이전 — 단계 C 작업 10: 대기 조직 충전 주문 만료 API 3.5(라우트 39개), 조직 회원의 추천 잔액 이체·출석 체크 거부, realtime 과금의 조직 지갑 검사, 회원 검색 keyword 리터럴 이스케이프, 가져오기 생성+배정 트랜잭션. 이전 — 단계 C 작업 8: `assignable-users` 목록을 `users/lookup` 정확 조회로 바꾸고 개인 잔액·구독이 있는 사용자의 할당 거부를 추가. 이전 — upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
+최종 수정: 2026-10-15 (단계 D 최종 수정: 3.5·3.6 만료 안전 기준을 24시간으로 올리고 3.6에 `user_id`를 필수로 함(전체 사용자 만료 없음). 이전 — 단계 D 작업 11: 대기 개인 충전·구독 주문 만료 API 3.6(관리자, `POST /api/user/topup/expire`). 이전 — 단계 C 작업 10: 대기 조직 충전 주문 만료 API 3.5(라우트 39개), 조직 회원의 추천 잔액 이체·출석 체크 거부, realtime 과금의 조직 지갑 검사, 회원 검색 keyword 리터럴 이스케이프, 가져오기 생성+배정 트랜잭션. 이전 — 단계 C 작업 8: `assignable-users` 목록을 `users/lookup` 정확 조회로 바꾸고 개인 잔액·구독이 있는 사용자의 할당 거부를 추가. 이전 — upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
 
 ## 1. 문서 범위
 
@@ -270,7 +270,7 @@ Path:
 처리 규칙:
 
 - 이 조직의 `target_type = organization`, `status = pending`인 충전 주문을 `status = expired`로 바꾼다(`model.ExpirePendingOrganizationTopUps`). `success`·`failed`·`expired` 주문과 다른 조직·개인 주문은 바뀌지 않는다.
-- 안전 기준: 활성 조직(`status = 1`)은 `create_time`이 1시간(`organizationTopUpExpireAge`)보다 오래된 pending 주문만 만료시킨다. 그보다 최근 주문은 소유자가 아직 결제 중일 수 있어 그대로 두고 `skipped_recent`로 센다(이 주문이 남아 있으면 조직 삭제는 계속 거부된다). 비활성 조직(`status = 2`)은 더 결제될 수 없으므로 나이와 관계없이 pending 주문을 모두 만료시킨다.
+- 안전 기준: 활성 조직(`status = 1`)은 `create_time`이 24시간(`organizationTopUpExpireAge`)보다 오래된 pending 주문만 만료시킨다. Stripe 결제 세션은 만든 뒤 24시간 동안 결제할 수 있으므로, 그보다 최근 주문은 소유자가 아직 결제 중일 수 있어 그대로 두고 `skipped_recent`로 센다(이 주문이 남아 있으면 조직 삭제는 계속 거부된다). 비활성 조직(`status = 2`)은 전체 관리자가 명시적으로 정리하는 경우로 보고 나이와 관계없이 pending 주문을 모두 만료시킨다. 비활성화 전에 연 결제 창은 여전히 결제될 수 있고, 그 결제는 provider에서 승인되지만 아무것도 적립되지 않는다(수동 대사 필요). 실행 전 provider 대시보드에서 진행 중인 결제가 없는지 확인한다.
 - 정산은 pending 주문만 적립하므로, 만료된 주문에 늦게 도착한 결제 콜백은 아무것도 적립하지 않는다. 실제로 결제된 주문을 만료시키면 그 금액은 provider 쪽에서 환불·수동 처리해야 한다. 실행 전 provider 대시보드에서 미결제를 확인한다.
 - 대기 주문이 없으면 `expired: 0`, `skipped_recent: 0`으로 성공한다.
 - 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
@@ -288,20 +288,20 @@ Path:
 
 관리자 전용이다(AdminAuth, upstream `POST /api/user/topup/complete` 옆 관리자 라우트 — `router/fork-router.go` `registerForkAdminUserRoutes`). 조직 라우트가 아니라 `/api/user` 아래에 있다.
 
-Body(선택):
+Body:
 
 | 이름 | 타입 | 필수 | 범위/값 | 설명 |
 | --- | --- | --- | --- | --- |
-| `user_id` | integer | 선택 | 0 이상 | 이 사용자의 주문만 만료시킨다. 없거나 0이면, 또는 body가 비어 있으면 모든 사용자 |
+| `user_id` | integer | 필수 | 양의 정수 | 이 사용자의 주문만 만료시킨다. 모든 사용자를 한 번에 만료시키는 방법은 없다 |
 
 처리 규칙:
 
-- 5.5의 가입 거부가 세는 개인 주문을 만료시킨다(`model.ExpirePendingPersonalTopUps`, 한 트랜잭션): `status = pending`이면서 `target_type`이 `organization`이 아닌(NULL·빈 값·`user`) 충전 주문(`top_ups`)과 `status = pending`인 구독 주문(`subscription_orders`, 항상 개인). 이 중 `create_time`이 1시간(`personalTopUpExpireAge`)보다 오래된 것을 `status = expired`로 바꾼다(구독 주문은 upstream `ExpireSubscriptionOrder`처럼 `complete_time`도 기록). 1시간이 안 된 pending 주문은 사용자가 아직 결제 중일 수 있어 그대로 두고 충전은 `skipped_recent`, 구독은 `skipped_recent_subscriptions`로 센다.
+- 5.5의 가입 거부가 세는 개인 주문을 만료시킨다(`model.ExpirePendingPersonalTopUps`, 한 트랜잭션): `status = pending`이면서 `target_type`이 `organization`이 아닌(NULL·빈 값·`user`) 충전 주문(`top_ups`)과 `status = pending`인 구독 주문(`subscription_orders`, 항상 개인). 이 중 `create_time`이 24시간(`personalTopUpExpireAge`)보다 오래된 것을 `status = expired`로 바꾼다(구독 주문은 upstream `ExpireSubscriptionOrder`처럼 `complete_time`도 기록). Stripe 결제 세션은 만든 뒤 24시간 동안 결제할 수 있으므로(충전·구독 세션 모두 `ExpiresAt`을 따로 두지 않는다), 24시간이 안 된 pending 주문은 사용자가 아직 결제 중일 수 있어 그대로 두고 충전은 `skipped_recent`, 구독은 `skipped_recent_subscriptions`로 센다.
 - 조직 충전 주문(`target_type = organization`)은 바꾸지 않는다(3.5를 쓴다). `success`·`failed`·`expired` 주문도 그대로다.
 - 용도: 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전, Epay·Creem·Waffo 구독 결제)은 5.5의 조직 가입을 계속 거부한다. 이 API로 만료시키면 가입할 수 있다(`skipped_recent`나 `skipped_recent_subscriptions`가 0이 아니면 그 사용자는 아직 막힌다).
-- 정산은 pending 주문만 적립하므로, 만료된 주문에 늦게 도착한 결제 콜백은 아무것도 적립하지 않는다. 실제로 결제된 주문을 만료시키면 그 금액은 provider 쪽에서 환불·수동 처리해야 한다(이때는 upstream `POST /api/user/topup/complete` 보정은 쓸 수 없다 — pending 주문만 완료한다). 실행 전 provider 대시보드에서 미결제를 확인한다.
-- `user_id`가 음수이거나 body가 JSON이 아니면 `Invalid parameters`로 거부된다. 없는 사용자는 모든 수가 0으로 성공한다.
-- `topup.expire` 감사 로그를 남긴다(params `user_id`, `expired`, `skipped_recent`, `expired_subscriptions`, `skipped_recent_subscriptions`; 전체 대상이면 `user_id: 0`).
+- 정산은 pending 주문만 적립하므로, 만료된 주문에 늦게 도착한 결제(24시간보다 오래 열려 있던 PayPal 승인 링크·Pancake 세션 등)는 provider에서 승인되지만 아무것도 적립되지 않는다. 이 경우 운영자가 수동으로 대사해야 한다: provider 쪽에서 환불하거나 사용자 잔액을 직접 보정한다(upstream `POST /api/user/topup/complete` 보정은 쓸 수 없다 — pending 주문만 완료한다). 실행 전 provider 대시보드에서 미결제를 확인한다.
+- `user_id`가 없거나 0이면, 또는 body가 비어 있으면 `user_id is required`(`message_key` 같음)로 거부되고 아무 주문도 바뀌지 않는다. `user_id`가 음수이거나 body가 JSON이 아니면 `Invalid parameters`로 거부된다. 없는 사용자는 모든 수가 0으로 성공한다.
+- `topup.expire` 감사 로그를 남긴다(params `user_id`, `expired`, `skipped_recent`, `expired_subscriptions`, `skipped_recent_subscriptions`).
 
 응답:
 
@@ -582,7 +582,7 @@ Body:
 - 전역 관리자 사용자는 조직에서 관리할 수 없다 (`global admin users cannot be managed by organization admins`).
 - 역할 값이 `member`, `admin`, `owner`가 아니면 `invalid organization role`.
 - 대상 사용자가 이미 다른 조직에 속해 있으면 모델이 거부한다 (`user belongs to another organization`). 조직이 비활성이면 `organization is not active`.
-- **개인 잔액 거부(spec §9 결정 6):** 조직 밖에서 들어오는 사용자가 개인 잔액(`users.quota > 0`), 추천(affiliate) 잔액(`users.aff_quota > 0` — 아직 잔액으로 옮기지 않은 추천 수익도 개인 돈이다), 활성 개인 구독(`user_subscriptions.status = 'active' AND end_time > now`)이나 결제 대기 중인 개인 주문(`top_ups.status = 'pending'`이면서 `target_type`이 `organization`이 아닌 것, 또는 `subscription_orders.status = 'pending'`)을 가지고 있으면 거부한다 (`user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization`, `message_key` 같음). 결제 대기 주문을 막는 이유: 결제 확정(settlement)은 가입 여부를 다시 보지 않으므로, 가입 전에 연 결제가 가입 뒤 끝나면 그 돈이 조직 관리자가 정하는 한도가 되어 버린다. 주문이 결제되면(그 뒤에는 잔액 거부) 또는 결제사가 만료시키면 다시 추가할 수 있다. 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전, Epay·Creem·Waffo 구독 결제)은 관리자가 3.6 `POST /api/user/topup/expire`로 만료시킨다(1시간이 지난 충전·구독 주문만). 조직에 들어오면 `users.quota`는 조직 관리자가 정하는 한도가 되므로, 사용자가 잔액을 다 쓰거나 운영자가 정리한 뒤에만 들어올 수 있다. 판정은 `model.AssignUserToOrganization`의 사용자 행 잠금 트랜잭션 안에서 한다. 초대·수락 흐름은 없다. 만료·취소된 구독은 막지 않는다. 이미 같은 조직 구성원의 역할 변경에는 적용하지 않는다.
+- **개인 잔액 거부(spec §9 결정 6):** 조직 밖에서 들어오는 사용자가 개인 잔액(`users.quota > 0`), 추천(affiliate) 잔액(`users.aff_quota > 0` — 아직 잔액으로 옮기지 않은 추천 수익도 개인 돈이다), 활성 개인 구독(`user_subscriptions.status = 'active' AND end_time > now`)이나 결제 대기 중인 개인 주문(`top_ups.status = 'pending'`이면서 `target_type`이 `organization`이 아닌 것, 또는 `subscription_orders.status = 'pending'`)을 가지고 있으면 거부한다 (`user still has a personal balance, affiliate balance, subscription or pending orders; it must be cleared before joining an organization`, `message_key` 같음). 결제 대기 주문을 막는 이유: 결제 확정(settlement)은 가입 여부를 다시 보지 않으므로, 가입 전에 연 결제가 가입 뒤 끝나면 그 돈이 조직 관리자가 정하는 한도가 되어 버린다. 주문이 결제되면(그 뒤에는 잔액 거부) 또는 결제사가 만료시키면 다시 추가할 수 있다. 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전, Epay·Creem·Waffo 구독 결제)은 관리자가 3.6 `POST /api/user/topup/expire`로 만료시킨다(사용자 한 명씩, 24시간이 지난 충전·구독 주문만). 조직에 들어오면 `users.quota`는 조직 관리자가 정하는 한도가 되므로, 사용자가 잔액을 다 쓰거나 운영자가 정리한 뒤에만 들어올 수 있다. 판정은 `model.AssignUserToOrganization`의 사용자 행 잠금 트랜잭션 안에서 한다. 초대·수락 흐름은 없다. 만료·취소된 구독은 막지 않는다. 이미 같은 조직 구성원의 역할 변경에는 적용하지 않는다.
 - 이미 조직 구성원인 경우 이 API로 역할을 변경할 수 있다.
 - 성공하면 `organization.user.assign` 감사 로그가 남는다.
 

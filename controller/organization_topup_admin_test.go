@@ -53,11 +53,13 @@ func TestOrganizationRootExpiresOnlyAbandonedTopUpsOfEnabledOrganization(t *test
 	f := setupOrgSecurityTest(t)
 	require.NoError(t, f.db.Model(&model.User{}).Where("id IN ?", []int{f.admin.Id, f.member.Id}).
 		Updates(map[string]any{"organization_id": 0, "organization_role": ""}).Error)
-	old := common.GetTimestamp() - 2*3600
-	now := common.GetTimestamp()
+	// A Stripe checkout session stays payable for 24 hours, so a two-hour-old
+	// order is still kept.
+	old := common.GetTimestamp() - 25*3600
+	twoHoursAgo := common.GetTimestamp() - 2*3600
 	pendingA := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-a", old)
 	pendingB := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-b", old)
-	recent := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-recent", now)
+	recent := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-recent", twoHoursAgo)
 	settled := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusSuccess, "org-success", old)
 	otherOrg := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id+1, common.TopUpStatusPending, "other-org-pending", old)
 	personal := seedOrganizationTopUp(t, f.admin.Id, model.TopUpTargetTypeUser, 0, common.TopUpStatusPending, "personal-pending", old)
@@ -82,14 +84,15 @@ func TestOrganizationRootExpiresOnlyAbandonedTopUpsOfEnabledOrganization(t *test
 	requireOrgSecurityResult(t, res, false, "organization has 1 pending top-up orders, wait for them to settle or expire first")
 }
 
-// A disabled organization cannot be topped up any more, so every pending
-// order is expired regardless of age and the organization can be deleted.
+// A disabled organization cannot start a new top-up, so root's wind-down
+// expires every pending order regardless of age and the organization can be
+// deleted (a checkout opened before disabling that is still paid is dropped).
 func TestOrganizationRootExpiresAllPendingTopUpsOfDisabledOrganizationThenDeletes(t *testing.T) {
 	f := setupOrgSecurityTest(t)
 	require.NoError(t, f.db.Model(&model.User{}).Where("id IN ?", []int{f.admin.Id, f.member.Id}).
 		Updates(map[string]any{"organization_id": 0, "organization_role": ""}).Error)
 	require.NoError(t, f.db.Model(&model.Organization{}).Where("id = ?", f.org.Id).Update("status", model.OrganizationStatusDisabled).Error)
-	old := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-old", common.GetTimestamp()-2*3600)
+	old := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-old", common.GetTimestamp()-25*3600)
 	recent := seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending-recent", common.GetTimestamp())
 	root := model.User{Id: 9999, Role: common.RoleRootUser}
 
@@ -107,7 +110,7 @@ func TestOrganizationRootExpiresAllPendingTopUpsOfDisabledOrganizationThenDelete
 
 func TestOrganizationExpireTopUpsRequiresRootAndAnExistingOrganization(t *testing.T) {
 	f := setupOrgSecurityTest(t)
-	seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending", common.GetTimestamp()-2*3600)
+	seedOrganizationTopUp(t, f.owner.Id, model.TopUpTargetTypeOrganization, f.org.Id, common.TopUpStatusPending, "org-pending", common.GetTimestamp()-25*3600)
 
 	res := orgSecurityRequest(ExpireOrganizationTopUps, f.owner, http.MethodPost, "/", "", orgSecurityIdParam(f.org.Id))
 	requireOrgSecurityResult(t, res, false, "root permission required")

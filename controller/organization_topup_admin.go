@@ -16,8 +16,9 @@ import (
 
 // ExpireOrganizationTopUps (POST /api/organizations/:id/topups/expire) marks
 // the organization's abandoned pending top-up orders expired so they no longer
-// block DeleteOrganization (orders younger than an hour are kept unless the
-// organization is disabled). Settled orders are not touched.
+// block DeleteOrganization (orders younger than a day are kept unless the
+// organization is disabled; expiring a disabled organization's checkout that
+// is still paid drops that payment). Settled orders are not touched.
 func ExpireOrganizationTopUps(c *gin.Context) {
 	if c.GetInt("role") != common.RoleRootUser {
 		common.ApiErrorT(c, "root permission required")
