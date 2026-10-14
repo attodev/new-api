@@ -51,6 +51,8 @@ const getGroupDefaults = (settings: BillingSettings) => ({
   DefaultUseAutoGroup: settings.DefaultUseAutoGroup,
   GroupSpecialUsableGroup:
     settings['group_ratio_setting.group_special_usable_group'],
+  ModelDiscount: settings.ModelDiscount, // fork: O6
+  VendorDiscount: settings.VendorDiscount, // fork: O6
 })
 
 const BILLING_SECTIONS = [

@@ -60,6 +60,8 @@ const defaultBillingSettings: BillingSettings = {
   MaxTokenAutoGroups: 5,
   DefaultUseAutoGroup: false,
   'group_ratio_setting.group_special_usable_group': '{}',
+  ModelDiscount: '{}', // fork: O6
+  VendorDiscount: '{}', // fork: O6
   PayAddress: '',
   EpayId: '',
   EpayKey: '',

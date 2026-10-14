@@ -306,6 +306,8 @@ export type BillingSettings = {
   MaxTokenAutoGroups: number
   DefaultUseAutoGroup: boolean
   'group_ratio_setting.group_special_usable_group': string
+  ModelDiscount: string // fork: O6
+  VendorDiscount: string // fork: O6
   PayAddress: string
   EpayId: string
   EpayKey: string

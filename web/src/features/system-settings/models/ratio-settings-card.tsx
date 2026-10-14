@@ -42,6 +42,7 @@ import { SettingsPageTitleStatusPortal } from '../components/settings-page-conte
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { positiveIntegerSchema } from '../utils/numeric-field'
+import { discountMapValidation } from './discount-utils' // fork: O6
 import { GroupRatioForm } from './group-ratio-form'
 import { ModelRatioForm } from './model-ratio-form'
 import { ToolPriceSettings } from './tool-price-settings'
@@ -145,6 +146,8 @@ const createGroupSchema = (t: Translate) =>
     MaxTokenAutoGroups: positiveIntegerSchema(t('Enter a positive integer')),
     DefaultUseAutoGroup: z.boolean(),
     GroupSpecialUsableGroup: createJsonStringField(t),
+    ModelDiscount: createJsonStringField(t, discountMapValidation('model')), // fork: O6
+    VendorDiscount: createJsonStringField(t, discountMapValidation('vendor')), // fork: O6
   })
 
 type ModelFormValues = z.infer<ReturnType<typeof createModelSchema>>
@@ -252,6 +255,8 @@ export function RatioSettingsCard({
     GroupSpecialUsableGroup: normalizeJsonString(
       groupDefaults.GroupSpecialUsableGroup
     ),
+    ModelDiscount: normalizeJsonString(groupDefaults.ModelDiscount), // fork: O6
+    VendorDiscount: normalizeJsonString(groupDefaults.VendorDiscount), // fork: O6
   })
   const modelSchema = useMemo(() => createModelSchema(t), [t])
   const groupSchema = useMemo(() => createGroupSchema(t), [t])
@@ -290,6 +295,8 @@ export function RatioSettingsCard({
       GroupSpecialUsableGroup: formatJsonForTextarea(
         groupDefaults.GroupSpecialUsableGroup
       ),
+      ModelDiscount: formatJsonForTextarea(groupDefaults.ModelDiscount), // fork: O6
+      VendorDiscount: formatJsonForTextarea(groupDefaults.VendorDiscount), // fork: O6
     },
   })
 
@@ -342,6 +349,8 @@ export function RatioSettingsCard({
       GroupSpecialUsableGroup: normalizeJsonString(
         groupDefaults.GroupSpecialUsableGroup
       ),
+      ModelDiscount: normalizeJsonString(groupDefaults.ModelDiscount), // fork: O6
+      VendorDiscount: normalizeJsonString(groupDefaults.VendorDiscount), // fork: O6
     }
 
     groupForm.reset({
@@ -354,6 +363,8 @@ export function RatioSettingsCard({
       GroupSpecialUsableGroup: formatJsonForTextarea(
         groupDefaults.GroupSpecialUsableGroup
       ),
+      ModelDiscount: formatJsonForTextarea(groupDefaults.ModelDiscount), // fork: O6
+      VendorDiscount: formatJsonForTextarea(groupDefaults.VendorDiscount), // fork: O6
     })
   }, [groupDefaults, groupForm])
 
@@ -420,6 +431,8 @@ export function RatioSettingsCard({
         GroupSpecialUsableGroup: normalizeJsonString(
           values.GroupSpecialUsableGroup
         ),
+        ModelDiscount: normalizeJsonString(values.ModelDiscount), // fork: O6
+        VendorDiscount: normalizeJsonString(values.VendorDiscount), // fork: O6
       }
 
       // Map form field names to API keys (most are 1:1, except GroupSpecialUsableGroup)

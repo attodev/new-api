@@ -83,6 +83,7 @@ import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
 import { safeJsonParse } from '../utils/json-parser'
+import { DiscountSettingsPanel } from './discount-settings-panel' // fork: O6
 import { GroupSpecialUsableRulesEditor } from './group-special-usable-editor'
 
 export type GroupSettingsSection =
@@ -90,6 +91,7 @@ export type GroupSettingsSection =
   | 'overrides'
   | 'visibility'
   | 'auto'
+  | 'discounts' // fork: O6
 
 type GroupRatioVisualEditorProps = {
   section: GroupSettingsSection
@@ -102,6 +104,8 @@ type GroupRatioVisualEditorProps = {
   autoGroups: string
   maxTokenAutoGroupsField: ReactNode
   groupSpecialUsableGroup: string
+  modelDiscount?: string // fork: O6
+  vendorDiscount?: string // fork: O6
   onChange: (field: string, value: string) => void
 }
 
@@ -277,6 +281,8 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
   autoGroups,
   maxTokenAutoGroupsField,
   groupSpecialUsableGroup,
+  modelDiscount = '{}', // fork: O6
+  vendorDiscount = '{}', // fork: O6
   onChange,
 }: GroupRatioVisualEditorProps) {
   const { t, i18n } = useTranslation()
@@ -363,6 +369,10 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
           <TabsTrigger value='auto' className='px-3'>
             {t('Auto group order')}
           </TabsTrigger>
+          {/* fork: O6 */}
+          <TabsTrigger value='discounts' className='px-3'>
+            {t('Discounts')}
+          </TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value='pricing' keepMounted>
@@ -386,6 +396,15 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
           value={groupSpecialUsableGroup}
           groupOptions={registryNames}
           onChange={(value) => onChange('GroupSpecialUsableGroup', value)}
+        />
+      </TabsContent>
+      {/* fork: O6 */}
+      <TabsContent value='discounts' keepMounted>
+        <DiscountSettingsPanel
+          active={section === 'discounts'}
+          modelDiscount={modelDiscount}
+          vendorDiscount={vendorDiscount}
+          onChange={onChange}
         />
       </TabsContent>
       <TabsContent value='auto' keepMounted>

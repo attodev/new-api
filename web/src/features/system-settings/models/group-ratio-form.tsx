@@ -60,12 +60,13 @@ import {
 } from '../components/settings-form-layout'
 import { SettingsPageActionsPortal } from '../components/settings-page-context'
 import { safeNumberFieldProps } from '../utils/numeric-field'
+import { DiscountJsonFields } from './discount-settings-panel' // fork: O6
 import {
   GroupRatioVisualEditor,
   type GroupSettingsSection,
 } from './group-ratio-visual-editor'
 
-type GroupFormValues = {
+export type GroupFormValues = {
   GroupRatio: string
   TopupGroupRatio: string
   UserUsableGroups: string
@@ -74,6 +75,8 @@ type GroupFormValues = {
   MaxTokenAutoGroups: number
   DefaultUseAutoGroup: boolean
   GroupSpecialUsableGroup: string
+  ModelDiscount: string // fork: O6
+  VendorDiscount: string // fork: O6
 }
 
 type GroupRatioFormProps = {
@@ -152,6 +155,10 @@ export const GroupRatioForm = memo(function GroupRatioForm({
             type='button'
             size='sm'
             onClick={form.handleSubmit(onSave, (errors) => {
+              // fork: O6
+              if (errors.ModelDiscount || errors.VendorDiscount) {
+                setSection('discounts')
+              }
               if (errors.MaxTokenAutoGroups) {
                 setEditMode('visual')
                 setSection('auto')
@@ -225,6 +232,8 @@ export const GroupRatioForm = memo(function GroupRatioForm({
               />
             }
             groupSpecialUsableGroup={values.GroupSpecialUsableGroup ?? ''}
+            modelDiscount={values.ModelDiscount ?? ''} // fork: O6
+            vendorDiscount={values.VendorDiscount ?? ''} // fork: O6
             onChange={(field, value) =>
               handleFieldChange(field as keyof GroupFormValues, value)
             }
@@ -412,6 +421,8 @@ export const GroupRatioForm = memo(function GroupRatioForm({
               )}
             />
 
+            {/* fork: O6 */}
+            <DiscountJsonFields control={form.control} />
             <FormField
               control={form.control}
               name='DefaultUseAutoGroup'

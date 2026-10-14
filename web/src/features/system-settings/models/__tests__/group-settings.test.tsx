@@ -43,6 +43,8 @@ const defaults = {
   MaxTokenAutoGroups: 5,
   DefaultUseAutoGroup: false,
   GroupSpecialUsableGroup: '{}',
+  ModelDiscount: '{}', // fork: O6
+  VendorDiscount: '{}', // fork: O6
 }
 
 const schema = z.object({
@@ -54,6 +56,8 @@ const schema = z.object({
   MaxTokenAutoGroups: positiveIntegerSchema('Enter a positive integer'),
   DefaultUseAutoGroup: z.boolean(),
   GroupSpecialUsableGroup: z.string(),
+  ModelDiscount: z.string(), // fork: O6
+  VendorDiscount: z.string(), // fork: O6
 })
 
 function Fixture(props: {
