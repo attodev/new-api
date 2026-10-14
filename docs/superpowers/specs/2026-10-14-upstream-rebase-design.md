@@ -36,7 +36,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 ### 2.2 가져가지 않는 것
 
 - **Toss 결제 전부**: 일반 충전, 정기결제·빌링키(`UserBillingKey`), webhook·reconciliation, 지갑 자동충전(임계값/정기, 프리셋)과 그 cron, 조직 지갑의 Toss 라우트, `web/classic`의 Toss 패리티. backend 23파일 27,087 LOC, 프런트 21파일.
-- **`web/classic` 테마**: upstream이 삭제했다. classic 사용자가 있으면 이 설계는 보류한다(§8 결정 사항).
+- **`web/classic` 테마**: upstream이 삭제했다. classic 사용자는 없다고 확인되었으므로(§9 결정 1) 함께 버린다.
 - **우리 quota 상한 구현의 코드 형태**(`common.MaxQuota`=5e14 상수, 자체 saturating 변환): upstream이 같은 문제를 64-bit 지갑 도메인으로 풀었으므로(`MaxWalletQuota`=2^53-1, 기본 단가 기준 약 180억 달러; 기동 시 `ensureUserQuotaColumns`가 bigint 컬럼을 요구) 그 구현을 쓴다. **큰 잔액을 저장·충전·표시하는 능력은 유지되고 상한은 오히려 올라간다.** 우리 DB 컬럼은 이미 bigint라 그대로 통과한다. 단일 요청 과금의 int32 포화는 양쪽 모두 같다. 이 변경의 나머지 조각은 overlay로 가져간다: 조직 쿼터 상한(`MaxOrganizationQuota`, O3), 프런트 큰 수 약어 표기(O8; upstream `currency.ts`는 `k` 단위만 있어 10억 단위 표기 확인 필요), 옵션 값의 64-bit 파싱(O8). 패리티 검증에 "2^31 이상 잔액을 관리자 수정·충전·환급 코드·조직 지갑·내보내기/가져오기·화면 표시에서 MySQL과 PostgreSQL 모두 확인"을 둔다(§7).
 - **2026-10 동기화에서 포팅한 upstream 커밋 34건과 2-A 중 upstream에 이미 있는 것**(Claude 5.x thinking 표, 충전 가드의 upstream 부분 등): 베이스에 포함되므로 재적용하지 않는다.
 - **web/classic 관련 백엔드 분기**(`theme` 설정의 classic 옵션): upstream 상태를 따른다.
@@ -66,7 +66,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 ### 4.4 O3 조직 관리
 - 데이터: `organizations`, `organization_subscription_plans`, `organization_user_subscriptions`, `organization_subscription_pre_consume_records` 테이블(team 모델 그대로), `users.organization_id`/`organization_role` 컬럼, `topups.target_type`/`target_id`.
-- 권한: 조직 역할(owner/admin/member)은 테넌트 범위의 자체 검사이고, upstream casbin은 관리자 리소스 권한이다. 서로 독립이므로 조직 컨트롤러는 team 검사 로직을 유지한다. 단, "root가 모든 조직 멤버를 관리" 같은 관리자 기능은 upstream `RequirePermission`으로 감싼다(권한 카탈로그에 `organization` 리소스 추가).
+- 권한: 조직 역할(owner/admin/member)은 테넌트 범위의 자체 검사이고, upstream casbin은 관리자 리소스 권한이다. 서로 독립이므로 `/api/organization/*`(멤버·조직 관리자용 46개 라우트)는 team 검사 로직을 유지한다. 플랫폼 관리자용 `/api/organizations/*`(목록·생성·수정·삭제, 현재 `RootAuth`)만 upstream `RequirePermission`으로 감싼다: `service/authz/resources_organization.go`에 `organization` 리소스와 `read`/`write` 액션을 등록하고(`DefaultRoles`는 `root`만, 현재 범위와 동일), `router/channel-router.go`의 `handlePermissionRoute` 패턴으로 등록해 접근 토큰 스코프에도 자동 노출되게 한다(§9 결정 5).
 - 과금: `OrganizationWalletFunding`/`OrganizationSubscriptionFunding`을 별도 파일로, `billing_session.go`에는 선택 훅만. upstream의 지갑 상한(2^53)과 `creditUserQuotaWithinCeiling` 패턴을 조직 지갑에도 동일 적용(team의 `ValidateOrganizationWalletCapacity`를 upstream 상한 상수로 교체).
 - 프런트: `features/organizations` 16파일과 라우트 7개를 `web/src`로 이식. 의존하는 `features/wallet` 조각 중 Toss·자동충전 컴포넌트는 제거하고 결제 탭은 Stripe/Creem/Epay/Waffo/PayPal만 남긴다. 사이드바 메뉴 등록은 upstream `components/layout`의 메뉴 정의에 항목 추가.
 
@@ -75,7 +75,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 ### 4.6 O6 할인 계층
 - 설정 저장(`ModelDiscount`/`VendorDiscount` 옵션, JSON map)과 `HandleGroupRatio`의 multiplier 적용은 team 코드를 그대로 쓴다(upstream `relay/helper/price.go`에 같은 함수가 있고 `GroupRatioInfo`도 유지됨).
-- 표시: upstream의 가격 페이지·모델 카드·usage-log 상세는 구조가 바뀌었으므로(변경량 2,693/3,509줄) team 컴포넌트를 복사하지 않고 upstream 컴포넌트에 할인 배지·할인 요소를 추가하는 식으로 다시 만든다. 범위: 가격 표 할인 배지, 모델 카드 할인 가격, usage-log 공식의 할인 요소, 관리자 할인 편집기(모델/벤더 JSON 편집기).
+- 표시: upstream의 가격 페이지·모델 카드·usage-log 상세는 구조가 바뀌었으므로(변경량 2,693/3,509줄) team 컴포넌트를 복사하지 않고 upstream 컴포넌트에 할인 배지·할인 요소를 추가하는 식으로 다시 만든다(§9 결정 3). 범위: 가격 표 할인 배지, 모델 카드 할인 가격, usage-log 공식의 할인 요소, 관리자 할인 편집기(모델/벤더 JSON 편집기).
 
 ### 4.7 O7 타이밍
 - `middleware/request_timing.go`, `common/timing_response_writer.go`는 복사. `RelayInfo`에 `UpstreamRequestStartTime/EndTime` 필드(규칙 3), `api_request.go doRequest`에 기록 두 줄, `log_info_generate.go`에 `other` 필드 채우기 함수 호출 한 줄(본문은 `service/log_timing.go`). usage-log 상세의 타이밍 표시는 upstream 다이얼로그에 섹션 추가.
@@ -96,7 +96,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 ## 5. 데이터와 스키마
 
-- 운영 DB에는 Toss·자동충전·빌링키 테이블과 `users.toss_customer_key` 컬럼이 남는다. 첫 릴리스에서는 **삭제하지 않는다**(되돌림 대비). 삭제는 전환 후 별도 작업.
+- 운영 DB에는 Toss·자동충전·빌링키 테이블과 `users.toss_customer_key` 컬럼이 남는다. 첫 릴리스에서는 **삭제하지 않는다**(되돌림 대비, §9 결정 2). 삭제는 전환 후 별도 작업.
 - upstream 신규 테이블(`audit_logs`, `user_sessions`, `authz_roles`, `casbin_rule`, `task_plugins`, `system_tasks`, `login_encryption_keys`, `external_identity_claims` 등)은 AutoMigrate가 만든다. upstream의 추가 마이그레이션(`options` PK 재구성, token key 유니크 제약, prefill group 인덱스)은 그대로 실행된다.
 - **quota 컬럼**: upstream 구조체는 `type:int` 태그에 Go `int`이고, 기동 시 `ensureUserQuotaColumns`가 MySQL/PostgreSQL에서 bigint가 아니면 거부한다. 우리 DB는 이미 bigint다. upstream의 커스텀 migration dialector(`model/migration_dialector.go`)가 기존 컬럼을 좁히지 않는지 **운영 DB 사본에서 리허설**한다. 좁히려 들면 `User`/`Token`/`Log`/`TopUp`의 quota 컬럼 태그를 bigint로 두는 패치를 규칙 3 목록에 추가한다.
 - 리허설 절차: MySQL과 PostgreSQL 운영 사본에 새 바이너리를 기동 → 로그에서 ALTER 문 확인 → `users.quota` 등 타입이 bigint 유지인지 조회 → 조직/구독/충전 샘플 데이터 조회로 읽기 호환 확인.
@@ -130,13 +130,15 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 각 단계는 독립 PR/브랜치로 리뷰·병합하고, 단계마다 별도의 구현 계획(`docs/superpowers/plans/`)을 쓴다. 단계 A가 끝나면 이후 upstream 동기화 리허설(`git merge qn/main`)을 한 번 해 보고 충돌 파일 수를 기록한다. 그 수가 규칙 3 목록과 일치해야 한다.
 
-## 9. 결정이 필요한 사항
+## 9. 결정 사항
 
-1. `web/classic` 사용자가 있는가. 있으면 이 설계는 보류.
-2. Toss 데이터 테이블을 첫 릴리스에서 남겨 두는 것에 동의하는가(§5).
-3. 할인 UI를 upstream 가격 페이지 위에 다시 만드는 것(§4.6)에 동의하는가. 대안은 할인을 설정·과금에만 두고 UI 표시는 생략.
-4. 한글 신규 키 2,778개의 번역 방식: 기계 번역 초안 + 사람 검수(권장) 또는 전부 사람.
-5. 조직 관리 기능 중 upstream의 `RequirePermission`으로 감쌀 관리자 기능의 범위.
+2026-10-14 확정.
+
+1. `web/classic` 사용자 없음 → classic은 버린다(§2.2).
+2. Toss 데이터 테이블은 첫 릴리스에서 남긴다(§5).
+3. 할인 UI는 upstream 가격 페이지 위에 다시 만든다(§4.6).
+4. 한글 신규 키 2,778개는 기계 번역 초안 + 용어집 기준 사람 검수(§4.8). 기본값으로 진행하며, 전부 사람 번역으로 바꾸려면 단계 D 계획 전에 알린다.
+5. `RequirePermission` 범위는 플랫폼 관리자용 `/api/organizations/*`만(§4.4). 기본값으로 진행하며, 조직 내부 관리 라우트까지 넓히려면 단계 B 계획 전에 알린다.
 
 ## 10. 리스크
 
