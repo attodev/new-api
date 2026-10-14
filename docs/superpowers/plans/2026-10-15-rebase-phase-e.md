@@ -470,4 +470,4 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 9. Excel 행 오류는 기존 `errors []string`을 유지하고 `error_details`를 더해 호환을 지킨다.
 10. 조직 로그·대시보드는 현재 멤버의 전체 기록을 그대로 보여 준다. 조직에 넣는 사용자는 새로 만들었거나 거의 새 계정이라 이전 기록이 없거나 공개돼도 무시할 수 있다고 가정한다(사용자 결정). 가입 시점 제한은 하지 않는다.
 11. team 브랜치(`TimingResponseWriter.Unwrap()` 역이식 등)는 이 계획에서 다루지 않는다. team 쪽은 별도로 확인한다(사용자 결정).
-12. Redis 쿼터 캐시 TTL(team `9ef93eb8c`)은 develop의 구현을 설명한 뒤 사용자가 결정한다. 결정에 따라 Task를 추가한다.
+12. Redis 쿼터 캐시 TTL은 이번 단계에서 upstream 상태(`SYNC_FREQUENCY` 기본 60초, 사용 중 갱신 없음)로 둔다(사용자 결정). 다음 단계에서 이것만 따로 다룬다: team `10ade7045`(배치 대기 중 DB 재수화 거부), `cf2cf300f`(예약·환불 때 TTL 갱신), `9ef93eb8c`(`QUOTA_CACHE_TTL` 기본 600초)와 develop의 배치 모드 재수화 구멍(캐시 만료가 배치 반영 전에 오면 오래된 DB 잔액으로 다시 채워짐)을 테스트로 재현한 뒤 선택지 A–D 중 하나로 정한다. 세션 캐시와 인증 fence가 사용자 캐시 TTL을 공유한다는 점도 그때 함께 정한다.
