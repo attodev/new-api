@@ -70,6 +70,16 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 - 권한: 조직 역할(owner/admin/member)은 테넌트 범위의 자체 검사이고, upstream casbin은 관리자 리소스 권한이다. 서로 독립이므로 `/api/organization/*`(멤버·조직 관리자용 46개 라우트)는 team 검사 로직을 유지한다. 플랫폼 관리자용 `/api/organizations/*`(목록·생성·수정·삭제, 현재 `RootAuth`)만 upstream `RequirePermission`으로 감싼다: `service/authz/resources_organization.go`에 `organization` 리소스와 `read`/`write` 액션을 등록하고(`DefaultRoles`는 `root`만, 현재 범위와 동일), `router/channel-router.go`의 `handlePermissionRoute` 패턴으로 등록해 접근 토큰 스코프에도 자동 노출되게 한다(§9 결정 5).
 - 과금: `OrganizationWalletFunding`/`OrganizationSubscriptionFunding`을 별도 파일로, `billing_session.go`에는 선택 훅만. upstream의 지갑 상한(2^53)과 `creditUserQuotaWithinCeiling` 패턴을 조직 지갑에도 동일 적용(team의 `ValidateOrganizationWalletCapacity`를 upstream 상한 상수로 교체).
 - 프런트: `features/organizations` 16파일과 라우트 7개를 `web/src`로 이식. 의존하는 `features/wallet` 조각 중 Toss·자동충전 컴포넌트는 제거하고 결제 탭은 Stripe/Creem/Epay/Waffo/PayPal만 남긴다. 사이드바 메뉴 등록은 upstream `components/layout`의 메뉴 정의에 항목 추가.
+- 단계 B 구현에서 위 문장과 달라진 점 (기록: `docs/2026-10-14-rebase-phase-b.md` §3):
+  - 결제 provider는 6종이다: Epay, Stripe, PayPal, Creem, Waffo, Waffo Pancake(위 5종 표기에 Waffo Pancake가 빠져 있었다).
+  - 라우트는 38개다: `/api/organization/*` 34개 + `/api/organizations/*` 4개(team 46개에서 Toss·자동충전 8개 제외). 위 "46개"는 team 기준 수치다.
+  - 접근 토큰 스코프: `/api/organization/*`는 기본 세션 전용이고, 조직 지갑 조회·충전 13개만 `wallet:read`/`wallet:write`, `subscription/self`는 `profile:read`다. `/api/organizations/*`는 `organization:read`/`organization:write`가 자동 선언된다.
+  - 감사 로그: 조직 변경 핸들러 12개가 `organization.*` 항목을 남긴다(upstream `auditContentTemplates`는 건드리지 않음).
+  - 조직 필드는 사용자 캐시(UserBase/Lua)에 넣지 않는다. 멤버십 변경 시 사용자 캐시를 무효화한다.
+  - 조직 자금 예약은 원자적이다: 이미지 수량 예약과 조직 구독 선차감은 조직 지갑을 `TryReserveOrganizationQuota`로 예약하고 부족하면 403(team은 음수 잔액을 허용했다).
+  - 레거시 Midjourney는 upstream 호출 전에 조직 플랜 회원과 빈 조직 지갑을 거부한다(`relay/mjproxy_handler.go` 훅 2줄 추가).
+  - "team 검사 로직을 유지"의 예외로, 이식으로 드러난 보안 결함을 고쳤다: 자기 자신 대상 변경 금지, owner 대상 변경은 owner만(구독 할당·취소는 root도), `owner` 역할 부여 금지, 멤버 제거·조직 삭제 시 `users.quota` 0, 목록 API 제한 컬럼, `ORDER BY` dialect quoting.
+  - 프런트: 사이드바 등록은 `components/layout`이 아니라 `hooks/use-sidebar-data.ts`(+ `use-sidebar-config.ts`, `use-sidebar-view.ts`)다. 라우트는 `/organization` 아래 5개와 `/wallet`의 역할별 화면 전환이다. 조직 사용 로그는 prop 전달 대신 `UsageLogsProvider` 컨텍스트(`logsScope`)로 범위를 넘긴다.
 
 ### 4.5 O4·O5·O10
 - 파일 복사 + 라우트 등록 한 줄. excelize 의존성 추가. 테스트 동반.

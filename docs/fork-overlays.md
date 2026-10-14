@@ -16,8 +16,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O4 사용자 Excel | router/api-router.go:157 | `registerForkAdminUserRoutes(adminRoute)` (위 O5 행과 동일 훅) | router/fork-router.go, controller/user_export.go, service/user_export.go, model/user_export.go |
 | O4 사용자 Excel | middleware/access_token_routes.go (레지스트리) | 없음 — `GET /api/user/export`(user:read), `POST /api/user/import`(user:write)를 fork 레지스트리에 선언 | middleware/fork_access_token_routes.go |
 | O2 PayPal | model/topup.go:26 | `TopUp.ProviderOrderId` 필드 + `// fork: O2` | model/topup_paypal.go, setting/payment_paypal.go |
-| O2 PayPal | model/topup.go:35,45 | `PaymentMethodPayPal` / `PaymentProviderPayPal` 상수 | model/topup_paypal.go |
-| O2 PayPal | model/topup.go:488 | `ManualCompleteTopUp` Stripe 조건에 `PaymentProviderPayPal` OR 추가 | model/topup_paypal.go |
+| O2 PayPal | model/topup.go:37,47 | `PaymentMethodPayPal` / `PaymentProviderPayPal` 상수 | model/topup_paypal.go |
+| O2 PayPal | model/topup.go:491 | `ManualCompleteTopUp` Stripe 조건에 `PaymentProviderPayPal` OR 추가 | model/topup_paypal.go |
 | O2 PayPal | model/option.go:102-108 | InitOptionMap `PayPal*` OptionMap 6줄 | setting/payment_paypal.go |
 | O2 PayPal | model/option.go:537-549 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
 | O2 PayPal | controller/topup.go:78 | `payMethods = appendPayPalPayMethod(payMethods)` | controller/payment_availability_paypal.go |
@@ -51,7 +51,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O8 가격 페이지 모델 상세 숨김 | web/src/features/rankings/components/entity-links.tsx | `ModelLink`가 링크 대신 일반 텍스트 렌더링 | — |
 | O8 큰 수 약어 | web/src/lib/currency.ts, web/src/lib/format.ts | `SUFFIX_TIERS` (k/M/B/T), `formatTokens` K/M/B/T 구간 (`web/src/lib/__tests__/number-suffix.test.ts`) | web/src/lib/__tests__/number-suffix.test.ts |
 | O3 조직 | model/user.go:101-102 | `User.OrganizationId`, `User.OrganizationRole` 필드 (Group 다음) | model/organization.go, model/organization_migrate.go |
-| O3 조직 | model/user.go:537 | `GetSelfUserById` Select 목록에 `"organization_id", "organization_role"` 한 줄 | model/organization.go |
+| O3 조직 | model/user.go:538 | `GetSelfUserById` Select 목록에 `"organization_id", "organization_role"` 한 줄 | model/organization.go |
 | O3 조직 | model/topup.go:27-28 | `TopUp.TargetType`, `TopUp.TargetId` 필드 (gofmt가 26행 O2 주석 정렬을 바꿈 — 공백만) | model/organization.go |
 | O3 조직 | model/task.go:112 | `TaskPrivateData.OrganizationId` 필드 | model/organization.go |
 | O3 조직 | model/task.go:262 | `InitTask`에서 `privateData.OrganizationId = relayInfo.BillingOrganizationId` (`relayInfo != nil` 검사 안) | model/organization.go |
@@ -95,7 +95,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 조회 | model/midjourney.go:234-236 | `CountAllTasks` 필터 체인 끝 같은 3줄 | model/log_organization.go |
 | O3 조직 라우트 | router/api-router.go:285-286 | `registerForkPublicRoutes` 다음 `// fork: O3` 주석 줄 + `registerForkOrganizationRoutes(apiRouter)` (주석을 윗줄에 둬 이웃 줄 gofmt 정렬을 유지) | router/organization-router.go |
 | O3 조직 라우트 | router/access_token_scope_test.go:83-87 | `accessTokenHelperRoutes`에 `// fork: O3` 주석 + `/api/organizations/` 4줄 (handlePermissionRoute 자동 선언: organization:read/write) | router/organization-router.go, service/authz/resources_organization.go |
-| O3 조직 라우트 | middleware/access_token_routes.go (레지스트리) | 없음 — `/api/organization/*` 34개를 fork 레지스트리에 선언(기본 session; wallet·topup/self·`.../amount` 5개는 wallet:read, `.../pay` 6개는 wallet:write, subscription/self는 profile:read) | middleware/fork_access_token_routes.go |
+| O3 조직 라우트 | middleware/access_token_routes.go (레지스트리) | 없음 — `/api/organization/*` 34개를 fork 레지스트리에 선언(session 전용 20개; `wallet`·`topup/self`와 `.../amount` 5개, 합계 7개는 wallet:read, `.../pay` 6개는 wallet:write, `subscription/self`는 profile:read) | middleware/fork_access_token_routes.go |
 | O3 조직 권한 | service/authz/authz_test.go:161-162, 195-196 | `TestSetUserPermissionsStoresOnlyOverrides` 기대 맵 2곳에 빈 줄 + `ResourceOrganization: {ActionRead: false, ActionWrite: false}` (등록된 리소스 전체를 열거하는 테스트; 빈 줄로 gofmt 정렬 분리) | service/authz/resources_organization.go |
 | O3 조직 충전 | controller/topup.go:266, 278 | `rejectInvalidCreditedQuota`·`rejectInvalidTopUpQuota`의 `model.ValidateTopUpQuotaCapacity(userId, …)` → `validateTopUpTargetCapacity(c, userId, …)` (조직 주문은 조직 지갑 상한으로 검사) | controller/topup_target.go |
 | O3 조직 충전 | controller/topup.go:351-352 | `RequestEpay` `&model.TopUp{`에 `TargetType: getTopUpTargetType(c)`, `TargetId: getTopUpTargetId(c)` 2줄 | controller/topup_target.go |
@@ -104,8 +104,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 충전 | controller/topup_waffo.go:226-227 | `RequestWaffoPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_waffo_pancake.go:383-384 | `RequestWaffoPancakePay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_paypal.go:345-346 | `RequestPayPalPay` `&model.TopUp{`에 같은 2줄 (fork O2 파일) | controller/topup_target.go |
-| O3 조직 (프런트) | web/src/stores/auth-store.ts, web/src/features/profile/types.ts | `AuthUser`/`UserProfile`에 `organization_id?`, `organization_role?` 두 필드 + `// fork: O3` | web/src/lib/organization-roles.ts, web/src/features/organizations/ |
-| O3 조직 (프런트) | web/src/features/users/types.ts | 사용자 zod 스키마 `group` 다음 `organization_id`, `organization_role` optional 두 줄 + `// fork: O3` | web/src/features/organizations/ |
+| O3 조직 (프런트) | web/src/stores/auth-store.ts:39-40, web/src/features/profile/types.ts:52-53 | `AuthUser`/`UserProfile`에 `organization_id?`, `organization_role?` 두 필드 + `// fork: O3` | web/src/lib/organization-roles.ts, web/src/features/organizations/ |
+| O3 조직 (프런트) | web/src/features/users/types.ts:49-50 | 사용자 zod 스키마 `group` 다음 `organization_id`, `organization_role` optional 두 줄 + `// fork: O3` | web/src/features/organizations/ |
 | O3 조직 (프런트) | web/src/features/wallet/components/wallet-stats-card.tsx | `balanceDisplay?: { value; description }` prop + 잔액 칸의 `value`/`description`이 이를 우선 (조직 플랜 회원은 잔액 대신 안내 문구) | web/src/features/organizations/ (Task 10–11) |
 | O3 조직 (프런트) | web/src/features/wallet/hooks/use-billing-history.ts, components/dialogs/billing-history-dialog.tsx | 옵션/prop `getBillingHistory?`(주어지면 사용자·관리자 선택보다 우선), `forceSelfHistory?`(관리자여도 `isAdmin=false` → 전체 내역·수동 완료 없음), 다이얼로그 `description?` | web/src/features/organizations/api.ts `getOrganizationBillingHistory` |
 | O3 조직 (프런트) | web/src/features/wallet/components/recharge-form-card.tsx | `showRedemption?: boolean`(기본 true); false면 교환 코드 폼과 비활성 안내를 모두 숨김 (삼항 하나를 조건부 블록 둘로 나눔) | web/src/features/organizations/ (Task 11) |
@@ -124,10 +124,13 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 (프런트) | web/src/hooks/use-sidebar-view.ts:25, 52, 61-68, 75 | `canAccessOrganizationArea` import, `organization_role` 셀렉터, `organization` 그룹은 root 또는 조직 admin/owner에게만(필터 한 단계), memo deps | web/src/features/organizations/lib/organization-access.ts |
 | O3 조직 (프런트) | web/src/features/system-settings/maintenance/config.ts:86-94, sidebar-modules-section.tsx:84-88, 171-193 | `SIDEBAR_MODULES_DEFAULT.organization`, `sectionMeta.organization`·`moduleMeta.organization`(5 모듈) | — |
 | O3 조직 (프런트) | web/src/features/usage-logs/components/columns/common-logs-columns.tsx:396, 403-407, 561, 570 | 조직 범위에선 채널 affinity 버튼 숨김(`affinity`를 undefined로 — 통계 다이얼로그가 사이트 관리자 API), 사용자 셀 버튼 `disabled`(사용자 정보 다이얼로그가 `/api/user/:id`) | — |
-| O3 조직 (프런트) | web/src/features/usage-logs/components/columns/task-logs-columns.tsx:131, 139, 259-269 | 사용자 셀 버튼 `disabled`(위와 같음), 작업물(Artifacts) 셀은 조직 범위에서 `-`(작업물 API는 사이트 관리자가 아니면 본인 작업만 조회) | — |
+| O3 조직 (프런트) | web/src/features/usage-logs/components/columns/task-logs-columns.tsx:131, 139, 260-266 | 사용자 셀 버튼 `disabled`(위와 같음), 작업물(Artifacts) 셀은 조직 범위에서 `-`(작업물 API는 사이트 관리자가 아니면 본인 작업만 조회) | — |
 | O3 조직 (프런트) | web/src/features/usage-logs/components/common-log-mobile-card.tsx:67, 377 | `showUserInfo` 한 줄, 모바일 사용자 필드의 `User Information` 버튼 조건에 `&& showUserInfo` | — |
 | O3 조직 (프런트) | web/src/routeTree.gen.ts | 생성 파일 — `bun run build`가 `/organization`, `/organization/dashboard`, `/organization/subscriptions`, `/organization/usage-logs/`, `/organization/usage-logs/$section` 라우트를 추가 | web/src/routes/_authenticated/organization/ |
 | O3 조직 (프런트) | web/src/routes/_authenticated/wallet/index.tsx:22-24, 26, 39-47 | import 4줄(`// fork: O3`)과 `RouteComponent`의 `// fork: O3` … `// fork: O3 end` 블록: `pickWalletView(useAuthStore(...))`가 `organization_owner`면 `OrganizationWallet`, `organization_member`면 `OrganizationMemberWalletSummary`, 아니면 기존 `Wallet` (검색 스키마는 `show_history`만 유지) | web/src/features/organizations/lib/wallet-view.ts, components/organization-wallet.tsx, components/organization-member-wallet-summary.tsx |
+| O3 조직 e2e | .gitignore:40-41 | `web/test-results/`, `web/playwright-report/` 2줄 (Playwright 산출물 무시) | web/playwright.config.ts, web/e2e/ |
+| O3 조직 e2e | web/package.json:19-21, 93; web/bun.lock | scripts `e2e`·`e2e:headed`·`e2e:install` 3줄, devDependency `@playwright/test` 한 줄; lockfile은 `bun install`이 갱신 (충돌 시 upstream lockfile을 받고 `bun install`을 다시 돌린다) | web/playwright.config.ts, web/e2e/organization.e2e.ts, web/e2e/README.md |
+| 공통 (i18n) | web/src/i18n/locales/*.json (en, fr, ja, ru, vi, zh, zh-TW) | fork 화면의 영문 키를 `en.json`에 추가하고 `bun run i18n:sync`로 다른 locale에 영문 fallback을 채움 (O2·O3·O4·O5). 충돌 시 upstream 쪽을 받고 fork 키를 `en.json`에 다시 넣은 뒤 sync | — |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
