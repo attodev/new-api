@@ -125,7 +125,7 @@
 
 ## 3a. 최종 수정 웨이브 (전체 브랜치 리뷰 I1·I2·M1–M6)
 
-리뷰: `.superpowers/sdd/2026-10-14-rebase-phase-c/final-review.md`. 결과: `final-fix-report.md`.
+리뷰: `docs/reviews/2026-10-14-rebase-phase-c-final-review.md`. 결과: `final-fix-report.md`.
 
 | 커밋 | 항목 | 내용 |
 |---|---|---|
