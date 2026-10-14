@@ -488,3 +488,26 @@ func TestImportOrgUsersDoesNotWriteAMemberWhoLeft(t *testing.T) {
 	require.Equal(t, model.OrganizationMemberStatusActive, member.OrganizationMemberStatus)
 	require.Equal(t, "", member.OrganizationRemark)
 }
+
+// Task 10 — creating a new user and assigning it to the organization is one
+// transaction: when the assignment fails no orphan account is left behind.
+func TestImportOrgUsersLeavesNoUserWhenAssignmentFails(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("status", model.OrganizationStatusDisabled).Error)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "initial_password"},
+		{"orphan_new", model.OrganizationRoleMember, "password123"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], "line 2 (orphan_new): failed to set org membership: organization is not active")
+	require.Zero(t, result.Created)
+
+	var count int64
+	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("username = ?", "orphan_new").Count(&count).Error)
+	require.Zero(t, count)
+}

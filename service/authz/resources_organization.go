@@ -15,7 +15,7 @@ func init() {
 		LabelKey: "Organization Management",
 		Actions: []ActionDefinition{
 			{Action: ActionRead, LabelKey: "Read organizations", DescriptionKey: "List organizations, their owners and wallet balances."},
-			{Action: ActionWrite, LabelKey: "Manage organizations", DescriptionKey: "Create, edit, fund and delete organizations."},
+			{Action: ActionWrite, LabelKey: "Manage organizations", DescriptionKey: "Create, edit, fund and delete organizations, and expire their abandoned top-up orders."},
 		},
 	})
 }

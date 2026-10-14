@@ -48,6 +48,9 @@ func DoCheckin(c *gin.Context) {
 	}
 
 	userId := c.GetInt("id")
+	if rejectOrganizationMemberPersonalInflow(c, userId) { // fork: O3
+		return
+	}
 
 	checkin, err := model.UserCheckin(userId)
 	if err != nil {

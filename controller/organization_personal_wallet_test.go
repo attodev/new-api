@@ -7,6 +7,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,4 +91,47 @@ func TestOrganizationMemberCannotStartPersonalPaidTopUp(t *testing.T) {
 	res = performOrganizationRequest(RequestOrganizationPayPalPay, owner, http.MethodPost, "/api/organization/paypal/pay",
 		`{"amount":10,"payment_method":"paypal"}`)
 	assert.JSONEq(t, `{"message":"error","data":"Failed to start payment","message_key":"Failed to start payment"}`, res.Body.String())
+}
+
+// Affiliate earnings and check-in rewards are personal money too: inside an
+// organization they would land in the member spending cap.
+func TestOrganizationMemberCannotTransferAffiliateQuota(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	confirmPaymentComplianceForTest(t)
+	member := seedOrganizationMemberWithCap(t, 2, 1, 100)
+	affQuota := int(common.QuotaPerUnit) * 2
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", member.Id).Update("aff_quota", affQuota).Error)
+
+	res := performOrganizationRequest(TransferAffQuota, member, http.MethodPost, "/api/user/aff_transfer",
+		fmt.Sprintf(`{"quota":%d}`, int(common.QuotaPerUnit)))
+
+	requireOrganizationApiError(t, res, "organization members cannot top up their personal balance")
+	requireUserQuota(t, member.Id, 100)
+	var reloaded model.User
+	require.NoError(t, model.DB.Select("aff_quota").First(&reloaded, member.Id).Error)
+	require.Equal(t, affQuota, reloaded.AffQuota)
+}
+
+func TestOrganizationMemberCannotCheckIn(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Checkin{}))
+	checkin := operation_setting.GetCheckinSetting()
+	previous := *checkin
+	checkin.Enabled = true
+	t.Cleanup(func() { *checkin = previous })
+	member := seedOrganizationMemberWithCap(t, 2, 1, 100)
+
+	res := performOrganizationRequest(DoCheckin, member, http.MethodPost, "/api/user/checkin", "")
+
+	requireOrganizationApiError(t, res, "organization members cannot top up their personal balance")
+	requireUserQuota(t, member.Id, 100)
+	var checkins int64
+	require.NoError(t, model.DB.Model(&model.Checkin{}).Count(&checkins).Error)
+	require.Zero(t, checkins)
+
+	// A user outside any organization still checks in.
+	outsider := model.User{Id: 50, Username: "outsider", Password: "x", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AffCode: "outsider"}
+	require.NoError(t, model.DB.Create(&outsider).Error)
+	res = performOrganizationRequest(DoCheckin, outsider, http.MethodPost, "/api/user/checkin", "")
+	require.Contains(t, res.Body.String(), `"success":true`)
 }

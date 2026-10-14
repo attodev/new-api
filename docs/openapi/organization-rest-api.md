@@ -1,23 +1,23 @@
 # 조직 관련 Backend REST API 명세
 
 작성일: 2026-06-15  
-최종 수정: 2026-10-14 (단계 C 작업 8: `assignable-users` 목록을 `users/lookup` 정확 조회로 바꾸고 개인 잔액·구독이 있는 사용자의 할당 거부를 추가. 이전 — upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
+최종 수정: 2026-10-14 (단계 C 작업 10: 대기 조직 충전 주문 만료 API 3.5(라우트 39개), 조직 회원의 추천 잔액 이체·출석 체크 거부, realtime 과금의 조직 지갑 검사, 회원 검색 keyword 리터럴 이스케이프, 가져오기 생성+배정 트랜잭션. 이전 — 단계 C 작업 8: `assignable-users` 목록을 `users/lookup` 정확 조회로 바꾸고 개인 잔액·구독이 있는 사용자의 할당 거부를 추가. 이전 — upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
 
 ## 1. 문서 범위
 
 이 문서는 현재 구현된 조직 관리 관련 REST API를 정리한다. 기준 코드는 다음 파일이다.
 
-- `router/organization-router.go` (조직 라우트 38개: `/api/organizations` 4개 + `/api/organization` 34개)
+- `router/organization-router.go` (조직 라우트 39개: `/api/organizations` 5개 + `/api/organization` 34개)
 - `middleware/fork_access_token_routes.go` (접근 토큰 스코프)
 - `controller/organization.go`, `controller/organization_validation.go`, `controller/organization_audit.go`
-- `controller/organization_subscription.go`
+- `controller/organization_subscription.go`, `controller/organization_topup_admin.go`
 - `controller/topup_target.go`, `controller/topup*.go`
 - `model/organization.go`
 - `model/organization_subscription.go`
 - `service/org_user_export.go` (Excel)
 - `common/page_info.go`
 
-기본 prefix는 `/api`다. 이 문서에 적힌 엔드포인트는 `router/organization-router.go`의 38개와 정확히 일치한다(빠진 것도 남는 것도 없다).
+기본 prefix는 `/api`다. 이 문서에 적힌 엔드포인트는 `router/organization-router.go`의 39개와 정확히 일치한다(빠진 것도 남는 것도 없다).
 
 응답은 대부분 다음 형태를 사용한다.
 
@@ -82,6 +82,8 @@
 - 조직 회원은 `POST /api/subscription/balance/pay`로 개인 잔액 구독을 살 수 없다(`organization members cannot pay with personal balance`).
 - 조직 회원은 교환 코드(`POST /api/user/topup`)로 개인 잔액을 채울 수 없다(`organization members cannot redeem codes into their personal balance`).
 - 조직 회원은 개인 유료 충전(`/api/user/pay`, `/api/user/amount`, Stripe·PayPal·Creem·Waffo·Waffo Pancake의 pay/amount)을 시작할 수 없다(`organization members cannot top up their personal balance`, 결제 API 형태). 조직 지갑 충전은 7장의 조직 API를 쓴다.
+- 조직 회원은 추천 잔액 이체(`POST /api/user/aff_transfer`)와 출석 체크(`POST /api/user/checkin`)도 할 수 없다. 둘 다 개인 잔액에 적립되는 흐름이라 같은 메시지 `{"success": false, "message": "organization members cannot top up their personal balance"}`로 거부되고 `quota`·`aff_quota`·출석 기록은 바뀌지 않는다(`controller/topup_target.go` `rejectOrganizationMemberPersonalInflow`).
+- 조직 회원의 realtime(WebSocket) 과금 선검사(`service.PreWssConsumeQuota`)는 회원 한도·토큰 잔량에 더해 조직 지갑도 본다. 조직 지갑 잔액이 이번 과금액보다 적으면 `organization wallet quota insufficient`로 거부된다(`service/quota_organization.go`). 조직 밖 사용자는 조직 지갑을 읽지 않는다.
 
 ### 2.1.1 접근 토큰 스코프
 
@@ -93,7 +95,7 @@ upstream의 scoped access token으로 호출할 때 적용되는 규칙이다(`m
 | `GET /api/organization/wallet`, `GET /api/organization/topup/self`, `POST .../amount` 5개 | `wallet:read` |
 | `POST .../pay` 6개 | `wallet:write` |
 | `GET /api/organization/subscription/self` | `profile:read` |
-| `/api/organizations/*` 4개 | `handlePermissionRoute`가 자동 선언 — `organization:read`(GET), `organization:write`(POST/PATCH/DELETE) |
+| `/api/organizations/*` 5개 | `handlePermissionRoute`가 자동 선언 — `organization:read`(GET), `organization:write`(POST/PATCH/DELETE, `POST /:id/topups/expire`) |
 
 ### 2.2 페이지네이션
 
@@ -246,11 +248,37 @@ Path:
 처리 규칙:
 
 - owner 외 구성원이 남아 있으면 거부된다 (`organization has N non-owner members, remove them first`). 먼저 멤버십 제거 API로 구성원을 내보낸다.
-- 대기 중(`status = pending`)인 조직 충전 주문(`target_type = organization`)이 있으면 거부된다 (`organization has N pending top-up orders, wait for them to settle or expire first`). 현재 pending 주문을 만료시키는 것은 Stripe 웹훅뿐이므로, 다른 provider의 버려진 주문은 운영자가 `topups.status`를 직접 `expired`로 바꿔야 삭제가 가능하다(단계 C 항목). 결제 콜백이 삭제된 지갑에 정산하지 못하고 결제된 주문이 남는 것을 막는다.
+- 대기 중(`status = pending`)인 조직 충전 주문(`target_type = organization`)이 있으면 거부된다 (`organization has N pending top-up orders, wait for them to settle or expire first`). 버려진 주문은 3.5 `POST /api/organizations/:id/topups/expire`로 만료시킨 뒤 삭제한다. 결제 콜백이 삭제된 지갑에 정산하지 못하고 결제된 주문이 남는 것을 막는다.
 - 삭제 시 owner의 `organization_id`/`organization_role`을 비우고 owner의 `users.quota`를 0으로 만든다(조직이 배정한 한도이므로). 이전 값은 `organization.delete` 감사 로그의 `previous_quota`에 남는다.
 - 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
 
 응답: `{"success": true, "message": "", "data": null}`
+
+### 3.5 대기 중인 조직 충전 주문 만료
+
+`POST /api/organizations/:id/topups/expire`
+
+전체 관리자 전용이다(RootAuth + casbin `organization:write`). body는 없다.
+
+Path:
+
+| 이름 | 타입 | 필수 | 범위/값 | 설명 |
+| --- | --- | --- | --- | --- |
+| `id` | integer | 필수 | 양의 정수 | 조직 ID |
+
+처리 규칙:
+
+- 이 조직의 `target_type = organization`, `status = pending`인 충전 주문을 모두 `status = expired`로 바꾼다(`model.ExpirePendingOrganizationTopUps`). `success`·`failed`·`expired` 주문과 다른 조직·개인 주문은 바뀌지 않는다.
+- 정산은 pending 주문만 적립하므로, 만료된 주문에 늦게 도착한 결제 콜백은 아무것도 적립하지 않는다. 실제로 결제된 주문을 만료시키면 그 금액은 provider 쪽에서 환불·수동 처리해야 한다. 실행 전 provider 대시보드에서 미결제를 확인한다.
+- 대기 주문이 없으면 `expired: 0`으로 성공한다.
+- 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
+- `organization.topup.expire` 감사 로그를 남긴다(params `organization_id`, `expired`).
+
+응답:
+
+```json
+{ "success": true, "message": "", "data": { "expired": 2 } }
+```
 
 ## 4. 조직 기본 정보와 모니터링 API
 
@@ -381,7 +409,7 @@ Query:
 | `organization_id` | integer | 전체 관리자만 필수 | `> 0` | 조회할 조직 ID |
 | `p` | integer | 선택 | 1 이상 권장 | 페이지 번호 |
 | `page_size` | integer | 선택 | 1-100 권장 | 페이지 크기 |
-| `keyword` | string | 선택 | 임의 문자열 | `username` 또는 `display_name` 부분 일치 |
+| `keyword` | string | 선택 | 임의 문자열 | `username` 또는 `display_name` 부분 일치(리터럴; 아래 처리 규칙) |
 | `order_by` | string | 선택 | `username`, `display_name`, `organization_role`, `quota`, `used_quota`, `group`, `status`, `organization_member_status` | 그 밖의 값은 `id` |
 | `order_dir` | string | 선택 | `asc`, `desc` | `desc`가 아니면 `asc` |
 
@@ -394,6 +422,7 @@ Query:
 - 조직 소속 사용자 중 `role < RoleAdminUser`인 사용자만 조회한다.
 - 전역 관리자 계정은 조직 사용자 목록에서 제외된다.
 - 정렬 컬럼은 dialect별로 quoting된다(`group` 예약어 대응).
+- `keyword`는 앞뒤 공백을 지운 리터럴 문자열이다. LIKE 와일드카드 `%`·`_`와 이스케이프 문자 `!`는 `model.SanitizeOrganizationKeyword`가 `!%`·`!_`·`!!`로 이스케이프하고 쿼리는 `LIKE ? ESCAPE '!'`를 쓴다(세 DB 공통). 예: `keyword=50%_x`는 username이 정확히 `50%_x`를 포함하는 사용자만 찾고 `50abx`는 찾지 않는다.
 
 ### 5.2 추가할 사용자 정확 조회
 
@@ -587,7 +616,8 @@ Path:
 - `group` 열은 읽지 않는다(내보내기 전용). 새 사용자는 기본 그룹을 받는다.
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
 - 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
-- 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance, affiliate balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다 — `model.AssignCreatedUserToOrganization`).
+- 조직 밖 기존 사용자 행에는 5.5의 개인 잔액 거부가 똑같이 적용된다. 그 행은 `line N (<username>): failed to assign: user still has a personal balance, affiliate balance or subscription; ...` 행 오류가 되고 사용자는 조직에 들어가지 않는다. 가져오기가 새로 만든 사용자는 거부하지 않는다(가입 보너스 `QuotaForNewUser`는 다른 사람의 잔액이 아니다).
+- 새 사용자 생성과 조직 배정은 한 트랜잭션이다(`model.CreateUserInOrganization`). 배정이 실패하면(예: 비활성 조직) 사용자 행도 남지 않고 `line N (<username>): failed to set org membership: <사유>` 행 오류가 된다.
 
 응답: `{"success": true, "data": {"assigned": n, "created": n, "updated": n, "removed": n, ... , "errors": [...]}}` (`OrgImportResult`). 요청마다 `organization.user.import` 감사 로그가 남는다.
 
@@ -965,7 +995,7 @@ Query:
 | 멤버 조회에 정확히 일치하는 사용자 없음 | HTTP 404 `user not found` |
 | owner 제거 시도 | `organization owner cannot be removed` |
 | 구성원이 남은 조직 삭제 | `organization has N non-owner members, remove them first` |
-| 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` |
+| 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` (3.5로 만료 후 삭제) |
 | 다른 조직과 같은 이름으로 변경 | `organization name already exists` |
 | 비활성 조직의 쓰기 API·relay·충전 | `organization is disabled` (relay는 HTTP 403) |
 | 정지된 조직 회원의 relay·레거시 Midjourney·`/api/organization/*` 쓰기 | `organization membership is suspended` (relay와 쓰기 요청은 HTTP 403) |
@@ -979,7 +1009,8 @@ Query:
 | 조직 로그 기간이 로그 설정 상한 초과 | `The time range cannot exceed N days` |
 | 조직 회원의 개인 잔액 구독 결제 | `organization members cannot pay with personal balance` |
 | 조직 회원의 교환 코드 사용 | `organization members cannot redeem codes into their personal balance` |
-| 조직 회원의 개인 유료 충전 | `organization members cannot top up their personal balance` |
+| 조직 회원의 개인 유료 충전·추천 잔액 이체·출석 체크 | `organization members cannot top up their personal balance` |
+| 조직 회원의 realtime(WebSocket) 과금에 조직 지갑 부족 | `organization wallet quota insufficient` |
 | 조직 구독 plan 기간 값 범위 초과 | `duration_value must be between 0 and 1200` |
 | custom 기간인데 custom_seconds 범위가 잘못됨 | `custom_seconds must be between 1 and 31536000` |
 | non-custom 기간인데 custom_seconds 범위가 잘못됨 | `custom_seconds must be between 0 and 31536000` |
@@ -999,6 +1030,6 @@ Query:
 - 조직 쓰기 API는 strict JSON decoding을 사용한다. 문서에 없는 body 필드는 무시하지 않고 `unsupported field: <field>`로 거부한다.
 - 일부 query 숫자 필드는 파싱 실패 시 오류가 아니라 0으로 처리된다. 문서의 "실제 검증" 항목을 우선한다.
 - 조직·조직 사용자·plan의 quota 계열 값은 `0`-`9,007,199,254,740,991`(2^53-1) 범위를 강제한다.
-- 조직 변경 API 12종은 `organization.*` 감사 로그를 남긴다(create, update, delete, user.assign, user.update, user.remove, user.import, plan.create, plan.update, plan.disable, subscription.assign, subscription.cancel).
+- 조직 변경 API 13종은 `organization.*` 감사 로그를 남긴다(create, update, delete, topup.expire, user.assign, user.update, user.remove, user.import, plan.create, plan.update, plan.disable, subscription.assign, subscription.cancel).
 - 조직 필드(`organization_id`, `organization_role`)는 사용자 캐시에 넣지 않는다. 멤버십이 바뀌면 해당 사용자 캐시를 무효화한다.
 - 결제 API의 최소 충전 금액은 운영 설정값에 따라 달라진다. 설정 API 또는 관리자 설정을 함께 확인해야 한다.

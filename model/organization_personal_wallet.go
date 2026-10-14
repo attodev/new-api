@@ -49,7 +49,10 @@ func RejectOrganizationMemberRedeem(userId int) error {
 	return nil
 }
 
-func rejectOrganizationMemberPersonalTopUp(userId int) error {
+// RejectOrganizationMemberPersonalTopUp refuses every inflow into the personal
+// balance of an organization member (paid top-ups, affiliate transfers,
+// check-in rewards): inside an organization users.quota is the member cap.
+func RejectOrganizationMemberPersonalTopUp(userId int) error {
 	organizationId, err := GetUserOrganizationId(userId)
 	if err != nil {
 		return err

@@ -94,3 +94,14 @@ func rejectOrganizationMemberRedeem(c *gin.Context, userId int) bool {
 	}
 	return false
 }
+
+// rejectOrganizationMemberPersonalInflow is the affiliate-transfer and
+// check-in guard: both credit the personal balance, which for an organization
+// member is the admin-controlled member cap.
+func rejectOrganizationMemberPersonalInflow(c *gin.Context, userId int) bool {
+	if err := model.RejectOrganizationMemberPersonalTopUp(userId); err != nil {
+		common.ApiError(c, err)
+		return true
+	}
+	return false
+}

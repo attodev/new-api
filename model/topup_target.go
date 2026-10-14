@@ -67,7 +67,7 @@ func ValidateTopUpTargetCapacity(targetType string, targetId int, creditedQuota 
 		}
 		return ValidateOrganizationWalletCapacity(targetId, creditedQuota)
 	}
-	if err := rejectOrganizationMemberPersonalTopUp(targetId); err != nil {
+	if err := RejectOrganizationMemberPersonalTopUp(targetId); err != nil {
 		return err
 	}
 	return ValidateTopUpQuotaCapacity(targetId, creditedQuota)
@@ -145,4 +145,18 @@ func SearchOrganizationTopUps(organizationId int, keyword string, pageInfo *comm
 	}
 	err = query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error
 	return topups, total, err
+}
+
+// ExpirePendingOrganizationTopUps marks an organization's pending top-up
+// orders expired (root action for abandoned checkouts, which otherwise block
+// DeleteOrganizationClearingOwner). Settlement only credits pending orders, so
+// a late provider callback for an expired order credits nothing.
+func ExpirePendingOrganizationTopUps(organizationId int) (int64, error) {
+	if organizationId <= 0 {
+		return 0, errOrganizationTopUpWithoutTarget
+	}
+	result := DB.Model(&TopUp{}).
+		Where("target_type = ? AND target_id = ? AND status = ?", TopUpTargetTypeOrganization, organizationId, common.TopUpStatusPending).
+		Update("status", common.TopUpStatusExpired)
+	return result.RowsAffected, result.Error
 }

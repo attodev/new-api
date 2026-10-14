@@ -19,6 +19,7 @@ func TestOrganizationRoutesRegistered(t *testing.T) {
 	}
 	for _, want := range []string{
 		"GET /api/organizations/", "POST /api/organizations/", "PATCH /api/organizations/:id", "DELETE /api/organizations/:id",
+		"POST /api/organizations/:id/topups/expire",
 		"GET /api/organization/", "GET /api/organization/dashboard", "GET /api/organization/logs", "GET /api/organization/mj", "GET /api/organization/task",
 		"GET /api/organization/users", "GET /api/organization/users/export", "POST /api/organization/users/import",
 		"GET /api/organization/users/lookup", "GET /api/organization/users/:id", "PATCH /api/organization/users/:id",
@@ -41,7 +42,7 @@ func TestOrganizationRoutesRegistered(t *testing.T) {
 	}
 	require.True(t, registered["GET /api/organization/users/lookup"])
 	require.False(t, registered["GET /api/organization/assignable-users"], "the assignable-users listing was replaced by the exact lookup")
-	require.Equal(t, 38, len(registered)) // 4 platform + 34 member routes (team 46 minus Toss 2 and auto-recharge 6)
+	require.Equal(t, 39, len(registered)) // 5 platform (4 + top-up expiry) + 34 member routes (team 46 minus Toss 2 and auto-recharge 6)
 	require.Equal(t, authz.Permission{Resource: "organization", Action: "write"}, authz.OrganizationWrite)
 	_ = http.MethodGet
 }

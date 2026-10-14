@@ -16,11 +16,7 @@ const (
 	MaxOrganizationRemarkLength      = 255
 	// Quota ceilings share the wallet bound with the model layer (fork: O3 —
 	// common.MaxWalletQuota; the controller is the overflow guard).
-	MaxOrganizationQuota int64 = int64(common.MaxWalletQuota)
-	// Top-up amounts are currency units handed to a payment gateway and are later
-	// multiplied by quotaPerUnit, so they keep the original, far lower ceiling
-	// rather than sharing MaxOrganizationQuota.
-	MaxTopUpAmount                                int64 = 1_000_000_000
+	MaxOrganizationQuota                          int64 = int64(common.MaxWalletQuota)
 	MaxOrganizationReferenceId                          = 1_000_000_000
 	MaxOrganizationSubscriptionPlanTitleLength          = 128
 	MaxOrganizationSubscriptionPlanSubtitleLength       = 255
@@ -94,11 +90,4 @@ func validateOrganizationDurationUnit(durationUnit string) error {
 	default:
 		return errors.New(OrganizationDurationUnitAllowedError)
 	}
-}
-
-func rejectTopUpAmountTooLarge(amount int64) error {
-	if amount > MaxTopUpAmount {
-		return fmt.Errorf("amount cannot be greater than %d", MaxTopUpAmount)
-	}
-	return nil
 }

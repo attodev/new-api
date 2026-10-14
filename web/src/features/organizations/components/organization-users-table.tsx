@@ -990,7 +990,7 @@ export function OrganizationUsersTable() {
                 <BarChart3 />
                 {t('Usage dashboard')}
               </Button>
-              {isOrganizationAdmin && (
+              {isOrganizationOwner && (
                 <Button
                   variant='outline'
                   size='sm'

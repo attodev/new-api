@@ -18,6 +18,7 @@ var organizationPermissionRoutes = []permissionRoute{
 	{method: http.MethodPost, path: "/", permission: authz.OrganizationWrite, handler: controller.CreateOrganization},
 	{method: http.MethodPatch, path: "/:id", permission: authz.OrganizationWrite, handler: controller.UpdateOrganization},
 	{method: http.MethodDelete, path: "/:id", permission: authz.OrganizationWrite, handler: controller.DeleteOrganization},
+	{method: http.MethodPost, path: "/:id/topups/expire", permission: authz.OrganizationWrite, handler: controller.ExpireOrganizationTopUps},
 }
 
 func registerForkOrganizationRoutes(apiRouter *gin.RouterGroup) {

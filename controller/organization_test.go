@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -2901,4 +2902,36 @@ func TestGetMyOrganizationSubscriptionWithActiveSub(t *testing.T) {
 	require.Contains(t, res.Body.String(), `"success":true`)
 	require.Contains(t, res.Body.String(), `"subscription"`)
 	require.Contains(t, res.Body.String(), `"plan"`)
+}
+
+// fork: O3 — the member search keyword is a literal: LIKE wildcards typed by
+// the admin (% and _) and the escape character itself match only themselves.
+func TestOrganizationUserSearchEscapesLikeWildcards(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	for _, name := range []string{"50%_x", "50abx", "500_x", "50!%_x"} {
+		u := model.User{Username: name, Password: "x", DisplayName: "plain", Role: common.RoleCommonUser, Status: common.UserStatusEnabled,
+			AffCode: "aff-" + name, OrganizationId: f.org.Id, OrganizationRole: model.OrganizationRoleMember}
+		require.NoError(t, f.db.Create(&u).Error)
+	}
+
+	search := func(keyword string) []string {
+		t.Helper()
+		res := orgSecurityRequest(ListOrganizationUsers, f.admin, http.MethodGet, "/?p=1&page_size=50&keyword="+url.QueryEscape(keyword), "")
+		requireOrgSecurityResult(t, res, true, "")
+		var payload struct {
+			Data struct {
+				Items []organizationUserView `json:"items"`
+			} `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(res.Body.Bytes(), &payload))
+		names := []string{}
+		for _, item := range payload.Data.Items {
+			names = append(names, item.Username)
+		}
+		return names
+	}
+
+	require.Equal(t, []string{"50%_x"}, search("50%_x"))
+	require.Equal(t, []string{"50!%_x"}, search("!%"))
+	require.ElementsMatch(t, []string{"50%_x", "50abx", "500_x", "50!%_x"}, search("50"))
 }

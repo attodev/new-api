@@ -656,8 +656,8 @@ func ListOrganizationUsers(c *gin.Context) {
 		Where("role < ?", common.RoleAdminUser)
 
 	if keyword != "" {
-		query = query.Where("username LIKE ? OR display_name LIKE ?",
-			"%"+keyword+"%", "%"+keyword+"%")
+		pattern := "%" + model.SanitizeOrganizationKeyword(keyword) + "%"
+		query = query.Where("username LIKE ? ESCAPE '!' OR display_name LIKE ? ESCAPE '!'", pattern, pattern)
 	}
 
 	query = query.Session(&gorm.Session{})

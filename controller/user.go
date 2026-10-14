@@ -424,6 +424,9 @@ func TransferAffQuota(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if rejectOrganizationMemberPersonalInflow(c, id) { // fork: O3
+		return
+	}
 	tran := TransferAffQuotaRequest{}
 	if err := c.ShouldBindJSON(&tran); err != nil {
 		common.ApiError(c, err)

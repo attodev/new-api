@@ -456,6 +456,21 @@ describe('OrganizationUsersTable', () => {
     )
   })
 
+  it('offers the organization wallet top-up only to the owner', async () => {
+    signIn(1, 'owner')
+    const { unmount } = render(<OrganizationUsersTable />)
+    expect(
+      await screen.findByRole('link', { name: /Top up organization wallet/ })
+    ).toHaveAttribute('href', '/wallet')
+    unmount()
+
+    signIn(2, 'admin')
+    render(<OrganizationUsersTable />)
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    expect(screen.getByText('Usage dashboard')).toBeInTheDocument()
+    expect(screen.queryByText('Top up organization wallet')).toBeNull()
+  })
+
   it('hides import/export from root until an organization is selected', async () => {
     useAuthStore.getState().auth.setUser({
       id: 99,

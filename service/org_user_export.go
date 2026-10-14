@@ -359,13 +359,10 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			continue
 		}
 
-		if err := newUser.Insert(0); err != nil {
+		// Insert and assignment share one transaction: a failed assignment
+		// leaves no account behind.
+		if err := model.CreateUserInOrganization(newUser, organizationId, orgRole); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
-			continue
-		}
-
-		if err := model.AssignCreatedUserToOrganization(newUser.Id, organizationId, orgRole); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set org membership: %v", lineNum, username, err))
 			continue
 		}
 
