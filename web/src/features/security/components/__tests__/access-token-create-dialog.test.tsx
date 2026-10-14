@@ -315,7 +315,7 @@ describe('create access token dialog', () => {
     await verifyPassword(user)
 
     const shown = await screen.findByRole('dialog', { name: 'Access tokens' })
-    expect(within(shown).getByLabelText('Token')).toHaveValue(token)
+    expect(within(shown).getByLabelText('Access token')).toHaveValue(token) // fork: O9
     expect(
       screen.queryByRole('dialog', { name: 'Create access token' })
     ).not.toBeInTheDocument()

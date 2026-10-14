@@ -42,7 +42,9 @@ export function AccessTokenDialog(props: {
       footer={<Button onClick={props.onClose}>{t('Close')}</Button>}
     >
       <div className='space-y-2 py-2'>
-        <Label htmlFor='generated-access-token'>{t('Token')}</Label>
+        <Label htmlFor='generated-access-token'>
+          {t('Access token') /* fork: O9 */}
+        </Label>
         <div className='flex gap-2'>
           <Input
             id='generated-access-token'

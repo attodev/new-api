@@ -189,6 +189,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 | web/src/components/date-picker.tsx:20,39 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
 | O9 한글 | web/src/components/datetime-picker.tsx:21,42 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
 | O9 한글 | web/src/features/auth/hooks/use-auth-redirect.ts:27,64 | 로그인 직후 저장된 사용자 언어를 `normalizeInterfaceLanguage`로 정규화해 `i18n.changeLanguage`에 전달 (team 사용자의 `setting.language = 'kr'` → `ko`, 데이터 마이그레이션 없이 read-time 정규화) | web/src/i18n/languages.test.ts |
+| O9 한글 | web/src/features/security/components/dialogs/access-token-dialog.tsx:46, web/src/features/security/components/__tests__/access-token-create-dialog.test.tsx:318 | 생성된 액세스 토큰 라벨을 공용 키 `t('Token')` 대신 `t('Access token')`로 표시 (`Token`은 사용 로그의 API 키 열이라 ko에서 "API 키"이므로 액세스 토큰 대화상자에 쓸 수 없음). 키 `Access token`은 8개 locale 모두에 추가 | web/src/i18n/locales/*.json |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
