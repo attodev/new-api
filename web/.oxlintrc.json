@@ -21,7 +21,8 @@
     ".tanstack",
     ".eslintrc.cjs",
     "src/components/ui",
-    "src/routeTree.gen.ts"
+    "src/routeTree.gen.ts",
+    "landing/**"
   ],
   "rules": {
     "curly": ["error", "multi-line"],

@@ -33,14 +33,19 @@ func newLandingTestEngine(t *testing.T) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	assets := WebAssets{LandingTemplatesFS: os.DirFS(".."), LandingPublicFS: os.DirFS("..")}
 	router := gin.New()
-	registerLandingRoutes(router, assets)
-	router.NoRoute(landingStatic(assets), func(c *gin.Context) { c.String(http.StatusNotFound, "spa") })
+	// Production order: static assets, then pages, then the SPA fallback.
+	router.NoRoute(landingStatic(assets), landingPages(assets), func(c *gin.Context) { c.String(http.StatusNotFound, "spa") })
 	return router
 }
 
 func get(t *testing.T, router *gin.Engine, path string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	return request(t, router, http.MethodGet, path, headers)
+}
+
+func request(t *testing.T, router *gin.Engine, method, path string, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, nil)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -61,6 +66,10 @@ func TestLandingPagesPickLanguageAndRedirectLegacyPaths(t *testing.T) {
 	legacy := get(t, router, "/guide_en.html", nil)
 	require.Equal(t, http.StatusMovedPermanently, legacy.Code)
 	require.Equal(t, "/en/guide", legacy.Header().Get("Location"))
+	head := request(t, router, http.MethodHead, "/en", nil)
+	require.Equal(t, http.StatusOK, head.Code)
+	require.Contains(t, head.Header().Get("Content-Type"), "text/html")
+	require.Equal(t, "spa", get(t, router, "/unknown-page", nil).Body.String())
 }
 
 func TestLandingPagesReflectSessionHint(t *testing.T) {
@@ -75,6 +84,7 @@ func TestLandingPagesReflectSessionHint(t *testing.T) {
 }
 
 func TestLandingAnalyticsFollowsEnv(t *testing.T) {
+	t.Setenv("GOOGLE_ANALYTICS_ID", "")
 	router := newLandingTestEngine(t)
 	require.NotContains(t, get(t, router, "/en/guide", nil).Body.String(), "googletagmanager")
 	t.Setenv("GOOGLE_ANALYTICS_ID", "G-TEST123")

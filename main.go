@@ -209,8 +209,9 @@ func main() {
 
 	// 设置路由
 	router.SetRouter(server, router.WebAssets{
-		BuildFS:         buildFS,
-		IndexPage:       indexPage,
+		BuildFS:   buildFS,
+		IndexPage: indexPage,
+
 		LandingPublicFS: landingPublicFS, LandingTemplatesFS: landingTemplatesFS, // fork: O1
 	})
 	var port = os.Getenv("PORT")

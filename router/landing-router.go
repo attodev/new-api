@@ -18,8 +18,9 @@ import (
 )
 
 // fork: O1 — server-rendered landing/guide pages and their static assets.
-// Hooks: router/web-router.go (registerLandingRoutes, landingStatic, WebAssets
-// fields) and main.go (embeds). Assets live in web/landing/{templates,public}.
+// Hooks: router/web-router.go (landingStatic and landingPages in the NoRoute
+// chain, WebAssets fields) and main.go (embeds). Assets live in
+// web/landing/{templates,public}.
 
 const (
 	landingTemplatesDir    = "web/landing/templates"
@@ -34,8 +35,17 @@ type landingPageData struct {
 	GoogleAnalyticsID string // GOOGLE_ANALYTICS_ID, same env as the SPA
 }
 
-var landingPages = []struct{ name, active string }{
-	{"index_ko", "about"}, {"index_en", "about"}, {"guide_ko", "guide"}, {"guide_en", "guide"},
+// landingPageActive maps each page template to its active nav item.
+var landingPageActive = map[string]string{
+	"index_ko": "about", "index_en": "about", "guide_ko": "guide", "guide_en": "guide",
+}
+
+// landingPagePaths maps page URLs to templates; "/" picks by Accept-Language.
+var landingPagePaths = map[string]string{"/en": "index_en", "/guide": "guide_ko", "/en/guide": "guide_en"}
+
+// landingRedirects keeps the legacy static-file URLs working.
+var landingRedirects = map[string]string{
+	"/index.html": "/", "/index_en.html": "/en", "/guide.html": "/guide", "/guide_en.html": "/en/guide",
 }
 
 func landingPageDataFor(c *gin.Context, active string) landingPageData {
@@ -103,59 +113,73 @@ func etagMatches(header, current string) bool {
 	return false
 }
 
-// registerLandingRoutes registers the four pages and the legacy .html redirects.
-// handlers (gzip, web rate limit) come from SetWebRouter so the pages share the
-// SPA's protections. Without embedded templates (e.g. upstream tests that build
-// WebAssets by hand) no landing routes are registered.
-func registerLandingRoutes(router *gin.Engine, assets WebAssets, handlers ...gin.HandlerFunc) {
+// landingPages renders the four pages (GET/HEAD) and answers the legacy .html
+// redirects from the NoRoute chain, after the plugin dispatcher, access-token
+// audit and web rate limit, then aborts. Every other path falls through to the
+// SPA handlers. Without embedded templates (e.g. upstream tests that build
+// WebAssets by hand) it is a pass-through.
+func landingPages(assets WebAssets) gin.HandlerFunc {
 	if assets.LandingTemplatesFS == nil {
-		return
+		return func(c *gin.Context) {}
 	}
-	group := router.Group("", handlers...)
-	var render func(c *gin.Context, name, active string)
+	var render func(c *gin.Context, name string) []byte
 	if common.DebugEnabled {
 		common.SysLog("landing dev mode (DEBUG=true): templates/public served from disk")
-		render = func(c *gin.Context, name, active string) {
+		render = func(c *gin.Context, name string) []byte {
 			tmpl, err := template.ParseGlob(landingTemplatesDir + "/*.tmpl")
 			if err != nil {
-				c.String(http.StatusInternalServerError, "landing templates: %v", err)
-				return
+				common.SysLog("failed to parse landing templates: " + err.Error())
+				return nil
 			}
-			c.Data(http.StatusOK, landingHTMLContentType, renderLandingTemplate(tmpl, name, landingPageDataFor(c, active)))
+			return renderLandingTemplate(tmpl, name, landingPageDataFor(c, landingPageActive[name]))
 		}
 	} else {
 		tmpl := template.Must(template.ParseFS(assets.LandingTemplatesFS, landingTemplatesDir+"/*.tmpl"))
-		anonymous := make(map[string][]byte, len(landingPages))
-		for _, page := range landingPages {
-			anonymous[page.name] = renderLandingTemplate(tmpl, page.name, landingPageDataFor(nil, page.active))
-		}
-		render = func(c *gin.Context, name, active string) {
-			data := landingPageDataFor(c, active)
-			if !data.IsLoggedIn {
-				c.Data(http.StatusOK, landingHTMLContentType, anonymous[name])
-				return
+		anonymous := make(map[string][]byte, len(landingPageActive))
+		for name, active := range landingPageActive {
+			body := renderLandingTemplate(tmpl, name, landingPageDataFor(nil, active))
+			if body == nil {
+				panic("failed to render landing template " + name)
 			}
-			c.Data(http.StatusOK, landingHTMLContentType, renderLandingTemplate(tmpl, name, data))
+			anonymous[name] = body
+		}
+		render = func(c *gin.Context, name string) []byte {
+			data := landingPageDataFor(c, landingPageActive[name])
+			if !data.IsLoggedIn {
+				return anonymous[name]
+			}
+			return renderLandingTemplate(tmpl, name, data)
 		}
 	}
-	page := func(name, active string) gin.HandlerFunc {
-		return func(c *gin.Context) {
-			c.Header("Cache-Control", landingRevalidate)
-			render(c, name, active)
-		}
-	}
-	group.GET("/", func(c *gin.Context) {
-		if prefersEnglish(c.GetHeader("Accept-Language")) {
-			page("index_en", "about")(c)
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
 			return
 		}
-		page("index_ko", "about")(c)
-	})
-	group.GET("/en", page("index_en", "about"))
-	group.GET("/guide", page("guide_ko", "guide"))
-	group.GET("/en/guide", page("guide_en", "guide"))
-	for from, to := range map[string]string{"/index.html": "/", "/index_en.html": "/en", "/guide.html": "/guide", "/guide_en.html": "/en/guide"} {
-		group.GET(from, func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, to) })
+		urlPath := c.Request.URL.Path
+		if to, ok := landingRedirects[urlPath]; ok {
+			c.Redirect(http.StatusMovedPermanently, to)
+			c.Abort()
+			return
+		}
+		name, ok := landingPagePaths[urlPath]
+		if urlPath == "/" {
+			name, ok = "index_ko", true
+			if prefersEnglish(c.GetHeader("Accept-Language")) {
+				name = "index_en"
+			}
+		}
+		if !ok {
+			return
+		}
+		c.Header("Cache-Control", landingRevalidate)
+		body := render(c, name)
+		if body == nil {
+			c.String(http.StatusInternalServerError, "failed to render landing page")
+			c.Abort()
+			return
+		}
+		c.Data(http.StatusOK, landingHTMLContentType, body)
+		c.Abort()
 	}
 }
 
