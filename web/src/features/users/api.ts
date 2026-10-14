@@ -279,6 +279,11 @@ export async function adminUnbindCustomOAuth(
  */
 export async function exportUsers(): Promise<void> {
   const res = await api.get('/api/user/export', { responseType: 'blob' })
+  // The backend reports failures as HTTP 200 JSON; don't save that as .xlsx.
+  if (res.data instanceof Blob && res.data.type.includes('application/json')) {
+    const parsed = JSON.parse(await res.data.text())
+    throw new Error(parsed?.message || 'Export failed')
+  }
   const url = window.URL.createObjectURL(new Blob([res.data]))
   const link = document.createElement('a')
   link.href = url
@@ -299,5 +304,5 @@ export async function importUsers(file: File): Promise<ImportResult> {
   const res = await api.post('/api/user/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
-  return res.data.data as ImportResult
+  return requireServerSuccess(res.data).data as ImportResult
 }

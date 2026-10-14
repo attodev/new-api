@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Download, Plus, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 
@@ -41,6 +42,10 @@ export function UsersPrimaryButtons() {
     setExportLoading(true)
     try {
       await exportUsers()
+    } catch (e: unknown) {
+      toast.error(
+        e instanceof Error && e.message ? e.message : t('Export failed')
+      )
     } finally {
       setExportLoading(false)
     }

@@ -69,7 +69,10 @@ export function UsersImportDialog({
     } catch (e: unknown) {
       const message = (e as { response?: { data?: { message?: string } } })
         ?.response?.data?.message
-      setError(message ?? t('Import failed'))
+      setError(
+        message ??
+          (e instanceof Error && e.message ? e.message : t('Import failed'))
+      )
     } finally {
       setLoading(false)
     }
@@ -143,7 +146,7 @@ export function UsersImportDialog({
               {loading ? t('Uploading...') : t('Upload')}
             </Button>
           )}
-          <Button variant='outline' onClick={handleClose}>
+          <Button variant='outline' onClick={handleClose} disabled={loading}>
             {result ? t('Close') : t('Cancel')}
           </Button>
         </DialogFooter>

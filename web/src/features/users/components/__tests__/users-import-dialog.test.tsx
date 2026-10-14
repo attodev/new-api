@@ -18,34 +18,56 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UsersImportDialog } from '../users-import-dialog'
 
+const importUsersMock = vi.hoisted(() => vi.fn())
+
 vi.mock('../../api', () => ({
-  importUsers: vi.fn(async () => ({
-    created: 2,
-    skipped: 1,
-    skipped_usernames: ['dup'],
-    errors: ['line 4 (bad): initial_password is empty'],
-  })),
+  importUsers: importUsersMock,
 }))
 
+const xlsx = () =>
+  new File(['x'], 'users.xlsx', {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+
 describe('UsersImportDialog', () => {
+  beforeEach(() => {
+    importUsersMock.mockReset()
+  })
+
   it('uploads the chosen workbook and shows the result summary', async () => {
+    importUsersMock.mockResolvedValue({
+      created: 2,
+      skipped: 1,
+      skipped_usernames: ['dup'],
+      errors: ['line 4 (bad): initial_password is empty'],
+    })
     const onSuccess = vi.fn()
     render(
       <UsersImportDialog open onOpenChange={() => {}} onSuccess={onSuccess} />
     )
     const input = screen.getByLabelText('Select .xlsx file') as HTMLInputElement
-    const file = new File(['x'], 'users.xlsx', {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    })
-    await userEvent.upload(input, file)
+    await userEvent.upload(input, xlsx())
     await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
-    await waitFor(() => expect(onSuccess).toHaveBeenCalled())
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1))
     expect(screen.getByText(/2 users created/)).toBeInTheDocument()
     expect(screen.getByText(/1 users skipped/)).toBeInTheDocument()
     expect(screen.getByText(/initial_password is empty/)).toBeInTheDocument()
+  })
+
+  it('shows the failure message and does not report success', async () => {
+    importUsersMock.mockRejectedValue(new Error('invalid xlsx file'))
+    const onSuccess = vi.fn()
+    render(
+      <UsersImportDialog open onOpenChange={() => {}} onSuccess={onSuccess} />
+    )
+    await userEvent.upload(screen.getByLabelText('Select .xlsx file'), xlsx())
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+    expect(await screen.findByText('invalid xlsx file')).toBeInTheDocument()
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled()
   })
 })
