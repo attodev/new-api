@@ -110,10 +110,28 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 	return session, nil, true
 }
 
+func orgReserveInsufficientError(err error) *types.NewAPIError {
+	return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+		types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+}
+
 // reserveOrganizationFunding is the reserveFunding case for both organization fundings.
-func reserveOrganizationFunding(funding FundingSource, delta int, lang string) error {
+// requireAvailableQuota mirrors upstream's WalletFunding branch: when the
+// quantity is known up front (image requests) both balances are reserved
+// atomically and the reserve fails instead of admitting debt.
+func reserveOrganizationFunding(funding FundingSource, delta int, requireAvailableQuota bool, lang string) error {
 	switch f := funding.(type) {
 	case *OrganizationWalletFunding:
+		if requireAvailableQuota {
+			if err := reserveWalletQuotaForOrganization(f.memberId, f.organizationId, delta); err != nil {
+				if errors.Is(err, ErrInsufficientWalletQuota) {
+					return orgReserveInsufficientError(fmt.Errorf("organization wallet quota insufficient: %w", err))
+				}
+				return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+			}
+			f.consumed += delta
+			return nil
+		}
 		if err := f.Settle(delta); err != nil {
 			return types.NewErrorWithStatusCode(fmt.Errorf("organization wallet quota insufficient: %s", err.Error()),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
@@ -121,6 +139,9 @@ func reserveOrganizationFunding(funding FundingSource, delta int, lang string) e
 		f.consumed += delta
 		return nil
 	case *OrganizationSubscriptionFunding:
+		if requireAvailableQuota {
+			return reserveOrganizationSubscriptionAtomically(f, delta, lang)
+		}
 		if err := f.Settle(delta); err != nil {
 			return types.NewErrorWithStatusCode(
 				errors.New(i18n.Translate(lang, i18n.MsgQuotaSubscriptionInsufficient, map[string]any{"Error": err.Error()})),
@@ -129,6 +150,30 @@ func reserveOrganizationFunding(funding FundingSource, delta int, lang string) e
 		return nil
 	}
 	return types.NewError(fmt.Errorf("unsupported funding source: %s", funding.Source()), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+}
+
+// reserveOrganizationSubscriptionAtomically applies the plan delta, then
+// reserves the organization wallet only if it can cover the delta; on failure
+// the plan delta is undone.
+func reserveOrganizationSubscriptionAtomically(f *OrganizationSubscriptionFunding, delta int, lang string) error {
+	d := int64(delta)
+	if err := model.PostConsumeOrganizationUserSubscriptionDelta(f.organizationUserSubscriptionId, d); err != nil {
+		return types.NewErrorWithStatusCode(
+			errors.New(i18n.Translate(lang, i18n.MsgQuotaSubscriptionInsufficient, map[string]any{"Error": err.Error()})),
+			types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+	}
+	reserved, err := model.TryReserveOrganizationQuota(f.organizationId, d)
+	if err != nil || !reserved {
+		if rollbackErr := model.PostConsumeOrganizationUserSubscriptionDelta(f.organizationUserSubscriptionId, -d); rollbackErr != nil {
+			common.SysLog(common.LogText("error undoing organization subscription reserve (subscriptionId=%d, delta=%d): %s", f.organizationUserSubscriptionId, d, rollbackErr.Error()))
+		}
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+		}
+		return orgReserveInsufficientError(fmt.Errorf("organization wallet quota insufficient: %w", ErrInsufficientWalletQuota))
+	}
+	f.organizationWalletConsumed += d
+	return nil
 }
 
 func rollbackOrganizationFundingReserve(funding FundingSource, delta int) {
@@ -199,12 +244,17 @@ func postConsumeOrganizationQuota(relayInfo *relaycommon.RelayInfo, quota int) (
 			if err := model.PostConsumeOrganizationUserSubscriptionDelta(relayInfo.SubscriptionId, int64(quota)); err != nil {
 				return true, err
 			}
+			var orgErr error
 			if quota > 0 {
-				if err := model.DecreaseOrganizationQuota(relayInfo.BillingOrganizationId, int64(quota)); err != nil {
-					return true, err
+				orgErr = model.DecreaseOrganizationQuota(relayInfo.BillingOrganizationId, int64(quota))
+			} else {
+				orgErr = model.IncreaseOrganizationQuota(relayInfo.BillingOrganizationId, int64(-quota))
+			}
+			if orgErr != nil {
+				if rollbackErr := model.PostConsumeOrganizationUserSubscriptionDelta(relayInfo.SubscriptionId, -int64(quota)); rollbackErr != nil {
+					common.SysLog(common.LogText("error undoing organization subscription post-consume (subscriptionId=%d, delta=%d): %s", relayInfo.SubscriptionId, quota, rollbackErr.Error()))
 				}
-			} else if err := model.IncreaseOrganizationQuota(relayInfo.BillingOrganizationId, int64(-quota)); err != nil {
-				return true, err
+				return true, orgErr
 			}
 			relayInfo.SubscriptionPostDelta += int64(quota)
 		}

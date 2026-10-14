@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 )
 
@@ -25,20 +26,8 @@ func resolveOrganizationForWallet(userId int) (int, error) {
 	return user.OrganizationId, nil
 }
 
-// AdjustWalletQuotaForUser charges (delta > 0) or refunds (delta < 0) the
-// user's wallet and, for organization members, the organization wallet of the
-// user's current organization.
-func AdjustWalletQuotaForUser(userId int, delta int) error {
-	if delta == 0 {
-		return nil
-	}
-	organizationId, err := resolveOrganizationForWallet(userId)
-	if err != nil {
-		return err
-	}
-	return adjustWalletQuotaForOrganization(userId, organizationId, delta)
-}
-
+// adjustWalletQuotaForOrganization charges (delta > 0) or refunds (delta < 0)
+// the member limit and, when organizationId > 0, the organization wallet.
 func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int) error {
 	if delta == 0 {
 		return nil
@@ -49,7 +38,9 @@ func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int)
 		}
 		if organizationId > 0 {
 			if err := model.DecreaseOrganizationQuota(organizationId, int64(delta)); err != nil {
-				_ = model.IncreaseUserQuota(userId, delta, false)
+				if rollbackErr := model.IncreaseUserQuota(userId, delta, false); rollbackErr != nil {
+					common.SysLog(common.LogText("error rolling back member limit charge (userId=%d, organizationId=%d, amount=%d): %s", userId, organizationId, delta, rollbackErr.Error()))
+				}
 				return err
 			}
 		}
@@ -62,7 +53,9 @@ func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int)
 	}
 	if organizationId > 0 {
 		if err := model.IncreaseOrganizationQuota(organizationId, int64(refund)); err != nil {
-			_ = model.DecreaseUserQuota(userId, refund, false)
+			if rollbackErr := model.DecreaseUserQuota(userId, refund, false); rollbackErr != nil {
+				common.SysLog(common.LogText("error rolling back member limit refund (userId=%d, organizationId=%d, amount=%d): %s", userId, organizationId, refund, rollbackErr.Error()))
+			}
 			return err
 		}
 	}
@@ -100,7 +93,9 @@ func UpdateOrganizationUsedQuotaForUser(userId int, quota int) {
 	if err != nil || organizationId <= 0 {
 		return
 	}
-	_ = model.UpdateOrganizationUsedQuota(organizationId, int64(quota))
+	if err := model.UpdateOrganizationUsedQuota(organizationId, int64(quota)); err != nil {
+		common.SysLog(common.LogText("error updating organization used quota (organizationId=%d, quota=%d): %s", organizationId, quota, err.Error()))
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -184,10 +179,17 @@ func (o *OrganizationSubscriptionFunding) PreConsume(_ int) error {
 	if o.preConsumed <= 0 {
 		return nil
 	}
-	if err := model.DecreaseOrganizationQuota(o.organizationId, o.preConsumed); err != nil {
-		_ = model.RefundOrganizationSubscriptionPreConsume(o.requestId)
+	// Atomic: the balance check in newOrganizationBillingSession is advisory only.
+	reserved, err := model.TryReserveOrganizationQuota(o.organizationId, o.preConsumed)
+	if err != nil || !reserved {
+		if refundErr := model.RefundOrganizationSubscriptionPreConsume(o.requestId); refundErr != nil {
+			common.SysLog(common.LogText("error refunding organization subscription pre-consume after organization wallet reserve failed (requestId=%s): %s", o.requestId, refundErr.Error()))
+		}
 		o.preConsumed = 0
-		return err
+		if err != nil {
+			return err
+		}
+		return ErrInsufficientWalletQuota
 	}
 	o.organizationWalletConsumed = o.preConsumed
 	return nil
@@ -203,7 +205,9 @@ func (o *OrganizationSubscriptionFunding) Settle(delta int) error {
 			return err
 		}
 		if err := model.DecreaseOrganizationQuota(o.organizationId, d); err != nil {
-			_ = model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, -d)
+			if rollbackErr := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, -d); rollbackErr != nil {
+				common.SysLog(common.LogText("error rolling back organization subscription charge (subscriptionId=%d, delta=%d): %s", o.organizationUserSubscriptionId, d, rollbackErr.Error()))
+			}
 			return err
 		}
 		o.organizationWalletConsumed += d
@@ -215,7 +219,9 @@ func (o *OrganizationSubscriptionFunding) Settle(delta int) error {
 		return err
 	}
 	if err := model.PostConsumeOrganizationUserSubscriptionDelta(o.organizationUserSubscriptionId, d); err != nil {
-		_ = model.DecreaseOrganizationQuota(o.organizationId, refund)
+		if rollbackErr := model.DecreaseOrganizationQuota(o.organizationId, refund); rollbackErr != nil {
+			common.SysLog(common.LogText("error rolling back organization wallet refund (organizationId=%d, amount=%d): %s", o.organizationId, refund, rollbackErr.Error()))
+		}
 		return err
 	}
 	o.organizationWalletConsumed -= refund
@@ -229,13 +235,18 @@ func (o *OrganizationSubscriptionFunding) Refund() error {
 	if o.preConsumed <= 0 {
 		return nil
 	}
-	if err := refundWithRetry(func() error {
+	// The organization wallet is refunded even when the plan refund fails, so a
+	// stuck plan record never also strands organization funds.
+	planErr := refundWithRetry(func() error {
 		return model.RefundOrganizationSubscriptionPreConsume(o.requestId)
-	}); err != nil {
-		return err
+	})
+	if planErr != nil {
+		common.SysLog(common.LogText("error refunding organization subscription pre-consume (requestId=%s): %s", o.requestId, planErr.Error()))
 	}
 	if o.organizationWalletConsumed > 0 {
-		return model.IncreaseOrganizationQuota(o.organizationId, o.organizationWalletConsumed)
+		if err := model.IncreaseOrganizationQuota(o.organizationId, o.organizationWalletConsumed); err != nil {
+			return errors.Join(planErr, err)
+		}
 	}
-	return nil
+	return planErr
 }

@@ -292,7 +292,7 @@ func (s *BillingSession) reserveFunding(delta int, requireAvailableQuota bool) e
 		}
 		return nil
 	case *OrganizationWalletFunding, *OrganizationSubscriptionFunding: // fork: O3
-		return reserveOrganizationFunding(s.funding, delta, s.lang)
+		return reserveOrganizationFunding(s.funding, delta, requireAvailableQuota, s.lang)
 	default:
 		return types.NewError(fmt.Errorf("unsupported funding source: %s", s.funding.Source()), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 	}

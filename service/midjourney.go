@@ -50,6 +50,9 @@ func PrepareMidjourneyTaskBilling(relayInfo *relaycommon.RelayInfo, task *model.
 	if relayInfo.BillingSource == BillingSourceSubscription || isOrganizationSubscriptionSource(relayInfo.BillingSource) { // fork: O3
 		return false, errors.New("legacy Midjourney billing does not support subscriptions")
 	}
+	if err := prepareMidjourneyOrganizationBilling(relayInfo); err != nil { // fork: O3
+		return false, err
+	}
 
 	task.Quota = quota
 	task.BillingChannelId = task.ChannelId
@@ -103,6 +106,7 @@ func RefundMidjourneyQuota(ctx context.Context, task *model.Midjourney, reason s
 		logger.LogWarn(ctx, common.LogText("failed to refund Midjourney user quota, task %s: %s", task.MjId, err.Error()))
 		return false
 	}
+	refundMidjourneyOrganizationQuota(task.UserId, quota) // fork: O3
 
 	if task.TokenId > 0 {
 		tokenKey := resolveTokenKey(ctx, task.TokenId, task.MjId)

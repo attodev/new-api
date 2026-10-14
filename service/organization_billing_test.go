@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -429,4 +431,108 @@ func TestOrganizationSubscriptionBillingRejectsWhenOrganizationWalletInsufficien
 	sub, err := model.GetActiveOrganizationUserSubscription(orgID, 30)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, sub.AmountUsed, "plan untouched")
+}
+
+// Image quantity is known up front: an organization member's Reserve must
+// fail instead of driving the member limit or organization wallet negative.
+func TestOrganizationWalletReserveForImageRequestRejectsInsteadOfDebt(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 50).Error)
+
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:            2,
+		OriginModelName:   "test-image",
+		IsPlayground:      true,
+		ForcePreConsume:   true,
+		ImageRequestCount: 10,
+	}
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.Equal(t, 75, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(25), getOrganizationForBillingTest(t, 1).Quota)
+
+	err := session.Reserve(250)
+	require.Error(t, err)
+	var reserveErr *types.NewAPIError
+	require.True(t, errors.As(err, &reserveErr))
+	require.Equal(t, http.StatusForbidden, reserveErr.StatusCode)
+	require.Equal(t, 25, session.GetPreConsumedQuota())
+	require.Equal(t, 75, getUserQuotaForBillingTest(t, 2), "member limit not driven into debt")
+	require.Equal(t, int64(25), getOrganizationForBillingTest(t, 1).Quota, "organization wallet not driven into debt")
+
+	// A reserve the organization wallet can cover still succeeds and is refundable.
+	require.NoError(t, session.Reserve(45))
+	require.Equal(t, 55, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(5), getOrganizationForBillingTest(t, 1).Quota)
+	session.Refund(newOrganizationBillingContext())
+	require.Eventually(t, func() bool {
+		return getUserQuotaForBillingTest(t, 2) == 100 && getOrganizationForBillingTest(t, 1).Quota == 50
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestOrganizationSubscriptionReserveForImageRequestRejectsInsteadOfDebt(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 50).Error)
+	sub, err := createOrganizationPlanAndAssign(t, 1, 2, 1000)
+	require.NoError(t, err)
+
+	relayInfo := &relaycommon.RelayInfo{
+		RequestId:         "org-sub-image-reserve-req",
+		UserId:            2,
+		OriginModelName:   "test-image",
+		IsPlayground:      true,
+		ForcePreConsume:   true,
+		ImageRequestCount: 4,
+	}
+	session, apiErr := NewBillingSession(newOrganizationBillingContext(), relayInfo, 25)
+	require.Nil(t, apiErr)
+	require.Equal(t, int64(25), getOrganizationForBillingTest(t, 1).Quota)
+
+	err = session.Reserve(100)
+	require.Error(t, err)
+	var reserveErr *types.NewAPIError
+	require.True(t, errors.As(err, &reserveErr))
+	require.Equal(t, http.StatusForbidden, reserveErr.StatusCode)
+	require.Equal(t, int64(25), getOrganizationForBillingTest(t, 1).Quota, "organization wallet not driven into debt")
+	var reloaded model.OrganizationUserSubscription
+	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
+	require.Equal(t, int64(25), reloaded.AmountUsed, "plan delta undone when the organization wallet cannot cover it")
+	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2), "plan members never touch the member limit")
+
+	require.NoError(t, session.Reserve(45))
+	require.Equal(t, int64(5), getOrganizationForBillingTest(t, 1).Quota)
+	session.Refund(newOrganizationBillingContext())
+	require.Eventually(t, func() bool {
+		var after model.OrganizationUserSubscription
+		if err := model.DB.First(&after, sub.Id).Error; err != nil {
+			return false
+		}
+		return after.AmountUsed == 0 && getOrganizationForBillingTest(t, 1).Quota == 50
+	}, time.Second, 10*time.Millisecond)
+}
+
+// Review finding 3: the plan-mode organization wallet pre-consume is atomic.
+func TestOrganizationSubscriptionPreConsumeIsAtomicOnOrganizationWallet(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).Update("quota", 100).Error)
+	sub, err := createOrganizationPlanAndAssign(t, 1, 2, 1000)
+	require.NoError(t, err)
+
+	first := &OrganizationSubscriptionFunding{requestId: "atomic-1", organizationId: 1, userId: 2, modelName: "m", amount: 60}
+	require.NoError(t, first.PreConsume(60))
+	second := &OrganizationSubscriptionFunding{requestId: "atomic-2", organizationId: 1, userId: 2, modelName: "m", amount: 60}
+	require.ErrorIs(t, second.PreConsume(60), ErrInsufficientWalletQuota)
+	require.Equal(t, int64(0), second.preConsumed)
+
+	require.Equal(t, int64(40), getOrganizationForBillingTest(t, 1).Quota)
+	var reloaded model.OrganizationUserSubscription
+	require.NoError(t, model.DB.First(&reloaded, sub.Id).Error)
+	require.Equal(t, int64(60), reloaded.AmountUsed, "the second pre-consume's plan usage is refunded")
 }

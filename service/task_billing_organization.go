@@ -1,6 +1,9 @@
 package service
 
-import "github.com/QuantumNous/new-api/model"
+import (
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
+)
 
 // fork: O3 — async tasks settle against the organization recorded at submission.
 func taskIsOrganizationSubscription(task *model.Task) bool {
@@ -26,7 +29,9 @@ func taskAdjustOrganizationFunding(task *model.Task, delta int) (bool, error) {
 		}
 		if orgErr != nil {
 			// Undo the plan step so a retried settlement or refund does not apply it twice.
-			_ = model.PostConsumeOrganizationUserSubscriptionDelta(subId, -int64(delta))
+			if rollbackErr := model.PostConsumeOrganizationUserSubscriptionDelta(subId, -int64(delta)); rollbackErr != nil {
+				common.SysLog(common.LogText("error undoing task organization subscription delta (task=%s, subscriptionId=%d, delta=%d): %s", task.TaskID, subId, delta, rollbackErr.Error()))
+			}
 		}
 		return true, orgErr
 	}
@@ -38,6 +43,8 @@ func taskAdjustOrganizationFunding(task *model.Task, delta int) (bool, error) {
 
 func taskAdjustOrganizationUsedQuota(task *model.Task, delta int) {
 	if task.PrivateData.OrganizationId > 0 && delta != 0 {
-		_ = model.UpdateOrganizationUsedQuota(task.PrivateData.OrganizationId, int64(delta))
+		if err := model.UpdateOrganizationUsedQuota(task.PrivateData.OrganizationId, int64(delta)); err != nil {
+			common.SysLog(common.LogText("error updating task organization used quota (task=%s, organizationId=%d, delta=%d): %s", task.TaskID, task.PrivateData.OrganizationId, delta, err.Error()))
+		}
 	}
 }
