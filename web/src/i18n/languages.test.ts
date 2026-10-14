@@ -18,7 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { convertDetectedLanguage } from './languages'
+import {
+  convertDetectedLanguage,
+  INTERFACE_LANGUAGE_OPTIONS,
+  normalizeInterfaceLanguage,
+  toIntlLocale,
+} from './languages'
 
 describe('convertDetectedLanguage', () => {
   test('maps browser BCP-47 Chinese tags onto interface codes', () => {
@@ -45,5 +50,27 @@ describe('convertDetectedLanguage', () => {
     expect(convertDetectedLanguage('en')).toBe('en')
     expect(convertDetectedLanguage('fr-FR')).toBe('fr-FR')
     expect(convertDetectedLanguage('ja')).toBe('ja')
+  })
+})
+
+describe('Korean interface language', () => {
+  test('maps Korean BCP-47 tags onto ko', () => {
+    expect(convertDetectedLanguage('ko')).toBe('ko')
+    expect(convertDetectedLanguage('ko-KR')).toBe('ko')
+    expect(convertDetectedLanguage('ko_KR')).toBe('ko')
+    expect(convertDetectedLanguage('kr')).toBe('ko') // legacy team code
+  })
+  test('normalizes saved Korean codes, including the legacy kr', () => {
+    expect(normalizeInterfaceLanguage('ko')).toBe('ko')
+    expect(normalizeInterfaceLanguage('ko-KR')).toBe('ko')
+    expect(normalizeInterfaceLanguage('kr')).toBe('ko')
+    expect(normalizeInterfaceLanguage('pt-BR')).toBe('en')
+  })
+  test('lists Korean as an interface language', () => {
+    expect(INTERFACE_LANGUAGE_OPTIONS.map((o) => o.code)).toContain('ko')
+  })
+  test('yields a valid Intl locale for ko', () => {
+    expect(toIntlLocale('ko')).toBe('ko')
+    expect(() => new Intl.NumberFormat(toIntlLocale('ko'))).not.toThrow()
   })
 })

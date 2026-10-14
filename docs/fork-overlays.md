@@ -183,6 +183,11 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O7 타이밍 분해 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json | `Timing Breakdown`, `Model Provider`, `Gateway Overhead` 키 3개 (`Vendor discount` 뒤) | — |
 | O9 한글 | web/package.json:27 | scripts에 `"i18n:ko": "node scripts/ko-locale.mjs"` 한 줄 (JSON이라 `// fork: O9` 주석을 달 수 없어 이 표로만 표시) | web/scripts/ko-locale.mjs, web/scripts/ko-locale.test.mjs |
 | O9 한글 | web/src/i18n/locales/ko.json | 신규 locale 파일(upstream 파일 아님). `node scripts/ko-locale.mjs seed`가 en.json 키 순서로 team `kr.json`의 한글 값과 영어 placeholder를 채우고, 이후 배치 번역으로 placeholder를 없앤다. `_extras`/`_reports`는 `sync-i18n.mjs` 관리 영역이라 쓰지 않는다 | docs/translation-glossary.ko.md, docs/i18n/ko-batches.json, docs/i18n/ko-skip.json |
+| O9 한글 | web/src/i18n/languages.ts:22,49,68 | `INTERFACE_LANGUAGE_OPTIONS`에 `ko`(한국어) 추가, `normalizeInterfaceLanguage`와 `convertDetectedLanguage`에 `kr`/`ko*` → `ko` 한 줄씩 (`kr`은 레거시 team 코드; Intl이 Kanuri로 읽으므로 내부 코드는 `ko`) | web/src/i18n/languages.test.ts |
+| O9 한글 | web/src/i18n/config.ts:27,39,50 | `ko.json` import, `resources.ko`, `supportedLngs`에 `'ko'` | web/src/i18n/locales/ko.json |
+| O9 한글 | web/scripts/sync-i18n.mjs:230 | 비라틴 스크립트 locale 목록(영어와 동일 값이면 미번역으로 판정)에 `ko` 추가 | - |
+| O9 한글 | web/src/components/date-picker.tsx:20,39 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
+| O9 한글 | web/src/components/datetime-picker.tsx:21,42 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'zhCN', label: '简体中文' },
   { code: 'en', label: 'English' },
+  { code: 'ko', label: '한국어' }, // fork: O9
   { code: 'fr', label: 'Français' },
   { code: 'ru', label: 'Русский' },
   { code: 'ja', label: '日本語' },
@@ -45,6 +46,8 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
     normalized = 'zhCN'
   }
 
+  if (normalized === 'kr' || normalized.startsWith('ko')) normalized = 'ko' // fork: O9
+
   return INTERFACE_LANGUAGE_OPTIONS.some((lang) => lang.code === normalized)
     ? normalized
     : 'en'
@@ -62,6 +65,7 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
  */
 export function convertDetectedLanguage(value: string): string {
   const lower = value.trim().replaceAll('_', '-').toLowerCase()
+  if (lower === 'kr' || lower.startsWith('ko')) return 'ko' // fork: O9
   if (!lower.startsWith('zh')) return value
   if (
     lower === 'zhtw' ||
