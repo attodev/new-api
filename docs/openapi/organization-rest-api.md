@@ -71,7 +71,10 @@
 
 - 조직 소유자/관리자가 5.4 `member_status: 2`로 정지한다. 플랫폼 `users.status`는 바뀌지 않는다(로그인은 계속된다).
 - 정지된 회원의 relay 요청은 과금 전에 HTTP 403 `organization membership is suspended`(`access_denied`)로 거부된다(`service.NewBillingSession`의 조직 분기, 조직 플랜 회원 포함). 레거시 Midjourney도 `CheckMidjourneyOrganizationBilling`에서 같은 문구로 거부된다(Midjourney 응답 `code: 4`).
-- 본인 조회는 계속된다: `/wallet` 요약, `GET /api/organization/subscription/self`, `GET /api/user/topup/self`. `RejectDisabledOrganizationMutation`은 정지 회원에 적용되지 않는다.
+- 본인 조회(GET)는 계속된다: `/wallet` 요약, `GET /api/organization/subscription/self`, `GET /api/organization/topup/self`.
+- `/api/organization/*`의 쓰기 요청(GET이 아닌 모든 요청)은 HTTP 403 `{"success": false, "message": "organization membership is suspended"}`로 거부된다(같은 미들웨어 `RejectDisabledOrganizationMutation`). 정지된 조직 관리자도 회원 재개·한도 변경·가져오기·plan 할당을 할 수 없다. owner는 정지할 수 없으므로 조직 충전(pay/amount)은 영향이 없다. 전체 관리자는 영향이 없다.
+- 무료 모델(가격 0, `FreeModel`)은 과금 세션을 만들지 않으므로 정지로 막히지 않는다(비활성 조직과 같다).
+- 정지는 realtime WebSocket 연결 시작(handshake) 때만 검사한다. 이미 열린 realtime 세션은 정지해도 끊기지 않는다.
 - 조직을 떠나면(멤버십 해제, `remove_absent`, 조직 삭제 시 owner) `organization_member_status`는 `1`, `organization_remark`는 빈 문자열로 초기화된다.
 
 조직 회원의 개인 잔액(`users.quota`는 조직 관리자가 정하는 회원 한도다):
@@ -463,6 +466,8 @@ Body:
 | `member_status` | integer | 선택 | `1`(active), `2`(suspended) | enum 외 값이면 `member_status must be one of: 1, 2`. `users.organization_member_status`에 쓴다 |
 | `quota` | integer | 선택 | `0`-`9,007,199,254,740,991` | 범위 밖이면 오류. active 조직 구독 사용자는 프론트에서 입력을 막는다. |
 | `organization_remark` | string | 선택 | 0-255자 | trim 후 `users.organization_remark`에 저장. 255자 초과이면 `organization_remark must be at most 255 characters` |
+
+쓰기는 호출자 조직으로 범위를 건다(`WHERE id = ? AND organization_id = ?`). 권한 확인 뒤 대상이 조직을 떠났으면 아무것도 쓰지 않고 `user is no longer a member of this organization`을 돌려준다. Excel 가져오기의 기존 구성원 갱신도 같은 규칙으로 행 오류(`line N (<username>): failed to update: user is no longer a member of this organization`)가 된다.
 
 플랫폼 필드 `status`·`remark`는 조직 관리자가 쓸 수 없다(spec §9 결정 7). 본문에 있으면 `unsupported field: status` / `unsupported field: remark`로 거부된다(엄격 디코딩).
 
@@ -963,7 +968,8 @@ Query:
 | 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` |
 | 다른 조직과 같은 이름으로 변경 | `organization name already exists` |
 | 비활성 조직의 쓰기 API·relay·충전 | `organization is disabled` (relay는 HTTP 403) |
-| 정지된 조직 회원의 relay·레거시 Midjourney | `organization membership is suspended` (relay는 HTTP 403) |
+| 정지된 조직 회원의 relay·레거시 Midjourney·`/api/organization/*` 쓰기 | `organization membership is suspended` (relay와 쓰기 요청은 HTTP 403) |
+| 수정 중 대상이 조직을 떠남 | `user is no longer a member of this organization` |
 | 조직 사용자 수정에 플랫폼 `status`/`remark` | `unsupported field: status` / `unsupported field: remark` |
 | 잘못된 member_status | `member_status must be one of: 1, 2` |
 | 가져오기 시트에 옛 `status`/`remark` 열 | `unsupported column: status — use member_status` / `unsupported column: remark — use organization_remark` (전체 거부) |

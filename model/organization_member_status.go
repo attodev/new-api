@@ -8,6 +8,8 @@ package model
 // service/midjourney_organization.go (relay refusal).
 
 import (
+	"errors"
+
 	"github.com/QuantumNous/new-api/common"
 )
 
@@ -37,6 +39,52 @@ func RequireActiveOrganizationMember(userId int) error {
 	}
 	if user.OrganizationId > 0 && user.OrganizationMemberStatus == OrganizationMemberStatusSuspended {
 		return ErrOrganizationMemberSuspended
+	}
+	return nil
+}
+
+// GetUserOrganizationMembership reads organization_id and
+// organization_member_status in one primary-key read, so the relay billing
+// session checks membership and suspension without a second query.
+func GetUserOrganizationMembership(userId int) (organizationId int, memberStatus int, err error) {
+	if userId == 0 {
+		return 0, 0, common.NewMessage("ID is empty!") // same as GetUserById
+	}
+	var user User
+	if err := DB.Select("organization_id", "organization_member_status").
+		Where("id = ?", userId).First(&user).Error; err != nil {
+		return 0, 0, err
+	}
+	return user.OrganizationId, user.OrganizationMemberStatus, nil
+}
+
+// UpdateOrganizationMemberFields writes member fields scoped to the
+// organization: a user who left (or moved) after the caller's permission check
+// is not written and ErrOrganizationMembershipChanged is returned. A write that
+// changes nothing (MySQL then reports 0 affected rows) is not an error while
+// the user is still a member.
+func UpdateOrganizationMemberFields(userId int, organizationId int, updates map[string]interface{}) error {
+	if userId <= 0 || organizationId <= 0 {
+		return errors.New("invalid organization member")
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	result := DB.Model(&User{}).
+		Where("id = ? AND organization_id = ?", userId, organizationId).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		return nil
+	}
+	var members int64
+	if err := DB.Model(&User{}).Where("id = ? AND organization_id = ?", userId, organizationId).Count(&members).Error; err != nil {
+		return err
+	}
+	if members == 0 {
+		return ErrOrganizationMembershipChanged
 	}
 	return nil
 }

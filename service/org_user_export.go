@@ -271,11 +271,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				if orgRole != existingUser.OrganizationRole {
 					updates["organization_role"] = orgRole
 				}
-				if len(updates) > 0 {
-					if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
-						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
-						continue
-					}
+				// Scoped to the organization: a member removed since the row was
+				// read is not written (ErrOrganizationMembershipChanged).
+				if err := model.UpdateOrganizationMemberFields(existingUser.Id, organizationId, updates); err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
+					continue
 				}
 				if importedQuota != nil {
 					if err := model.SetOrganizationMemberQuota(existingUser.Id, organizationId, *importedQuota); err != nil {
@@ -302,12 +302,8 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
 				continue
 			}
-			if len(memberFields) > 0 {
-				if err := model.DB.Model(&model.User{}).
-					Where("id = ? AND organization_id = ?", existingUser.Id, organizationId).
-					Updates(memberFields).Error; err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
-				}
+			if err := model.UpdateOrganizationMemberFields(existingUser.Id, organizationId, memberFields); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
 			}
 			if err := model.InvalidateUserCache(existingUser.Id); err != nil {
 				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
@@ -373,12 +369,8 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			continue
 		}
 
-		if len(memberFields) > 0 {
-			if err := model.DB.Model(&model.User{}).
-				Where("id = ? AND organization_id = ?", newUser.Id, organizationId).
-				Updates(memberFields).Error; err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
-			}
+		if err := model.UpdateOrganizationMemberFields(newUser.Id, organizationId, memberFields); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
 		}
 
 		if quotaProvided {

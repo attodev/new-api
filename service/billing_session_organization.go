@@ -59,14 +59,12 @@ func requireActiveOrganization(organizationId int) *types.NewAPIError {
 
 // requireActiveOrganizationMember refuses relay requests of a member an
 // organization admin suspended (users.organization_member_status) with 403
-// before anything is charged.
-func requireActiveOrganizationMember(userId int) *types.NewAPIError {
-	if err := model.RequireActiveOrganizationMember(userId); err != nil {
-		if errors.Is(err, model.ErrOrganizationMemberSuspended) {
-			return types.NewErrorWithStatusCode(err, types.ErrorCodeAccessDenied, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-		}
-		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+// before anything is charged. memberStatus comes from the same read as the
+// organization id (model.GetUserOrganizationMembership).
+func requireActiveOrganizationMember(memberStatus int) *types.NewAPIError {
+	if memberStatus == model.OrganizationMemberStatusSuspended {
+		return types.NewErrorWithStatusCode(model.ErrOrganizationMemberSuspended, types.ErrorCodeAccessDenied, http.StatusForbidden,
+			types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 	return nil
 }
@@ -76,7 +74,7 @@ func requireActiveOrganizationMember(userId int) *types.NewAPIError {
 func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError, bool) {
 	// One primary-key read of a single column for every request (organization
 	// fields stay outside the user cache, plan decision 3); non-members stop here.
-	organizationId, err := model.GetUserOrganizationId(relayInfo.UserId)
+	organizationId, memberStatus, err := model.GetUserOrganizationMembership(relayInfo.UserId)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry()), true
 	}
@@ -86,7 +84,7 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 	if apiErr := requireActiveOrganization(organizationId); apiErr != nil {
 		return nil, apiErr, true
 	}
-	if apiErr := requireActiveOrganizationMember(relayInfo.UserId); apiErr != nil {
+	if apiErr := requireActiveOrganizationMember(memberStatus); apiErr != nil {
 		return nil, apiErr, true
 	}
 	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(organizationId, relayInfo.UserId)

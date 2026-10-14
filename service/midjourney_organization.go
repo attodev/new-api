@@ -17,7 +17,7 @@ import (
 // upstream call, so organization plan members and empty organization wallets
 // must be rejected before the request is sent.
 func CheckMidjourneyOrganizationBilling(userId int) error {
-	organizationId, err := model.GetUserOrganizationId(userId)
+	organizationId, memberStatus, err := model.GetUserOrganizationMembership(userId)
 	if err != nil {
 		return err
 	}
@@ -27,8 +27,8 @@ func CheckMidjourneyOrganizationBilling(userId int) error {
 	if err := model.RequireActiveOrganization(organizationId); err != nil {
 		return err
 	}
-	if err := model.RequireActiveOrganizationMember(userId); err != nil {
-		return err
+	if memberStatus == model.OrganizationMemberStatusSuspended {
+		return model.ErrOrganizationMemberSuspended
 	}
 	hasPlan, err := model.HasActiveOrganizationUserSubscription(organizationId, userId)
 	if err != nil {

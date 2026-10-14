@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -117,6 +118,9 @@ type PendingChange =
   | RoleChange
   | NoteChange
 
+// users.status, read-only here: a member the site administrator disabled
+// cannot sign in or call the API whatever the member status says.
+const PLATFORM_STATUS_ENABLED = 1
 const MEMBER_STATUS_ACTIVE = 1
 const MEMBER_STATUS_SUSPENDED = 2
 const MAX_ORGANIZATION_NOTE_LENGTH = 255
@@ -1393,9 +1397,18 @@ export function OrganizationUsersTable() {
                   <td
                     className={`px-3 py-2${pendingRemove ? ' text-muted-foreground line-through' : ''}`}
                   >
-                    {effectiveStatus === MEMBER_STATUS_SUSPENDED
-                      ? t('Suspended')
-                      : t('Active')}
+                    <div className='flex flex-wrap items-center gap-1'>
+                      <span>
+                        {effectiveStatus === MEMBER_STATUS_SUSPENDED
+                          ? t('Suspended')
+                          : t('Active')}
+                      </span>
+                      {user.status !== PLATFORM_STATUS_ENABLED && (
+                        <Badge variant='destructive'>
+                          {t('Disabled by platform')}
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className='px-3 py-2'>
                     <div className='min-w-64 space-y-2'>

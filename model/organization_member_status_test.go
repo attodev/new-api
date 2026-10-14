@@ -49,3 +49,33 @@ func TestDeleteOrganizationResetsOwnerMemberStatusAndRemark(t *testing.T) {
 	require.Equal(t, OrganizationMemberStatusActive, reloaded.OrganizationMemberStatus)
 	require.Equal(t, "", reloaded.OrganizationRemark)
 }
+
+func TestGetUserOrganizationMembershipAndScopedMemberUpdate(t *testing.T) {
+	setupOrganizationModelTestDB(t)
+	member := User{Id: 2, Username: "member", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: OrganizationRoleMember, OrganizationMemberStatus: OrganizationMemberStatusSuspended, AffCode: "member-fix1"}
+	outsider := User{Id: 3, Username: "outsider", Password: "password", Role: common.RoleCommonUser, AffCode: "outsider-fix1"}
+	require.NoError(t, DB.Create(&member).Error)
+	require.NoError(t, DB.Create(&outsider).Error)
+
+	orgId, status, err := GetUserOrganizationMembership(2)
+	require.NoError(t, err)
+	require.Equal(t, 1, orgId)
+	require.Equal(t, OrganizationMemberStatusSuspended, status)
+	orgId, status, err = GetUserOrganizationMembership(3)
+	require.NoError(t, err)
+	require.Zero(t, orgId)
+	require.Equal(t, OrganizationMemberStatusActive, status)
+
+	require.NoError(t, UpdateOrganizationMemberFields(2, 1, map[string]interface{}{"organization_remark": "note"}))
+	// Writing the same value again is not "membership changed".
+	require.NoError(t, UpdateOrganizationMemberFields(2, 1, map[string]interface{}{"organization_remark": "note"}))
+	// Another organization's scope writes nothing.
+	require.ErrorIs(t, UpdateOrganizationMemberFields(2, 9, map[string]interface{}{"organization_remark": "other"}), ErrOrganizationMembershipChanged)
+	require.ErrorIs(t, UpdateOrganizationMemberFields(3, 1, map[string]interface{}{"organization_remark": "other"}), ErrOrganizationMembershipChanged)
+	var reloaded User
+	require.NoError(t, DB.First(&reloaded, 2).Error)
+	require.Equal(t, "note", reloaded.OrganizationRemark)
+	var reloadedOutsider User
+	require.NoError(t, DB.First(&reloadedOutsider, 3).Error)
+	require.Equal(t, "", reloadedOutsider.OrganizationRemark)
+}

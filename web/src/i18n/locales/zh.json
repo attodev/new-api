@@ -151,6 +151,7 @@
     "Suspended members cannot call the API": "已暂停的成员无法调用 API",
     "Failed to update note": "更新备注失败",
     "{{count}} note changes": "{{count}} 项备注更改",
+    "Disabled by platform": "已被平台禁用",
     "Already a member": "已是成员",
     "Discounts": "折扣",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "按模型设置的折扣百分比（0–100）。模型设置了自己的折扣时，优先于任何供应商折扣。",

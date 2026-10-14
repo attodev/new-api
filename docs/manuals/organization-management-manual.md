@@ -210,10 +210,14 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 정지된 회원:
 
 - API(relay) 요청이 과금 전에 HTTP 403 `organization membership is suspended`로 거부된다. 레거시 Midjourney도 거부된다.
-- 로그인과 본인 조회(`/wallet` 요약, 조직 플랜 조회, 충전 내역)는 계속된다.
+- 조직 관리 화면의 저장·가져오기·플랜 할당 같은 쓰기 작업도 403으로 거부된다. 정지된 조직 관리자는 다른 회원을 재개하거나 한도를 바꿀 수 없다.
+- 로그인과 본인 조회(`/wallet` 요약, 조직 플랜 조회, 조직 충전 내역 `GET /api/organization/topup/self`)는 계속된다.
+- 예외: 무료(가격 0) 모델은 과금을 거치지 않으므로 정지 중에도 호출된다. 이미 열려 있는 realtime(WebSocket) 세션은 연결 시작 때만 검사하므로 정지해도 바로 끊기지 않는다.
 - 조직을 떠나면 정지 상태와 조직 메모는 초기화된다(다시 들어오면 `Active`).
 
 owner와 자기 자신은 정지할 수 없다(체크박스 disabled).
+
+사이트 관리자가 플랫폼에서 비활성화한 계정은 `Status` 컬럼에 `Disabled by platform` 배지가 함께 표시된다. 이 상태는 조직 화면에서 바꿀 수 없고, 회원 상태가 `Active`여도 로그인과 API 호출이 막힌다.
 
 ## 6-4. 조직 메모 쓰기
 

@@ -407,6 +407,27 @@ describe('OrganizationUsersTable', () => {
     )
   })
 
+  it('marks a member the platform disabled next to the member status', async () => {
+    signIn(1, 'owner')
+    api.getOrganizationUsers.mockResolvedValue({
+      success: true,
+      data: {
+        page: 1,
+        page_size: 20,
+        total: 3,
+        items: [MEMBERS[0], MEMBERS[1], { ...MEMBERS[2], status: 2 }],
+      },
+    })
+    render(<OrganizationUsersTable />)
+
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    expect(within(rowOf('mia')).getByText('Active')).toBeInTheDocument()
+    expect(
+      within(rowOf('mia')).getByText('Disabled by platform')
+    ).toBeInTheDocument()
+    expect(within(rowOf('adam')).queryByText('Disabled by platform')).toBeNull()
+  })
+
   it('edits the organization note, not the platform remark', async () => {
     signIn(1, 'owner')
     api.updateOrganizationUser.mockResolvedValue({ success: true })

@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // Imported balances are new quota: they must respect the wallet ceiling
@@ -448,4 +449,42 @@ func TestImportOrgUsersAssignsNewUsersDespiteSignUpBonus(t *testing.T) {
 	var created model.User
 	require.NoError(t, model.DB.Where("username = ?", "bonus_new").First(&created).Error)
 	require.Equal(t, 1, created.OrganizationId)
+}
+
+// Fix round 1 — the existing-member update is scoped to the organization: a
+// member removed between the row read and the write is not touched.
+func TestImportOrgUsersDoesNotWriteAMemberWhoLeft(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+
+	fired := false
+	const name = "test:import_leave_before_update"
+	require.NoError(t, model.DB.Callback().Update().Before("gorm:update").Register(name, func(tx *gorm.DB) {
+		if fired || tx.Statement.Table != "users" {
+			return
+		}
+		fired = true
+		tx.Session(&gorm.Session{NewDB: true}).Exec("UPDATE users SET organization_id = 0 WHERE id = ?", 21)
+	}))
+	t.Cleanup(func() { _ = model.DB.Callback().Update().Remove(name) })
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "display_name", "member_status", "organization_remark"},
+		{"member_21", "Renamed", "suspended", "late"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.True(t, fired)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], "line 2 (member_21): failed to update: "+model.ErrOrganizationMembershipChanged.Error())
+	require.Zero(t, result.Updated)
+
+	var member model.User
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.Zero(t, member.OrganizationId)
+	require.NotEqual(t, "Renamed", member.DisplayName)
+	require.Equal(t, model.OrganizationMemberStatusActive, member.OrganizationMemberStatus)
+	require.Equal(t, "", member.OrganizationRemark)
 }

@@ -151,6 +151,7 @@
     "Suspended members cannot call the API": "Les membres suspendus ne peuvent pas appeler l'API",
     "Failed to update note": "Échec de la mise à jour de la note",
     "{{count}} note changes": "{{count}} modifications de note",
+    "Disabled by platform": "Désactivé par la plateforme",
     "Already a member": "Déjà membre",
     "Discounts": "Remises",
     "Per-model discount percentage (0–100). When a model has its own discount it takes precedence over any vendor discount.": "Pourcentage de remise par modèle (0–100). Lorsqu'un modèle a sa propre remise, elle prévaut sur toute remise du fournisseur.",

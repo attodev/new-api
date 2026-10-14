@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // fork: O3 — organization admins manage an organization-scoped member status
@@ -106,4 +108,88 @@ func TestClearMembershipResetsMemberStatusAndRemark(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.OrganizationMemberStatusActive, fresh.OrganizationMemberStatus)
 	require.Equal(t, "", fresh.OrganizationRemark)
+}
+
+// Fix round 1 — a suspended member (an admin included) cannot perform any
+// write on /api/organization/*; reads keep working and root is unaffected.
+func performMemberGuardedRequest(actor model.User, method string, path string, body string) *httptest.ResponseRecorder {
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) {
+		c.Set("id", actor.Id)
+		c.Set("role", actor.Role)
+		c.Next()
+	})
+	engine.Use(RejectDisabledOrganizationMutation())
+	engine.GET("/api/organization/subscription/self", GetMyOrganizationSubscription)
+	engine.PATCH("/api/organization/users/:id", UpdateOrganizationUser)
+	engine.POST("/api/organization/subscription/plans", CreateOrganizationSubscriptionPlan)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func TestSuspendedOrganizationAdminCannotWrite(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	root := model.User{Username: "root_guard", Password: "x", Role: common.RoleRootUser, Status: common.UserStatusEnabled, AffCode: "aff-root-guard"}
+	require.NoError(t, f.db.Create(&root).Error)
+	// The owner suspended both the admin and the member.
+	for _, id := range []int{f.admin.Id, f.member.Id} {
+		require.NoError(t, f.db.Model(&model.User{}).Where("id = ?", id).
+			Update("organization_member_status", model.OrganizationMemberStatusSuspended).Error)
+	}
+
+	res := performMemberGuardedRequest(f.admin, http.MethodPatch, fmt.Sprintf("/api/organization/users/%d", f.member.Id), `{"member_status":1}`)
+	require.Equal(t, http.StatusForbidden, res.Code)
+	require.Contains(t, res.Body.String(), `"success":false`)
+	require.Contains(t, res.Body.String(), "organization membership is suspended")
+	require.Equal(t, model.OrganizationMemberStatusSuspended, orgSecurityUser(t, f.db, f.member.Id).OrganizationMemberStatus)
+
+	res = performMemberGuardedRequest(f.admin, http.MethodPost, "/api/organization/subscription/plans", `{"title":"Plan","total_amount":10}`)
+	require.Equal(t, http.StatusForbidden, res.Code)
+
+	// The suspended member's own reads still work.
+	res = performMemberGuardedRequest(f.member, http.MethodGet, "/api/organization/subscription/self", "")
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+
+	// The active owner and root are unaffected.
+	res = performMemberGuardedRequest(f.owner, http.MethodPatch, fmt.Sprintf("/api/organization/users/%d", f.member.Id), `{"member_status":1}`)
+	require.Contains(t, res.Body.String(), `"success":true`)
+	res = performMemberGuardedRequest(root, http.MethodPost, fmt.Sprintf("/api/organization/subscription/plans?organization_id=%d", f.org.Id), `{"title":"Plan","total_amount":10}`)
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Contains(t, res.Body.String(), `"success":true`)
+}
+
+// Fix round 1 — the member update is scoped to the actor's organization: a
+// member who left between the permission check and the write is not touched.
+func TestUpdateOrganizationUserIsScopedToTheOrganization(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	leaveBeforeUserUpdate(t, f.db, f.member.Id)
+
+	res := orgSecurityRequest(UpdateOrganizationUser, f.admin, http.MethodPatch, "/",
+		`{"quota":999,"organization_remark":"late"}`, orgSecurityIdParam(f.member.Id))
+	requireOrgSecurityResult(t, res, false, model.ErrOrganizationMembershipChanged.Error())
+	fresh := orgSecurityUser(t, f.db, f.member.Id)
+	require.Zero(t, fresh.OrganizationId)
+	require.Equal(t, 300, fresh.Quota)
+	require.Equal(t, "", fresh.OrganizationRemark)
+}
+
+// leaveBeforeUserUpdate moves userId out of its organization right before the
+// next UPDATE on users runs (inside the same statement's connection), as a
+// concurrent membership removal would.
+func leaveBeforeUserUpdate(t *testing.T, db *gorm.DB, userId int) {
+	t.Helper()
+	fired := false
+	name := "test:leave_before_update_" + strings.ReplaceAll(t.Name(), "/", "_")
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(name, func(tx *gorm.DB) {
+		if fired || tx.Statement.Table != "users" {
+			return
+		}
+		fired = true
+		tx.Session(&gorm.Session{NewDB: true}).Exec("UPDATE users SET organization_id = 0 WHERE id = ?", userId)
+	}))
+	t.Cleanup(func() { _ = db.Callback().Update().Remove(name) })
 }

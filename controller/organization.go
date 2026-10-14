@@ -769,7 +769,9 @@ func UpdateOrganizationUser(c *gin.Context) {
 		return
 	}
 
-	if err := model.DB.Model(&model.User{}).Where("id = ?", target.Id).Updates(updates).Error; err != nil {
+	// Scoped to the actor's organization: a member who left after the
+	// permission check is not written.
+	if err := model.UpdateOrganizationMemberFields(target.Id, actor.OrganizationId, updates); err != nil {
 		common.ApiError(c, err)
 		return
 	}
