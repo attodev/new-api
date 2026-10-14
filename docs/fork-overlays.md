@@ -58,6 +58,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 | model/main.go:383 | `migrateDB` AutoMigrate 오류 검사 뒤 `MigrateForkOrganizationTables(DB)` | model/organization_migrate.go |
 | O3 조직 | controller/user.go:512-513 | `buildSelfUserData`에 `"organization_id"`, `"organization_role"` 두 줄 | model/organization.go |
 | O3 조직 | model/task_cas_test.go:63,97 | TestMain AutoMigrate에 조직 모델 4개, `truncateTables`에 `organizations` | model/organization_quota_reserve_test.go |
+| O3 조직 | model/topup.go (Recharge/Stripe Recharge/ManualCompleteTopUp/RechargeCreem/RechargeWaffo/RechargeWaffoPancake) | `creditTopUpQuota`→`creditTopUpTarget(tx, topUp, …)`, `syncCreditUserQuotaCache`→`syncCreditTopUpCache(topUp, …)` 12줄(정산 6곳 × 2). `ManualCompleteTopUp`은 사후 sync가 `topUp`을 보도록 `var topUp *TopUp`을 클로저 밖으로 올림(선언 1줄 + 대입 1줄) | model/topup_target.go |
+| O3 조직 | model/topup_paypal.go | `RechargePayPal`의 `creditTopUpTarget`/`syncCreditTopUpCache` 2줄 | model/topup_target.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

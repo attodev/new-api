@@ -50,14 +50,14 @@ func RechargePayPal(tradeNo string, callerIp string) (err error) {
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpTarget(tx, topUp, quotaToAdd, nil) // fork: O3
 	})
 	if err != nil {
 		common.SysError(common.LogText("paypal topup failed: %s", err.Error()))
 		return errors.New("top-up failed")
 	}
 	if quotaToAdd > 0 {
-		syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, common.LogText("paypal topup"))
+		syncCreditTopUpCache(topUp, quotaToAdd, common.LogText("paypal topup")) // fork: O3
 		RecordTopupLog(topUp.UserId, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}",
 			map[string]any{"provider": "PayPal", "quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%.2f", topUp.Money)}),
 			callerIp, topUp.PaymentMethod, PaymentMethodPayPal)

@@ -220,7 +220,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpTarget(tx, topUp, quotaToAdd, nil) // fork: O3
 	})
 	if err != nil {
 		if !errors.Is(err, ErrTopUpNotFound) && !errors.Is(err, ErrPaymentMethodMismatch) && !errors.Is(err, ErrTopUpStatusInvalid) {
@@ -231,7 +231,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 	if alreadyDone {
 		return true, nil
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, common.LogText("epay topup"))
+	syncCreditTopUpCache(topUp, quotaToAdd, common.LogText("epay topup")) // fork: O3
 
 	common.SysLog(common.LogText("Epay top-up succeeded trade_no=%s user_id=%d quota_to_add=%d money=%.2f", topUp.TradeNo, topUp.UserId, quotaToAdd, topUp.Money))
 	RecordTopupLog(topUp.UserId, common.NewMessage("Online top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%f", topUp.Money)}), callerIp, topUp.PaymentMethod, PaymentProviderEpay)
@@ -278,7 +278,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quota, map[string]any{
+		return creditTopUpTarget(tx, topUp, quota, map[string]any{ // fork: O3
 			"stripe_customer": customerId,
 		})
 	})
@@ -287,7 +287,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		common.SysError(common.LogText("topup failed: %s", err.Error()))
 		return errors.New("top-up failed")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quota, common.LogText("stripe topup"))
+	syncCreditTopUpCache(topUp, quota, common.LogText("stripe topup")) // fork: O3
 
 	RecordTopupLog(topUp.UserId, common.NewMessage("Online top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"quota": logger.FormatQuota(quota), "amount": topUp.Amount}), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
@@ -466,9 +466,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	var quotaToAdd int
 	var payMoney float64
 	var paymentMethod string
+	var topUp *TopUp // fork: O3 hoisted so the post-commit cache sync sees the wallet target
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		topUp := &TopUp{}
+		topUp = &TopUp{} // fork: O3
 		// 行级锁，避免并发补单
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return common.NewMessage("Top-up order does not exist")
@@ -508,7 +509,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		}
 
 		// 增加用户额度（立即写库，保持一致性）
-		if err := creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil); err != nil {
+		if err := creditTopUpTarget(tx, topUp, quotaToAdd, nil); err != nil { // fork: O3
 			return err
 		}
 
@@ -523,7 +524,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	}
 
 	// 事务外记录日志，避免阻塞
-	syncCreditUserQuotaCache(userId, quotaToAdd, common.LogText("manual topup"))
+	syncCreditTopUpCache(topUp, quotaToAdd, common.LogText("manual topup")) // fork: O3
 	RecordTopupLog(userId, common.NewMessage("Administrator completed the order, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%f", payMoney)}), callerIp, paymentMethod, "admin")
 	return nil
 }
@@ -585,14 +586,14 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			}
 		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quota, updateFields)
+		return creditTopUpTarget(tx, topUp, quota, updateFields) // fork: O3
 	})
 
 	if err != nil {
 		common.SysError(common.LogText("creem topup failed: %s", err.Error()))
 		return errors.New("top-up failed")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quota, common.LogText("creem topup"))
+	syncCreditTopUpCache(topUp, quota, common.LogText("creem topup")) // fork: O3
 
 	RecordTopupLog(topUp.UserId, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"provider": "Creem", "quota": quota, "amount": fmt.Sprintf("%.2f", topUp.Money)}), callerIp, topUp.PaymentMethod, PaymentMethodCreem)
 
@@ -643,14 +644,14 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return err
 		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpTarget(tx, topUp, quotaToAdd, nil) // fork: O3
 	})
 
 	if err != nil {
 		common.SysError(common.LogText("waffo topup failed: %s", err.Error()))
 		return errors.New("top-up failed")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, common.LogText("waffo topup"))
+	syncCreditTopUpCache(topUp, quotaToAdd, common.LogText("waffo topup")) // fork: O3
 
 	if quotaToAdd > 0 {
 		RecordTopupLog(topUp.UserId, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"provider": "Waffo", "quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%.2f", topUp.Money)}), callerIp, topUp.PaymentMethod, PaymentMethodWaffo)
@@ -703,14 +704,14 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return err
 		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpTarget(tx, topUp, quotaToAdd, nil) // fork: O3
 	})
 
 	if err != nil {
 		common.SysError(common.LogText("waffo pancake topup failed: %s", err.Error()))
 		return errors.New("top-up failed")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, common.LogText("waffo pancake topup"))
+	syncCreditTopUpCache(topUp, quotaToAdd, common.LogText("waffo pancake topup")) // fork: O3
 
 	if quotaToAdd > 0 {
 		RecordLog(topUp.UserId, LogTypeTopup, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"provider": "Waffo Pancake", "quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%.2f", topUp.Money)}))
