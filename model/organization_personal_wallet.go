@@ -27,6 +27,9 @@ func rejectOrganizationMemberBalancePay(user *User) error {
 // GetUserOrganizationId reads only organization_id (uncached: organization
 // fields are kept out of the user cache).
 func GetUserOrganizationId(userId int) (int, error) {
+	if userId == 0 {
+		return 0, common.NewMessage("ID is empty!") // same as GetUserById
+	}
 	var user User
 	if err := DB.Select("organization_id").Where("id = ?", userId).First(&user).Error; err != nil {
 		return 0, err

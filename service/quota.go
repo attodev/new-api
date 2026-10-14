@@ -232,7 +232,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 			relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
 	} else {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
-		UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, quota) // fork: O3
+		UpdateBillingOrganizationUsedQuota(relayInfo.BillingOrganizationId, quota) // fork: O3
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
@@ -372,7 +372,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 			relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, billingModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
-		UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, quota) // fork: O3
+		UpdateBillingOrganizationUsedQuota(relayInfo.BillingOrganizationId, quota) // fork: O3
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 

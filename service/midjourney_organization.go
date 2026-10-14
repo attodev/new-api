@@ -17,24 +17,24 @@ import (
 // upstream call, so organization plan members and empty organization wallets
 // must be rejected before the request is sent.
 func CheckMidjourneyOrganizationBilling(userId int) error {
-	user, err := model.GetUserById(userId, false)
+	organizationId, err := model.GetUserOrganizationId(userId)
 	if err != nil {
 		return err
 	}
-	if user.OrganizationId <= 0 {
+	if organizationId <= 0 {
 		return nil
 	}
-	if err := model.RequireActiveOrganization(user.OrganizationId); err != nil {
+	if err := model.RequireActiveOrganization(organizationId); err != nil {
 		return err
 	}
-	hasPlan, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, userId)
+	hasPlan, err := model.HasActiveOrganizationUserSubscription(organizationId, userId)
 	if err != nil {
 		return err
 	}
 	if hasPlan {
 		return errors.New("legacy Midjourney billing does not support organization plans")
 	}
-	organizationQuota, err := model.GetOrganizationQuota(user.OrganizationId)
+	organizationQuota, err := model.GetOrganizationQuota(organizationId)
 	if err != nil {
 		return err
 	}
@@ -51,22 +51,22 @@ func CheckMidjourneyOrganizationBilling(userId int) error {
 // fall back to personal quota.
 func prepareMidjourneyOrganizationBilling(relayInfo *relaycommon.RelayInfo, task *model.Midjourney) error {
 	task.OrganizationId = 0
-	user, err := model.GetUserById(relayInfo.UserId, false)
+	organizationId, err := model.GetUserOrganizationId(relayInfo.UserId)
 	if err != nil {
 		return err
 	}
-	if user.OrganizationId <= 0 {
+	if organizationId <= 0 {
 		return nil
 	}
-	hasPlan, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, relayInfo.UserId)
+	hasPlan, err := model.HasActiveOrganizationUserSubscription(organizationId, relayInfo.UserId)
 	if err != nil {
 		return err
 	}
 	if hasPlan {
 		return errors.New("legacy Midjourney billing does not support organization plans")
 	}
-	relayInfo.BillingOrganizationId = user.OrganizationId
-	task.OrganizationId = user.OrganizationId
+	relayInfo.BillingOrganizationId = organizationId
+	task.OrganizationId = organizationId
 	return nil
 }
 

@@ -60,17 +60,19 @@ func requireActiveOrganization(organizationId int) *types.NewAPIError {
 // newOrganizationBillingSession returns handled=false for users without an
 // organization so NewBillingSession continues with upstream's preference logic.
 func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError, bool) {
-	user, err := model.GetUserById(relayInfo.UserId, false)
+	// One primary-key read of a single column for every request (organization
+	// fields stay outside the user cache, plan decision 3); non-members stop here.
+	organizationId, err := model.GetUserOrganizationId(relayInfo.UserId)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry()), true
 	}
-	if user.OrganizationId <= 0 {
+	if organizationId <= 0 {
 		return nil, nil, false
 	}
-	if apiErr := requireActiveOrganization(user.OrganizationId); apiErr != nil {
+	if apiErr := requireActiveOrganization(organizationId); apiErr != nil {
 		return nil, apiErr, true
 	}
-	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(user.OrganizationId, relayInfo.UserId)
+	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(organizationId, relayInfo.UserId)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry()), true
 	}
@@ -79,13 +81,13 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 		if subConsume <= 0 {
 			subConsume = 1
 		}
-		if apiErr := requireOrganizationQuota(c, user.OrganizationId, subConsume); apiErr != nil {
+		if apiErr := requireOrganizationQuota(c, organizationId, subConsume); apiErr != nil {
 			return nil, apiErr, true
 		}
 		session := &BillingSession{
 			relayInfo: relayInfo,
 			funding: &OrganizationSubscriptionFunding{
-				requestId: relayInfo.RequestId, organizationId: user.OrganizationId, userId: relayInfo.UserId,
+				requestId: relayInfo.RequestId, organizationId: organizationId, userId: relayInfo.UserId,
 				modelName: relayInfo.OriginModelName, amount: subConsume,
 			},
 			lang: i18n.StatedLang(c),
@@ -112,12 +114,12 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 			types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog()), true
 	}
 	relayInfo.UserQuota = userQuota
-	if apiErr := requireOrganizationQuota(c, user.OrganizationId, int64(preConsumedQuota)); apiErr != nil {
+	if apiErr := requireOrganizationQuota(c, organizationId, int64(preConsumedQuota)); apiErr != nil {
 		return nil, apiErr, true
 	}
 	session := &BillingSession{
 		relayInfo: relayInfo,
-		funding:   &OrganizationWalletFunding{memberId: relayInfo.UserId, organizationId: user.OrganizationId},
+		funding:   &OrganizationWalletFunding{memberId: relayInfo.UserId, organizationId: organizationId},
 		lang:      i18n.StatedLang(c),
 	}
 	if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {

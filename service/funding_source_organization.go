@@ -15,17 +15,6 @@ import (
 // the organization wallet. User-side amounts are upstream ints; organization
 // amounts are int64 and converted at the boundary.
 
-func resolveOrganizationForWallet(userId int) (int, error) {
-	user, err := model.GetUserById(userId, false)
-	if err != nil {
-		return 0, err
-	}
-	if user.OrganizationId <= 0 {
-		return 0, nil
-	}
-	return user.OrganizationId, nil
-}
-
 // adjustWalletQuotaForOrganization charges (delta > 0) or refunds (delta < 0)
 // the member limit and, when organizationId > 0, the organization wallet.
 func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int) error {
@@ -107,14 +96,13 @@ func reserveWalletQuotaForOrganization(userId int, organizationId int, amount in
 	return nil
 }
 
-// UpdateOrganizationUsedQuotaForUser adds quota (either sign) to the used
-// quota of the user's current organization; no-op for non-members.
-func UpdateOrganizationUsedQuotaForUser(userId int, quota int) {
-	if quota == 0 {
-		return
-	}
-	organizationId, err := resolveOrganizationForWallet(userId)
-	if err != nil || organizationId <= 0 {
+// UpdateBillingOrganizationUsedQuota adds quota (either sign) to the used
+// quota of the organization the request was billed to
+// (relayInfo.BillingOrganizationId, pinned at session start). organizationId 0
+// (a personal request) is a no-op with no database read, so non-members pay
+// nothing for it on the hot path.
+func UpdateBillingOrganizationUsedQuota(organizationId int, quota int) {
+	if quota == 0 || organizationId <= 0 {
 		return
 	}
 	if err := model.UpdateOrganizationUsedQuota(organizationId, int64(quota)); err != nil {

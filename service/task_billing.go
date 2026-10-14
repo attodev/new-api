@@ -89,7 +89,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo, task *model
 		Other:     other,
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
-	UpdateOrganizationUsedQuotaForUser(info.UserId, info.PriceData.Quota) // fork: O3
+	UpdateBillingOrganizationUsedQuota(info.BillingOrganizationId, info.PriceData.Quota) // fork: O3
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
 }
 

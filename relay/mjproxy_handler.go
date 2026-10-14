@@ -298,7 +298,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 			Other:     other,
 		})
 		model.UpdateUserUsedQuotaAndRequestCount(info.UserId, midjourneyTask.Quota)
-		service.UpdateOrganizationUsedQuotaForUser(info.UserId, midjourneyTask.Quota) // fork: O3
+		service.UpdateBillingOrganizationUsedQuota(info.BillingOrganizationId, midjourneyTask.Quota) // fork: O3
 		model.UpdateChannelUsedQuota(billingChannelId, midjourneyTask.Quota)
 	}
 	c.Writer.WriteHeader(mjResp.StatusCode)
@@ -681,7 +681,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 			Other:     other,
 		})
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, midjourneyTask.Quota)
-		service.UpdateOrganizationUsedQuotaForUser(relayInfo.UserId, midjourneyTask.Quota) // fork: O3
+		service.UpdateBillingOrganizationUsedQuota(relayInfo.BillingOrganizationId, midjourneyTask.Quota) // fork: O3
 		model.UpdateChannelUsedQuota(billingChannelId, midjourneyTask.Quota)
 	}
 
