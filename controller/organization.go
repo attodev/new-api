@@ -305,8 +305,15 @@ func GetOrganizationLogs(c *gin.Context) {
 		return
 	}
 
+	filter := logFilterFromQuery(c, true)
+	startTimestamp, ok := limitOrganizationLogTimeRange(c, filter.StartTimestamp, filter.EndTimestamp, 1)
+	if !ok {
+		return
+	}
+	filter.StartTimestamp = startTimestamp
+
 	pageInfo := common.GetPageQuery(c)
-	logs, total, err := model.GetLogsByUserIDs(userIDs, logFilterFromQuery(c, true), pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	logs, total, err := model.GetLogsByUserIDs(userIDs, filter, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -319,6 +326,14 @@ func GetOrganizationLogs(c *gin.Context) {
 
 func GetOrganizationMidjourney(c *gin.Context) {
 	_, userIDs, ok := getOrganizationLogActorAndUserIDs(c)
+	if !ok {
+		return
+	}
+
+	// Midjourney submit_time is in milliseconds.
+	startMs, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endMs, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	startMs, ok = limitOrganizationLogTimeRange(c, startMs, endMs, 1000)
 	if !ok {
 		return
 	}
@@ -336,6 +351,9 @@ func GetOrganizationMidjourney(c *gin.Context) {
 		EndTimestamp:   c.Query("end_timestamp"),
 		UserIDs:        userIDs,
 	}
+	if startMs > 0 {
+		queryParams.StartTimestamp = strconv.FormatInt(startMs, 10)
+	}
 
 	items := model.GetAllTasks(pageInfo.GetStartIdx(), pageInfo.GetPageSize(), queryParams)
 	total := model.CountAllTasks(queryParams)
@@ -350,14 +368,19 @@ func GetOrganizationTask(c *gin.Context) {
 		return
 	}
 
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	startTimestamp, ok = limitOrganizationLogTimeRange(c, startTimestamp, endTimestamp, 1)
+	if !ok {
+		return
+	}
+
 	pageInfo := common.GetPageQuery(c)
 	if len(userIDs) == 0 { // fork: O3 — an empty user filter would match every user's tasks
 		pageInfo.SetItems([]any{})
 		common.ApiSuccess(c, pageInfo)
 		return
 	}
-	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
-	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	queryParams := model.SyncTaskQueryParams{
 		Platform:       constant.TaskPlatform(c.Query("platform")),
 		TaskID:         c.Query("task_id"),
@@ -486,6 +509,25 @@ func RequestOrganizationWaffoPancakePay(c *gin.Context) {
 		return
 	}
 	RequestWaffoPancakePay(c)
+}
+
+// limitOrganizationLogTimeRange applies upstream's non-admin log range limit
+// (limitLogTimeRange, as in GetUserLogs) to organization log searches:
+// organization admins are ordinary users. Platform admins are not limited.
+// unit is 1 for second timestamps and 1000 for Midjourney's milliseconds.
+func limitOrganizationLogTimeRange(c *gin.Context, start int64, end int64, unit int64) (int64, bool) {
+	if c.GetInt("role") >= common.RoleAdminUser {
+		return start, true
+	}
+	limited, err := limitLogTimeRange(start/unit, end/unit)
+	if err != nil {
+		common.ApiError(c, err)
+		return 0, false
+	}
+	if start != 0 && limited == start/unit {
+		return start, true
+	}
+	return limited * unit, true
 }
 
 func getOrganizationActor(c *gin.Context) (*model.User, error) {
