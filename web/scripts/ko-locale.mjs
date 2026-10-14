@@ -52,9 +52,15 @@ const PRINTF = /%(?:\d+\$)?[sdfiu](?![A-Za-z])/g
 // Keys that stay english although they contain words or lowercase letters.
 const MANUAL_SKIP = new Set([
   '_copy',
+  '{{operation}} (ID: {{id}})',
   '{{value}}ms',
   '，and ',
+  '(ID: {{id}})',
   '1M token',
+  'Ali',
+  'Alipay',
+  'Baidu',
+  'Baidu V2',
   'ChatGPT Subscription (Codex)',
   'contact@yourcompany.com',
   'Doubao',

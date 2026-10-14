@@ -103,6 +103,18 @@
 | Auto-renew | 자동 갱신 | team은 "자동갱신" 4회, "자동결제" 7회로 갈립니다. 새 번역은 띄어 쓴 "자동 갱신"을 씁니다. |
 | Free model | 무료 모델 | |
 | Multiplier | 배율 | 단독 용어일 때만. 가격·비용 계산의 "ratio"는 "비율". |
+| Billed as / Billable / Billing group | ~(으)로 과금 / 과금 대상 / 과금 그룹 | 그룹 비율 설명에서 호출이 어느 그룹 기준으로 요금이 매겨지는지를 말할 때. 시드된 값의 "기본 과금 그룹", "과금 대상 입력 토큰"과 맞춥니다. 화면·기능 이름의 Billing(결제 관리, 결제 표현식)은 "결제"를 그대로 씁니다. |
+| Override (rule, matrix) | 재정의 | 시드된 값 `Override` = "재정의". "Override matrix"는 "재정의 매트릭스". |
+| Auto group | 자동 그룹 | 시드된 값 "자동 그룹 동작"과 맞춥니다. |
+| Access token (personal) | 액세스 토큰 | 대시보드 개인 액세스 토큰. API 호출용 토큰(API 키)과 구분합니다. |
+| Token group | 토큰 그룹 | 그룹 비율 설명에서 쓰는 고정 표현이라 "API 키 그룹"으로 바꾸지 않습니다. 같은 설명 안의 "the token"도 "토큰". |
+| Check-in | 체크인 | 시드된 값 "체크인 실패", "체크인 설정"과 맞춥니다. |
+| Plugin | 플러그인 | "Task plugins"는 "작업 플러그인", 플러그인 "Marketplace"는 "마켓플레이스". |
+| Route | 라우트 | 시드된 값 `Route` = "라우트". 동사 routing은 "라우팅". |
+| Affinity | 친화성 | 시드된 값 "채널 친화성"과 맞춥니다. |
+| Async | 비동기 | "Sync"는 "동기". |
+| Reset credits (Codex) | 초기화 크레딧 | 업스트림 사용량 창을 초기화하는 크레딧. 충전(Credit)과 다른 개념입니다. |
+| Model square | 모델 마켓플레이스 | 시드된 `Model Square` 라벨이 "모델 마켓플레이스"라 문장 안에서도 같은 이름을 씁니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
