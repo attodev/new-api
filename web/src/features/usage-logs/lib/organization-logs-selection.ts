@@ -24,7 +24,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { getOrganizations } from '@/features/organizations/api'
+import { getAllOrganizations } from '@/features/organizations/api'
 import {
   getLastSelectedOrganizationId,
   resolveAvailableOrganizationId,
@@ -54,7 +54,7 @@ export function useOrganizationLogsSelection(
   )
   const { data } = useQuery({
     queryKey: ['organizations', 'usage-logs-selector'],
-    queryFn: () => getOrganizations({ page: 1, size: 100 }),
+    queryFn: () => getAllOrganizations(),
     enabled,
   })
   const organizations = useMemo(() => data?.data?.items ?? [], [data])

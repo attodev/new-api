@@ -56,6 +56,7 @@ import {
   calculateOrganizationAmount,
   calculateOrganizationPayPalAmount,
   calculateOrganizationStripeAmount,
+  calculateOrganizationWaffoAmount,
   calculateOrganizationWaffoPancakeAmount,
   getOrganizationBillingHistory,
   getOrganizationWallet,
@@ -71,14 +72,14 @@ import type { Organization } from '../types'
 
 /**
  * Amount quotes for the organization wallet come from the organization
- * endpoints. Waffo has no organization quote client, so it is priced by the
- * regular organization calculator, as the team wallet did.
+ * endpoints, one per provider (Waffo is priced by its own endpoint, as the
+ * personal wallet does).
  */
 const ORGANIZATION_AMOUNT_CALCULATORS: PaymentAmountCalculators = {
   regular: calculateOrganizationAmount,
   stripe: calculateOrganizationStripeAmount,
   paypal: calculateOrganizationPayPalAmount,
-  waffo: calculateOrganizationAmount,
+  waffo: calculateOrganizationWaffoAmount,
   waffoPancake: calculateOrganizationWaffoPancakeAmount,
 }
 

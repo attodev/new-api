@@ -78,7 +78,7 @@ import type {
 } from '@/features/dashboard/types'
 import {
   getOrganizationDashboard,
-  getOrganizations,
+  getAllOrganizations,
 } from '@/features/organizations/api'
 import {
   getLastSelectedOrganizationId,
@@ -543,7 +543,7 @@ export function OrganizationDashboard() {
   const range = useMemo(() => getRangeTimestamps(rangePreset), [rangePreset])
   const organizationsQuery = useQuery({
     queryKey: ['organizations', 'dashboard-selector'],
-    queryFn: () => getOrganizations({ page: 1, size: 100 }),
+    queryFn: () => getAllOrganizations(),
     enabled: isRoot,
   })
   const organizations = useMemo(

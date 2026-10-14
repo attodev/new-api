@@ -20,7 +20,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
-import { deleteOrganization, exportOrgUsers, importOrgUsers } from '../api'
+import {
+  calculateOrganizationWaffoAmount,
+  deleteOrganization,
+  exportOrgUsers,
+  getAllOrganizations,
+  importOrgUsers,
+} from '../api'
 
 vi.mock('@/lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -77,5 +83,62 @@ describe('organization api business failures', () => {
       }),
     })
     await expect(exportOrgUsers(1)).rejects.toThrow('denied')
+  })
+})
+
+describe('organization list and quotes', () => {
+  function organization(id: number) {
+    return {
+      id,
+      name: `org-${id}`,
+      description: '',
+      status: 1,
+      owner_user_id: id,
+      quota: 0,
+      used_quota: 0,
+    }
+  }
+
+  test('getAllOrganizations pages past the 100-item API maximum', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, i) => organization(i + 1))
+    const secondPage = Array.from({ length: 50 }, (_, i) =>
+      organization(i + 101)
+    )
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { page: 1, page_size: 100, total: 150, items: firstPage },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: { page: 2, page_size: 100, total: 150, items: secondPage },
+        },
+      })
+
+    const res = await getAllOrganizations()
+
+    expect(vi.mocked(api.get).mock.calls.map((call) => call[0])).toEqual([
+      '/api/organizations/?p=1&page_size=100',
+      '/api/organizations/?p=2&page_size=100',
+    ])
+    expect(res.success).toBe(true)
+    expect(res.data?.items).toHaveLength(150)
+    expect(res.data?.items.at(-1)?.id).toBe(150)
+  })
+
+  test('calculateOrganizationWaffoAmount quotes through the organization Waffo endpoint', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { message: 'success', data: '9.50' },
+    })
+    await expect(
+      calculateOrganizationWaffoAmount({ amount: 10 })
+    ).resolves.toEqual({ message: 'success', data: '9.50' })
+    expect(vi.mocked(api.post).mock.calls[0][0]).toBe(
+      '/api/organization/waffo/amount'
+    )
+    expect(vi.mocked(api.post).mock.calls[0][1]).toEqual({ amount: 10 })
   })
 })

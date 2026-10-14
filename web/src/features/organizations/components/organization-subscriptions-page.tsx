@@ -67,7 +67,7 @@ import {
   getOrganizationSubscriptionPlans,
   getOrganizationUserSubscriptions,
   getOrganizationUsers,
-  getOrganizations,
+  getAllOrganizations,
   updateOrganizationSubscriptionPlan,
 } from '../api'
 import {
@@ -204,7 +204,7 @@ export function OrganizationSubscriptionsPage() {
 
   const loadOrganizations = useCallback(async () => {
     if (!isRoot) return
-    const res = await getOrganizations({ page: 1, size: 100 })
+    const res = await getAllOrganizations()
     const items = res.data?.items
     if (res.success && items?.length) {
       setOrganizations(items)

@@ -35,7 +35,7 @@ const api = vi.hoisted(() => ({
   getOrganizationSubscriptionPlans: vi.fn(),
   getOrganizationUserSubscriptions: vi.fn(),
   getOrganizationUsers: vi.fn(),
-  getOrganizations: vi.fn(),
+  getAllOrganizations: vi.fn(),
   updateOrganizationSubscriptionPlan: vi.fn(),
 }))
 

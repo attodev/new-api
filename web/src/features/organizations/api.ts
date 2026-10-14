@@ -73,6 +73,44 @@ export async function getOrganizations(params: {
   return res.data
 }
 
+// The list endpoint caps page_size at 100 (common.GetPageQuery) and has no
+// search parameter, so root selectors page through every organization.
+const ORGANIZATION_LIST_PAGE_SIZE = 100
+const ORGANIZATION_LIST_MAX_PAGES = 100
+
+/**
+ * Loads every organization (all pages of /api/organizations/) for the root
+ * selectors, returned as one page in the getOrganizations response shape.
+ */
+export async function getAllOrganizations(): Promise<
+  ApiResponse<OrganizationsPage>
+> {
+  const first = await getOrganizations({
+    page: 1,
+    size: ORGANIZATION_LIST_PAGE_SIZE,
+  })
+  if (!first.success || !first.data) return first
+  const items = [...(first.data.items ?? [])]
+  const total = first.data.total ?? items.length
+  for (
+    let page = 2;
+    items.length < total && page <= ORGANIZATION_LIST_MAX_PAGES;
+    page++
+  ) {
+    const next = await getOrganizations({
+      page,
+      size: ORGANIZATION_LIST_PAGE_SIZE,
+    })
+    const pageItems = next.data?.items ?? []
+    if (!next.success || pageItems.length === 0) break
+    items.push(...pageItems)
+  }
+  return {
+    ...first,
+    data: { ...first.data, page: 1, page_size: items.length, items },
+  }
+}
+
 export async function updateOrganization(
   organizationId: number,
   payload: OrganizationUpdatePayload
@@ -194,6 +232,15 @@ export async function calculateOrganizationPayPalAmount(
   request: AmountRequest
 ): Promise<AmountResponse> {
   const res = await api.post('/api/organization/paypal/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function calculateOrganizationWaffoAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/organization/waffo/amount', request, {
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data

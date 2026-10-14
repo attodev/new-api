@@ -36,6 +36,7 @@ type assignOrganizationUserRequest struct {
 }
 
 type updateOrganizationRequest struct {
+	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Quota       *int64  `json:"quota,omitempty"`
 	Status      *int    `json:"status,omitempty"`
@@ -183,6 +184,25 @@ func UpdateOrganization(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
+	if req.Name != nil {
+		// Same validation as CreateOrganization; the unique index backs the
+		// explicit check below.
+		name, err := trimAndValidateText("name", *req.Name, MaxOrganizationNameLength, true)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		var duplicates int64
+		if err := model.DB.Model(&model.Organization{}).Where("name = ? AND id <> ?", name, organizationId).Count(&duplicates).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if duplicates > 0 {
+			common.ApiErrorT(c, "organization name already exists")
+			return
+		}
+		updates["name"] = name
+	}
 	if req.Description != nil {
 		description, err := trimAndValidateText("description", *req.Description, MaxOrganizationDescriptionLength, false)
 		if err != nil {

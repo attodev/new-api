@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
   calculateOrganizationAmount: vi.fn(),
   calculateOrganizationPayPalAmount: vi.fn(),
   calculateOrganizationStripeAmount: vi.fn(),
+  calculateOrganizationWaffoAmount: vi.fn(),
   calculateOrganizationWaffoPancakeAmount: vi.fn(),
   getOrganizationBillingHistory: vi.fn(),
   getOrganizationWallet: vi.fn(),
@@ -187,6 +188,31 @@ describe('OrganizationWallet', () => {
       )
     )
     errorSpy.mockRestore()
+  })
+
+  it('quotes Waffo with the organization Waffo calculator', async () => {
+    topup.info = {
+      ...topupInfo(),
+      pay_methods: [],
+      enable_paypal_topup: false,
+      enable_waffo_topup: true,
+      waffo_min_topup: 0,
+      waffo_pay_methods: [{ name: 'Waffo Card' }],
+    }
+    api.calculateOrganizationWaffoAmount.mockResolvedValue({
+      success: true,
+      message: 'success',
+      data: '9.50',
+    })
+    render(<OrganizationWallet />)
+
+    await screen.findByText(formatQuota(ORGANIZATION_QUOTA))
+    await waitFor(() =>
+      expect(api.calculateOrganizationWaffoAmount).toHaveBeenCalledWith({
+        amount: 10,
+      })
+    )
+    expect(api.calculateOrganizationAmount).not.toHaveBeenCalled()
   })
 
   it('rejects a Waffo payment below the minimum top-up without calling the endpoint', async () => {

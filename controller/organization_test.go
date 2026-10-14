@@ -341,8 +341,8 @@ func TestOrganizationRootRejectsInvalidUpdateInput(t *testing.T) {
 		},
 		{
 			name:    "unsupported field",
-			body:    `{"quota":0,"name":"Acme"}`,
-			message: "unsupported field: name",
+			body:    `{"quota":0,"owner_user_id":2}`,
+			message: "unsupported field: owner_user_id",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

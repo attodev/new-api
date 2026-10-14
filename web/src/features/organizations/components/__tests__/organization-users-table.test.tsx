@@ -35,7 +35,7 @@ const api = vi.hoisted(() => ({
   getOrganizationProfile: vi.fn(),
   getOrganizationUsers: vi.fn(),
   getOrganizationUserSubscriptions: vi.fn(),
-  getOrganizations: vi.fn(),
+  getAllOrganizations: vi.fn(),
   importOrgUsers: vi.fn(),
   removeOrganizationUserMembership: vi.fn(),
   updateOrganization: vi.fn(),
@@ -179,7 +179,7 @@ describe('OrganizationUsersTable', () => {
       username: 'root',
       role: 100,
     })
-    api.getOrganizations.mockResolvedValue({
+    api.getAllOrganizations.mockResolvedValue({
       success: true,
       data: {
         page: 1,
@@ -212,13 +212,13 @@ describe('OrganizationUsersTable', () => {
       username: 'root',
       role: 100,
     })
-    api.getOrganizations.mockResolvedValue({
+    api.getAllOrganizations.mockResolvedValue({
       success: true,
       data: { page: 1, page_size: 50, total: 0, items: [] },
     })
     render(<OrganizationUsersTable />)
 
-    await waitFor(() => expect(api.getOrganizations).toHaveBeenCalled())
+    await waitFor(() => expect(api.getAllOrganizations).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: 'Export' })).toBeNull()
   })
 })
