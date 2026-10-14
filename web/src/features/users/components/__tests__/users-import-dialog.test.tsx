@@ -58,6 +58,24 @@ describe('UsersImportDialog', () => {
     expect(screen.getByText(/initial_password is empty/)).toBeInTheDocument()
   })
 
+  it('lists accounts whose imported quota could not be applied', async () => {
+    importUsersMock.mockResolvedValue({
+      created: 1,
+      skipped: 0,
+      skipped_usernames: [],
+      errors: [],
+      created_usernames: ['carol'],
+      granted_quota: 0,
+      quota_errors: ['carol'],
+    })
+    render(
+      <UsersImportDialog open onOpenChange={() => {}} onSuccess={() => {}} />
+    )
+    await userEvent.upload(screen.getByLabelText('Select .xlsx file'), xlsx())
+    await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
+    expect(await screen.findByText('quota: carol')).toBeInTheDocument()
+  })
+
   it('shows the failure message and does not report success', async () => {
     importUsersMock.mockRejectedValue(new Error('invalid xlsx file'))
     const onSuccess = vi.fn()

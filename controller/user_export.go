@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
@@ -55,9 +56,40 @@ func ImportUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	recordUserImportAudit(c, result)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    result,
 	})
+}
+
+// importAuditUsernameLimit caps how many created usernames one import audit entry lists.
+const importAuditUsernameLimit = 50
+
+// recordUserImportAudit records one operation audit entry summarising an Excel
+// import, attributed to the importing admin, and marks the request as audited so
+// AdminAuth does not add its generic fallback entry. It mirrors
+// recordManageAuditFor but supplies its own English content, because
+// "user.import" has no entry in the upstream template table (controller/audit.go).
+func recordUserImportAudit(c *gin.Context, result *service.ImportResult) {
+	usernames := result.CreatedUsernames
+	if len(usernames) > importAuditUsernameLimit {
+		usernames = usernames[:importAuditUsernameLimit]
+	}
+	params := map[string]any{
+		"created":                 result.Created,
+		"skipped":                 result.Skipped,
+		"error_count":             len(result.Errors),
+		"created_usernames":       usernames,
+		"created_usernames_total": len(result.CreatedUsernames),
+		"granted_quota":           result.GrantedQuota,
+	}
+	if len(result.QuotaErrors) > 0 {
+		params["quota_errors"] = result.QuotaErrors
+	}
+	content := fmt.Sprintf("Imported %d users from Excel (skipped %d, errors %d, granted quota %d)",
+		result.Created, result.Skipped, len(result.Errors), result.GrantedQuota)
+	model.RecordOperationAuditLog(c.GetInt("id"), c.GetInt("role"), content, c.ClientIP(), "user.import", params, auditOperatorInfo(c), nil, c)
+	markAuditLogged(c)
 }

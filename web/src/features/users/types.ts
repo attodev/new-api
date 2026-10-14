@@ -160,4 +160,8 @@ export interface ImportResult {
   skipped: number
   skipped_usernames: string[]
   errors: string[]
+  created_usernames?: string[]
+  granted_quota?: number
+  /** Accounts created without their imported quota; they need a manual fix. */
+  quota_errors?: string[]
 }

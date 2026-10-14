@@ -115,6 +115,13 @@ type ImportResult struct {
 	Skipped          int      `json:"skipped"`
 	SkippedUsernames []string `json:"skipped_usernames"`
 	Errors           []string `json:"errors"`
+	// CreatedUsernames lists every account the import inserted, in row order.
+	CreatedUsernames []string `json:"created_usernames"`
+	// GrantedQuota is the sum of the wallet balances the created accounts ended up with.
+	GrantedQuota int `json:"granted_quota"`
+	// QuotaErrors lists accounts that were created but whose imported quota could
+	// not be applied; they keep the default new-user balance and need a manual fix.
+	QuotaErrors []string `json:"quota_errors"`
 }
 
 // ImportUsersFromFile parses an Excel file and creates new users.
@@ -126,6 +133,8 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 	result := &ImportResult{
 		SkippedUsernames: []string{},
 		Errors:           []string{},
+		CreatedUsernames: []string{},
+		QuotaErrors:      []string{},
 	}
 
 	// Find the sheet — use first sheet regardless of name
@@ -186,9 +195,12 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 			continue
 		}
 
-		// Parse quota
+		// Parse quota. A present cell (including "0") is applied exactly; an empty
+		// cell keeps the default new-user balance.
 		quota := 0
+		quotaProvided := false
 		if qs := getCell(row, "quota"); qs != "" {
+			quotaProvided = true
 			if q, err := strconv.Atoi(qs); err == nil {
 				quota = q
 			} else {
@@ -254,7 +266,7 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 			Role:        role,
 			Status:      stringToStatus(getCell(row, "status")),
 			Group:       group,
-			Quota:       0, // Insert() will set QuotaForNewUser; we override below if needed
+			Quota:       0, // Insert() sets QuotaForNewUser; an imported quota is applied below
 			AffQuota:    affQuota,
 			InviterId:   inviterId,
 			Remark:      getCell(row, "remark"),
@@ -273,14 +285,20 @@ func ImportUsersFromFile(f *excelize.File, callerRole int) (*ImportResult, error
 			continue
 		}
 
-		// Override quota with imported value if it differs from the default applied by Insert().
-		if quota != 0 {
-			if err := setImportedUserQuota(user.Id, common.QuotaForNewUser, quota); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+		result.Created++
+		result.CreatedUsernames = append(result.CreatedUsernames, username)
+
+		// Move the balance from what Insert() stored on the struct to the imported value.
+		granted := user.Quota
+		if quotaProvided {
+			if err := setImportedUserQuota(user.Id, user.Quota, quota); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): user created but quota could not be set: %v", lineNum, username, err))
+				result.QuotaErrors = append(result.QuotaErrors, username)
+			} else {
+				granted = quota
 			}
 		}
-
-		result.Created++
+		result.GrantedQuota += granted
 	}
 
 	return result, nil

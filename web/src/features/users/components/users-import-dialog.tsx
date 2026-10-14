@@ -124,12 +124,16 @@ export function UsersImportDialog({
                   : {result.skipped_usernames.join(', ')}
                 </p>
               )}
-              {result.errors.length > 0 && (
+              {(result.errors.length > 0 ||
+                (result.quota_errors?.length ?? 0) > 0) && (
                 <div className='text-red-600'>
                   <p>{t('Errors')}:</p>
                   <ul className='list-inside list-disc'>
                     {result.errors.map((e) => (
                       <li key={e}>{e}</li>
+                    ))}
+                    {result.quota_errors?.map((username) => (
+                      <li key={`quota:${username}`}>quota: {username}</li>
                     ))}
                   </ul>
                 </div>
