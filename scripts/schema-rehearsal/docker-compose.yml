@@ -20,6 +20,6 @@ services:
       POSTGRES_DB: new_api
     ports: ["54321:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root -d new_api"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U root -d new_api"]
       interval: 3s
       retries: 20
