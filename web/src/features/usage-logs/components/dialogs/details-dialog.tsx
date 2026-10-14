@@ -85,6 +85,7 @@ import {
   renderLogContent,
 } from '../../lib/format'
 import { buildQuotaAuditOperation } from '../../lib/quota-audit-operation'
+import { effectiveUseTimeSec } from '../../lib/timing-breakdown' // fork: O7
 import {
   getLogTypeConfig,
   isPerCallBilling,
@@ -94,6 +95,7 @@ import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
 import { ResponseModelDetails } from '../model-badge'
 import { PluginAuthorLink } from '../plugin-author-link'
 import { DetailRow, DetailSection } from './log-detail-layout'
+import { TimingBreakdownSection } from './timing-breakdown-section' // fork: O7
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
 // to its i18n label key for display in the audit details.
@@ -519,6 +521,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
   )
   const hasAudioTokens = other?.ws || other?.audio
   const showTiming = isTimingLogType(props.log.type)
+  const useTimeSec = effectiveUseTimeSec(other, props.log.use_time) // fork: O7
   const showAdminIp =
     !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
   const adminInfo = other?.admin_info
@@ -739,7 +742,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
             />
           )}
 
-          {showTiming && props.log.use_time > 0 && (
+          {showTiming && useTimeSec > 0 && (
             <DetailRow
               label={t('Response Time')}
               value={
@@ -748,13 +751,13 @@ export function DetailsDialog(props: DetailsDialogProps) {
                     'font-medium',
                     timingTextColorClass(
                       getResponseTimeColor(
-                        props.log.use_time,
+                        useTimeSec,
                         props.log.completion_tokens
                       )
                     )
                   )}
                 >
-                  {formatUseTime(props.log.use_time)}
+                  {formatUseTime(useTimeSec)}
                   {props.log.is_stream &&
                     other?.frt != null &&
                     other.frt > 0 && (
@@ -775,6 +778,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
             />
           )}
         </div>
+
+        {/* fork: O7 */}
+        <TimingBreakdownSection other={other} showTiming={showTiming} />
 
         {/* Request conversion (admin only, not for refund) */}
         {showConversion && (

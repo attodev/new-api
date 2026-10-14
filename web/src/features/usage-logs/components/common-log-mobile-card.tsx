@@ -33,6 +33,7 @@ import { formatLogQuota, formatTimestampToDate } from '@/lib/format'
 
 import type { UsageLog } from '../data/schema'
 import { formatModelName, logTokenName, parseLogOther } from '../lib/format'
+import { effectiveUseTimeSec } from '../lib/timing-breakdown' // fork: O7
 import {
   getLogTypeConfig,
   isDisplayableLogType,
@@ -206,7 +207,7 @@ export function CommonLogMobileCard<TData>(props: {
               )}
               {props.cells.has('use_time') && (
                 <TimingMetricsCell
-                  useTimeSec={log.use_time}
+                  useTimeSec={effectiveUseTimeSec(other, log.use_time)} // fork: O7
                   completionTokens={log.completion_tokens}
                   frtMs={other?.frt}
                   isStream={log.is_stream}

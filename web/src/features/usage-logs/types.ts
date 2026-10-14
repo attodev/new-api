@@ -218,6 +218,9 @@ export interface LogOtherData {
   audio_ratio?: number
   audio_completion_ratio?: number
   frt?: number
+  e2e_ms?: number // fork: O7
+  llm_ms?: number // fork: O7
+  gateway_ms?: number // fork: O7
   // Tiered (expression-based) billing fields, set by backend when
   // billing_mode === 'tiered_expr'. expr_b64 is the base64-encoded billing
   // expression; the matched tier and request-rule traces come from the actual

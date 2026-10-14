@@ -66,6 +66,7 @@ import {
   renderAuditContent,
   renderLogContent,
 } from '../../lib/format'
+import { effectiveUseTimeSec } from '../../lib/timing-breakdown' // fork: O7
 import {
   isDisplayableLogType,
   isTimingLogType,
@@ -801,7 +802,7 @@ export function useCommonLogsColumns(
 
           return (
             <TimingMetricsCell
-              useTimeSec={useTime}
+              useTimeSec={effectiveUseTimeSec(other, useTime)} // fork: O7
               completionTokens={log.completion_tokens}
               frtMs={other?.frt}
               isStream={log.is_stream}
