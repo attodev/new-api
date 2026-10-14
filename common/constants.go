@@ -38,7 +38,7 @@ var SessionCookieSecure = false
 
 // DefaultLanguage is the DEFAULT_LANGUAGE environment variable: the language of
 // server log lines and of text for a reader who states no language: en, zh-CN
-// or zh-TW. English when empty.
+// or zh-TW, ko. English when empty. // fork: O9
 var DefaultLanguage string
 var SessionCookieTrustedURLs []string
 

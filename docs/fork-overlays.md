@@ -190,6 +190,10 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 | web/src/components/datetime-picker.tsx:21,42 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
 | O9 한글 | web/src/features/auth/hooks/use-auth-redirect.ts:27,64 | 로그인 직후 저장된 사용자 언어를 `normalizeInterfaceLanguage`로 정규화해 `i18n.changeLanguage`에 전달 (team 사용자의 `setting.language = 'kr'` → `ko`, 데이터 마이그레이션 없이 read-time 정규화) | web/src/i18n/languages.test.ts |
 | O9 한글 | web/src/features/security/components/dialogs/access-token-dialog.tsx:46, web/src/features/security/components/__tests__/access-token-create-dialog.test.tsx:318 | 생성된 액세스 토큰 라벨을 공용 키 `t('Token')` 대신 `t('Access token')`로 표시 (`Token`은 사용 로그의 API 키 열이라 ko에서 "API 키"이므로 액세스 토큰 대화상자에 쓸 수 없음). 키 `Access token`은 8개 locale 모두에 추가 | web/src/i18n/locales/*.json |
+| O9 한글 (백엔드) | i18n/i18n.go:23,45,58,198-199,214 | `LangKo = "ko"` 상수, embed 파일 목록에 `locales/ko.yaml`, `localizers[LangKo]`, `normalizeLang`의 zh 분기 앞 `kr`/`ko`/`ko-*` → `LangKo`(정확히 일치 또는 하이픈 접두사라 `kok`·`kos`는 한국어가 아님; `_`는 앞에서 `-`로 바뀜), `SupportedLanguages()`에 `LangKo` | i18n/locales/ko.yaml, i18n/ko_test.go |
+| O9 한글 (백엔드) | i18n/i18n_test.go:42-44 | `TestLanguageFromUserSetting` 케이스 표에 `ko`, `ko-KR`, `kr` 세 줄 | i18n/ko_test.go |
+| O9 한글 (백엔드) | common/constants.go:41 | `DefaultLanguage` 주석의 언어 목록에 `ko` 한 단어 | — |
+| O9 한글 (백엔드) | i18n/locales/ko.yaml | 신규 locale 파일(upstream 파일 아님). `en.yaml` 66키 전부, 같은 순서·주석 구조. team `i18n/locales/ko.yaml`에 같은 키가 있는 19개는 그 값, 나머지 47개는 용어집으로 번역 | docs/translation-glossary.ko.md |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
