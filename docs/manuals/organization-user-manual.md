@@ -116,14 +116,17 @@
 
 ### 2. 멤버 추가
 
-`Assign Organization Member` 영역의 username 입력 필드에 추가할 사용자의 username을 입력한다.
+`Assign Organization Member` 영역의 `Username or email` 입력 필드에 추가할 사용자의 username이나 email을 정확히 입력하고 `Look up user`를 누른다(또는 Enter).
+
+- 미소속 사용자 목록은 보여주지 않는다. 먼저 username으로, 없고 입력값에 `@`가 있으면 email로 정확 일치 조회한다(부분 일치 없음).
+- 결과가 없거나 다른 조직 소속·전역 관리자면 `User not found`가 표시된다. 이미 우리 조직 구성원이면 `Already a member`가 표시되고 `Add`는 비활성화된다.
 
 ### 3. 추가 버튼 클릭
 
-`Add` 버튼을 누르거나 Enter 키를 누른다.
+결과 줄의 `Add`를 누른다. 소유자는 그 전에 `member`/`admin`을 고를 수 있고, 관리자는 `member`로 추가한다.
 
-- 입력한 username이 할당 후보에 없으면 `User not found` 오류가 표시된다. 다른 조직에 속한 사용자는 서버가 거부한다.
-- 추가 성공 시 해당 사용자는 `member` 역할로 조직에 추가된다.
+- 개인 잔액(quota)·추천 잔액(aff_quota)이 남았거나 활성 개인 구독이 있는 사용자는 `This user still has a personal balance or subscription`으로 거부된다. 잔액을 소진하거나 전체 관리자가 정리한 뒤 다시 추가한다. 초대·수락 절차는 없다.
+- 추가 성공 시 해당 사용자는 선택한 역할(기본 `member`)로 조직에 추가된다.
 
 ### 4. 역할 변경 (필요한 경우, 소유자)
 
@@ -141,12 +144,12 @@
 조직 소유자와 조직 관리자는 조직 사용자 화면에서 다음 작업을 할 수 있다.
 
 - 조직 사용자 목록 조회 (검색/정렬/페이지네이션)
-- 사용자 추가 (username 입력, member 역할로 추가)
+- 사용자 추가 (username/email 정확 조회 후 추가)
 - 사용자 역할 변경 (Role 컬럼 인라인 편집 — 소유자 화면만, owner 행 제외)
 - 사용자 quota 조정
-- 사용자 상태 변경 (체크박스 선택 후 일괄 비활성화)
+- 조직 회원 정지·재개 (체크박스 선택 후 `Suspend`/`Resume`. 플랫폼 계정 상태는 바꾸지 않는다)
 - 사용자 제거 (체크박스 선택 후 일괄 제거, owner·자기 자신 제외)
-- remark 수정 (화면에는 없음 — API 또는 Excel 가져오기)
+- 조직 메모 수정 (`Organization note` 열의 입력칸 또는 Excel `organization_remark` 열. 회원 본인에게는 보이지 않는다)
 - 목록 Export (Excel, `Export`)
 - 목록 Import (Excel, `Import`. 파일에 없는 구성원 제거 옵션 있음. `group` 열은 무시된다)
 
@@ -163,12 +166,12 @@
 입력 제한:
 
 - 사용자 quota: 0 이상 9,007,199,254,740,991(2^53-1) 이하
-- 사용자 상태: 활성 또는 비활성만 선택 가능
-- remark: 255자 이하
+- 조직 회원 상태: `Active` 또는 `Suspended`만 가능
+- 조직 메모: 255자 이하
 
 ### 저장/취소 패턴
 
-변경 사항(quota 수정, 상태 변경, 역할 변경, 제거)은 즉시 API 호출되지 않고 pending 상태로 축적된다. 1건 이상의 변경이 있으면 테이블 상단에 배너가 표시된다.
+변경 사항(quota 수정, 정지·재개, 메모, 역할 변경, 제거)은 즉시 API 호출되지 않고 pending 상태로 축적된다. 1건 이상의 변경이 있으면 테이블 상단에 배너가 표시된다.
 
 - `Save`: 모든 pending 변경을 일괄 API 호출로 반영
 - `Cancel`: 모든 pending 변경 초기화
@@ -177,10 +180,13 @@
 
 체크박스로 사용자를 선택(복수 가능)하면 검색창 옆에 툴바가 표시된다.
 
-- `Disable`: 선택한 사용자를 비활성화 예정으로 추가
+- `Suspend`: 선택한 사용자를 정지 예정으로 추가(`Pending suspension`)
+- `Resume`: 선택한 사용자를 재개 예정으로 추가(`Pending resume`)
 - `Remove from organization`: 선택한 사용자를 제거 예정으로 추가
 
 owner 행과 자기 자신의 행은 체크박스가 비활성화되어 선택 불가. 제거가 확정되면 그 사용자의 quota는 0이 된다(조직이 배정한 한도이므로).
+
+정지된 회원은 API 요청(relay)이 403 `organization membership is suspended`로 거부되고, 조직 관리 화면의 쓰기 작업도 할 수 없다. 로그인과 본인 지갑·조직 플랜 조회는 된다. 조직을 떠나면 정지 상태와 조직 메모는 초기화된다. 자세한 규칙은 `organization-management-manual.md` §6-3·§6-4.
 
 ## 조직 사용자 quota 설정 방법
 
@@ -386,8 +392,8 @@ organization:last-selected-id
 
 1. 조직 소유자(또는 조직 관리자)로 로그인한다.
 2. `Organization Users` 메뉴로 이동한다.
-3. `Assign Organization Member` 영역에 조직에 속하지 않은 일반 사용자의 username을 입력한다.
-4. `Add`를 누른다. 사용자는 `member`로 추가된다.
+3. `Assign Organization Member` 영역에 조직에 속하지 않은 일반 사용자(개인 잔액·구독 없음)의 username 또는 email을 입력하고 `Look up user`를 누른다.
+4. 결과 줄의 `Add`를 누른다. 사용자는 `member`로 추가된다(소유자는 `admin`도 선택 가능).
 5. `admin`이 필요하면 소유자가 `Role` 컬럼에서 바꾸고 `Save`를 누른다.
 
 ### 시나리오 3: 조직 사용자 quota 할당
@@ -462,7 +468,9 @@ organization quota insufficient, remaining: ＄0.000000
 - 조직 관리자가 owner 행을 바꾸려 했다 (`only the organization owner can manage the owner`).
 - 자기 자신을 바꾸려 했다 (`organization admins cannot modify their own membership`).
 - `owner` 역할을 부여하려 했다 (`ownership is assigned when the organization is created`).
-- 대상 사용자가 다른 조직에 속해 있다 (`user belongs to another organization`).
+- 대상 사용자가 다른 조직에 속해 있다 (`user belongs to another organization`, 화면 조회는 `User not found`).
+- 대상 사용자에게 개인 잔액·추천 잔액·활성 개인 구독이 남아 있다 (`This user still has a personal balance or subscription`).
+- 조직 관리자 본인이 정지 상태다 (`organization membership is suspended`, HTTP 403).
 
 해결:
 

@@ -91,9 +91,11 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 ### 4.6 O6 할인 계층
 - 설정 저장(`ModelDiscount`/`VendorDiscount` 옵션, JSON map)과 `HandleGroupRatio`의 multiplier 적용은 team 코드를 그대로 쓴다(upstream `relay/helper/price.go`에 같은 함수가 있고 `GroupRatioInfo`도 유지됨).
 - 표시: upstream의 가격 페이지·모델 카드·usage-log 상세는 구조가 바뀌었으므로(변경량 2,693/3,509줄) team 컴포넌트를 복사하지 않고 upstream 컴포넌트에 할인 배지·할인 요소를 추가하는 식으로 다시 만든다(§9 결정 3). 범위: 가격 표 할인 배지, 모델 카드 할인 가격, usage-log 공식의 할인 요소, 관리자 할인 편집기(모델/벤더 JSON 편집기).
+- 2026-10-14 구현 메모(단계 C): 할인 조회 순서는 요청 모델명 → 그 벤더 → 과금 모델명 → 그 벤더다(마켓플레이스가 요청 모델명으로 표시하므로 보이는 할인 == 청구 할인). `GroupRatioInfo.BaseGroupRatio`로 로그에 할인 전 그룹 배율을 나눗셈 없이 남겨 100% 할인도 안전하다. 기록 `docs/2026-10-14-rebase-phase-c.md` §1.
 
 ### 4.7 O7 타이밍
 - `middleware/request_timing.go`, `common/timing_response_writer.go`는 복사. `RelayInfo`에 `UpstreamRequestStartTime/EndTime` 필드(규칙 3), `api_request.go doRequest`에 기록 두 줄, `log_info_generate.go`에 `other` 필드 채우기 함수 호출 한 줄(본문은 `service/log_timing.go`). usage-log 상세의 타이밍 표시는 upstream 다이얼로그에 섹션 추가.
+- 2026-10-14 구현 메모(단계 C): 본문은 `service/log_timing_fork.go`다. `e2e_ms`/`llm_ms`/`gateway_ms`는 public, 내부 구간 `pre_llm_ms`/`post_llm_ms`는 admin 전용(`SetAdmin`)이고, hijack된 realtime WSS 로그에는 타이밍 키가 없다. `TimingResponseWriter.Unwrap()`으로 write deadline이 유지된다(team에도 같은 결함이 있어 역이식 필요). 기록 `docs/2026-10-14-rebase-phase-c.md` §2.
 
 ### 4.8 O9 한글
 - 프런트: `web/src/i18n/locales/ko.json` 생성. team `kr.json`의 4,489개 일치 키를 옮기고, upstream 신규 2,778개 키는 기계 번역 초안 후 용어집(`docs/translation-glossary.md`의 한글 규칙: 크레딧→잔액/요금 등)으로 검수. `languages.ts`에 `{ code: 'ko', label: '한국어' }` 추가, `normalizeInterfaceLanguage`에 ko 매핑. 인터페이스 언어 제한(O8)은 upstream의 옵션 메커니즘으로 en/ko만 노출.
@@ -155,10 +157,10 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 4. 한글 신규 키 2,778개는 기계 번역 초안 + 용어집 기준 사람 검수(§4.8). 기본값으로 진행하며, 전부 사람 번역으로 바꾸려면 단계 D 계획 전에 알린다.
 5. `RequirePermission` 범위는 플랫폼 관리자용 `/api/organizations/*`만(§4.4). 기본값으로 진행하며, 조직 내부 관리 라우트까지 넓히려면 단계 B 계획 전에 알린다.
 
-열린 제품 결정 (단계 B 최종 리뷰, 단계 C에서 정한다; 기록 `docs/2026-10-14-rebase-phase-b.md` §3·§4):
+단계 B 최종 리뷰가 넘긴 제품 결정(기록 `docs/2026-10-14-rebase-phase-b.md` §3·§4). 단계 C에서 정하고 구현했다(기록 `docs/2026-10-14-rebase-phase-c.md` §3):
 
-6. 조직 미소속 사용자 할당(I2): 지금은 조직 관리자가 미소속 일반 사용자 전체를 보고 동의 없이 할당할 수 있으며, 할당되면 그 사용자의 개인 잔액이 조직이 통제하는 한도가 된다(제거 시 0). 후보: 잔액·개인 구독이 있는 사용자 할당 거부, 정확 일치 조회로 축소, `quota`·`remark` 숨김, 초대·수락 단계.
-7. 플랫폼 사용자 필드(I7): 지금은 조직 관리자가 `users.status`(root의 차단 해제 포함)와 `users.remark`를 쓴다. 후보: 조직 범위 "멤버십 정지" 플래그 또는 비활성화만 허용, 조직 범위 메모.
+6. 2026-10-14 확정: 조직 미소속 사용자 할당(I2)은 초대·수락 단계 없이 "정확 조회 + 개인 잔액이 있으면 거부"다. 할당 후보 목록(`GET /api/organization/assignable-users`)을 없애고 `GET /api/organization/users/lookup`(username 정확 일치, 없고 `@`가 있으면 email 정확 일치; 응답은 id·username·display_name·organization_id만)으로 바꿨다. 미소속 사용자는 `quota > 0`, `aff_quota > 0` 또는 활성 개인 구독이 있으면 할당이 거부된다(API·Excel 기존 사용자 행 모두; Excel이 새로 만드는 사용자는 해당 없음). 단계 C Task 8.
+7. 2026-10-14 확정: 플랫폼 사용자 필드(I7)는 조직 범위 필드로 분리했다. `users.organization_member_status`(1 active / 2 suspended)와 `users.organization_remark`(255자) 컬럼을 추가하고, 조직 API는 `member_status`·`organization_remark`만 쓰며 플랫폼 `status`·`remark`는 root 전용이다(옛 키는 `unsupported field`로 거부). 정지된 회원은 relay(403)·레거시 MJ·`/api/organization/*`의 GET이 아닌 요청이 모두 막히고, 로그인과 본인 조회(`/wallet` 요약, `subscription/self`, `topup/self`)는 된다. 조직을 떠나면 두 값은 초기화된다. 단계 C Task 9.
 
 ## 10. 리스크
 

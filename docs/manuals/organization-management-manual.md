@@ -66,7 +66,7 @@
 - 자기 자신의 역할·quota·상태는 바꾸거나 제거할 수 없다. 자기 행은 화면에서 잠겨 있다(`You cannot modify your own membership`).
 - owner 행은 owner 본인만 바꿀 수 있다. 관리자에게 owner 행은 잠겨 있다(`Owner cannot be modified`).
 - 누구도 `owner` 역할을 부여할 수 없다. 소유권은 조직 생성 때 정해진다.
-- 조직 지갑 충전은 소유자 전용이다. 관리자에게도 `Top up organization wallet` 버튼이 보이지만 `/wallet`에서는 구성원 요약 화면이 열린다.
+- 조직 지갑 충전은 소유자 전용이다. `Top up organization wallet` 버튼도 소유자에게만 보인다.
 
 ### 조직 일반 사용자
 
@@ -87,6 +87,8 @@
 ### 사용자 quota
 
 사용자 quota는 조직 내부에서 사용자별 사용 한도로 쓰인다.
+
+조직 구성원은 이 한도를 스스로 늘릴 수 없다. 교환 코드 충전, 개인 결제 충전, 개인 잔액으로 구독 구매, 추천 적립 이체(`POST /api/user/aff_transfer`), 출석 보상(`POST /api/user/checkin`)이 모두 거부된다. realtime(WebSocket) 요청도 시작 때 회원 한도와 조직 지갑을 함께 확인한다.
 
 조직 구독 플랜이 없는 사용자는 사용자 quota와 조직 quota가 모두 충분해야 요청할 수 있다.
 
@@ -148,6 +150,8 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 
 구성원이 남아 있으면 `organization has N non-owner members, remove them first` 오류로 거부된다. 삭제되면 owner는 조직에서 빠지고 owner의 사용자 quota는 0이 된다.
 
+대기(pending) 중인 조직 충전 주문이 있어도 삭제가 거부된다. 결제창을 열고 떠난 주문은 전체 관리자가 API `POST /api/organizations/:id/topups/expire`로 만료시킨 뒤 삭제한다. 활성 조직에서는 만든 지 1시간이 지난 주문만 만료되고(응답의 `skipped_recent`가 남은 수), 비활성(`status=2`) 조직은 모두 만료된다. 만료된 주문은 뒤늦게 결제 완료 웹훅이 와도 적립되지 않으므로, 결제가 진행 중인지 provider에서 먼저 확인한다(`docs/openapi/organization-rest-api.md` §3.5). 화면 버튼은 없다.
+
 ## 6. 조직 관리자/소유자로 사용자 추가하기
 
 1. 조직 소유자 또는 조직 관리자 계정으로 로그인한다.
@@ -163,7 +167,7 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 - 미소속 사용자 목록은 보여주지 않는다. 입력값을 먼저 username으로 조회하고, 없으면서 입력값에 `@`가 있으면 email로 다시 조회한다. 부분 일치는 하지 않는다(email은 대소문자 무시). 조회 결과에는 잔액·비고가 나오지 않는다.
 - 이미 우리 조직 구성원이면 결과 줄에 `Already a member`가 표시되고 `Add`는 비활성화된다(역할 변경은 Role 컬럼에서 한다).
 - 조직 미소속 일반 사용자와 같은 조직 구성원만 찾을 수 있다. 다른 조직 소속 사용자와 전역 관리자는 `User not found`로 나온다.
-- **개인 잔액이 남은 사용자는 추가할 수 없다.** 개인 잔액(quota)이나 추천 잔액(aff_quota)이 0보다 크거나 활성 개인 구독이 있으면 `Add`가 `This user still has a personal balance, affiliate balance or subscription`으로 거부된다. 조직에 들어오면 개인 quota가 조직 관리자가 정하는 한도로 바뀌기 때문이다. 사용자가 잔액을 다 쓰거나 구독이 끝난 뒤, 또는 전체 관리자가 사용자 관리에서 잔액을 0으로 정리하고 구독을 취소한 뒤 다시 추가한다. 초대·수락 절차는 없다.
+- **개인 잔액이 남은 사용자는 추가할 수 없다.** 개인 잔액(quota)이나 추천 잔액(aff_quota)이 0보다 크거나 활성 개인 구독이 있으면 `Add`가 `This user still has a personal balance or subscription` 안내로 거부된다(API 메시지는 `user still has a personal balance, affiliate balance or subscription; it must be cleared before joining an organization`). 조직에 들어오면 개인 quota가 조직 관리자가 정하는 한도로 바뀌기 때문이다. 사용자가 잔액을 다 쓰거나 구독이 끝난 뒤, 또는 전체 관리자가 사용자 관리에서 잔액을 0으로 정리하고 구독을 취소한 뒤 다시 추가한다. 초대·수락 절차는 없다.
 - Excel 가져오기도 같다. 잔액이나 활성 구독이 있는 기존 사용자 행은 `failed to assign: user still has a personal balance, affiliate balance or subscription` 행 오류가 된다. 가져오기가 새로 만드는 사용자는 해당하지 않는다.
 - 역할 변경은 사용자 테이블의 Role 컬럼(소유자 화면)이나 API로 따로 수행한다.
 
@@ -397,6 +401,8 @@ quota reset은 별도로 설정하지 않고 플랜 기간과 동일하게 동�
 2. `Organization Usage Logs`(`/organization/usage-logs/common`) 메뉴로 이동한다.
 3. 필요한 필터를 적용한다.
 4. 로그 상세를 열어 요청 정보를 확인한다.
+
+로그 상세(`Log Details`)는 일반 사용 로그와 같다. 모델·벤더 할인이 적용된 요청은 `Billing Details`의 `Group Ratio` 다음에 `Model discount 0.7500x`·`Vendor discount 0.9000x` 행이 있고(`docs/discount/admin-guide.md` §3), 새 로그에는 `Timing Breakdown` 섹션(`Model Provider` = 업스트림 모델 호출 시간, `Gateway Overhead` = 나머지 시간과 비율)이 있다. 채널 재시도가 있었던 요청은 실패한 시도의 시간이 `Gateway Overhead`에 들어간다.
 
 조직 구독으로 사용한 요청은 로그 상세에 조직 구독 정보가 표시될 수 있다.
 
