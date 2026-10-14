@@ -309,7 +309,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 				}
 				// Leaving zeroes the member quota cap (model.ClearOrganizationMembership),
 				// so an imported cap never survives as a personal balance.
-				if _, err := model.ClearOrganizationMembership(member.Id); err != nil {
+				if _, err := model.ClearOrganizationMembership(member.Id, organizationId); err != nil {
 					result.Errors = append(result.Errors, fmt.Sprintf("remove-absent (%s): failed to remove: %v", member.Username, err))
 					continue
 				}

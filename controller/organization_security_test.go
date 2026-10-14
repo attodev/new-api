@@ -141,6 +141,18 @@ func TestOrganizationRemovalZeroesMemberQuotaAndAuditsPreviousQuota(t *testing.T
 	require.Len(t, audits, 1)
 	require.NotNil(t, audits[0].Other.Op)
 	requireOrgSecurityAuditParam(t, audits[0], "previous_quota", "300")
+
+	// A stale clear scoped to this organization must not touch a user who has
+	// meanwhile joined another organization.
+	require.NoError(t, f.db.Model(&model.User{}).Where("id = ?", f.admin.Id).
+		Updates(map[string]any{"organization_id": f.org.Id + 1, "organization_role": model.OrganizationRoleMember}).Error)
+	_, err := model.ClearOrganizationMembership(f.admin.Id, f.org.Id)
+	require.ErrorIs(t, err, model.ErrOrganizationMembershipChanged)
+	require.EqualError(t, err, "user is no longer a member of this organization")
+	moved := orgSecurityUser(t, f.db, f.admin.Id)
+	require.Equal(t, f.org.Id+1, moved.OrganizationId)
+	require.Equal(t, model.OrganizationRoleMember, moved.OrganizationRole)
+	require.Equal(t, 200, moved.Quota)
 }
 
 func TestOrganizationDeleteZeroesOwnerQuota(t *testing.T) {
@@ -255,4 +267,34 @@ func requireOrgSecurityAuditParam(t *testing.T, audit model.AuditLog, key string
 	raw, err := common.Marshal(audit.Other.Op.Params[key])
 	require.NoError(t, err)
 	require.JSONEq(t, wantJSON, string(raw))
+}
+
+func TestOrganizationRootCanManageOwnerSubscription(t *testing.T) {
+	f := setupOrgSecurityTest(t)
+	root := model.User{Username: "platform_root", Password: "x", DisplayName: "root", Role: common.RoleRootUser,
+		Status: common.UserStatusEnabled, AffCode: "aff-root"}
+	require.NoError(t, f.db.Create(&root).Error)
+	plan := model.OrganizationSubscriptionPlan{OrganizationId: f.org.Id, Title: "team", Enabled: true,
+		DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 50, QuotaResetPeriod: model.SubscriptionResetNever}
+	require.NoError(t, f.db.Create(&plan).Error)
+	ownerParam := orgSecurityIdParam(f.owner.Id)
+	query := "/?organization_id=" + strconv.Itoa(f.org.Id)
+	body := `{"plan_id":` + strconv.Itoa(plan.Id) + `}`
+
+	// A non-owner organization admin is still rejected.
+	res := orgSecurityRequest(AssignOrganizationUserSubscription, f.admin, http.MethodPut, "/", body, ownerParam)
+	requireOrgSecurityResult(t, res, false, "only the organization owner can manage the owner")
+
+	res = orgSecurityRequest(AssignOrganizationUserSubscription, root, http.MethodPut, query, body, ownerParam)
+	requireOrgSecurityResult(t, res, true, "")
+	sub, err := model.GetActiveOrganizationUserSubscription(f.org.Id, f.owner.Id)
+	require.NoError(t, err)
+	require.Equal(t, plan.Id, sub.PlanId)
+
+	res = orgSecurityRequest(CancelOrganizationUserSubscription, f.admin, http.MethodDelete, "/", "", ownerParam)
+	requireOrgSecurityResult(t, res, false, "only the organization owner can manage the owner")
+	res = orgSecurityRequest(CancelOrganizationUserSubscription, root, http.MethodDelete, query, "", ownerParam)
+	requireOrgSecurityResult(t, res, true, "")
+	_, err = model.GetActiveOrganizationUserSubscription(f.org.Id, f.owner.Id)
+	require.Error(t, err)
 }

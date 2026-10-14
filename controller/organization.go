@@ -842,7 +842,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 
-	previousQuota, err := model.ClearOrganizationMembership(target.Id)
+	previousQuota, err := model.ClearOrganizationMembership(target.Id, actor.OrganizationId)
 	if err != nil {
 		common.ApiError(c, err)
 		return

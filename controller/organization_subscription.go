@@ -170,7 +170,9 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 		common.ApiErrorT(c, "organization target permission denied")
 		return
 	}
-	if rejectOrganizationOwnerTarget(c, actor, target) {
+	// Platform root manages any member's plan (the console calls this with
+	// ?organization_id=); the owner guard applies to organization admins.
+	if actor.Role != common.RoleRootUser && rejectOrganizationOwnerTarget(c, actor, target) {
 		return
 	}
 
@@ -222,7 +224,7 @@ func CancelOrganizationUserSubscription(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if target.OrganizationId == organizationId && rejectOrganizationOwnerTarget(c, actor, target) {
+	if actor.Role != common.RoleRootUser && target.OrganizationId == organizationId && rejectOrganizationOwnerTarget(c, actor, target) {
 		return
 	}
 	if _, err := model.CancelActiveOrganizationUserSubscriptionForUser(organizationId, targetId); err != nil {
