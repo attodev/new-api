@@ -280,7 +280,7 @@ bun run e2e:install
 7. 같은 화면에서 `Assign Organization Member`로 다른 조직 밖 사용자를 추가할 수 있는지 확인한다.
 8. 조직 관리자가 API `PUT /api/organization/users/:id/membership`로 member를 `admin`으로, 다시 `member`로 바꿀 수 있는지 확인한다(관리자 화면에는 Role 드롭다운이 없다).
 9. 같은 API로 `{"organization_role":"owner"}`를 보내면 거부되는지 확인한다.
-10. 조직 관리자가 기존 member의 quota, 상태를 수정할 수 있는지 확인한다(remark는 API로).
+10. 조직 관리자가 기존 member의 quota, 조직 회원 상태(`Suspend`/`Resume`), 조직 메모(`Organization note`)를 수정할 수 있는지 확인한다. 정지된 member의 API 호출은 403 `organization membership is suspended`이고 `/wallet`·조직 플랜 조회는 계속 되는지, 플랫폼 상태(`users.status`)는 그대로인지 확인한다.
 11. 조직 관리자 화면에서 owner 행과 자기 행이 잠겨 있는지, API로 자기 quota나 owner quota를 바꾸면 거부되는지 확인한다.
 12. 조직 관리자가 다른 조직 사용자 또는 전역 관리자 사용자를 수정할 수 없는지 확인한다.
 13. 조직 일반 사용자는 멤버 추가 API가 거부되는지 확인한다.
@@ -777,7 +777,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 3. 조직 생성에서 빈 이름, owner ID 0, owner ID 1,000,000,001, quota -1도 API 또는 UI 개발 도구로 전송해 본다.
 4. 조직 수정에서 256자 이상 설명, quota -1, 9,007,199,254,740,991 초과 quota, 허용되지 않는 상태값을 API 또는 UI 개발 도구로 전송해 본다.
 5. 조직 소유자 또는 조직 관리자 계정으로 로그인한다.
-6. 조직 사용자 수정에서 quota -1, 9,007,199,254,740,991 초과 quota, 허용되지 않는 상태값, 256자 이상 remark를 입력해 본다.
+6. 조직 사용자 수정에서 quota -1, 9,007,199,254,740,991 초과 quota, 허용되지 않는 `member_status`, 256자 이상 `organization_remark`, 플랫폼 필드 `status`/`remark`를 입력해 본다.
 7. 조직 구독 플랜 생성에서 빈 제목, 129자 이상 제목, 256자 이상 부제목, 잘못된 기간 단위, -1 또는 1201 기간 값, 0 또는 31,536,001 사용자 지정 초, -1 또는 9,007,199,254,740,992 금액, -1,000,001 또는 1,000,001 정렬값을 입력해 본다.
 8. 조직 구독 플랜 생성에서 `quota_reset_period`, `quota_reset_custom_seconds`, `upgrade_group`, `enabled` 같은 허용되지 않은 필드를 API로 전송해 본다.
 9. 조직 구독 할당에서 `plan_id` 0 또는 1,000,000,000 초과 값을 API로 전송해 본다.
@@ -878,7 +878,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 
 - [ ] 조직 사용자 목록 조회 가능
 - [ ] 조직 사용자 quota/status 수정 가능
-- [ ] 조직 사용자 quota/status/remark 제한값이 서버에서 검증됨
+- [ ] 조직 사용자 quota/member_status/organization_remark 제한값이 서버에서 검증되고 플랫폼 status/remark는 거부됨
 - [ ] 조직 대시보드/로그 조회 가능
 - [ ] 조직 구독 플랜 관리 가능
 - [ ] 새 멤버 추가 가능 (`member`)

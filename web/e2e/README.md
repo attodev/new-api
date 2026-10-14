@@ -4,7 +4,7 @@
 
 ## 개요
 
-조직(Organization) 기능의 브라우저 스모크 테스트. 총 **19개 (프로비저닝 setup 1 + 기능 17 + 정리 teardown 1)** 테스트를 serial 모드로 실행한다. `beforeAll`에서 4개의 브라우저 컨텍스트를 분리 생성하지만 **root(루트 관리자)만** 로그인한다. owner / org admin / member 계정과 테스트 조직은 첫 번째 setup 테스트에서 **UI를 통해** 런타임에 생성되며, 실행마다 충돌하지 않도록 run-scoped 고유 이름을 사용한다(`runId = Date.now().toString(36)`, 사용자명 `e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, 조직명 `E2E Org <runId>`). 생성된 계정은 admin 비밀번호를 그대로 재사용한다.
+조직(Organization) 기능의 브라우저 스모크 테스트. 총 **20개 (프로비저닝 setup 1 + 기능 18 + 정리 teardown 1)** 테스트를 serial 모드로 실행한다. `beforeAll`에서 4개의 브라우저 컨텍스트를 분리 생성하지만 **root(루트 관리자)만** 로그인한다. owner / org admin / member 계정과 테스트 조직은 첫 번째 setup 테스트에서 **UI를 통해** 런타임에 생성되며, 실행마다 충돌하지 않도록 run-scoped 고유 이름을 사용한다(`runId = Date.now().toString(36)`, 사용자명 `e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, 조직명 `E2E Org <runId>`). 생성된 계정은 admin 비밀번호를 그대로 재사용한다.
 
 ## 실행 방법
 
@@ -46,7 +46,7 @@ E2E_REUSE_SERVER=1 bun run e2e
 
 > setup만 끝낸 뒤 백엔드를 내리고 `bun run e2e`를 실행해도 된다. 그러면 webServer가 같은 `$TMPDIR/new-api-e2e.db`로 `go run .`을 띄운다.
 
-> 19개 테스트 통과 후 DB에는 root 1명만 남고 조직·조직 플랜·조직 구독은 0개다(teardown 검증 완료).
+> 20개 테스트 통과 후 DB에는 root 1명만 남고 조직·조직 플랜·조직 구독은 0개다(teardown 검증 완료).
 
 ## 환경 변수
 
@@ -171,11 +171,20 @@ member 역할은 사이드바에 Organization 관리 메뉴가 전혀 없고, �
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`
 
-조직 사용자 테이블 페이지 구조를 확인한다. "Organization Users" heading과 Username, Role, Status 컬럼 헤더가 모두 노출되어야 한다.
+조직 사용자 테이블 페이지 구조를 확인한다. "Organization Users" heading과 Username, Role, Status, Organization note 컬럼 헤더가 모두 노출되어야 한다.
 
 ---
 
-### 8. organization users search filters table results
+### 8. admin suspends and resumes a member (organization member status)
+
+**페이지:** `/organization`
+**대상:** `organizationAdminPage`
+
+조직 범위 회원 상태(spec §9 결정 7)를 확인한다. 멤버 행의 Status가 `Active`인지 보고, 체크박스 선택 → `Suspend` → `Pending suspension` 표시 → `Save` 후 `Suspended`가 되는지, 다시 선택 → `Resume` → `Save` 후 `Active`로 돌아오는지 확인한다. 플랫폼 `users.status`는 바뀌지 않는다(서버는 `member_status`만 받는다).
+
+---
+
+### 9. organization users search filters table results
 
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`
@@ -184,7 +193,7 @@ member 역할은 사이드바에 Organization 관리 메뉴가 전혀 없고, �
 
 ---
 
-### 9. export button is visible for admin and triggers download
+### 10. export button is visible for admin and triggers download
 
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`
@@ -193,7 +202,7 @@ Export 버튼이 보이고, 클릭하면 `org-users*.xlsx` 파일 다운로드�
 
 ---
 
-### 10. import button is visible for admin and opens dialog
+### 11. import button is visible for admin and opens dialog
 
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`
@@ -202,7 +211,7 @@ Import 버튼이 보이고, 클릭하면 모달 dialog가 열리며, Escape 키�
 
 ---
 
-### 11. add member section is visible for admin but not for member
+### 12. add member section is visible for admin but not for member
 
 **페이지:** `/organization`
 **대상:** `organizationAdminPage`, `memberPage`
@@ -211,7 +220,7 @@ admin은 멤버 추가 섹션의 "Username or email" 입력란이 보이고, 없
 
 ---
 
-### 12. owner sees all controls including role selector in table
+### 13. owner sees all controls including role selector in table
 
 **페이지:** `/organization`
 **대상:** `ownerPage`
@@ -220,7 +229,7 @@ owner 역할로 접근했을 때 "Organization Users" heading과 Role 컬럼 헤
 
 ---
 
-### 13. dashboard preset buttons change the chart range
+### 14. dashboard preset buttons change the chart range
 
 **페이지:** `/organization/dashboard`
 **대상:** `organizationAdminPage`
@@ -229,7 +238,7 @@ owner 역할로 접근했을 때 "Organization Users" heading과 Role 컬럼 헤
 
 ---
 
-### 14. subscription page renders plan configuration form for admin
+### 15. subscription page renders plan configuration form for admin
 
 **페이지:** `/organization/subscriptions`
 **대상:** `organizationAdminPage`
@@ -238,7 +247,7 @@ Subscription 페이지에 Plan configuration 폼이 올바르게 렌더링되는
 
 ---
 
-### 15. subscription page create plan validates empty title
+### 16. subscription page create plan validates empty title
 
 **페이지:** `/organization/subscriptions`
 **대상:** `organizationAdminPage`
@@ -247,7 +256,7 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 
 ---
 
-### 16. admin creates an organization subscription plan
+### 17. admin creates an organization subscription plan
 
 **페이지:** `/organization/subscriptions`
 **대상:** `organizationAdminPage`
@@ -256,18 +265,18 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 
 ---
 
-### 17. admin assigns the organization subscription plan to a member
+### 18. admin assigns the organization subscription plan to a member
 
 **페이지:** `/organization/subscriptions`
 **대상:** `organizationAdminPage`
 
-"Member plan assignment" 섹션에서 #16에서 만든 플랜을 멤버(`e2e_member_<runId>`)에게 **할당**한다. User/Plan 네이티브 셀렉트를 선택하고 Assign을 클릭하면 "Organization plan assigned" 토스트가 뜨고, 하단 멤버 구독 테이블에 해당 플랜 행이 나타나는지 확인한다.
+"Member plan assignment" 섹션에서 #17에서 만든 플랜을 멤버(`e2e_member_<runId>`)에게 **할당**한다. User/Plan 네이티브 셀렉트를 선택하고 Assign을 클릭하면 "Organization plan assigned" 토스트가 뜨고, 하단 멤버 구독 테이블에 해당 플랜 행이 나타나는지 확인한다.
 
-> 정리: 플랜·구독은 조직에 종속되며, teardown(#19)에서 조직을 삭제하면 백엔드가 해당 조직의 구독 플랜·사용자 구독을 **함께 삭제(cascade)** 하므로 별도 정리가 필요 없다(`model.DeleteOrganization`).
+> 정리: 플랜·구독은 조직에 종속되며, teardown(#20)에서 조직을 삭제하면 백엔드가 해당 조직의 구독 플랜·사용자 구독을 **함께 삭제(cascade)** 하므로 별도 정리가 필요 없다(`model.DeleteOrganization`).
 
 ---
 
-### 18. root admin can open organization users page without org_id error
+### 19. root admin can open organization users page without org_id error
 
 **페이지:** `/organization`
 **대상:** `rootPage` (root/super admin)
@@ -278,7 +287,7 @@ Plan title을 비운 채 Create 버튼을 클릭했을 때 "Plan title is requir
 
 ---
 
-### 19. admin removes organization members, organization, and users via UI
+### 20. admin removes organization members, organization, and users via UI
 
 **페이지:** `/organization` → 사용자 관리
 **대상:** `ownerPage`(멤버 제거), `rootPage`(조직·계정 삭제) (teardown, best-effort)
@@ -298,7 +307,7 @@ teardown 테스트. setup에서 생성한 리소스를 UI로 정리한다. **순
 ### 생성 → 사용 → 삭제 흐름
 
 ```
-setup 테스트(#1)            기능 테스트(#2~#18)            teardown 테스트(#19)
+setup 테스트(#1)            기능 테스트(#2~#19)            teardown 테스트(#20)
 ─────────────────         ───────────────────          ──────────────────────────
 root가 UI로                 setup이 만든 계정·조직을        ① owner가 조직에서 멤버 제거
  · 사용자 3명 생성            그대로 재사용해 권한·렌더링         (e2e_admin, e2e_member)
@@ -329,7 +338,7 @@ owner가 UI로                                              ③ root가 계정 3
 
 ### 충돌 방지: run-scoped 고유 이름
 
-모든 자원은 `runId = Date.now().toString(36)` 기반 고유 이름을 쓴다. 따라서 **중간 테스트 실패로 teardown이 건너뛰어져 잔여물이 남더라도, 다음 실행은 새 `runId`를 쓰므로 충돌하지 않는다.** (serial 모드에서는 한 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어지므로, teardown(#19)도 실행되지 않을 수 있다는 점에 유의.)
+모든 자원은 `runId = Date.now().toString(36)` 기반 고유 이름을 쓴다. 따라서 **중간 테스트 실패로 teardown이 건너뛰어져 잔여물이 남더라도, 다음 실행은 새 `runId`를 쓰므로 충돌하지 않는다.** (serial 모드에서는 한 테스트가 실패하면 이후 테스트가 모두 "did not run"으로 건너뛰어지므로, teardown(#20)도 실행되지 않을 수 있다는 점에 유의.)
 
 ### 사용자명 길이 제약
 

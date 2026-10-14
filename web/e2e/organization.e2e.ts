@@ -507,6 +507,33 @@ test.describe('organization browser smoke tests', () => {
     await expect(
       page.getByRole('columnheader', { name: /status/i })
     ).toBeVisible()
+    await expect(
+      page.getByRole('columnheader', { name: /organization note/i })
+    ).toBeVisible()
+  })
+
+  test('admin suspends and resumes a member (organization member status)', async () => {
+    const page = await openAuthenticatedPage(
+      organizationAdminPage,
+      '/organization'
+    )
+    const memberRow = page.getByRole('row', {
+      name: new RegExp(memberUsername),
+    })
+    await expect(memberRow.getByText('Active', { exact: true })).toBeVisible()
+
+    await memberRow.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Suspend', exact: true }).click()
+    await expect(memberRow.getByText('Pending suspension')).toBeVisible()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(
+      memberRow.getByText('Suspended', { exact: true })
+    ).toBeVisible()
+
+    await memberRow.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Resume', exact: true }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(memberRow.getByText('Active', { exact: true })).toBeVisible()
   })
 
   test('organization users search filters table results', async () => {

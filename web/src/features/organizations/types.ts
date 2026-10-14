@@ -25,13 +25,17 @@ export interface OrganizationUser {
   username: string
   display_name: string
   role: number
+  /** Platform status (root-only); shown read-only, never sent by org admins. */
   status: number
+  /** Organization-scoped status: 1 active, 2 suspended (no relay). */
+  member_status: number
   quota: number
   used_quota: number
   group: string
   organization_id: number
   organization_role: OrganizationRole
-  remark?: string
+  /** Organization-scoped note; the platform remark is root-only. */
+  organization_remark?: string
 }
 
 /** GET /api/organization/users/lookup: identity only, no quota or remark. */
@@ -83,9 +87,9 @@ export interface CreateOrganizationPayload {
 }
 
 export interface OrganizationUserUpdatePayload {
-  status?: number
+  member_status?: number
   quota?: number
-  remark?: string
+  organization_remark?: string
 }
 
 export interface AssignOrganizationUserPayload {

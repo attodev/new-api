@@ -195,6 +195,30 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 - owner와 자기 자신은 제거 불가 (체크박스 disabled).
 - 제거 후 해당 사용자는 조직에서 탈퇴되며 일반 사용자로 전환된다. 이때 사용자 quota는 0이 된다(3장 "조직을 떠날 때의 quota").
 
+## 6-3. 조직 사용자 정지·재개하기
+
+조직 관리자는 회원을 조직 안에서만 정지할 수 있다(spec §9 결정 7). 플랫폼 계정 상태(`users.status`)는 사이트 관리자만 바꾸며, 조직 화면은 그 값을 쓰지 않는다.
+
+1. 조직 소유자 또는 조직 관리자 계정으로 로그인한다.
+2. `Organization Users` 메뉴로 이동한다.
+3. 정지할 사용자의 체크박스를 선택한다(다중 선택 가능).
+4. 툴바에서 `Suspend`를 누른다. 행에 `Pending suspension`이 표시되고 `Status` 컬럼이 `Suspended`로 바뀐다.
+5. 변경 배너(`{{count}} status changes`)에서 `Save`를 누른다.
+
+재개는 같은 방법으로 `Resume`을 누르고 저장한다(`Pending resume` → `Active`).
+
+정지된 회원:
+
+- API(relay) 요청이 과금 전에 HTTP 403 `organization membership is suspended`로 거부된다. 레거시 Midjourney도 거부된다.
+- 로그인과 본인 조회(`/wallet` 요약, 조직 플랜 조회, 충전 내역)는 계속된다.
+- 조직을 떠나면 정지 상태와 조직 메모는 초기화된다(다시 들어오면 `Active`).
+
+owner와 자기 자신은 정지할 수 없다(체크박스 disabled).
+
+## 6-4. 조직 메모 쓰기
+
+`Organization note` 컬럼에 회원별 메모(255자 이하)를 쓴다. 입력칸에 쓰고 Enter를 누르거나 밖으로 나가면 변경 배너(`{{count}} note changes`)가 나타나고, `Save`로 확정한다. 이 메모는 `users.organization_remark`에 저장되며 사이트 관리자의 플랫폼 메모(`users.remark`)와 별개다. 조직 메모는 회원 본인에게 보이지 않는다(`subscription/self` 응답에서 비운다).
+
 ## 7. 조직 사용자 quota 관리하기
 
 1. 조직 소유자 또는 조직 관리자 계정으로 로그인한다.
@@ -217,8 +241,9 @@ API로는 `PATCH /api/organizations/:id`에 `{"quota": <quota 단위 값>}`을 �
 서버 검증 기준:
 
 - 사용자 quota: 0 이상 9,007,199,254,740,991(2^53-1) 이하
-- 사용자 상태: 활성 또는 비활성 값만 허용
-- remark: 255자 이하 (remark는 화면에서 편집하지 않는다. API `PATCH /api/organization/users/:id` 또는 Excel 가져오기로 바꾼다)
+- 조직 회원 상태(`member_status`): `1`(Active) 또는 `2`(Suspended)만 허용
+- 조직 메모(`organization_remark`): 255자 이하
+- 플랫폼 `status`·`remark`는 조직 API로 바꿀 수 없다(`unsupported field: status` / `unsupported field: remark`)
 
 ## 8. 조직 지갑 사용하기
 

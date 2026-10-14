@@ -67,6 +67,13 @@
 - 전체 관리자는 영향이 없다(`/api/organizations/*`, `?organization_id=`로 비활성 조직을 관리). 다시 쓰려면 3.3으로 `status: 1`.
 - 이미 결제된 조직 충전 주문의 정산은 비활성 조직에도 적립된다.
 
+정지된 조직 회원(`users.organization_member_status = 2`, spec §9 결정 7):
+
+- 조직 소유자/관리자가 5.4 `member_status: 2`로 정지한다. 플랫폼 `users.status`는 바뀌지 않는다(로그인은 계속된다).
+- 정지된 회원의 relay 요청은 과금 전에 HTTP 403 `organization membership is suspended`(`access_denied`)로 거부된다(`service.NewBillingSession`의 조직 분기, 조직 플랜 회원 포함). 레거시 Midjourney도 `CheckMidjourneyOrganizationBilling`에서 같은 문구로 거부된다(Midjourney 응답 `code: 4`).
+- 본인 조회는 계속된다: `/wallet` 요약, `GET /api/organization/subscription/self`, `GET /api/user/topup/self`. `RejectDisabledOrganizationMutation`은 정지 회원에 적용되지 않는다.
+- 조직을 떠나면(멤버십 해제, `remove_absent`, 조직 삭제 시 owner) `organization_member_status`는 `1`, `organization_remark`는 빈 문자열로 초기화된다.
+
 조직 회원의 개인 잔액(`users.quota`는 조직 관리자가 정하는 회원 한도다):
 
 - 조직 회원은 `POST /api/subscription/balance/pay`로 개인 잔액 구독을 살 수 없다(`organization members cannot pay with personal balance`).
@@ -372,12 +379,12 @@ Query:
 | `p` | integer | 선택 | 1 이상 권장 | 페이지 번호 |
 | `page_size` | integer | 선택 | 1-100 권장 | 페이지 크기 |
 | `keyword` | string | 선택 | 임의 문자열 | `username` 또는 `display_name` 부분 일치 |
-| `order_by` | string | 선택 | `username`, `display_name`, `organization_role`, `quota`, `used_quota`, `group`, `status` | 그 밖의 값은 `id` |
+| `order_by` | string | 선택 | `username`, `display_name`, `organization_role`, `quota`, `used_quota`, `group`, `status`, `organization_member_status` | 그 밖의 값은 `id` |
 | `order_dir` | string | 선택 | `asc`, `desc` | `desc`가 아니면 `asc` |
 
 응답 `data`: `PageInfo<OrganizationUser[]>`
 
-`OrganizationUser`는 제한된 사용자 뷰다: `id`, `username`, `display_name`, `role`, `status`, `quota`, `used_quota`, `group`, `organization_id`, `organization_role`, `remark`. 비밀번호 해시, access token, 이메일, 결제 고객 ID, setting은 포함하지 않는다.
+`OrganizationUser`는 제한된 사용자 뷰다: `id`, `username`, `display_name`, `role`, `status`, `member_status`, `quota`, `used_quota`, `group`, `organization_id`, `organization_role`, `organization_remark`. `status`는 플랫폼 상태(읽기 전용, 전체 관리자만 바꾼다), `member_status`는 조직 범위 상태(`1` active, `2` suspended, 컬럼 `users.organization_member_status`), `organization_remark`는 조직 범위 메모(컬럼 `users.organization_remark`)다. 플랫폼 메모 `users.remark`, 비밀번호 해시, access token, 이메일, 결제 고객 ID, setting은 포함하지 않는다.
 
 처리 규칙:
 
@@ -453,9 +460,11 @@ Body:
 
 | 이름 | 타입 | 필수 | 범위/값 | 실제 검증 |
 | --- | --- | --- | --- | --- |
-| `status` | integer | 선택 | `1`, `2` | enum 외 값이면 오류 |
+| `member_status` | integer | 선택 | `1`(active), `2`(suspended) | enum 외 값이면 `member_status must be one of: 1, 2`. `users.organization_member_status`에 쓴다 |
 | `quota` | integer | 선택 | `0`-`9,007,199,254,740,991` | 범위 밖이면 오류. active 조직 구독 사용자는 프론트에서 입력을 막는다. |
-| `remark` | string | 선택 | 0-255자 | trim 후 저장. 255자 초과이면 오류 |
+| `organization_remark` | string | 선택 | 0-255자 | trim 후 `users.organization_remark`에 저장. 255자 초과이면 `organization_remark must be at most 255 characters` |
+
+플랫폼 필드 `status`·`remark`는 조직 관리자가 쓸 수 없다(spec §9 결정 7). 본문에 있으면 `unsupported field: status` / `unsupported field: remark`로 거부된다(엄격 디코딩).
 
 최소 하나의 필드는 포함해야 한다. 그렇지 않으면 `no organization user fields to update` 오류가 발생한다.
 
@@ -464,8 +473,8 @@ Body:
 ```json
 {
   "quota": 100000,
-  "status": 1,
-  "remark": "team member"
+  "member_status": 2,
+  "organization_remark": "team member"
 }
 ```
 
@@ -553,7 +562,7 @@ Path:
 
 응답: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` 첨부 파일 `org-users-<조직ID>-<unix>.xlsx` (시트 `OrgUsers`). 실패하면 JSON 오류 응답이다.
 
-열: `username`, `display_name`, `organization_role`, `quota`, `used_quota`, `group`, `status`, `remark`, `initial_password`. 조직 소속이면서 `role < admin`인 사용자만 포함한다.
+열: `username`, `display_name`, `organization_role`, `quota`, `used_quota`, `group`, `member_status`, `organization_remark`, `initial_password`. `member_status`는 `active`/`suspended`다. 조직 소속이면서 `role < admin`인 사용자만 포함한다. 플랫폼 `status`·`remark`는 내보내지 않는다.
 
 ### 5.8 조직 사용자 Excel 가져오기
 
@@ -568,7 +577,8 @@ Path:
 
 처리 규칙:
 
-- 없는 username은 `initial_password`로 새 사용자를 만들고, 조직 밖 사용자는 조직에 넣고, 기존 구성원은 표시 이름·역할·quota·상태·remark를 갱신한다. quota는 시트 값을 절대값으로 한 번에 쓴다. `remark`는 시트에 `remark` 열이 있을 때만 쓴다(열이 없으면 기존 값 유지, 열이 있고 칸이 비면 지움).
+- 없는 username은 `initial_password`로 새 사용자를 만들고, 조직 밖 사용자는 조직에 넣고, 기존 구성원은 표시 이름·역할·quota·`member_status`·`organization_remark`를 갱신한다. quota는 시트 값을 절대값으로 한 번에 쓴다. `member_status`는 `active`/`suspended`(대소문자 무시)만 받고 그 밖의 값은 행 오류(`invalid member_status "…" (use active or suspended)`), 빈 칸은 기존 값 유지다. `organization_remark`는 시트에 그 열이 있을 때만 쓴다(열이 없으면 기존 값 유지, 열이 있고 칸이 비면 지움, 255자 초과는 행 오류).
+- 옛 열 `status`·`remark`가 있는 시트는 전체가 거부된다(`unsupported column: status — use member_status`, `unsupported column: remark — use organization_remark`). 가져오기는 플랫폼 `users.status`·`users.remark`를 쓰지 않으며, 새 사용자의 플랫폼 상태는 항상 enabled다.
 - `group` 열은 읽지 않는다(내보내기 전용). 새 사용자는 기본 그룹을 받는다.
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
 - 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
@@ -599,7 +609,7 @@ Path:
 | 이름 | 타입 | 설명 |
 | --- | --- | --- |
 | `subscription` | object | 사용자 조직 구독 |
-| `user` | object | 5.1의 `OrganizationUser` 제한 뷰(`id`, `username`, `display_name`, `role`, `status`, `quota`, `used_quota`, `group`, `organization_id`, `organization_role`, `remark`). `subscription/self`에서는 호출자 본인. 비밀번호·접근 토큰·email 등은 없다 |
+| `user` | object | 5.1의 `OrganizationUser` 제한 뷰(`id`, `username`, `display_name`, `role`, `status`, `member_status`, `quota`, `used_quota`, `group`, `organization_id`, `organization_role`, `organization_remark`). `subscription/self`에서는 호출자 본인이며 `organization_remark`는 빈 문자열이다(관리자 메모는 회원에게 보이지 않는다). 비밀번호·접근 토큰·email 등은 없다 |
 | `plan` | object | 조직 구독 plan |
 
 ### 6.2 조직 구독 plan 목록 조회
@@ -953,6 +963,10 @@ Query:
 | 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` |
 | 다른 조직과 같은 이름으로 변경 | `organization name already exists` |
 | 비활성 조직의 쓰기 API·relay·충전 | `organization is disabled` (relay는 HTTP 403) |
+| 정지된 조직 회원의 relay·레거시 Midjourney | `organization membership is suspended` (relay는 HTTP 403) |
+| 조직 사용자 수정에 플랫폼 `status`/`remark` | `unsupported field: status` / `unsupported field: remark` |
+| 잘못된 member_status | `member_status must be one of: 1, 2` |
+| 가져오기 시트에 옛 `status`/`remark` 열 | `unsupported column: status — use member_status` / `unsupported column: remark — use organization_remark` (전체 거부) |
 | 자기 자신에게 플랜 할당·취소 | `organization admins cannot manage their own subscription` |
 | 가져오기 시트에 가져오는 사용자 자신의 행 | `line N (<username>): an import cannot change the importing admin's own row` (행 오류) |
 | 대상 조직에 없는 plan id 수정·비활성화 | HTTP 404 `subscription plan not found` |

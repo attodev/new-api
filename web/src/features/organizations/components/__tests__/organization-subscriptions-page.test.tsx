@@ -52,6 +52,7 @@ function member(
     display_name: '',
     role: 1,
     status: 1,
+    member_status: 1,
     quota: 0,
     used_quota: 0,
     group: 'default',

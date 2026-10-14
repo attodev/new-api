@@ -105,16 +105,21 @@ type QuotaChange = {
   newQuota: number
   originalQuota: number
 }
+// Organization-scoped member status (users.organization_member_status). The
+// platform status stays root-only.
 type StatusChange = { type: 'status'; userId: number; newStatus: number }
 type RoleChange = { type: 'role'; userId: number; newRole: AssignableRole }
+type NoteChange = { type: 'note'; userId: number; newNote: string }
 type PendingChange =
   | QuotaChange
   | StatusChange
   | { type: 'remove'; userId: number }
   | RoleChange
+  | NoteChange
 
-const USER_STATUS_ENABLED = 1
-const USER_STATUS_DISABLED = 2
+const MEMBER_STATUS_ACTIVE = 1
+const MEMBER_STATUS_SUSPENDED = 2
+const MAX_ORGANIZATION_NOTE_LENGTH = 255
 // The membership endpoint never accepts `owner`; ownership is set when the
 // organization is created.
 const ASSIGNABLE_ROLES: AssignableRole[] = [
@@ -603,10 +608,17 @@ export function OrganizationUsersTable() {
             }
           } else if (change.type === 'status') {
             const res = await updateOrganizationUser(change.userId, {
-              status: change.newStatus,
+              member_status: change.newStatus,
             })
             if (!res.success) {
               errors.push(res.message ?? t('Failed to update status'))
+            }
+          } else if (change.type === 'note') {
+            const res = await updateOrganizationUser(change.userId, {
+              organization_remark: change.newNote,
+            })
+            if (!res.success) {
+              errors.push(res.message ?? t('Failed to update note'))
             }
           } else if (change.type === 'remove') {
             const res = await removeOrganizationUserMembership(change.userId)
@@ -637,22 +649,25 @@ export function OrganizationUsersTable() {
     await loadUsers()
   }
 
-  function handleBulkDisable() {
+  function handleBulkMemberStatus(newStatus: number) {
     selectedUserIds.forEach((userId) => {
       const user = users.find((u) => u.id === userId)
       if (!user || !isRowEditable(user)) return
-      const statusChange = pendingChanges.find(
-        (c): c is StatusChange => c.type === 'status' && c.userId === userId
-      )
-      const currentStatus = statusChange ? statusChange.newStatus : user.status
-      if (currentStatus === USER_STATUS_ENABLED) {
-        setPendingChange({
-          type: 'status',
-          userId,
-          newStatus: USER_STATUS_DISABLED,
-        })
+      if (newStatus === user.member_status) {
+        removePendingChange(userId, 'status')
+        return
       }
+      setPendingChange({ type: 'status', userId, newStatus })
     })
+  }
+
+  function handleNoteChange(user: OrganizationUser, value: string) {
+    const newNote = value.trim()
+    if (newNote === (user.organization_remark ?? '')) {
+      removePendingChange(user.id, 'note')
+      return
+    }
+    setPendingChange({ type: 'note', userId: user.id, newNote })
   }
 
   function handleBulkRemove() {
@@ -691,6 +706,7 @@ export function OrganizationUsersTable() {
   const pendingCounts = {
     quota: pendingChanges.filter((c) => c.type === 'quota').length,
     status: pendingChanges.filter((c) => c.type === 'status').length,
+    note: pendingChanges.filter((c) => c.type === 'note').length,
     remove: pendingChanges.filter((c) => c.type === 'remove').length,
     role: pendingChanges.filter((c) => c.type === 'role').length,
   }
@@ -1072,6 +1088,8 @@ export function OrganizationUsersTable() {
                 t('{{count}} quota changes', { count: pendingCounts.quota }),
               pendingCounts.status > 0 &&
                 t('{{count}} status changes', { count: pendingCounts.status }),
+              pendingCounts.note > 0 &&
+                t('{{count}} note changes', { count: pendingCounts.note }),
               pendingCounts.role > 0 &&
                 t('{{count}} role changes', { count: pendingCounts.role }),
               pendingCounts.remove > 0 &&
@@ -1129,8 +1147,20 @@ export function OrganizationUsersTable() {
               {t('{{count}} selected', { count: selectedUserIds.size })}
             </span>
             <div className='bg-border h-4 w-px' />
-            <Button size='sm' variant='outline' onClick={handleBulkDisable}>
-              {t('Disable')}
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => handleBulkMemberStatus(MEMBER_STATUS_SUSPENDED)}
+              title={t('Suspended members cannot call the API')}
+            >
+              {t('Suspend')}
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => handleBulkMemberStatus(MEMBER_STATUS_ACTIVE)}
+            >
+              {t('Resume')}
             </Button>
             {isOrganizationAdmin && (
               <Button
@@ -1150,7 +1180,7 @@ export function OrganizationUsersTable() {
       </div>
 
       <div className='overflow-x-auto rounded-md border'>
-        <table className='w-full min-w-[720px] text-sm'>
+        <table className='w-full min-w-[900px] text-sm'>
           <thead className='bg-muted/50'>
             <tr>
               <th className='w-10 px-3 py-2'>
@@ -1190,10 +1220,14 @@ export function OrganizationUsersTable() {
               </th>
               <th
                 className='cursor-pointer px-3 py-2 text-left font-medium select-none'
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort('organization_member_status')}
               >
                 {t('Status')}
-                <SortIcon col='status' orderBy={orderBy} orderDir={orderDir} />
+                <SortIcon
+                  col='organization_member_status'
+                  orderBy={orderBy}
+                  orderDir={orderDir}
+                />
               </th>
               <th
                 className='cursor-pointer px-3 py-2 text-left font-medium select-none'
@@ -1201,6 +1235,9 @@ export function OrganizationUsersTable() {
               >
                 {t('Quota')}
                 <SortIcon col='quota' orderBy={orderBy} orderDir={orderDir} />
+              </th>
+              <th className='px-3 py-2 text-left font-medium'>
+                {t('Organization note')}
               </th>
             </tr>
           </thead>
@@ -1223,6 +1260,10 @@ export function OrganizationUsersTable() {
                 (c): c is RoleChange =>
                   c.type === 'role' && c.userId === user.id
               )
+              const pendingNote = pendingChanges.find(
+                (c): c is NoteChange =>
+                  c.type === 'note' && c.userId === user.id
+              )
               const quotaControlState = getOrganizationQuotaControlState(
                 user.id,
                 user.quota,
@@ -1231,7 +1272,7 @@ export function OrganizationUsersTable() {
               const hasActivePlan = quotaControlState.hasActivePlan
               const effectiveStatus = pendingStatus
                 ? pendingStatus.newStatus
-                : user.status
+                : user.member_status
               const quotaDisabled =
                 !editable || !!pendingRemove || quotaControlState.disabled
               let lockedReason: string | undefined
@@ -1279,9 +1320,9 @@ export function OrganizationUsersTable() {
                     )}
                     {!pendingRemove && pendingStatus && (
                       <div className='text-xs text-orange-600'>
-                        {pendingStatus.newStatus === USER_STATUS_DISABLED
-                          ? t('Pending disable')
-                          : t('Pending enable')}
+                        {pendingStatus.newStatus === MEMBER_STATUS_SUSPENDED
+                          ? t('Pending suspension')
+                          : t('Pending resume')}
                       </div>
                     )}
                     {!pendingRemove && !pendingStatus && pendingQuota && (
@@ -1352,9 +1393,9 @@ export function OrganizationUsersTable() {
                   <td
                     className={`px-3 py-2${pendingRemove ? ' text-muted-foreground line-through' : ''}`}
                   >
-                    {effectiveStatus === USER_STATUS_ENABLED
-                      ? t('Enabled')
-                      : t('Disabled')}
+                    {effectiveStatus === MEMBER_STATUS_SUSPENDED
+                      ? t('Suspended')
+                      : t('Active')}
                   </td>
                   <td className='px-3 py-2'>
                     <div className='min-w-64 space-y-2'>
@@ -1428,6 +1469,32 @@ export function OrganizationUsersTable() {
                       )}
                     </div>
                   </td>
+                  <td className='px-3 py-2'>
+                    <Input
+                      key={`${user.id}-note-${user.organization_remark ?? ''}-${pendingNote?.newNote ?? ''}`}
+                      className={`w-48${pendingNote ? ' border-amber-500' : ''}`}
+                      defaultValue={
+                        pendingNote
+                          ? pendingNote.newNote
+                          : (user.organization_remark ?? '')
+                      }
+                      maxLength={MAX_ORGANIZATION_NOTE_LENGTH}
+                      placeholder={t('Organization note')}
+                      aria-label={t('Organization note')}
+                      title={lockedReason}
+                      disabled={!editable || !!pendingRemove}
+                      onBlur={(event) => {
+                        if (editable) {
+                          handleNoteChange(user, event.currentTarget.value)
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.currentTarget.blur()
+                        }
+                      }}
+                    />
+                  </td>
                 </tr>
               )
             })}
@@ -1435,7 +1502,7 @@ export function OrganizationUsersTable() {
               <tr>
                 <td
                   className='text-muted-foreground px-3 py-8 text-center'
-                  colSpan={5}
+                  colSpan={6}
                 >
                   {t('No data')}
                 </td>

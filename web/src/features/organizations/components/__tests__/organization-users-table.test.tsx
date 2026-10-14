@@ -70,11 +70,13 @@ function member(
     display_name: '',
     role: 1,
     status: 1,
+    member_status: 1,
     quota: 500000,
     used_quota: 0,
     group: 'default',
     organization_id: 7,
     organization_role: organizationRole,
+    organization_remark: '',
   }
 }
 
@@ -353,6 +355,84 @@ describe('OrganizationUsersTable', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Export' }))
     expect(api.exportOrgUsers).toHaveBeenCalledWith(7)
     expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument()
+  })
+
+  it('suspends selected members through the organization member status', async () => {
+    signIn(1, 'owner')
+    api.updateOrganizationUser.mockResolvedValue({ success: true })
+    render(<OrganizationUsersTable />)
+
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    expect(within(rowOf('mia')).getByText('Active')).toBeInTheDocument()
+    await userEvent.click(within(rowOf('mia')).getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Suspend' }))
+    expect(
+      within(rowOf('mia')).getByText('Pending suspension')
+    ).toBeInTheDocument()
+    expect(within(rowOf('mia')).getByText('Suspended')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(api.updateOrganizationUser).toHaveBeenCalledWith(3, {
+        member_status: 2,
+      })
+    )
+  })
+
+  it('resumes a suspended member', async () => {
+    signIn(1, 'owner')
+    api.getOrganizationUsers.mockResolvedValue({
+      success: true,
+      data: {
+        page: 1,
+        page_size: 20,
+        total: 3,
+        items: [MEMBERS[0], MEMBERS[1], { ...MEMBERS[2], member_status: 2 }],
+      },
+    })
+    api.updateOrganizationUser.mockResolvedValue({ success: true })
+    render(<OrganizationUsersTable />)
+
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    expect(within(rowOf('mia')).getByText('Suspended')).toBeInTheDocument()
+    await userEvent.click(within(rowOf('mia')).getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(within(rowOf('mia')).getByText('Pending resume')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(api.updateOrganizationUser).toHaveBeenCalledWith(3, {
+        member_status: 1,
+      })
+    )
+  })
+
+  it('edits the organization note, not the platform remark', async () => {
+    signIn(1, 'owner')
+    api.updateOrganizationUser.mockResolvedValue({ success: true })
+    render(<OrganizationUsersTable />)
+
+    await waitFor(() => expect(screen.getByText('mia')).toBeInTheDocument())
+    expect(
+      screen.getByRole('columnheader', { name: 'Organization note' })
+    ).toBeInTheDocument()
+    expect(
+      within(rowOf('olivia')).getByRole('textbox', {
+        name: 'Organization note',
+      })
+    ).toBeDisabled()
+    const note = within(rowOf('mia')).getByRole('textbox', {
+      name: 'Organization note',
+    })
+    await userEvent.type(note, 'night shift')
+    await userEvent.tab()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(api.updateOrganizationUser).toHaveBeenCalledWith(3, {
+        organization_remark: 'night shift',
+      })
+    )
   })
 
   it('hides import/export from root until an organization is selected', async () => {
