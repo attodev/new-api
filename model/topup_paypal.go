@@ -11,7 +11,11 @@ import (
 )
 
 // fork: O2 — PayPal settlement, mirrors RechargeWaffo. Money is the USD amount
-// after the group ratio, so quota = Money * QuotaPerUnit (same as Stripe).
+// charged by PayPal: amount × PayPalUnitPrice × topup group ratio × amount
+// discount (getPayPalPayMoney), and the credit is quota = Money × QuotaPerUnit.
+// This differs from Stripe, whose Money is amount × group ratio, so there the unit
+// price and discount change only the charge; here they scale both the charge and
+// the credited balance. Kept deliberately; Phase E (O11) decides whether to align.
 func RechargePayPal(tradeNo string, callerIp string) (err error) {
 	if tradeNo == "" {
 		return errors.New("payment order number not provided")

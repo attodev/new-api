@@ -1647,7 +1647,9 @@ export function PaymentSettingsSection({
                           />
                         </FormControl>
                         <FormDescription>
-                          {t('e.g., 8 means 8 local currency per USD')}
+                          {t(
+                            'Multiplier applied to the USD charge and the credited balance (orders are always in USD)'
+                          )}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -1684,7 +1686,9 @@ export function PaymentSettingsSection({
                         <SettingsSwitchContent>
                           <FormLabel>{t('Sandbox mode')}</FormLabel>
                           <FormDescription>
-                            {t('Use the PayPal sandbox environment')}
+                            {t(
+                              'Use the PayPal sandbox environment — never enable on production: webhook signatures are not verified in sandbox mode'
+                            )}
                           </FormDescription>
                         </SettingsSwitchContent>
                         <FormControl>

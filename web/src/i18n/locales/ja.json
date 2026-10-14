@@ -7299,6 +7299,8 @@
     "Webhook ID": "Webhook ID",
     "Webhook ID from PayPal Developer Dashboard": "Webhook ID from PayPal Developer Dashboard",
     "Used to verify PayPal webhook signatures": "Used to verify PayPal webhook signatures",
-    "Use the PayPal sandbox environment": "Use the PayPal sandbox environment"
+    "Use the PayPal sandbox environment": "Use the PayPal sandbox environment",
+    "Multiplier applied to the USD charge and the credited balance (orders are always in USD)": "Multiplier applied to the USD charge and the credited balance (orders are always in USD)",
+    "Use the PayPal sandbox environment — never enable on production: webhook signatures are not verified in sandbox mode": "Use the PayPal sandbox environment — never enable on production: webhook signatures are not verified in sandbox mode"
   }
 }

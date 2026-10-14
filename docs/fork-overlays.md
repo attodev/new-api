@@ -5,10 +5,10 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
-| 공통(quota) | model/user.go:97-104 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint | model/user_quota_columns_fork_test.go |
+| 공통(quota) | model/user.go:97-98,103-104 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint (gofmt가 이웃 줄 94-96, 99의 주석 정렬을 바꿈 — 공백만) | model/user_quota_columns_fork_test.go |
 | O5 문의 메일 | common/constants.go:113 | `var ContactEmail = ""` | controller/contact.go, controller/email.go, middleware/fork_access_token_routes.go |
 | O5 문의 메일 | model/option.go:77 | InitOptionMap `OptionMap["ContactEmail"]` 한 줄 | controller/contact.go |
-| O5 문의 메일 | model/option.go:488-489 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
+| O5 문의 메일 | model/option.go:495-496 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
 | O5 문의 메일 | router/api-router.go:284 | `registerForkPublicRoutes(apiRouter)` | router/fork-router.go |
 | O5 문의 메일 | router/api-router.go:96 | `registerForkSelfRoutes(selfRoute)` (O2가 채움) | router/fork-router.go |
 | O5 문의 메일 | router/api-router.go:157 | `registerForkAdminUserRoutes(adminRoute)` (O4가 채움) | router/fork-router.go |
@@ -19,7 +19,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O2 PayPal | model/topup.go:35,45 | `PaymentMethodPayPal` / `PaymentProviderPayPal` 상수 | model/topup_paypal.go |
 | O2 PayPal | model/topup.go:488 | `ManualCompleteTopUp` Stripe 조건에 `PaymentProviderPayPal` OR 추가 | model/topup_paypal.go |
 | O2 PayPal | model/option.go:102-108 | InitOptionMap `PayPal*` OptionMap 6줄 | setting/payment_paypal.go |
-| O2 PayPal | model/option.go:537-548 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
+| O2 PayPal | model/option.go:537-549 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
 | O2 PayPal | controller/topup.go:78 | `payMethods = appendPayPalPayMethod(payMethods)` | controller/payment_availability_paypal.go |
 | O2 PayPal | controller/topup.go:105 | data map `"enable_paypal_topup"` | controller/payment_availability_paypal.go |
 | O2 PayPal | controller/topup.go:122 | data map `"paypal_min_topup"` | controller/payment_availability_paypal.go |

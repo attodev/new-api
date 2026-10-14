@@ -69,6 +69,8 @@
 - OIDC 이메일 도메인 검사는 `findOrCreateOAuthUser` 앞에서 돌아 거부된 사용자의 행이 생기지 않는다.
 - O8 범위: 인터페이스 언어 제한은 단계 D로 미룸, "기본 첫 화면 콘솔"은 team에서 되돌려져 제외, 64-bit 옵션 파싱은 upstream에서 no-op.
 - 기준선 실패(`lint`, `format:check`, `copyright:check`, `knip`)는 upstream 파일 문제라 고치지 않았다.
+- PayPal 충전은 fork 동작을 유지한다. 주문 금액(`Money`)이 `amount × PayPalUnitPrice × 충전 그룹 배율 × 금액 할인`이고 적립은 `Money × QuotaPerUnit`이라서, 단가와 할인이 결제 금액과 적립 잔액을 함께 바꾼다. upstream Stripe는 `Money = amount × 그룹 배율`이라 단가·할인이 결제 금액에만 영향을 준다. `model/topup_paypal.go` 주석과 결제 설정 안내 문구를 이 동작에 맞췄고, Stripe 방식으로 맞출지는 단계 E(O11)에서 정한다.
+- Excel 가져오기는 요청마다 `user.import` 감사 로그 한 건(생성·건너뜀·오류 수, 생성 사용자명 최대 50개와 전체 수, 지급 잔액 합계)을 남기고 AdminAuth 기본 감사 항목은 생략한다. `quota` 칸이 있으면 `0`도 그대로 적용하고, 잔액 설정에 실패한 계정은 생성 수에 포함하되 `quota_errors`로 따로 알린다.
 
 ## 7. 단계 B로 넘기는 것
 - 조직 내보내기(`service/org_user_export.go`): 사용자 내보내기와 같은 excelize 경로를 쓰며 O3와 함께 이식한다.
