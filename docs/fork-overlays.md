@@ -6,6 +6,14 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
 | 공통(quota) | model/user.go:97-104 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint | model/user_quota_columns_fork_test.go |
+| O5 문의 메일 | common/constants.go:113 | `var ContactEmail = ""` | controller/contact.go, controller/email.go |
+| O5 문의 메일 | model/option.go:77 | InitOptionMap `OptionMap["ContactEmail"]` 한 줄 | controller/contact.go |
+| O5 문의 메일 | model/option.go:488-489 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
+| O5 문의 메일 | router/api-router.go:284 | `registerForkPublicRoutes(apiRouter)` | router/fork-router.go |
+| O5 문의 메일 | router/api-router.go:96 | `registerForkSelfRoutes(selfRoute)` (O2가 채움) | router/fork-router.go |
+| O5 문의 메일 | router/api-router.go:157 | `registerForkAdminUserRoutes(adminRoute)` (O4가 채움) | router/fork-router.go |
+| O5 문의 메일 | middleware/access_token_routes.go | `"POST /api/admin/test-email"` 토큰 규칙 1줄 (신규 라우트는 규칙 선언 필수) | router/fork-router.go |
+| O5 문의 메일 | router/access_token_scope_test.go | exempt 목록에 `"POST /api/contact"` 1줄 | router/fork-router.go |
 
 ## 빌드·테스트 전제
 - `web/dist/index.html`이 있어야 루트 패키지가 빌드된다 (`cd web && bun run build`).

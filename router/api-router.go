@@ -93,6 +93,7 @@ func SetApiRouter(router *gin.Engine) {
 			selfRoute := userRoute.Group("/")
 			selfRoute.Use(middleware.DisableCache(), middleware.UserAuth())
 			{
+				registerForkSelfRoutes(selfRoute) // fork: router/fork-router.go
 				selfRoute.GET("/sessions", middleware.DisableCache(), controller.GetLoginSessions)
 				selfRoute.DELETE("/sessions/:sid", middleware.DisableCache(), controller.DeleteLoginSession)
 				selfRoute.POST("/sessions/revoke-others", middleware.DisableCache(), controller.RevokeOtherLoginSessions)
@@ -153,6 +154,7 @@ func SetApiRouter(router *gin.Engine) {
 			adminRoute := userRoute.Group("/")
 			adminRoute.Use(middleware.AdminAuth())
 			{
+				registerForkAdminUserRoutes(adminRoute) // fork: router/fork-router.go
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
@@ -279,6 +281,7 @@ func SetApiRouter(router *gin.Engine) {
 		handlePermissionRoute(apiRouter.Group("", middleware.AdminAuth()), http.MethodGet, "/task_plugin_options", authz.TaskPluginBind, controller.GetTaskPluginOptions)
 		registerChannelRoutes(apiRouter)
 		registerAuthzRoutes(apiRouter)
+		registerForkPublicRoutes(apiRouter) // fork: router/fork-router.go
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())
 		tokenRoute.Use(middleware.TokenOperationAudit())

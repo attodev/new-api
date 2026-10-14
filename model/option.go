@@ -74,6 +74,7 @@ func InitOptionMap() {
 	common.OptionMap["SMTPStartTLSEnabled"] = strconv.FormatBool(common.SMTPStartTLSEnabled)
 	common.OptionMap["SMTPInsecureSkipVerify"] = strconv.FormatBool(common.SMTPInsecureSkipVerify)
 	common.OptionMap["SMTPForceAuthLogin"] = strconv.FormatBool(common.SMTPForceAuthLogin)
+	common.OptionMap["ContactEmail"] = common.ContactEmail // fork: O5
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
@@ -484,6 +485,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SMTPFrom = value
 	case "SMTPToken":
 		common.SMTPToken = value
+	case "ContactEmail": // fork: O5
+		common.ContactEmail = value
 	case "ServerAddress":
 		system_setting.ServerAddress = value
 	case "TaskPublicAddress":

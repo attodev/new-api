@@ -110,6 +110,7 @@ var SMTPForceAuthLogin = false
 var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""
+var ContactEmail = "" // fork: O5 landing inquiry recipient
 
 var GitHubClientId = ""
 var GitHubClientSecret = ""
