@@ -34,6 +34,7 @@ type TaskQueryParams struct {
 	MjID           string
 	StartTimestamp string
 	EndTimestamp   string
+	UserIDs        []int // fork: O3
 }
 
 func GetAllUserTask(userId int, startIdx int, num int, queryParams TaskQueryParams) []*Midjourney {
@@ -82,6 +83,9 @@ func GetAllTasks(startIdx int, num int, queryParams TaskQueryParams) []*Midjourn
 	}
 	if queryParams.EndTimestamp != "" {
 		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	}
+	if len(queryParams.UserIDs) > 0 {
+		query = query.Where("user_id IN ?", queryParams.UserIDs) // fork: O3
 	}
 
 	// 获取数据
@@ -226,6 +230,9 @@ func CountAllTasks(queryParams TaskQueryParams) int64 {
 	}
 	if queryParams.EndTimestamp != "" {
 		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	}
+	if len(queryParams.UserIDs) > 0 {
+		query = query.Where("user_id IN ?", queryParams.UserIDs) // fork: O3
 	}
 	_ = query.Count(&total).Error
 	return total

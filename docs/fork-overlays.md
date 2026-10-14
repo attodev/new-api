@@ -89,6 +89,9 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 과금 | relay/mjproxy_handler.go:229-231 | `RelaySwapFace` 회원 한도 검사 뒤, 업스트림 호출 전 `if err := service.CheckMidjourneyOrganizationBilling(info.UserId); err != nil { return &dto.MidjourneyResponse{Code: 4, Description: err.Error()} }` (조직 플랜 회원·빈 조직 지갑 거부) | service/midjourney_organization.go |
 | O3 조직 과금 | relay/mjproxy_handler.go:556-558 | `RelayMidjourneySubmit` 회원 한도 검사 뒤, 업스트림 호출 전 같은 가드 (`consumeQuota && err != nil`일 때만 거부 — upstream 한도 검사와 같은 조건) | service/midjourney_organization.go |
 | O3 조직 과금 | service/task_billing_test.go:66-68, 90-93 | TestMain AutoMigrate 뒤 `model.MigrateForkOrganizationTables(db)` 3줄, `truncate`에 조직 테이블 4개 `DELETE` 4줄 | service/organization_billing_test.go, service/funding_source_organization_test.go |
+| O3 조직 조회 | model/midjourney.go:37 | `TaskQueryParams.UserIDs []int` 필드 (조직 관리자가 회원 작업만 조회) | model/log_organization.go |
+| O3 조직 조회 | model/midjourney.go:87-89 | `GetAllTasks` 필터 체인 끝 `if len(queryParams.UserIDs) > 0 { query = query.Where("user_id IN ?", …) }` 3줄 | model/log_organization.go |
+| O3 조직 조회 | model/midjourney.go:234-236 | `CountAllTasks` 필터 체인 끝 같은 3줄 | model/log_organization.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
