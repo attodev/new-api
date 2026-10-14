@@ -1,6 +1,6 @@
 # upstream 재기반 단계 A 기록
 
-베이스: qn/main 7de10f2c6. 브랜치: rebase/upstream-2026-10. 계획: docs/superpowers/plans/2026-10-14-rebase-phase-a.md
+베이스: qn/main 7de10f2c6. 브랜치: develop (작업 중 이름 rebase/upstream-2026-10; 단계 A 완료 후 구 develop을 develop-legacy-2026-10로 보존하고 교체). 계획: docs/superpowers/plans/2026-10-14-rebase-phase-a.md
 
 ## 1. 기준선 (Task 1)
 - Go: `GOWORK=off go build ./...` 통과. `make test` 종료 코드 0, 패키지 100개(루트 + relaykit + tokenkit 합산) — `ok` 54, `no test files` 46, FAIL 0. upstream 기준선 실패 없음.

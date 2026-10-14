@@ -53,7 +53,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 ## 4. 컴포넌트별 설계
 
 ### 4.1 베이스와 브랜치
-- 브랜치 `rebase/upstream-2026-10`를 `qn/main` `7de10f2c6`에서 만든다. `team`은 손대지 않고, 전환 시점에 `team-legacy-2026-10`로 이름을 바꿔 보존한다.
+- 브랜치 `develop`를 `qn/main` `7de10f2c6`에서 만든다(작업 중 이름 `rebase/upstream-2026-10`; 2026-10-14 단계 A 완료 후 `develop`으로 교체, 구 develop은 `develop-legacy-2026-10`로 보존). `team`은 손대지 않고, 전환 시점에 `team-legacy-2026-10`로 이름을 바꿔 보존한다.
 - `go.mod`는 upstream 것을 쓰고 fork 의존성(excelize, waffo-pancake-sdk는 upstream에도 있음, miniredis 테스트용)을 더한다. 모듈 경로는 upstream과 동일(`github.com/QuantumNous/new-api`)하게 유지한다(CLAUDE.md Rule 5).
 
 ### 4.2 O1 랜딩·가이드
