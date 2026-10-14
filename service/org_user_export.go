@@ -97,8 +97,10 @@ type OrgImportResult struct {
 
 // ImportOrgUsersFromFile parses an Excel file and assigns/creates users for an org.
 // The group column is ignored (never written); platform admins and the owner are
-// never edited or detached, including by removeAbsent.
-func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent bool) (*OrgImportResult, error) {
+// never edited or detached, including by removeAbsent. actorId is the importing
+// user: their own row is rejected and removeAbsent never removes them, the same
+// "organization admins cannot modify themselves" rule the member endpoints apply.
+func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, removeAbsent bool) (*OrgImportResult, error) {
 	result := &OrgImportResult{
 		UpdatedUsernames: []string{},
 		RemovedUsernames: []string{},
@@ -164,6 +166,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 
 		if dbErr != nil && !isNotFound(dbErr) {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): db error: %v", lineNum, username, dbErr))
+			continue
+		}
+
+		if userExists && actorId > 0 && existingUser.Id == actorId {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): an import cannot change the importing admin's own row", lineNum, username))
 			continue
 		}
 
@@ -304,7 +311,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, removeAbsent b
 			result.Errors = append(result.Errors, fmt.Sprintf("remove-absent: failed to query members: %v", err))
 		} else {
 			for _, member := range currentMembers {
-				if listedUsernames[member.Username] {
+				if listedUsernames[member.Username] || member.Id == actorId {
 					continue
 				}
 				// Leaving zeroes the member quota cap (model.ClearOrganizationMembership),

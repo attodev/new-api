@@ -188,8 +188,8 @@ func AssignOrganizationUserSubscription(c *gin.Context) {
 		return
 	}
 	// Platform root manages any member's plan (the console calls this with
-	// ?organization_id=); the owner guard applies to organization admins.
-	if actor.Role != common.RoleRootUser && rejectOrganizationOwnerTarget(c, actor, target) {
+	// ?organization_id=); the self and owner guards apply to organization admins.
+	if actor.Role != common.RoleRootUser && (rejectOrganizationSelfSubscription(c, actor, target) || rejectOrganizationOwnerTarget(c, actor, target)) {
 		return
 	}
 
@@ -241,6 +241,9 @@ func CancelOrganizationUserSubscription(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if actor.Role != common.RoleRootUser && rejectOrganizationSelfSubscription(c, actor, target) {
+		return
+	}
 	if actor.Role != common.RoleRootUser && target.OrganizationId == organizationId && rejectOrganizationOwnerTarget(c, actor, target) {
 		return
 	}
@@ -252,6 +255,17 @@ func CancelOrganizationUserSubscription(c *gin.Context) {
 		fmt.Sprintf("Cancelled the active organization %d subscription of user %d", organizationId, targetId),
 		map[string]any{"organization_id": organizationId, "user_id": targetId})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+// rejectOrganizationSelfSubscription stops an organization admin (the owner
+// included) from assigning or cancelling their own plan: a self-assigned
+// unlimited plan would bypass the cap the owner set.
+func rejectOrganizationSelfSubscription(c *gin.Context, actor *model.User, target *model.User) bool {
+	if target.Id == actor.Id {
+		common.ApiErrorT(c, "organization admins cannot manage their own subscription")
+		return true
+	}
+	return false
 }
 
 func GetMyOrganizationSubscription(c *gin.Context) {

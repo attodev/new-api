@@ -787,3 +787,40 @@ func TestOrganizationCancelSubscriptionRejectsInvalidId(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Code)
 	require.Contains(t, res.Body.String(), `"success":false`)
 }
+
+// fork: O3 — "organization admins cannot modify themselves" also covers plan
+// assignment: an admin must not give themselves an (unlimited) plan or cancel
+// their own. Root still manages any member.
+func TestOrganizationAdminCannotAssignOrCancelOwnSubscription(t *testing.T) {
+	setupOrganizationSubscriptionControllerTestDB(t)
+	owner := model.User{Id: 1, Username: "owner", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleOwner, AffCode: "owner-self-plan"}
+	admin := model.User{Id: 2, Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin-self-plan"}
+	root := model.User{Id: 3, Username: "root", Password: "password", Role: common.RoleRootUser, AffCode: "root-self-plan"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	plan := model.OrganizationSubscriptionPlan{OrganizationId: 1, Title: "Unlimited", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 0, Enabled: true}
+	for _, row := range []any{&owner, &admin, &root, &org, &plan} {
+		require.NoError(t, model.DB.Create(row).Error)
+	}
+
+	for _, actor := range []model.User{admin, owner} {
+		res := performOrganizationRequest(AssignOrganizationUserSubscription, actor, http.MethodPut,
+			fmt.Sprintf("/api/organization/subscription/users/%d", actor.Id), fmt.Sprintf(`{"plan_id":%d}`, plan.Id),
+			gin.Param{Key: "id", Value: fmt.Sprintf("%d", actor.Id)})
+		requireOrganizationApiError(t, res, "organization admins cannot manage their own subscription")
+	}
+	var count int64
+	require.NoError(t, model.DB.Model(&model.OrganizationUserSubscription{}).Count(&count).Error)
+	require.Zero(t, count)
+
+	// Root assigns the admin's plan; the admin cannot cancel it.
+	res := performOrganizationRequest(AssignOrganizationUserSubscription, root, http.MethodPut,
+		fmt.Sprintf("/api/organization/subscription/users/%d?organization_id=1", admin.Id), fmt.Sprintf(`{"plan_id":%d}`, plan.Id),
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", admin.Id)})
+	require.Contains(t, res.Body.String(), `"success":true`)
+	res = performOrganizationRequest(CancelOrganizationUserSubscription, admin, http.MethodDelete,
+		fmt.Sprintf("/api/organization/subscription/users/%d", admin.Id), "",
+		gin.Param{Key: "id", Value: fmt.Sprintf("%d", admin.Id)})
+	requireOrganizationApiError(t, res, "organization admins cannot manage their own subscription")
+	require.NoError(t, model.DB.Model(&model.OrganizationUserSubscription{}).Where("user_id = ? AND status = ?", admin.Id, "active").Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}

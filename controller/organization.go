@@ -935,7 +935,7 @@ func ImportOrganizationUsers(c *gin.Context) {
 	defer f.Close()
 
 	removeAbsent := c.PostForm("remove_absent") == "true"
-	result, err := service.ImportOrgUsersFromFile(f, organizationId, removeAbsent)
+	result, err := service.ImportOrgUsersFromFile(f, organizationId, c.GetInt("id"), removeAbsent)
 	if err != nil {
 		common.ApiError(c, err)
 		return

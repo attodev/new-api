@@ -37,7 +37,7 @@ func TestImportOrgUsersRejectsQuotaAboveWalletCeiling(t *testing.T) {
 		{"org_member", "after", model.OrganizationRoleMember, overUSD, ""},
 		{"org_new_member", "", model.OrganizationRoleMember, overUSD, "password123"},
 	})
-	result, err := ImportOrgUsersFromFile(f, orgId, false)
+	result, err := ImportOrgUsersFromFile(f, orgId, 0, false)
 	require.NoError(t, err)
 	require.Len(t, result.Errors, 2)
 	require.Contains(t, result.Errors[0], "line 2 (org_member): invalid quota")
@@ -60,7 +60,7 @@ func TestImportOrgUsersRejectsQuotaAboveWalletCeiling(t *testing.T) {
 		{"username", "organization_role", "quota"},
 		{"org_member", model.OrganizationRoleMember, "18014398509"},
 	})
-	result, err = ImportOrgUsersFromFile(f, orgId, false)
+	result, err = ImportOrgUsersFromFile(f, orgId, 0, false)
 	require.NoError(t, err)
 	require.Empty(t, result.Errors)
 	require.Equal(t, 1, result.Updated)
@@ -97,7 +97,7 @@ func TestImportOrgUsersNeverEscalatesRoles(t *testing.T) {
 		{"brand_new", "admin", "1", "admin", "password123"},
 		{"brand_owner", "owner", "1", "", "password123"},
 	})
-	result, err := ImportOrgUsersFromFile(f, 1, false)
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
 	require.NoError(t, err)
 
 	var member model.User
@@ -133,7 +133,7 @@ func TestImportOrgUsersDoesNotDemoteOwnerOrTouchPlatformAdmins(t *testing.T) {
 		{"owner_20", "member", "x"},
 		{"plat_admin", "member", "x"},
 	})
-	result, err := ImportOrgUsersFromFile(f, 1, true)
+	result, err := ImportOrgUsersFromFile(f, 1, 0, true)
 	require.NoError(t, err)
 	require.Len(t, result.Errors, 2)
 	var owner, admin model.User
@@ -157,7 +157,7 @@ func TestImportOrgUsersRemoveAbsentKeepsUnlistedPlatformAdmins(t *testing.T) {
 		{"username", "organization_role"},
 		{"someone_else", "member"},
 	})
-	result, err := ImportOrgUsersFromFile(f, 1, true)
+	result, err := ImportOrgUsersFromFile(f, 1, 0, true)
 	require.NoError(t, err)
 	require.Equal(t, 1, result.Removed)
 	require.Equal(t, []string{"member_21"}, result.RemovedUsernames)
@@ -181,7 +181,7 @@ func TestImportOrgUsersIgnoresGroupColumn(t *testing.T) {
 		{"member_21", "member", "vip", ""},
 		{"brand_new", "member", "vip", "password123"},
 	})
-	result, err := ImportOrgUsersFromFile(f, 1, false)
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
 	require.NoError(t, err)
 	require.Empty(t, result.Errors)
 	require.Equal(t, 1, result.Updated)
@@ -204,7 +204,7 @@ func TestImportOrgUsersRemoveAbsentZeroesMemberQuota(t *testing.T) {
 		{"username", "organization_role"},
 		{"owner_20", "member"},
 	})
-	result, err := ImportOrgUsersFromFile(f, 1, true)
+	result, err := ImportOrgUsersFromFile(f, 1, 0, true)
 	require.NoError(t, err)
 	require.Equal(t, []string{"member_21"}, result.RemovedUsernames)
 	var member model.User
@@ -212,4 +212,47 @@ func TestImportOrgUsersRemoveAbsentZeroesMemberQuota(t *testing.T) {
 	require.Zero(t, member.OrganizationId)
 	require.Empty(t, member.OrganizationRole)
 	require.Zero(t, member.Quota)
+}
+
+// fork: O3 — the importing admin's own row is rejected (an admin must not raise
+// their own cap or change their own status/role through a sheet), and
+// remove-absent never removes the importing admin.
+func TestImportOrgUsersRejectsTheActorsOwnRow(t *testing.T) {
+	truncate(t)
+	withDefaultQuotaPerUnit(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 22, "admin_22", 500, 1, model.OrganizationRoleAdmin)
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "quota", "status"},
+		{"admin_22", model.OrganizationRoleAdmin, "1000000", "disabled"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 22, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], "line 2 (admin_22): an import cannot change the importing admin's own row")
+	require.Zero(t, result.Updated)
+	var admin model.User
+	require.NoError(t, model.DB.First(&admin, 22).Error)
+	require.Equal(t, 500, admin.Quota)
+	require.Equal(t, common.UserStatusEnabled, admin.Status)
+}
+
+func TestImportOrgUsersRemoveAbsentNeverRemovesTheActor(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 22, "admin_22", 500, 1, model.OrganizationRoleAdmin)
+	seedOrganizationUser(t, 23, "member_23", 300, 1, model.OrganizationRoleMember)
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role"},
+		{"owner_20", "member"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 22, true)
+	require.NoError(t, err)
+	require.Equal(t, []string{"member_23"}, result.RemovedUsernames)
+	var admin model.User
+	require.NoError(t, model.DB.First(&admin, 22).Error)
+	require.Equal(t, 1, admin.OrganizationId)
+	require.Equal(t, 500, admin.Quota)
 }
