@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "重複的模型名稱：{{names}}",
     "Duplicate vendor names: {{names}}": "重複的供應商名稱：{{names}}",
     "Discount percentages must be between 0 and 100.": "折扣百分比必須介於 0 到 100 之間。",
+    "Rows with an empty name are not saved": "名稱為空的列不會被儲存",
     "Select a vendor": "選擇供應商",
     "Expected a JSON map of model name to discount percentage (0–100)": "應為模型名稱對折扣百分比（0–100）的 JSON 對應",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "應為供應商名稱對折扣百分比（0–100）的 JSON 對應",

@@ -63,8 +63,15 @@ import { DiscountRowMessages } from './model-discount-visual-editor'
 export const VendorDiscountVisualEditor = memo(
   function VendorDiscountVisualEditor(props: DiscountEditorProps) {
     const { t } = useTranslation()
-    const { rows, updateRow, addRow, removeRow, duplicateNames, outOfRange } =
-      useDiscountRows(props)
+    const {
+      rows,
+      updateRow,
+      addRow,
+      removeRow,
+      duplicateNames,
+      outOfRange,
+      hasEmptyName,
+    } = useDiscountRows(props)
 
     const { data: vendorsData, isError: vendorsError } = useQuery({
       queryKey: vendorsQueryKeys.list(),
@@ -218,6 +225,7 @@ export const VendorDiscountVisualEditor = memo(
                 : undefined
             }
             outOfRange={outOfRange}
+            hasEmptyName={hasEmptyName}
           />
         </CardContent>
       </Card>

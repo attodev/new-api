@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "Повторяющиеся названия моделей: {{names}}",
     "Duplicate vendor names: {{names}}": "Повторяющиеся названия поставщиков: {{names}}",
     "Discount percentages must be between 0 and 100.": "Процент скидки должен быть от 0 до 100.",
+    "Rows with an empty name are not saved": "Строки с пустым названием не сохраняются",
     "Select a vendor": "Выберите поставщика",
     "Expected a JSON map of model name to discount percentage (0–100)": "Ожидается JSON-объект: название модели → процент скидки (0–100)",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "Ожидается JSON-объект: название поставщика → процент скидки (0–100)",

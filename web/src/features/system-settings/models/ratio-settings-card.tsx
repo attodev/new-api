@@ -131,7 +131,8 @@ const createModelSchema = (t: Translate) =>
     PluginBillingExpr: createJsonStringField(t),
   })
 
-const createGroupSchema = (t: Translate) =>
+// oxlint-disable-next-line react/only-export-components -- fork: O6 exported for discount tests
+export const createGroupSchema = (t: Translate) =>
   z.object({
     GroupRatio: createJsonStringField(t),
     TopupGroupRatio: createJsonStringField(t),

@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "Duplicate model names: {{names}}",
     "Duplicate vendor names: {{names}}": "Duplicate vendor names: {{names}}",
     "Discount percentages must be between 0 and 100.": "Discount percentages must be between 0 and 100.",
+    "Rows with an empty name are not saved": "Rows with an empty name are not saved",
     "Select a vendor": "Select a vendor",
     "Expected a JSON map of model name to discount percentage (0–100)": "Expected a JSON map of model name to discount percentage (0–100)",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "Expected a JSON map of vendor name to discount percentage (0–100)",

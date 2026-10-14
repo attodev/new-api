@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "Noms de modèles en double : {{names}}",
     "Duplicate vendor names: {{names}}": "Noms de fournisseurs en double : {{names}}",
     "Discount percentages must be between 0 and 100.": "Les pourcentages de remise doivent être compris entre 0 et 100.",
+    "Rows with an empty name are not saved": "Les lignes sans nom ne sont pas enregistrées",
     "Select a vendor": "Sélectionner un fournisseur",
     "Expected a JSON map of model name to discount percentage (0–100)": "Un objet JSON associant chaque nom de modèle à un pourcentage de remise (0–100) est attendu",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "Un objet JSON associant chaque nom de fournisseur à un pourcentage de remise (0–100) est attendu",

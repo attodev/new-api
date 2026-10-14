@@ -50,8 +50,15 @@ import {
 export const ModelDiscountVisualEditor = memo(
   function ModelDiscountVisualEditor(props: DiscountEditorProps) {
     const { t } = useTranslation()
-    const { rows, updateRow, addRow, removeRow, duplicateNames, outOfRange } =
-      useDiscountRows(props)
+    const {
+      rows,
+      updateRow,
+      addRow,
+      removeRow,
+      duplicateNames,
+      outOfRange,
+      hasEmptyName,
+    } = useDiscountRows(props)
 
     return (
       <Card className={discountCardClassName}>
@@ -149,6 +156,7 @@ export const ModelDiscountVisualEditor = memo(
                 : undefined
             }
             outOfRange={outOfRange}
+            hasEmptyName={hasEmptyName}
           />
         </CardContent>
       </Card>
@@ -159,12 +167,18 @@ export const ModelDiscountVisualEditor = memo(
 export function DiscountRowMessages(props: {
   duplicateMessage?: string
   outOfRange: boolean
+  hasEmptyName: boolean
 }) {
   const { t } = useTranslation()
   return (
     <>
       {props.duplicateMessage && (
         <p className='text-destructive text-sm'>{props.duplicateMessage}</p>
+      )}
+      {props.hasEmptyName && (
+        <p className='text-destructive text-sm'>
+          {t('Rows with an empty name are not saved')}
+        </p>
       )}
       {props.outOfRange && (
         <p className='text-destructive text-sm'>

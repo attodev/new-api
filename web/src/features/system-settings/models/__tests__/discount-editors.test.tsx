@@ -32,6 +32,7 @@ import { positiveIntegerSchema } from '../../utils/numeric-field'
 import { discountMapValidation } from '../discount-utils'
 import { GroupRatioForm } from '../group-ratio-form'
 import { ModelDiscountVisualEditor } from '../model-discount-visual-editor'
+import { createGroupSchema } from '../ratio-settings-card'
 import { validateJsonString } from '../utils'
 import { VendorDiscountVisualEditor } from '../vendor-discount-visual-editor'
 
@@ -103,6 +104,21 @@ describe('ModelDiscountVisualEditor', () => {
     expect(
       screen.getByText('Discount percentages must be between 0 and 100.')
     ).toBeInTheDocument()
+  })
+
+  it('warns that rows with an empty name are not saved', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<ModelDiscountVisualEditor value='{}' onChange={onChange} />)
+    expect(
+      screen.queryByText('Rows with an empty name are not saved')
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add model' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Model name' }))
+    expect(
+      screen.getByText('Rows with an empty name are not saved')
+    ).toBeInTheDocument()
+    expect(JSON.parse(onChange.mock.lastCall?.[0])).toEqual({})
   })
 
   it('removes a row', async () => {
@@ -226,6 +242,24 @@ describe('discount map validation', () => {
     expect(
       validateJsonString(value, discountMapValidation('model')).valid
     ).toBe(valid)
+  })
+})
+
+describe('real group schema', () => {
+  const groupSchema = createGroupSchema((key) => key)
+
+  it.each([
+    ['ModelDiscount', '{"gpt-4":101}', false],
+    ['ModelDiscount', '{"gpt-4":"10"}', false],
+    ['ModelDiscount', '[]', false],
+    ['ModelDiscount', '{}', true],
+    ['ModelDiscount', '{"gpt-4":25}', true],
+    ['VendorDiscount', '{"OpenAI":101}', false],
+    ['VendorDiscount', '{"OpenAI":10}', true],
+  ])('%s %s -> %s', (field, value, success) => {
+    expect(groupSchema.safeParse({ ...defaults, [field]: value }).success).toBe(
+      success
+    )
   })
 })
 

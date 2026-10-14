@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "重复的模型名称：{{names}}",
     "Duplicate vendor names: {{names}}": "重复的供应商名称：{{names}}",
     "Discount percentages must be between 0 and 100.": "折扣百分比必须在 0 到 100 之间。",
+    "Rows with an empty name are not saved": "名称为空的行不会被保存",
     "Select a vendor": "选择供应商",
     "Expected a JSON map of model name to discount percentage (0–100)": "应为模型名称到折扣百分比（0–100）的 JSON 映射",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "应为供应商名称到折扣百分比（0–100）的 JSON 映射",

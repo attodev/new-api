@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "重複したモデル名: {{names}}",
     "Duplicate vendor names: {{names}}": "重複したベンダー名: {{names}}",
     "Discount percentages must be between 0 and 100.": "割引率は 0 から 100 の間で指定してください。",
+    "Rows with an empty name are not saved": "名前が空の行は保存されません",
     "Select a vendor": "ベンダーを選択",
     "Expected a JSON map of model name to discount percentage (0–100)": "モデル名から割引率（0–100）への JSON マップが必要です",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "ベンダー名から割引率（0–100）への JSON マップが必要です",

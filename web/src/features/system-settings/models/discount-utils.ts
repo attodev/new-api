@@ -148,6 +148,12 @@ export function useDiscountRows({ value, onChange }: DiscountEditorProps) {
     [rows]
   )
 
+  // Rows without a name are skipped when serializing; surface that.
+  const hasEmptyName = useMemo(
+    () => rows.some((row) => !row.name.trim()),
+    [rows]
+  )
+
   return {
     rows,
     updateRow,
@@ -155,6 +161,7 @@ export function useDiscountRows({ value, onChange }: DiscountEditorProps) {
     removeRow,
     duplicateNames,
     outOfRange,
+    hasEmptyName,
   }
 }
 

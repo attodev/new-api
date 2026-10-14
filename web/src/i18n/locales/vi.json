@@ -145,6 +145,7 @@
     "Duplicate model names: {{names}}": "Tên mô hình bị trùng: {{names}}",
     "Duplicate vendor names: {{names}}": "Tên nhà cung cấp bị trùng: {{names}}",
     "Discount percentages must be between 0 and 100.": "Phần trăm giảm giá phải nằm trong khoảng từ 0 đến 100.",
+    "Rows with an empty name are not saved": "Các hàng có tên trống sẽ không được lưu",
     "Select a vendor": "Chọn nhà cung cấp",
     "Expected a JSON map of model name to discount percentage (0–100)": "Cần một bản đồ JSON từ tên mô hình đến phần trăm giảm giá (0–100)",
     "Expected a JSON map of vendor name to discount percentage (0–100)": "Cần một bản đồ JSON từ tên nhà cung cấp đến phần trăm giảm giá (0–100)",
