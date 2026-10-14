@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Activity,
   Box,
+  Building2, // fork: O3
   ClipboardList,
   CreditCard,
   FileText,
@@ -125,6 +126,43 @@ export function useSidebarData(): SidebarData {
             title: t('Security & Access'),
             url: '/security',
             icon: ShieldCheck,
+          },
+        ],
+      },
+      // fork: O3 — shown only to root and organization admins (use-sidebar-view)
+      {
+        id: 'organization',
+        title: t('Organization'),
+        items: [
+          {
+            title: t('Organization Users'),
+            url: '/organization',
+            icon: Building2,
+          },
+          {
+            title: t('Organization Dashboard'),
+            url: '/organization/dashboard',
+            icon: LayoutDashboard,
+          },
+          {
+            title: t('Organization Usage Logs'),
+            url: '/organization/usage-logs/common',
+            icon: FileText,
+          },
+          {
+            title: t('Organization Task Logs'),
+            url: '/organization/usage-logs/task',
+            activeUrls: ['/organization/usage-logs/drawing'],
+            configUrls: [
+              '/organization/usage-logs/drawing',
+              '/organization/usage-logs/task',
+            ],
+            icon: ListTodo,
+          },
+          {
+            title: t('Organization Subscription'),
+            url: '/organization/subscriptions',
+            icon: CreditCard,
           },
         ],
       },

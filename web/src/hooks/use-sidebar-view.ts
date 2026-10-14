@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { resolveSidebarView } from '@/components/layout/lib/sidebar-view-registry'
 import type { NavGroup, ResolvedSidebarView } from '@/components/layout/types'
+import { canAccessOrganizationArea } from '@/features/organizations/lib/organization-access' // fork: O3
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -48,6 +49,7 @@ export function useSidebarView(): ResolvedSidebarView {
   const { t } = useTranslation()
   const pathname = useLocation({ select: (l) => l.pathname })
   const userRole = useAuthStore((s) => s.auth.user?.role)
+  const organizationRole = useAuthStore((s) => s.auth.user?.organization_role) // fork: O3
   const rootSidebarData = useSidebarData()
   const configFilteredRoot = useSidebarConfig(rootSidebarData.navGroups)
 
@@ -56,13 +58,21 @@ export function useSidebarView(): ResolvedSidebarView {
     const isAdmin = role >= ROLE.ADMIN
     return configFilteredRoot
       .filter((group) => (group.id === 'admin' ? isAdmin : true))
+      .filter(
+        (group) =>
+          group.id !== 'organization' ||
+          canAccessOrganizationArea({
+            role,
+            organization_role: organizationRole,
+          })
+      ) // fork: O3
       .map((group) => {
         const items = group.items.filter(
           (item) => item.requiredRole === undefined || role >= item.requiredRole
         )
         return items.length === group.items.length ? group : { ...group, items }
       })
-  }, [configFilteredRoot, userRole])
+  }, [configFilteredRoot, userRole, organizationRole]) // fork: O3
 
   const view = resolveSidebarView(pathname)
 

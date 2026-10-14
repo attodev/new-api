@@ -64,6 +64,7 @@ export function CommonLogMobileCard<TData>(props: {
 }) {
   const { t } = useTranslation()
   const context = useUsageLogsContext()
+  const showUserInfo = context.logsScope !== 'organization' // fork: O3 — user info needs a site admin
   const [selectedField, setSelectedField] = useState<FieldName | null>(null)
   const log = props.log
   const other = parseLogOther(log.other)
@@ -373,7 +374,7 @@ export function CommonLogMobileCard<TData>(props: {
                 )}
               </div>
             )}
-            {selectedField === 'user' && (
+            {selectedField === 'user' && showUserInfo && (
               <Button
                 variant='outline'
                 className='min-h-11'

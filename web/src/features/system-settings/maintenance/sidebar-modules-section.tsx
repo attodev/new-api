@@ -81,6 +81,11 @@ export function SidebarModulesSection({
       title: t('Admin area'),
       description: t('Global configuration and administrative tools.'),
     },
+    // fork: O3
+    organization: {
+      title: t('Organization area'),
+      description: t('Organization users, billing, and usage monitoring.'),
+    },
   }
 
   const moduleMeta: Record<
@@ -161,6 +166,29 @@ export function SidebarModulesSection({
       subscription: {
         title: t('Subscription Management'),
         description: t('Manage subscription plans and pricing.'),
+      },
+    },
+    // fork: O3
+    organization: {
+      users: {
+        title: t('Organization Users'),
+        description: t('Manage organization members and roles.'),
+      },
+      dashboard: {
+        title: t('Organization Dashboard'),
+        description: t('Review organization usage and quota trends.'),
+      },
+      subscription: {
+        title: t('Organization Subscription'),
+        description: t('Manage organization-only plans and assignments.'),
+      },
+      log: {
+        title: t('Organization Usage Logs'),
+        description: t('Review organization API usage records.'),
+      },
+      task: {
+        title: t('Organization Task Logs'),
+        description: t('Review organization task records.'),
       },
     },
   }

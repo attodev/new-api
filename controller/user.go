@@ -582,6 +582,7 @@ func generateDefaultSidebarConfig(userRole int) string {
 		"topup":    true,
 		"personal": true,
 	}
+	model.AddOrganizationSidebarDefaults(defaultConfig) // fork: O3
 
 	// 管理员区域 - 根据角色决定
 	if userRole == common.RoleAdminUser {

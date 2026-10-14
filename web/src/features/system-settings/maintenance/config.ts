@@ -83,6 +83,15 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     setting: true,
     subscription: true,
   },
+  // fork: O3
+  organization: {
+    enabled: true,
+    users: true,
+    dashboard: true,
+    subscription: true,
+    log: true,
+    task: true,
+  },
 }
 
 const toBoolean = (value: unknown, fallback: boolean): boolean => {

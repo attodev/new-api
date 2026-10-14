@@ -393,13 +393,18 @@ export function useCommonLogsColumns(
               sensitiveVisible,
               setAffinityTarget,
               setAffinityDialogOpen,
+              logsScope, // fork: O3
             } = useUsageLogsContext()
             const log = row.original
 
             if (!isDisplayableLogType(log.type)) return null
 
             const other = parseLogOther(log.other)
-            const affinity = other?.admin_info?.channel_affinity
+            // fork: O3 — the affinity stats dialog needs a site admin
+            const affinity =
+              logsScope === 'organization'
+                ? undefined
+                : other?.admin_info?.channel_affinity
             const rawUseChannel = other?.admin_info?.use_channel ?? []
             const useChannel = Array.isArray(rawUseChannel)
               ? rawUseChannel.map(String).filter(Boolean)
@@ -553,6 +558,7 @@ export function useCommonLogsColumns(
               sensitiveVisible,
               setSelectedUserId,
               setUserInfoDialogOpen,
+              logsScope, // fork: O3
             } = useUsageLogsContext()
             const log = row.original
 
@@ -561,6 +567,7 @@ export function useCommonLogsColumns(
             return (
               <button
                 type='button'
+                disabled={logsScope === 'organization'} // fork: O3 — user info needs a site admin
                 className='flex items-center gap-1.5 text-left'
                 onClick={(e) => {
                   e.stopPropagation()

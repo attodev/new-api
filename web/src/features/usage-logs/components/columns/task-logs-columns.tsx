@@ -128,6 +128,7 @@ export function useTaskLogsColumns(
               sensitiveVisible,
               setSelectedUserId,
               setUserInfoDialogOpen,
+              logsScope, // fork: O3
             } = useUsageLogsContext()
             const log = row.original
             const displayName = log.username || String(log.user_id || '?')
@@ -135,6 +136,7 @@ export function useTaskLogsColumns(
             return (
               <button
                 type='button'
+                disabled={logsScope === 'organization'} // fork: O3 — user info needs a site admin
                 className='flex items-center gap-1.5 text-left'
                 onClick={(e) => {
                   e.stopPropagation()
@@ -254,9 +256,17 @@ export function useTaskLogsColumns(
       {
         id: 'artifacts',
         header: t('Artifacts'),
-        cell: ({ row }) => (
-          <TaskArtifactsCell key={row.original.task_id} log={row.original} />
-        ),
+        cell: function ArtifactsCell({ row }) {
+          // fork: O3 — artifacts resolve only the viewer's own tasks unless a
+          // site admin, so the organization view does not offer them.
+          const { logsScope } = useUsageLogsContext()
+          if (logsScope === 'organization') {
+            return <span className='text-muted-foreground/60 text-xs'>-</span>
+          }
+          return (
+            <TaskArtifactsCell key={row.original.task_id} log={row.original} />
+          )
+        },
         size: 120,
         maxSize: 140,
       },

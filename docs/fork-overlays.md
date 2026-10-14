@@ -116,6 +116,16 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 (프런트) | web/src/features/usage-logs/components/usage-logs-table.tsx | `getRouteApi` import·상수 삭제, search/navigate는 `useUsageLogsRoute()`; 컨텍스트의 `logsScope`/`organizationId`를 `fetchLogsByCategory`·queryKey에 전달, `enabled: !waitForOrganization \|\| organizationId !== undefined`; 조직 범위에선 `getAdminPlans` 조회 끔 | web/src/features/usage-logs/components/usage-logs-route.ts |
 | O3 조직 (프런트) | web/src/features/usage-logs/components/common-logs-filter-bar.tsx, task-logs-filter-bar.tsx | `getRouteApi` import·상수 삭제, search는 `useUsageLogsRoute()`, `navigate` `to:`는 `routeTo`(+deps); 공통 필터: 조직 범위에선 관리자 그룹(`/api/group/`) 대신 본인 그룹, 통계 바·내보내기 숨김 | web/src/features/usage-logs/components/usage-logs-route.ts |
 | O3 조직 (프런트) | web/src/features/usage-logs/components/common-logs-stats.tsx, components/dialogs/export-logs-dialog.tsx | `getRouteApi` import·상수 삭제, `route.useSearch()` → `useUsageLogsRoute().search` (조직 범위에선 렌더되지 않음) | web/src/features/usage-logs/components/usage-logs-route.ts |
+| O3 조직 사이드바 | controller/user.go:585 | `generateDefaultSidebarConfig` personal 블록 뒤 `model.AddOrganizationSidebarDefaults(defaultConfig)` 한 줄 | model/organization_sidebar.go |
+| O3 조직 사이드바 | model/user.go:253 | `generateDefaultSidebarConfigForRole` personal 블록 뒤 `AddOrganizationSidebarDefaults(defaultConfig)` 한 줄 | model/organization_sidebar.go |
+| O3 조직 (프런트) | web/src/hooks/use-sidebar-data.ts:22, 132-168 | `Building2` import 한 줄, `personal` 그룹 뒤 `organization` 그룹(5 항목: 사용자·대시보드·사용 로그·작업 로그·구독) | web/src/features/organizations/, web/src/routes/_authenticated/organization/ |
+| O3 조직 (프런트) | web/src/hooks/use-sidebar-config.ts:69-77, 132-144 | `DEFAULT_SIDEBAR_MODULES.organization`(`enabled/users/dashboard/subscription/log/task`), `URL_TO_CONFIG_MAP`에 `/organization*` 6개 | — |
+| O3 조직 (프런트) | web/src/hooks/use-sidebar-view.ts:25, 52, 61-68, 75 | `canAccessOrganizationArea` import, `organization_role` 셀렉터, `organization` 그룹은 root 또는 조직 admin/owner에게만(필터 한 단계), memo deps | web/src/features/organizations/lib/organization-access.ts |
+| O3 조직 (프런트) | web/src/features/system-settings/maintenance/config.ts:86-94, sidebar-modules-section.tsx:84-88, 171-193 | `SIDEBAR_MODULES_DEFAULT.organization`, `sectionMeta.organization`·`moduleMeta.organization`(5 모듈) | — |
+| O3 조직 (프런트) | web/src/features/usage-logs/components/columns/common-logs-columns.tsx:396, 403-407, 561, 570 | 조직 범위에선 채널 affinity 버튼 숨김(`affinity`를 undefined로 — 통계 다이얼로그가 사이트 관리자 API), 사용자 셀 버튼 `disabled`(사용자 정보 다이얼로그가 `/api/user/:id`) | — |
+| O3 조직 (프런트) | web/src/features/usage-logs/components/columns/task-logs-columns.tsx:131, 139, 259-269 | 사용자 셀 버튼 `disabled`(위와 같음), 작업물(Artifacts) 셀은 조직 범위에서 `-`(작업물 API는 사이트 관리자가 아니면 본인 작업만 조회) | — |
+| O3 조직 (프런트) | web/src/features/usage-logs/components/common-log-mobile-card.tsx:67, 377 | `showUserInfo` 한 줄, 모바일 사용자 필드의 `User Information` 버튼 조건에 `&& showUserInfo` | — |
+| O3 조직 (프런트) | web/src/routeTree.gen.ts | 생성 파일 — `bun run build`가 `/organization`, `/organization/dashboard`, `/organization/subscriptions`, `/organization/usage-logs/`, `/organization/usage-logs/$section` 라우트를 추가 | web/src/routes/_authenticated/organization/ |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 
