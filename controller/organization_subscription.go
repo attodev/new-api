@@ -312,6 +312,7 @@ func GetMyOrganizationSubscription(c *gin.Context) {
 	// Same shape as the list items: the caller through organizationUserView,
 	// never the full users row.
 	userView := newOrganizationUserView(actor)
+	userView.OrganizationRemark = "" // the admins' note about the member stays with the admins
 	common.ApiSuccess(c, organizationUserSubscriptionView{
 		Subscription: sub,
 		User:         &userView,

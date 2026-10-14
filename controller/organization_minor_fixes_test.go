@@ -85,7 +85,8 @@ func TestMyOrganizationSubscriptionDoesNotReturnTheFullUser(t *testing.T) {
 	setupOrganizationSubscriptionControllerTestDB(t)
 	accessToken := "member-secret-access-token"
 	member := model.User{Id: 2, Username: "member", Password: "member-password-hash", Email: "member@example.com", AccessToken: &accessToken,
-		Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-self"}
+		Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleMember, AffCode: "member-self",
+		OrganizationRemark: "admin-only member note"}
 	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Status: model.OrganizationStatusEnabled}
 	plan := model.OrganizationSubscriptionPlan{OrganizationId: 1, Title: "Team Basic", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 500, Enabled: true}
 	for _, row := range []any{&member, &org, &plan} {
@@ -101,7 +102,9 @@ func TestMyOrganizationSubscriptionDoesNotReturnTheFullUser(t *testing.T) {
 	require.Contains(t, body, `"subscription"`)
 	require.Contains(t, body, `"username":"member"`)
 	require.Contains(t, body, `"Team Basic"`)
-	for _, leaked := range []string{`"password"`, `"access_token"`, `"email"`, "member@example.com", "member-secret-access-token"} {
+	// The organization note is written by the organization admins about the
+	// member; the member's own view does not carry it.
+	for _, leaked := range []string{`"password"`, `"access_token"`, `"email"`, "member@example.com", "member-secret-access-token", "admin-only member note"} {
 		require.NotContains(t, body, leaked)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -32,10 +33,61 @@ func importedWalletQuota(usd float64) (int, error) {
 // The group column is export-only: the import never writes users.group (it sets
 // channel access and the billing ratio, which organization admins must not
 // choose), so the cell is ignored and new users get the default group.
+// member_status and organization_remark are the organization-scoped member
+// status and note (plan decision 7); the platform users.status / users.remark
+// are root-only and never read from or written to a sheet.
 var OrgExcelHeaders = []string{
 	"username", "display_name", "organization_role",
-	"quota", "used_quota", "group", "status", "remark", "initial_password",
+	"quota", "used_quota", "group", "member_status", "organization_remark", "initial_password",
 }
+
+// orgExcelRetiredColumns are the old platform columns. A sheet still carrying
+// one is refused as a whole, so an old template never silently drops edits.
+var orgExcelRetiredColumns = []struct{ column, replacement string }{
+	{"status", "member_status"},
+	{"remark", "organization_remark"},
+}
+
+func memberStatusToString(status int) string {
+	if status == model.OrganizationMemberStatusSuspended {
+		return "suspended"
+	}
+	return "active"
+}
+
+func stringToMemberStatus(s string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "active":
+		return model.OrganizationMemberStatusActive, true
+	case "suspended":
+		return model.OrganizationMemberStatusSuspended, true
+	default:
+		return 0, false
+	}
+}
+
+// orgImportMemberFields reads the organization-scoped member columns of a row.
+// Only present, non-empty member_status cells and present organization_remark
+// columns are returned, so an absent column keeps the stored value.
+func orgImportMemberFields(memberStatusCell string, remarkPresent bool, remarkCell string) (map[string]interface{}, error) {
+	fields := map[string]interface{}{}
+	if memberStatusCell != "" {
+		status, ok := stringToMemberStatus(memberStatusCell)
+		if !ok {
+			return nil, fmt.Errorf("invalid member_status %q (use active or suspended)", memberStatusCell)
+		}
+		fields["organization_member_status"] = status
+	}
+	if remarkPresent {
+		if utf8.RuneCountInString(remarkCell) > orgImportMaxRemarkLength {
+			return nil, fmt.Errorf("organization_remark must be at most %d characters", orgImportMaxRemarkLength)
+		}
+		fields["organization_remark"] = remarkCell
+	}
+	return fields, nil
+}
+
+const orgImportMaxRemarkLength = 255
 
 // BuildOrgExportFile creates an Excel file of all members in an organization.
 func BuildOrgExportFile(organizationId int) (*excelize.File, error) {
@@ -71,8 +123,8 @@ func BuildOrgExportFile(organizationId int) (*excelize.File, error) {
 			float64(u.Quota) / common.QuotaPerUnit,
 			float64(u.UsedQuota) / common.QuotaPerUnit,
 			u.Group,
-			statusToString(u.Status),
-			u.Remark,
+			memberStatusToString(u.OrganizationMemberStatus),
+			u.OrganizationRemark,
 			"",
 		}
 		for col, val := range values {
@@ -130,6 +182,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 	hasColumn := func(key string) bool {
 		_, ok := headerIdx[key]
 		return ok
+	}
+	for _, retired := range orgExcelRetiredColumns {
+		if hasColumn(retired.column) {
+			return nil, fmt.Errorf("unsupported column: %s — use %s", retired.column, retired.replacement)
+		}
 	}
 	getCell := func(row []string, key string) string {
 		idx, ok := headerIdx[key]
@@ -203,18 +260,16 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 						importedQuota = &quota
 					}
 				}
-				updates := map[string]interface{}{}
+				updates, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
+				if err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+					continue
+				}
 				if dn := getCell(row, "display_name"); dn != "" {
 					updates["display_name"] = dn
 				}
 				if orgRole != existingUser.OrganizationRole {
 					updates["organization_role"] = orgRole
-				}
-				if st := getCell(row, "status"); st != "" {
-					updates["status"] = stringToStatus(st)
-				}
-				if hasColumn("remark") {
-					updates["remark"] = getCell(row, "remark")
 				}
 				if len(updates) > 0 {
 					if err := model.DB.Model(&model.User{}).Where("id = ?", existingUser.Id).Updates(updates).Error; err != nil {
@@ -238,9 +293,21 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): belongs to another organization", lineNum, username))
 				continue
 			}
+			memberFields, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+				continue
+			}
 			if err := model.AssignUserToOrganization(existingUser.Id, organizationId, orgRole); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
 				continue
+			}
+			if len(memberFields) > 0 {
+				if err := model.DB.Model(&model.User{}).
+					Where("id = ? AND organization_id = ?", existingUser.Id, organizationId).
+					Updates(memberFields).Error; err != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
+				}
 			}
 			if err := model.InvalidateUserCache(existingUser.Id); err != nil {
 				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
@@ -253,6 +320,11 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		password := getCell(row, "initial_password")
 		if password == "" {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): initial_password is required for new users", lineNum, username))
+			continue
+		}
+		memberFields, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
 			continue
 		}
 
@@ -282,8 +354,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			Password:    password,
 			DisplayName: displayName,
 			Role:        common.RoleCommonUser,
-			Status:      stringToStatus(getCell(row, "status")),
-			Remark:      getCell(row, "remark"),
+			Status:      common.UserStatusEnabled, // the platform status is root-only
 		}
 
 		// Same struct validation CreateUser applies (username/display name length, password length).
@@ -300,6 +371,14 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		if err := model.AssignCreatedUserToOrganization(newUser.Id, organizationId, orgRole); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set org membership: %v", lineNum, username, err))
 			continue
+		}
+
+		if len(memberFields) > 0 {
+			if err := model.DB.Model(&model.User{}).
+				Where("id = ? AND organization_id = ?", newUser.Id, organizationId).
+				Updates(memberFields).Error; err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
+			}
 		}
 
 		if quotaProvided {

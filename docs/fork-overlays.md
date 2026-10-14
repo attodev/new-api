@@ -51,6 +51,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O8 가격 페이지 모델 상세 숨김 | web/src/features/rankings/components/entity-links.tsx | `ModelLink`가 링크 대신 일반 텍스트 렌더링 | — |
 | O8 큰 수 약어 | web/src/lib/currency.ts, web/src/lib/format.ts | `SUFFIX_TIERS` (k/M/B/T), `formatTokens` K/M/B/T 구간 (`web/src/lib/__tests__/number-suffix.test.ts`) | web/src/lib/__tests__/number-suffix.test.ts |
 | O3 조직 | model/user.go:101-102 | `User.OrganizationId`, `User.OrganizationRole` 필드 (Group 다음) | model/organization.go, model/organization_migrate.go |
+| O3 조직 회원 상태 | model/user.go:118-119 | `User.OrganizationMemberStatus`, `User.OrganizationRemark` 필드 (구조체 끝, 빈 줄로 gofmt 정렬 분리 — upstream 필드 정렬 무변경). 조직 범위 회원 상태(1 active / 2 suspended)·메모, 플랫폼 `status`·`remark`는 root 전용 (spec §9 결정 7) | model/organization_member_status.go |
 | O3 조직 | model/user.go:538 | `GetSelfUserById` Select 목록에 `"organization_id", "organization_role"` 한 줄 | model/organization.go |
 | O3 조직 | model/topup.go:27-28 | `TopUp.TargetType`, `TopUp.TargetId` 필드 (gofmt가 26행 O2 주석 정렬을 바꿈 — 공백만) | model/organization.go |
 | O3 조직 | model/task.go:112 | `TaskPrivateData.OrganizationId` 필드 | model/organization.go |

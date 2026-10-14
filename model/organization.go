@@ -1,6 +1,6 @@
 package model
 
-// fork: O3 — organizations. Hooks: model/user.go (OrganizationId/OrganizationRole), model/main.go (MigrateForkOrganizationTables).
+// fork: O3 — organizations. Hooks: model/user.go (OrganizationId/OrganizationRole, OrganizationMemberStatus/OrganizationRemark), model/main.go (MigrateForkOrganizationTables).
 
 import (
 	"errors"
@@ -457,9 +457,9 @@ func DeleteOrganizationClearingOwner(id int) (ownerUserId int, ownerPreviousQuot
 			}
 			// Use Select to force-update zero-value fields that GORM might otherwise skip.
 			if err := tx.Model(&User{}).
-				Select("organization_id", "organization_role").
+				Select("organization_id", "organization_role", "organization_member_status", "organization_remark").
 				Where("organization_id = ?", id).
-				Updates(User{OrganizationId: 0, OrganizationRole: ""}).Error; err != nil {
+				Updates(User{OrganizationId: 0, OrganizationRole: "", OrganizationMemberStatus: OrganizationMemberStatusActive}).Error; err != nil {
 				return err
 			}
 
@@ -511,7 +511,7 @@ func ClearOrganizationMembership(userId int, organizationId int) (previousQuota 
 }
 
 // clearOrganizationMembershipTx locks the user and clears organization_id,
-// organization_role and quota with an UPDATE scoped to organizationId. It
+// organization_role, quota and the organization-scoped member status/note with an UPDATE scoped to organizationId. It
 // returns ErrOrganizationMembershipChanged when no row matched.
 func clearOrganizationMembershipTx(tx *gorm.DB, userId int, organizationId int) (previousQuota int, err error) {
 	var user User
@@ -521,9 +521,11 @@ func clearOrganizationMembershipTx(tx *gorm.DB, userId int, organizationId int) 
 	result := tx.Model(&User{}).
 		Where("id = ? AND organization_id = ?", userId, organizationId).
 		Updates(map[string]interface{}{
-			"organization_id":   0,
-			"organization_role": "",
-			"quota":             0,
+			"organization_id":            0,
+			"organization_role":          "",
+			"quota":                      0,
+			"organization_member_status": OrganizationMemberStatusActive,
+			"organization_remark":        "",
 		})
 	if result.Error != nil {
 		return 0, result.Error

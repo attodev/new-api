@@ -224,8 +224,8 @@ func TestImportOrgUsersRejectsTheActorsOwnRow(t *testing.T) {
 	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
 	seedOrganizationUser(t, 22, "admin_22", 500, 1, model.OrganizationRoleAdmin)
 	f := newImportWorkbook(t, [][]any{
-		{"username", "organization_role", "quota", "status"},
-		{"admin_22", model.OrganizationRoleAdmin, "1000000", "disabled"},
+		{"username", "organization_role", "quota", "member_status"},
+		{"admin_22", model.OrganizationRoleAdmin, "1000000", "suspended"},
 	})
 	result, err := ImportOrgUsersFromFile(f, 1, 22, false)
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func TestImportOrgUsersRejectsTheActorsOwnRow(t *testing.T) {
 	var admin model.User
 	require.NoError(t, model.DB.First(&admin, 22).Error)
 	require.Equal(t, 500, admin.Quota)
-	require.Equal(t, common.UserStatusEnabled, admin.Status)
+	require.Equal(t, model.OrganizationMemberStatusActive, admin.OrganizationMemberStatus)
 }
 
 func TestImportOrgUsersRemoveAbsentNeverRemovesTheActor(t *testing.T) {
@@ -257,14 +257,18 @@ func TestImportOrgUsersRemoveAbsentNeverRemovesTheActor(t *testing.T) {
 	require.Equal(t, 500, admin.Quota)
 }
 
-// fork: O3 (review I7, partial) — the import writes remark only when the sheet
-// has a remark column; a sheet without it keeps the existing remark.
-func TestImportOrgUsersKeepsRemarkWhenColumnIsAbsent(t *testing.T) {
+// fork: O3 (review I7, plan decision 7) — the import writes the
+// organization-scoped note only when the sheet has an organization_remark
+// column; a sheet without it keeps the existing note. The platform remark is
+// never written.
+func TestImportOrgUsersKeepsOrganizationRemarkWhenColumnIsAbsent(t *testing.T) {
 	truncate(t)
 	seedOrganization(t, 1, 20)
 	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
 	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
-	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Update("remark", "root note").Error)
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Updates(map[string]any{
+		"remark": "root note", "organization_remark": "org note",
+	}).Error)
 
 	f := newImportWorkbook(t, [][]any{
 		{"username", "display_name"},
@@ -276,17 +280,101 @@ func TestImportOrgUsersKeepsRemarkWhenColumnIsAbsent(t *testing.T) {
 	var member model.User
 	require.NoError(t, model.DB.First(&member, 21).Error)
 	require.Equal(t, "Renamed", member.DisplayName)
-	require.Equal(t, "root note", member.Remark)
+	require.Equal(t, "org note", member.OrganizationRemark)
 
-	// With the column present the remark is written (an empty cell clears it).
+	// With the column present the note is written (an empty cell clears it).
 	f = newImportWorkbook(t, [][]any{
-		{"username", "remark"},
-		{"member_21", "sheet note"},
+		{"username", "organization_remark", "member_status"},
+		{"member_21", "sheet note", "suspended"},
 	})
-	_, err = ImportOrgUsersFromFile(f, 1, 0, false)
+	result, err = ImportOrgUsersFromFile(f, 1, 0, false)
 	require.NoError(t, err)
+	require.Empty(t, result.Errors)
 	require.NoError(t, model.DB.First(&member, 21).Error)
-	require.Equal(t, "sheet note", member.Remark)
+	require.Equal(t, "sheet note", member.OrganizationRemark)
+	require.Equal(t, model.OrganizationMemberStatusSuspended, member.OrganizationMemberStatus)
+	require.Equal(t, "root note", member.Remark, "the platform remark stays root-only")
+	require.Equal(t, common.UserStatusEnabled, member.Status, "the platform status stays root-only")
+}
+
+// Sheets written for the old layout carry platform status/remark columns; the
+// whole import is refused instead of silently ignoring them (plan decision 9).
+func TestImportOrgUsersRejectsPlatformStatusAndRemarkColumns(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+
+	for column, replacement := range map[string]string{"status": "member_status", "remark": "organization_remark"} {
+		f := newImportWorkbook(t, [][]any{
+			{"username", "display_name", column},
+			{"member_21", "Renamed", "x"},
+		})
+		result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+		require.Nil(t, result)
+		require.EqualError(t, err, fmt.Sprintf("unsupported column: %s — use %s", column, replacement))
+	}
+	var member model.User
+	require.NoError(t, model.DB.First(&member, 21).Error)
+	require.NotEqual(t, "Renamed", member.DisplayName, "a refused sheet changes nothing")
+}
+
+func TestImportOrgUsersMemberStatusValuesAndNewUsers(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "member_status", "organization_remark", "initial_password"},
+		{"member_21", "disabled", "", ""},
+		{"org_new_member", "Suspended", "new hire", "password123"},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	require.Len(t, result.Errors, 1)
+	require.Contains(t, result.Errors[0], `line 2 (member_21): invalid member_status "disabled" (use active or suspended)`)
+	require.Equal(t, 1, result.Created)
+
+	var created model.User
+	require.NoError(t, model.DB.Where("username = ?", "org_new_member").First(&created).Error)
+	require.Equal(t, common.UserStatusEnabled, created.Status, "new users are always enabled on the platform")
+	require.Equal(t, model.OrganizationMemberStatusSuspended, created.OrganizationMemberStatus)
+	require.Equal(t, "new hire", created.OrganizationRemark)
+	require.Equal(t, "", created.Remark)
+}
+
+func TestBuildOrgExportFileWritesMemberStatusAndOrganizationRemark(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 21).Updates(map[string]any{
+		"remark": "root note", "organization_remark": "org note",
+		"organization_member_status": model.OrganizationMemberStatusSuspended,
+	}).Error)
+
+	f, err := BuildOrgExportFile(1)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = f.Close() })
+	rows, err := f.GetRows(f.GetSheetName(0))
+	require.NoError(t, err)
+	require.Equal(t, OrgExcelHeaders, rows[0])
+	require.NotContains(t, rows[0], "status")
+	require.NotContains(t, rows[0], "remark")
+	col := func(name string) int {
+		for i, h := range rows[0] {
+			if h == name {
+				return i
+			}
+		}
+		t.Fatalf("missing column %s", name)
+		return -1
+	}
+	require.Equal(t, "active", rows[1][col("member_status")])
+	require.Equal(t, "suspended", rows[2][col("member_status")])
+	require.Equal(t, "org note", rows[2][col("organization_remark")])
+	require.NotContains(t, rows[2], "root note")
 }
 
 // fork: O3 (review M9) — an imported cap is written as one absolute value, not

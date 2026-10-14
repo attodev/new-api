@@ -114,6 +114,9 @@ type User struct {
 	LastLoginAt          int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AuthVersion          int64                      `json:"-" gorm:"type:bigint;not null;default:1;column:auth_version"`
 	AdminPermissions     map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
+
+	OrganizationMemberStatus int    `json:"organization_member_status" gorm:"type:int;default:1;column:organization_member_status"` // fork: O3
+	OrganizationRemark       string `json:"organization_remark" gorm:"type:varchar(255);default:'';column:organization_remark"`     // fork: O3
 }
 
 func (user *User) ToBaseUser() *UserBase {

@@ -57,6 +57,20 @@ func requireActiveOrganization(organizationId int) *types.NewAPIError {
 	return nil
 }
 
+// requireActiveOrganizationMember refuses relay requests of a member an
+// organization admin suspended (users.organization_member_status) with 403
+// before anything is charged.
+func requireActiveOrganizationMember(userId int) *types.NewAPIError {
+	if err := model.RequireActiveOrganizationMember(userId); err != nil {
+		if errors.Is(err, model.ErrOrganizationMemberSuspended) {
+			return types.NewErrorWithStatusCode(err, types.ErrorCodeAccessDenied, http.StatusForbidden,
+				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		}
+		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+	}
+	return nil
+}
+
 // newOrganizationBillingSession returns handled=false for users without an
 // organization so NewBillingSession continues with upstream's preference logic.
 func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError, bool) {
@@ -70,6 +84,9 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 		return nil, nil, false
 	}
 	if apiErr := requireActiveOrganization(organizationId); apiErr != nil {
+		return nil, apiErr, true
+	}
+	if apiErr := requireActiveOrganizationMember(relayInfo.UserId); apiErr != nil {
 		return nil, apiErr, true
 	}
 	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(organizationId, relayInfo.UserId)

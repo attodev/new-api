@@ -29,6 +29,7 @@ const (
 	MaxOrganizationSubscriptionSortOrder                = 1_000_000
 
 	OrganizationStatusAllowedError       = "status must be one of: 1, 2"
+	OrganizationMemberStatusAllowedError = "member_status must be one of: 1, 2"
 	OrganizationDurationValueRangeError  = "duration_value must be between 0 and 1200"
 	OrganizationDurationUnitAllowedError = "duration_unit must be one of: year, month, day, hour, custom"
 )
@@ -75,9 +76,9 @@ func validateOrganizationStatus(status int) error {
 	return nil
 }
 
-func validateUserStatus(status int) error {
-	if status != common.UserStatusEnabled && status != common.UserStatusDisabled {
-		return errors.New(OrganizationStatusAllowedError)
+func validateOrganizationMemberStatus(status int) error {
+	if !model.IsValidOrganizationMemberStatus(status) {
+		return errors.New(OrganizationMemberStatusAllowedError)
 	}
 	return nil
 }

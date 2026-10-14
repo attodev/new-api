@@ -182,7 +182,7 @@ func ListOrganizationUserSubscriptions(organizationId int) ([]OrganizationUserSu
 	// Only the columns the organization user view exposes; never load password,
 	// access token, email or setting columns for the subscription summary.
 	if err := DB.Select("id", "username", "display_name", "role", "status", "quota", "used_quota",
-		"group", "organization_id", "organization_role", "remark").
+		"group", "organization_id", "organization_role", "organization_member_status", "organization_remark").
 		Where("id IN ?", userIds).Find(&users).Error; err != nil {
 		return nil, err
 	}

@@ -700,7 +700,7 @@ func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
 		admin,
 		http.MethodPatch,
 		fmt.Sprintf("/api/organization/users/%d", target.Id),
-		`{"quota":100,"status":1,"remark":"reviewed"}`,
+		`{"quota":100,"member_status":1,"organization_remark":"reviewed"}`,
 		gin.Param{Key: "id", Value: fmt.Sprintf("%d", target.Id)},
 	)
 
@@ -710,7 +710,7 @@ func TestOrganizationAdminCanUpdateQuotaForMember(t *testing.T) {
 	var reloaded model.User
 	require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
 	require.Equal(t, 100, reloaded.Quota)
-	require.Equal(t, "reviewed", reloaded.Remark)
+	require.Equal(t, "reviewed", reloaded.OrganizationRemark)
 }
 
 func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
@@ -722,17 +722,17 @@ func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
 		wantRemark string
 	}{
 		{
-			name:       "minimum quota and enabled status",
-			body:       `{"quota":0,"status":1,"remark":""}`,
+			name:       "minimum quota and active member status",
+			body:       `{"quota":0,"member_status":1,"organization_remark":""}`,
 			wantQuota:  0,
-			wantStatus: common.UserStatusEnabled,
+			wantStatus: model.OrganizationMemberStatusActive,
 			wantRemark: "",
 		},
 		{
-			name:       "maximum quota remark and disabled status",
-			body:       fmt.Sprintf(`{"quota":%d,"status":2,"remark":%q}`, MaxOrganizationQuota, strings.Repeat("라", MaxOrganizationRemarkLength)),
+			name:       "maximum quota remark and suspended member status",
+			body:       fmt.Sprintf(`{"quota":%d,"member_status":2,"organization_remark":%q}`, MaxOrganizationQuota, strings.Repeat("라", MaxOrganizationRemarkLength)),
 			wantQuota:  int(MaxOrganizationQuota),
-			wantStatus: common.UserStatusDisabled,
+			wantStatus: model.OrganizationMemberStatusSuspended,
 			wantRemark: strings.Repeat("라", MaxOrganizationRemarkLength),
 		},
 	} {
@@ -758,8 +758,9 @@ func TestOrganizationAdminAcceptsUserUpdateBoundaryInput(t *testing.T) {
 			var reloaded model.User
 			require.NoError(t, model.DB.First(&reloaded, target.Id).Error)
 			require.Equal(t, tc.wantQuota, reloaded.Quota)
-			require.Equal(t, tc.wantStatus, reloaded.Status)
-			require.Equal(t, tc.wantRemark, reloaded.Remark)
+			require.Equal(t, tc.wantStatus, reloaded.OrganizationMemberStatus)
+			require.Equal(t, common.UserStatusEnabled, reloaded.Status, "the platform status is root-only")
+			require.Equal(t, tc.wantRemark, reloaded.OrganizationRemark)
 		})
 	}
 }
@@ -781,19 +782,24 @@ func TestOrganizationAdminRejectsInvalidUserUpdateInput(t *testing.T) {
 			message: fmt.Sprintf("quota must be between 0 and %d", MaxOrganizationQuota),
 		},
 		{
-			name:    "invalid status",
-			body:    `{"status":99}`,
-			message: "status must be one of: 1, 2",
+			name:    "invalid member status",
+			body:    `{"member_status":99}`,
+			message: "member_status must be one of: 1, 2",
 		},
 		{
-			name:    "status below enum",
-			body:    `{"status":0}`,
-			message: "status must be one of: 1, 2",
+			name:    "member status below enum",
+			body:    `{"member_status":0}`,
+			message: "member_status must be one of: 1, 2",
 		},
 		{
-			name:    "remark too long",
-			body:    fmt.Sprintf(`{"remark":%q}`, strings.Repeat("a", MaxOrganizationRemarkLength+1)),
-			message: "remark must be at most 255 characters",
+			name:    "organization remark too long",
+			body:    fmt.Sprintf(`{"organization_remark":%q}`, strings.Repeat("a", MaxOrganizationRemarkLength+1)),
+			message: "organization_remark must be at most 255 characters",
+		},
+		{
+			name:    "platform status is root-only",
+			body:    `{"status":2}`,
+			message: "unsupported field: status",
 		},
 		{
 			name:    "unsupported field",

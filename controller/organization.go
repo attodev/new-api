@@ -25,10 +25,13 @@ type createOrganizationRequest struct {
 	Quota       *int64 `json:"quota,omitempty"`
 }
 
+// updateOrganizationUserRequest is what organization admins may change on a
+// member. The platform users.status / users.remark are root-only; the old
+// "status" / "remark" keys are rejected by DecodeJsonStrict (plan decision 7).
 type updateOrganizationUserRequest struct {
-	Status *int    `json:"status,omitempty"`
-	Quota  *int64  `json:"quota,omitempty"`
-	Remark *string `json:"remark,omitempty"`
+	MemberStatus       *int    `json:"member_status,omitempty"`
+	Quota              *int64  `json:"quota,omitempty"`
+	OrganizationRemark *string `json:"organization_remark,omitempty"`
 }
 
 type assignOrganizationUserRequest struct {
@@ -45,30 +48,36 @@ type updateOrganizationRequest struct {
 // organizationUserView is the user shape organization admins see (the web
 // OrganizationUser type). It never carries password, access token, email,
 // payment-customer or setting columns.
+// The platform status is shown read-only; member_status and
+// organization_remark are the organization-scoped fields admins edit. The
+// platform remark is never shown.
 type organizationUserView struct {
-	Id               int    `json:"id"`
-	Username         string `json:"username"`
-	DisplayName      string `json:"display_name"`
-	Role             int    `json:"role"`
-	Status           int    `json:"status"`
-	Quota            int    `json:"quota"`
-	UsedQuota        int    `json:"used_quota"`
-	Group            string `json:"group"`
-	OrganizationId   int    `json:"organization_id"`
-	OrganizationRole string `json:"organization_role"`
-	Remark           string `json:"remark"`
+	Id                 int    `json:"id"`
+	Username           string `json:"username"`
+	DisplayName        string `json:"display_name"`
+	Role               int    `json:"role"`
+	Status             int    `json:"status"`
+	MemberStatus       int    `json:"member_status" gorm:"column:organization_member_status"`
+	Quota              int    `json:"quota"`
+	UsedQuota          int    `json:"used_quota"`
+	Group              string `json:"group"`
+	OrganizationId     int    `json:"organization_id"`
+	OrganizationRole   string `json:"organization_role"`
+	OrganizationRemark string `json:"organization_remark"`
 }
 
 var organizationUserViewColumns = []string{
-	"id", "username", "display_name", "role", "status", "quota", "used_quota",
-	"group", "organization_id", "organization_role", "remark",
+	"id", "username", "display_name", "role", "status", "organization_member_status", "quota", "used_quota",
+	"group", "organization_id", "organization_role", "organization_remark",
 }
 
 func newOrganizationUserView(user *model.User) organizationUserView {
 	return organizationUserView{
 		Id: user.Id, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role,
-		Status: user.Status, Quota: user.Quota, UsedQuota: user.UsedQuota, Group: user.Group,
-		OrganizationId: user.OrganizationId, OrganizationRole: user.OrganizationRole, Remark: user.Remark,
+		Status: user.Status, MemberStatus: user.OrganizationMemberStatus,
+		Quota: user.Quota, UsedQuota: user.UsedQuota, Group: user.Group,
+		OrganizationId: user.OrganizationId, OrganizationRole: user.OrganizationRole,
+		OrganizationRemark: user.OrganizationRemark,
 	}
 }
 
@@ -633,6 +642,7 @@ func ListOrganizationUsers(c *gin.Context) {
 	allowedOrderBy := map[string]bool{
 		"username": true, "display_name": true, "organization_role": true,
 		"quota": true, "used_quota": true, "group": true, "status": true,
+		"organization_member_status": true,
 	}
 	if !allowedOrderBy[orderBy] {
 		orderBy = "id"
@@ -732,12 +742,12 @@ func UpdateOrganizationUser(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
-	if req.Status != nil {
-		if err := validateUserStatus(*req.Status); err != nil {
+	if req.MemberStatus != nil {
+		if err := validateOrganizationMemberStatus(*req.MemberStatus); err != nil {
 			common.ApiError(c, err)
 			return
 		}
-		updates["status"] = *req.Status
+		updates["organization_member_status"] = *req.MemberStatus
 	}
 	if req.Quota != nil {
 		if err := validateInt64Range("quota", *req.Quota, 0, MaxOrganizationQuota); err != nil {
@@ -746,13 +756,13 @@ func UpdateOrganizationUser(c *gin.Context) {
 		}
 		updates["quota"] = *req.Quota
 	}
-	if req.Remark != nil {
-		remark, err := trimAndValidateText("remark", *req.Remark, MaxOrganizationRemarkLength, false)
+	if req.OrganizationRemark != nil {
+		remark, err := trimAndValidateText("organization_remark", *req.OrganizationRemark, MaxOrganizationRemarkLength, false)
 		if err != nil {
 			common.ApiError(c, err)
 			return
 		}
-		updates["remark"] = remark
+		updates["organization_remark"] = remark
 	}
 	if len(updates) == 0 {
 		common.ApiErrorT(c, "no organization user fields to update")
