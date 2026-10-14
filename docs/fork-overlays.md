@@ -103,6 +103,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 충전 | controller/topup_waffo.go:226-227 | `RequestWaffoPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_waffo_pancake.go:383-384 | `RequestWaffoPancakePay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_paypal.go:345-346 | `RequestPayPalPay` `&model.TopUp{`에 같은 2줄 (fork O2 파일) | controller/topup_target.go |
+| O3 조직 (프런트) | web/src/stores/auth-store.ts, web/src/features/profile/types.ts | `AuthUser`/`UserProfile`에 `organization_id?`, `organization_role?` 두 필드 + `// fork: O3` | web/src/lib/organization-roles.ts, web/src/features/organizations/ |
+| O3 조직 (프런트) | web/src/features/users/types.ts | 사용자 zod 스키마 `group` 다음 `organization_id`, `organization_role` optional 두 줄 + `// fork: O3` | web/src/features/organizations/ |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
 

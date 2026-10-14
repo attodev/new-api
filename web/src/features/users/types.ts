@@ -46,6 +46,8 @@ export const userSchema = z.object({
   used_quota: z.number(),
   request_count: z.number(),
   group: z.string(),
+  organization_id: z.number().optional(), // fork: O3
+  organization_role: z.string().optional(), // fork: O3
   aff_code: z.string().optional(),
   aff_count: z.number().optional(),
   aff_quota: z.number().optional(),

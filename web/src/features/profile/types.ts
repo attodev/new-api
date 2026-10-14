@@ -49,6 +49,8 @@ export interface UserProfile {
   email?: string
   /** User group */
   group: string
+  organization_id?: number // fork: O3
+  organization_role?: string // fork: O3
   /** Current quota balance */
   quota: number
   /** Total used quota */
