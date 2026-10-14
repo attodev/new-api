@@ -17,21 +17,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { execFileSync } from 'node:child_process'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Korean locale tooling (fork: O9).
 //
-//   node scripts/ko-locale.mjs seed              build ko.json, batches and the skip list
+//   node scripts/ko-locale.mjs seed [--force]    build ko.json, batches and the skip list
 //   node scripts/ko-locale.mjs check [--batch N] validate ko.json against en.json
 //   node scripts/ko-locale.mjs status            count english placeholders still left
 //
 // Run from the web/ package root (see the `i18n:ko` script in package.json).
-// `seed` is deterministic and idempotent: re-running it overwrites ko.json, the
-// batch list and the skip list from en.json plus team's legacy kr.json, so any
-// translation work must be committed before re-seeding.
+// `seed` is deterministic: it rebuilds ko.json, the batch list and the skip list
+// from en.json plus team's legacy kr.json. Because that discards translation
+// work, it refuses to run when the outputs already exist unless `--force` is
+// given. Hand-picked skip keys belong in MANUAL_SKIP below (ko-skip.json is
+// regenerated, so edits made there directly would be lost).
 
 const LOCALES = path.resolve('src/i18n/locales')
 const EN = path.join(LOCALES, 'en.json')
@@ -42,7 +44,27 @@ const TEAM_KR = 'team:web/default/src/i18n/locales/kr.json'
 const BATCH_COUNT = 6
 const HANGUL = /[가-힣]/
 const INTERP = /\{\{\s*[^}]+\s*\}\}/g
-const TAG = /<\/?\d+>/g
+// Trans index tags (<0>, </0>) and named tags (<strong>, <ServerAddress>, <p>).
+const TAG = /<\/?(?:\d+|[A-Za-z][^>]*)>/g
+// printf-style placeholders: %s, %d, %1$s
+const PRINTF = /%(?:\d+\$)?[sdfiu](?![A-Za-z])/g
+// Keys that stay english although they contain words or lowercase letters.
+const MANUAL_SKIP = new Set([
+  '_copy',
+  '{{value}}ms',
+  '，and ',
+  '1M token',
+  'ChatGPT Subscription (Codex)',
+  'contact@yourcompany.com',
+  'Doubao',
+  'footer.columns.related.links.midjourney',
+  'MjProxy',
+  'MjProxyPlus',
+  'OAuth',
+  'SGLang',
+  'Top P',
+  'vLLM',
+])
 
 // en.json stores this key with a unicode escape (see sync-i18n.mjs); keep the
 // same on-disk spelling so ko.json matches the other locales.
@@ -69,14 +91,35 @@ export function validateEntry(en, ko, { skip }) {
   if (ta.join('|') !== tb.join('|')) {
     issues.push(`tag set differs: ${ta} vs ${tb}`)
   }
-  if (
-    en.startsWith(' ') !== ko.startsWith(' ') ||
-    en.endsWith(' ') !== ko.endsWith(' ')
-  ) {
-    issues.push('whitespace drift')
+  const pa = (en.match(PRINTF) ?? []).sort()
+  const pb = (ko.match(PRINTF) ?? []).sort()
+  if (pa.join('|') !== pb.join('|')) {
+    issues.push(`placeholder set differs: ${pa} vs ${pb}`)
   }
-  if (en.includes('\n') !== ko.includes('\n')) issues.push('newline drift')
+  if (edgeSpace(en) !== edgeSpace(ko)) issues.push('whitespace drift')
+  if (countNewlines(en) !== countNewlines(ko)) issues.push('newline drift')
   return issues
+}
+
+function edgeSpace(text) {
+  return `${text.match(/^\s*/)[0]}\u0000${text.match(/\s*$/)[0]}`
+}
+
+function countNewlines(text) {
+  return text.split('\n').length - 1
+}
+
+// Copy the english value's leading/trailing whitespace onto a translation.
+export function repairWhitespace(en, ko) {
+  return `${en.match(/^\s*/)[0]}${ko.trim()}${en.match(/\s*$/)[0]}`
+}
+
+// Returns a message when seed would overwrite existing output, else null.
+export function seedBlockedReason(paths, force) {
+  if (force) return null
+  const existing = paths.filter((p) => existsSync(p))
+  if (existing.length === 0) return null
+  return `refusing to seed: ${existing.join(', ')} already exist. Seeding discards translation work; re-run with --force to overwrite.`
 }
 
 // JSON samples, URLs and bare numbers/units keep the english value. A leading
@@ -87,7 +130,16 @@ export function isSkippable(key) {
     (key.startsWith('{') && !key.startsWith('{{')) ||
     key.startsWith('[') ||
     /^https?:\/\//.test(key) ||
-    key.length < 2
+    key.length < 2 ||
+    // only interpolations and punctuation ({{method}} {{route}})
+    !/[A-Za-z]/.test(key.replaceAll(INTERP, '')) ||
+    // identifiers and acronyms: no lowercase letter, no space, no one-letter word
+    // (CPU, HTTP/1.1, but not N/A)
+    (key.length >= 3 &&
+      /[A-Z]/.test(key) &&
+      !/[a-z\s]/.test(key) &&
+      !/(?:^|[^A-Za-z])[A-Za-z](?![A-Za-z])/.test(key)) ||
+    MANUAL_SKIP.has(key)
   )
 }
 
@@ -114,7 +166,12 @@ async function writeLocale(translation) {
   await fs.writeFile(KO, `${text}\n`)
 }
 
-async function seed() {
+async function seed(force) {
+  const blocked = seedBlockedReason([KO, BATCHES], force)
+  if (blocked) {
+    console.error(blocked)
+    process.exit(1)
+  }
   const en = (await readJson(EN)).translation
   const kr = JSON.parse(
     execFileSync('git', ['show', TEAM_KR], {
@@ -126,19 +183,21 @@ async function seed() {
   const ko = {}
   const todo = []
   const skip = []
+  let repaired = 0
   for (const key of Object.keys(en)) {
     const v = kr[key]
-    if (isSkippable(key) || isKeptLiteral(en[key], v, zh[key])) {
+    // A usable team translation always wins over the skip heuristics.
+    const fixed = typeof v === 'string' ? repairWhitespace(en[key], v) : v
+    if (
+      typeof fixed === 'string' &&
+      HANGUL.test(fixed) &&
+      validateEntry(en[key], fixed, { skip: false }).length === 0
+    ) {
+      ko[key] = fixed
+      if (fixed !== v) repaired += 1
+    } else if (isSkippable(key) || isKeptLiteral(en[key], v, zh[key])) {
       ko[key] = en[key]
       skip.push(key)
-      continue
-    }
-    if (
-      typeof v === 'string' &&
-      HANGUL.test(v) &&
-      validateEntry(en[key], v, { skip: false }).length === 0
-    ) {
-      ko[key] = v
     } else {
       ko[key] = en[key]
       todo.push(key)
@@ -161,6 +220,7 @@ async function seed() {
     `seeded: reused ${Object.keys(en).length - todo.length - skip.length}, todo ${todo.length}, skip ${skip.length}`
   )
   console.log(`batch sizes: ${sizes.join(', ')}`)
+  console.log(`whitespace repairs on team values: ${repaired}`)
 }
 
 async function check(batchId) {
@@ -205,13 +265,15 @@ async function status() {
 async function main(argv) {
   const [cmd, flag, arg] = argv
   if (cmd === 'seed') {
-    await seed()
+    await seed(argv.includes('--force'))
   } else if (cmd === 'check') {
     await check(flag === '--batch' ? Number(arg) : undefined)
   } else if (cmd === 'status') {
     await status()
   } else {
-    console.log('usage: ko-locale.mjs seed | check [--batch N] | status')
+    console.log(
+      'usage: ko-locale.mjs seed [--force] | check [--batch N] | status'
+    )
   }
 }
 

@@ -3,8 +3,6 @@
     {
       "id": 1,
       "keys": [
-        "_copy",
-        "，and ",
         "(billed as vip itself, so base ratio of vip)",
         "(falls back to billing as vip, so base ratio of vip)",
         "(hits the override rule above)",
@@ -16,7 +14,6 @@
         "{{bytes}} bytes",
         "{{channels}} channels, {{tasks}} in-flight tasks",
         "{{completed}}/{{total}} completed",
-        "{{condition}} ({{timezone}})",
         "{{count}} / {{max}} groups selected",
         "{{count}} announcements will be removed from the list.",
         "{{count}} API shortcuts will be removed from the list.",
@@ -45,7 +42,6 @@
         "A channel test task is already running or queued. Cannot start this manual task",
         "a dashboard login session is required",
         "Contact Recipient Email",
-        "contact@yourcompany.com",
         "Enter recipient address",
         "Inquiry emails from the landing page will be sent to this address",
         "Send a test message to verify your SMTP configuration",
@@ -57,7 +53,6 @@
         "{{key}} · from {{source}}",
         "{{key}} · version {{version}} · from {{source}}",
         "A token can select at most {{max}} Auto groups",
-        "{{method}} {{route}}",
         "{{operation}} (ID: {{id}})",
         "{{percent}}% OFF",
         "{{processed}} of {{total}} log entries processed.",
@@ -65,14 +60,12 @@
         "{{protocol}} auth value",
         "{{protocol}} authentication",
         "{{selected}} of {{total}} changed fields selected",
-        "{{start}}–{{end}}",
         "{{success}} succeeded, {{failed}} failed",
         "{{target}} test failed",
         "{{target}} test succeeded",
         "{{total}} models · {{syncable}} syncable · {{skipped}} skipped this time",
         "{{unit}} tokens",
         "{{value}} tokens/s",
-        "{{value}}ms",
         "{{value}}s",
         "Access token expiry must be at least one hour from now.",
         "Access token name must be 1 to 64 characters.",
@@ -115,7 +108,6 @@
         "JSON map of model name → discount percentage (0–100), for example",
         "JSON map of vendor name → discount percentage (0–100), for example",
         "`, `-nothinking`, and effort suffixes such as `-high` while routing to the correct Gemini variant. When off, model names are sent upstream unchanged.",
-        "| Based on",
         "1 Hour",
         "1 Month",
         "1 year",
@@ -124,7 +116,6 @@
         "Action {{action}}",
         "180 days",
         "1M",
-        "1M token",
         "1W",
         "2. Set names users call",
         "2. Set upstream model names",
@@ -375,7 +366,6 @@
         "Available variables: {{provider}}, {{field}}, {{op}}, {{required}}, {{current}}, and paths such as {{current.roles}}.",
         "Awake engines",
         "Batch-adding Vertex AI keys requires a JSON array, for example {{example}}. Check the input: {{error}}",
-        "AZURE_OPENAI_ENDPOINT",
         "Back to configuration",
         "Billed per request",
         "Back to footnote {{id}} reference",
@@ -491,18 +481,18 @@
         "Channel disable requested",
         "Channel error",
         "Channel health",
-        "Channel health checks"
-      ]
-    },
-    {
-      "id": 2,
-      "keys": [
+        "Channel health checks",
         "Channel ID is required",
         "Channel is not selected",
         "Channel Management",
         "Channel selected",
         "Channel selection",
-        "Channel switching options",
+        "Channel switching options"
+      ]
+    },
+    {
+      "id": 2,
+      "keys": [
         "Channel test concurrency",
         "Channel test concurrency must be between 1 and 32",
         "Channel test mode",
@@ -514,7 +504,6 @@
         "Channels and groups",
         "Channels must also enable Auto Ban before automatic disabling can take effect.",
         "Charge.",
-        "ChatGPT Subscription (Codex)",
         "Check again",
         "Check channels awaiting recovery only",
         "Check for new upstream models",
@@ -560,7 +549,6 @@
         "Client model matching help",
         "Close panel",
         "Close the panel to edit here",
-        "CNY",
         "Codex Account Status",
         "Collapse all",
         "Collapse panel",
@@ -685,7 +673,6 @@
         "Could not load this source",
         "Count",
         "Counters and averages cover the period since the upstream metrics were initialized or reset.",
-        "CPU",
         "Create access token",
         "Create aliases for users",
         "Create API token",
@@ -832,7 +819,6 @@
         "Do not keep sessions",
         "Do not wait one second between polling async tasks for this channel",
         "Does not check healthy channels. It only rechecks auto-disabled channels and restores them after they recover.",
-        "Doubao",
         "Downgrade Group",
         "Downgrade to pre-purchase group",
         "Downgrade to this group after the subscription expires",
@@ -985,18 +971,18 @@
         "Failed to generate default token",
         "Failed to get the channel information. Please contact the administrator",
         "Failed to get the token count",
-        "Failed to get the user group"
-      ]
-    },
-    {
-      "id": 3,
-      "keys": [
+        "Failed to get the user group",
         "Failed to get token from {{provider}}, please check settings",
         "Failed to get user information",
         "Failed to initialize the system: {{error}}",
         "Extra destinations beyond the channel API address. The channel address remains accessible.",
         "Extra visible",
-        "Extra visible to {{group}}",
+        "Extra visible to {{group}}"
+      ]
+    },
+    {
+      "id": 3,
+      "keys": [
         "Factory",
         "Factory and custom plugin behavior",
         "Factory and custom plugins all stop serving immediately. In-flight tasks will be handled by timeout cleanup.",
@@ -1120,7 +1106,6 @@
         "Flow Filters",
         "Flow width metric",
         "Follow user group",
-        "footer.columns.related.links.midjourney",
         "For advanced custom channels this applies only to /v1/responses routes without protocol conversion.",
         "GitHub ID is empty!",
         "For this channel, map the model name in client requests to the model name sent upstream.",
@@ -1205,7 +1190,6 @@
         "How to set up Passkey domains",
         "HTTP Protocol",
         "HTTP protocol must be Auto or HTTP/1.1",
-        "HTTP/1.1",
         "HTTP/2 Connection Shards",
         "HTTP/2 connection shards are unavailable when HTTP/1.1 is selected.",
         "HTTP/2 connection shards must be 1 when HTTP/1.1 is selected",
@@ -1457,8 +1441,6 @@
         "Minimum {{amount}}",
         "Model test",
         "Missing metadata",
-        "MjProxy",
-        "MjProxyPlus",
         "Model {{model}}",
         "Model Analytics Defaults",
         "Model Analytics Filters",
@@ -1479,18 +1461,18 @@
         "Model pricing saved",
         "Multi-key channels do not support balance queries",
         "Model redirect is unavailable",
-        "Model redirects"
-      ]
-    },
-    {
-      "id": 4,
-      "keys": [
+        "Model redirects",
         "Model regex cannot be empty",
         "Model scope",
         "Model shown in model square",
         "Model source",
         "Model square visibility",
-        "Model Version",
+        "Model Version"
+      ]
+    },
+    {
+      "id": 4,
+      "keys": [
         "Model-scoped only",
         "Models exposed by this channel",
         "Models listed here skip automatic -thinking / -nothinking suffix handling. Matched names are also exempt from @-modifier parsing and 400 validation. Prefix an entry with re: to match the full model name as a Go regular expression, for example re:.*@sha256:.*",
@@ -1640,7 +1622,6 @@
         "Note",
         "Now a user whose user group is vip creates tokens with different groups and makes one call with each:",
         "Number",
-        "OAuth",
         "OAuth 2.0 service account",
         "OAuth authorization timed out. Please try again.",
         "OAuth authorization was cancelled.",
@@ -1922,7 +1903,6 @@
         "Raw response",
         "Read channels",
         "Realtime pricing must be converted manually.",
-        "Reason:",
         "Regular administrators cannot promote other users to administrator",
         "Received amount",
         "Recent maintenance tasks running across instances and their execution status.",
@@ -1973,16 +1953,16 @@
         "Removes MjProxy flags such as --fast, --relax, and --turbo from user prompts.",
         "Renamed an access token",
         "Renaming metadata does not rename channel models or move pricing. Existing prices stay with the original model name.",
-        "Repair"
+        "Repair",
+        "Repair Channel Consistency",
+        "Repair channel consistency?",
+        "Replace {{find}} with {{replaceWith}}",
+        "Replace forwarding routes?"
       ]
     },
     {
       "id": 5,
       "keys": [
-        "Repair Channel Consistency",
-        "Repair channel consistency?",
-        "Replace {{find}} with {{replaceWith}}",
-        "Replace forwarding routes?",
         "Replace text",
         "Replace with",
         "Request & Response",
@@ -2208,7 +2188,6 @@
         "Setup expired. Scan the new QR code and save the new backup codes.",
         "Setup: three groups and one override matrix cell.",
         "Setup: three groups and one override rule.",
-        "SGLang",
         "SMTP server is not configured",
         "SGLang API key, or EMPTY if authentication is disabled",
         "SGLang channel base URL cannot be empty",
@@ -2267,7 +2246,6 @@
         "Speculative decoding acceptance rate",
         "Spend limited",
         "Spread HTTP/2 traffic across multiple reusable connections to the same upstream origin (1-8).",
-        "SSL/TLS",
         "stale",
         "Standard protocol interfaces",
         "Start ≤ end: within the day; start > end: across midnight",
@@ -2281,7 +2259,6 @@
         "Start weekday",
         "Started",
         "Started two-factor authentication setup",
-        "STARTTLS",
         "State changed",
         "State unchanged: {{status}}",
         "Status change",
@@ -2467,15 +2444,15 @@
         "This base URL uses plain HTTP, so the channel key is sent unencrypted.",
         "This callback URL updates from the slug field and is the value to register with your provider.",
         "This changelog is not available in your language. Showing English.",
-        "This channel has no configured models."
+        "This channel has no configured models.",
+        "This channel serves the models of every selected plugin. The upstream New API gateway must have the same plugins installed.",
+        "This combination will be billed as free.",
+        "This domain does not match the current website. Passkeys may not work here."
       ]
     },
     {
       "id": 6,
       "keys": [
-        "This channel serves the models of every selected plugin. The upstream New API gateway must have the same plugins installed.",
-        "This combination will be billed as free.",
-        "This domain does not match the current website. Passkeys may not work here.",
         "This email address is already in use.",
         "This {{provider}} account cannot be linked to an existing account automatically, please sign in or register another way and then link {{provider}} in account settings",
         "This {{provider}} account has already been bound",
@@ -2587,7 +2564,6 @@
         "Too many login sessions were created recently. Please wait for the rolling window to pass, then try again.",
         "Turnstile token is empty",
         "Turnstile verification failed, please refresh and try again!",
-        "Top P",
         "Top up, pay for subscriptions, check in, and transfer referral rewards.",
         "Top-up ratio",
         "Unable to connect to {{provider}} server, please try again later",
@@ -2762,7 +2738,6 @@
         "User demoted to regular user successfully",
         "User disabled successfully",
         "User enabled successfully",
-        "User groups that can access this channel. ",
         "User promoted to admin successfully",
         "Users call",
         "Users in {{group}}",
@@ -2860,7 +2835,6 @@
         "Visible only to users with access to the model’s groups.",
         "Vision",
         "Visual prices use {{currency}} per declared unit; token prices are per 1M tokens. Raw expressions always use USD, with token terms divided by 1000000.",
-        "vLLM",
         "vLLM API key, or EMPTY if authentication is disabled",
         "vLLM server address, without /v1",
         "vLLM status",
