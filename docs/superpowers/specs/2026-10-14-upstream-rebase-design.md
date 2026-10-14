@@ -80,6 +80,9 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
   - 레거시 Midjourney는 upstream 호출 전에 조직 플랜 회원과 빈 조직 지갑을 거부한다(`relay/mjproxy_handler.go` 훅 2줄 추가).
   - "team 검사 로직을 유지"의 예외로, 이식으로 드러난 보안 결함을 고쳤다: 자기 자신 대상 변경 금지, owner 대상 변경은 owner만(구독 할당·취소는 root도), `owner` 역할 부여 금지, 멤버 제거·조직 삭제 시 `users.quota` 0, 목록 API 제한 컬럼, `ORDER BY` dialect quoting.
   - 프런트: 사이드바 등록은 `components/layout`이 아니라 `hooks/use-sidebar-data.ts`(+ `use-sidebar-config.ts`, `use-sidebar-view.ts`)다. 라우트는 `/organization` 아래 5개와 `/wallet`의 역할별 화면 전환이다. 조직 사용 로그는 prop 전달 대신 `UsageLogsProvider` 컨텍스트(`logsScope`)로 범위를 넘긴다.
+  - 개인 잔액 가드(최종 리뷰 C1·M10): 조직 회원의 `users.quota`는 회원 한도라 개인 잔액 구독 결제, 교환 코드, 개인 유료 충전 주문을 거부한다(`PurchaseSubscriptionWithBalance` 훅, `TopUp` 훅, `ValidateTopUpTargetCapacity`).
+  - 비활성 조직(최종 리뷰 I4): `status=2`이면 회원 relay는 403, 조직 충전은 거부, `/api/organization/*` 쓰기는 미들웨어 `RejectDisabledOrganizationMutation`이 거부한다. 조회와 root 관리는 그대로다.
+  - 환급 고정(최종 리뷰 I1·M3): 환급과 조직 `used_quota`는 과금 때 고정한 조직(`RelayInfo.BillingOrganizationId`, `TaskPrivateData.OrganizationId`, `midjourneys.organization_id`)으로 가고, 회원 한도는 그 조직에 아직 소속일 때만 돌려준다.
 
 ### 4.5 O4·O5·O10
 - 파일 복사 + 라우트 등록 한 줄. excelize 의존성 추가. 테스트 동반.
@@ -151,6 +154,11 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 3. 할인 UI는 upstream 가격 페이지 위에 다시 만든다(§4.6).
 4. 한글 신규 키 2,778개는 기계 번역 초안 + 용어집 기준 사람 검수(§4.8). 기본값으로 진행하며, 전부 사람 번역으로 바꾸려면 단계 D 계획 전에 알린다.
 5. `RequirePermission` 범위는 플랫폼 관리자용 `/api/organizations/*`만(§4.4). 기본값으로 진행하며, 조직 내부 관리 라우트까지 넓히려면 단계 B 계획 전에 알린다.
+
+열린 제품 결정 (단계 B 최종 리뷰, 단계 C에서 정한다; 기록 `docs/2026-10-14-rebase-phase-b.md` §3·§4):
+
+6. 조직 미소속 사용자 할당(I2): 지금은 조직 관리자가 미소속 일반 사용자 전체를 보고 동의 없이 할당할 수 있으며, 할당되면 그 사용자의 개인 잔액이 조직이 통제하는 한도가 된다(제거 시 0). 후보: 잔액·개인 구독이 있는 사용자 할당 거부, 정확 일치 조회로 축소, `quota`·`remark` 숨김, 초대·수락 단계.
+7. 플랫폼 사용자 필드(I7): 지금은 조직 관리자가 `users.status`(root의 차단 해제 포함)와 `users.remark`를 쓴다. 후보: 조직 범위 "멤버십 정지" 플래그 또는 비활성화만 허용, 조직 범위 메모.
 
 ## 10. 리스크
 

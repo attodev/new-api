@@ -1,7 +1,7 @@
 # 조직 관련 Backend REST API 명세
 
 작성일: 2026-06-15  
-최종 수정: 2026-10-14 (upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그)
+최종 수정: 2026-10-14 (upstream 재기반 단계 B: develop 라우트 38개 기준으로 정정 — 조직 삭제·Excel 내보내기/가져오기 추가, quota 상한 2^53-1, 소유자·자기 자신 대상 규칙, 접근 토큰 스코프, 감사 로그. 같은 날 최종 리뷰 수정: 비활성 조직 거부, 조직 이름 변경, 대기 충전 주문이 있는 조직 삭제 거부, 자기 플랜 할당·취소 금지, 가져오기의 actor 행 거부, 로그 기간 제한, 구독 응답의 사용자 제한 뷰)
 
 ## 1. 문서 범위
 
@@ -59,6 +59,19 @@
 - 전역 관리자(`role >= admin`) 사용자는 조직 API로 관리할 수 없다.
 
 전체 관리자가 `/api/organization/*` 계열의 조직별 화면 API를 호출할 때는 대부분 `organization_id` query가 필수다. 조직 소유자/관리자는 자신의 `organization_id`가 자동으로 사용된다.
+
+비활성 조직(`status = 2`):
+
+- 회원의 relay 요청은 과금 전에 HTTP 403 `organization is disabled`로 거부된다(레거시 Midjourney 포함).
+- `/api/organization/*`의 쓰기 요청(GET이 아닌 모든 요청: 사용자 수정·멤버십·가져오기·plan·구독 할당/취소·조직 지갑 pay/amount)은 `{"success": false, "message": "organization is disabled"}`로 거부된다. 단일 지점은 `/api/organization` 그룹 미들웨어 `RejectDisabledOrganizationMutation`이다. 조회(GET)는 계속 된다.
+- 전체 관리자는 영향이 없다(`/api/organizations/*`, `?organization_id=`로 비활성 조직을 관리). 다시 쓰려면 3.3으로 `status: 1`.
+- 이미 결제된 조직 충전 주문의 정산은 비활성 조직에도 적립된다.
+
+조직 회원의 개인 잔액(`users.quota`는 조직 관리자가 정하는 회원 한도다):
+
+- 조직 회원은 `POST /api/subscription/balance/pay`로 개인 잔액 구독을 살 수 없다(`organization members cannot pay with personal balance`).
+- 조직 회원은 교환 코드(`POST /api/user/topup`)로 개인 잔액을 채울 수 없다(`organization members cannot redeem codes into their personal balance`).
+- 조직 회원은 개인 유료 충전(`/api/user/pay`, `/api/user/amount`, Stripe·PayPal·Creem·Waffo·Waffo Pancake의 pay/amount)을 시작할 수 없다(`organization members cannot top up their personal balance`, 결제 API 형태). 조직 지갑 충전은 7장의 조직 API를 쓴다.
 
 ### 2.1.1 접근 토큰 스코프
 
@@ -191,6 +204,7 @@ Body:
 
 | 이름 | 타입 | 필수 | 범위/값 | 실제 검증 |
 | --- | --- | --- | --- | --- |
+| `name` | string | 선택 | 1-64자 | 생성과 같은 검증: trim 후 빈 문자열이면 `name is required`, 64자 초과이면 오류. 다른 조직과 같으면 `organization name already exists` |
 | `description` | string | 선택 | 0-255자 | trim 후 저장. 255자 초과이면 오류 |
 | `quota` | integer | 선택 | `0`-`9,007,199,254,740,991` | 범위 밖이면 오류. 조직 지갑 잔액을 이 값으로 바꾼다(관리자 충전·조정 경로) |
 | `status` | integer | 선택 | `1`, `2` | enum 외 값이면 오류 |
@@ -222,6 +236,7 @@ Path:
 처리 규칙:
 
 - owner 외 구성원이 남아 있으면 거부된다 (`organization has N non-owner members, remove them first`). 먼저 멤버십 제거 API로 구성원을 내보낸다.
+- 대기 중(`status = pending`)인 조직 충전 주문(`target_type = organization`)이 있으면 거부된다 (`organization has N pending top-up orders, wait for them to settle or expire first`). 결제 콜백이 삭제된 지갑에 정산하지 못하고 결제된 주문이 남는 것을 막는다.
 - 삭제 시 owner의 `organization_id`/`organization_role`을 비우고 owner의 `users.quota`를 0으로 만든다(조직이 배정한 한도이므로). 이전 값은 `organization.delete` 감사 로그의 `previous_quota`에 남는다.
 - 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
 
@@ -295,6 +310,7 @@ Query:
 주의:
 
 - 조직 밖 사용자 로그는 포함되지 않는다.
+- 기간 제한(4.3·4.4·4.5 공통): 전역 관리자가 아닌 호출자(조직 소유자/관리자)에게는 upstream 사용자 로그와 같은 `limitLogTimeRange`가 적용된다. 범위가 로그 설정(`log_setting.max_range_days`, 기본 365일)을 넘으면 `The time range cannot exceed N days` 오류, `start_timestamp`가 없으면 최대 범위만큼만 거슬러 올라간다. 전체 관리자는 제한이 없다.
 - text 필터는 모델의 `applyExplicitLogTextFilter` 규칙을 따른다.
 
 ### 4.4 조직 Midjourney 작업 로그 조회
@@ -312,8 +328,8 @@ Query:
 | `page_size` | integer | 선택 | 1-100 권장 | 페이지 크기 |
 | `channel_id` | string | 선택 | 숫자 문자열 권장 | 작업 channel ID 필터 |
 | `mj_id` | string | 선택 | 임의 문자열 | Midjourney 작업 ID |
-| `start_timestamp` | string | 선택 | Unix seconds 문자열 권장 | 시작 시각 |
-| `end_timestamp` | string | 선택 | Unix seconds 문자열 권장 | 종료 시각 |
+| `start_timestamp` | string | 선택 | Unix milliseconds 문자열 (`submit_time` 단위) | 시작 시각. 4.3의 기간 제한을 초 단위로 바꿔 적용 |
+| `end_timestamp` | string | 선택 | Unix milliseconds 문자열 | 종료 시각 |
 
 응답 `data`: `PageInfo<Task[]>`
 
@@ -504,6 +520,8 @@ Path:
 - 대상 사용자가 같은 조직 소속이 아니면 `user does not belong to your organization`.
 - 대상 사용자가 owner이면 `organization owner cannot be removed`.
 - 성공 시 해당 사용자의 `organization_id = 0`, `organization_role = ""`가 되고 `users.quota`는 0이 된다(조직이 배정한 한도이므로 개인 잔액으로 남기지 않는다). 이전 값은 `organization.user.remove` 감사 로그의 `previous_quota`에 남는다.
+- 같은 트랜잭션에서 그 사용자의 활성 조직 구독도 취소된다(다시 추가돼도 이전 플랜이 되살아나지 않는다).
+- 제거 뒤 도착한 환급(비동기 작업·Midjourney·요청 실패)은 조직 지갑에만 돌아가고 회원 한도에는 더하지 않는다.
 
 응답:
 
@@ -537,9 +555,10 @@ Path:
 
 처리 규칙:
 
-- 없는 username은 `initial_password`로 새 사용자를 만들고, 조직 밖 사용자는 조직에 넣고, 기존 구성원은 표시 이름·역할·quota·상태·remark를 갱신한다.
+- 없는 username은 `initial_password`로 새 사용자를 만들고, 조직 밖 사용자는 조직에 넣고, 기존 구성원은 표시 이름·역할·quota·상태·remark를 갱신한다. quota는 시트 값을 절대값으로 한 번에 쓴다. `remark`는 시트에 `remark` 열이 있을 때만 쓴다(열이 없으면 기존 값 유지, 열이 있고 칸이 비면 지움).
 - `group` 열은 읽지 않는다(내보내기 전용). 새 사용자는 기본 그룹을 받는다.
 - `owner` 행은 오류로 처리한다. 전역 관리자 계정은 만들거나 바꾸지 않는다.
+- 가져오는 사용자 자신의 행은 오류로 처리한다 (`line N (<username>): an import cannot change the importing admin's own row`). `remove_absent`는 가져오는 사용자를 제거하지 않는다.
 
 응답: `{"success": true, "data": {"assigned": n, "created": n, "updated": n, "removed": n, ... , "errors": [...]}}` (`OrgImportResult`). 요청마다 `organization.user.import` 감사 로그가 남는다.
 
@@ -566,7 +585,7 @@ Path:
 | 이름 | 타입 | 설명 |
 | --- | --- | --- |
 | `subscription` | object | 사용자 조직 구독 |
-| `user` | object | 사용자 정보 (`subscription/self`에서는 호출자 본인) |
+| `user` | object | 5.1의 `OrganizationUser` 제한 뷰(`id`, `username`, `display_name`, `role`, `status`, `quota`, `used_quota`, `group`, `organization_id`, `organization_role`, `remark`). `subscription/self`에서는 호출자 본인. 비밀번호·접근 토큰·email 등은 없다 |
 | `plan` | object | 조직 구독 plan |
 
 ### 6.2 조직 구독 plan 목록 조회
@@ -658,7 +677,7 @@ Body:
 
 추가 처리:
 
-- `id`와 `organization_id`가 모두 일치하는 plan만 수정한다.
+- `id`와 `organization_id`가 모두 일치하는 plan만 수정한다. 일치하는 plan이 없으면(다른 조직의 plan 포함) HTTP 404 `{"success": false, "message": "subscription plan not found"}`이고 감사 로그를 남기지 않는다.
 - `quota_reset_period`, `quota_reset_custom_seconds`, `upgrade_group`, `enabled`는 요청 body로 받을 수 없다.
 
 ### 6.5 조직 구독 plan 비활성화
@@ -684,6 +703,7 @@ Body: 없음
 처리:
 
 - row를 삭제하지 않고 `enabled=false`로 업데이트한다.
+- 대상 조직의 plan이 아니면 6.4와 같은 HTTP 404이고 감사 로그를 남기지 않는다.
 - 이미 사용자에게 할당된 구독은 별도 취소 전까지 남을 수 있다.
 
 ### 6.6 조직 사용자 구독 할당 목록 조회
@@ -705,7 +725,7 @@ Query:
 주의:
 
 - 이 API는 active뿐 아니라 cancelled 등 모든 status의 구독 record를 반환할 수 있다. UI는 active 목록 표시 시 cancelled/expired를 필터링한다.
-- 알려진 결함(2026-10-14 수동 실행에서 확인, 단계 C 이전 수정 대상): 이 API의 `user`는 제한 뷰가 아니라 `users` 행 전체여서 비밀번호 해시 등 민감 컬럼이 응답에 포함된다. 5.1의 `OrganizationUser` 뷰로 바꿔야 한다.
+- 각 항목의 `user`는 5.1의 `OrganizationUser` 제한 뷰다(6.1과 같음). 2026-10-14 수동 실행에서 찾은 비밀번호 해시 노출(`users` 행 전체)은 단계 B에서 고쳤다.
 
 ### 6.7 조직 사용자에게 구독 plan 할당
 
@@ -744,6 +764,7 @@ Body:
 - 대상 사용자는 같은 조직 소속이어야 한다.
 - 대상 사용자의 전역 role이 관리자 이상이면 거부된다.
 - owner를 대상으로 하는 할당은 owner 본인 또는 전체 관리자만 할 수 있다.
+- 조직 소유자/관리자는 자기 자신에게 플랜을 할당할 수 없다 (`organization admins cannot manage their own subscription`). 자기 플랜은 전체 관리자가 `organization_id` query로 할당한다.
 - 같은 사용자에게 기존 active 구독이 있으면 취소되고 새 active 구독이 생성된다.
 - 새 구독의 `amount_total`은 plan의 `total_amount`다.
 - 성공하면 `organization.subscription.assign` 감사 로그가 남는다. plan 생성·수정·비활성화와 구독 취소도 각각 `organization.plan.create`/`organization.plan.update`/`organization.plan.disable`/`organization.subscription.cancel`을 남긴다.
@@ -771,6 +792,7 @@ Body: 없음
 처리:
 
 - 해당 조직/사용자의 active 조직 구독을 취소한다. owner의 구독은 owner 본인 또는 전체 관리자만 취소할 수 있다.
+- 조직 소유자/관리자는 자기 자신의 구독을 취소할 수 없다 (`organization admins cannot manage their own subscription`).
 - 만료 시간이 지났더라도 `status=active`인 구독은 취소 대상이다.
 - active 구독이 없으면 모델 레벨에서 오류가 날 수 있다.
 
@@ -781,6 +803,8 @@ Body: 없음
 결제 provider는 Epay, Stripe, PayPal, Creem, Waffo, Waffo Pancake 6종이다(Toss와 지갑 자동충전은 develop에 없다). 결제 설정이 끝나지 않은 provider는 오류를 돌려준다. 예: Epay `Payment information has not been configured by administrator`, PayPal `Unsupported payment channel`. pay/amount 계열의 거부 응답은 결제 API 형태 `{"message": "error", "data": "<사유>"}`다.
 
 관리자가 조직 지갑을 직접 채우거나 조정할 때는 결제 API가 아니라 `PATCH /api/organizations/:id`의 `quota`를 쓴다(3.3).
+
+비활성 조직의 pay/amount는 거부된다(2.1의 비활성 조직 규칙; 핸들러 단계에서도 `ValidateOrganizationWalletCapacity`가 `organization is disabled`를 결제 API 형태로 돌려준다). 조직 회원의 개인 충전 거부는 2.1 참고.
 
 ### 7.1 조직 지갑 조회
 
@@ -813,7 +837,7 @@ Query:
 | POST | `/api/organization/amount` | `AmountRequest` | Epay 계열 금액 계산 |
 | POST | `/api/organization/stripe/amount` | `StripePayRequest` | Stripe 금액 계산 |
 | POST | `/api/organization/paypal/amount` | `PayPalPayRequest` | PayPal 금액 계산 |
-| POST | `/api/organization/waffo/amount` | `WaffoPayRequest` | Waffo 금액 계산 |
+| POST | `/api/organization/waffo/amount` | `WaffoPayRequest` | Waffo 금액 계산 (웹 조직 지갑의 Waffo 금액 표시가 이 API를 쓴다) |
 | POST | `/api/organization/waffo-pancake/amount` | `WaffoPancakePayRequest` | Waffo Pancake 금액 계산 |
 
 #### `AmountRequest`
@@ -909,6 +933,16 @@ Query:
 | 다른 조직 사용자를 멤버로 추가 | `user belongs to another organization` |
 | owner 제거 시도 | `organization owner cannot be removed` |
 | 구성원이 남은 조직 삭제 | `organization has N non-owner members, remove them first` |
+| 대기 중인 조직 충전 주문이 있는 조직 삭제 | `organization has N pending top-up orders, wait for them to settle or expire first` |
+| 다른 조직과 같은 이름으로 변경 | `organization name already exists` |
+| 비활성 조직의 쓰기 API·relay·충전 | `organization is disabled` (relay는 HTTP 403) |
+| 자기 자신에게 플랜 할당·취소 | `organization admins cannot manage their own subscription` |
+| 가져오기 시트에 가져오는 사용자 자신의 행 | `line N (<username>): an import cannot change the importing admin's own row` (행 오류) |
+| 대상 조직에 없는 plan id 수정·비활성화 | HTTP 404 `subscription plan not found` |
+| 조직 로그 기간이 로그 설정 상한 초과 | `The time range cannot exceed N days` |
+| 조직 회원의 개인 잔액 구독 결제 | `organization members cannot pay with personal balance` |
+| 조직 회원의 교환 코드 사용 | `organization members cannot redeem codes into their personal balance` |
+| 조직 회원의 개인 유료 충전 | `organization members cannot top up their personal balance` |
 | 조직 구독 plan 기간 값 범위 초과 | `duration_value must be between 0 and 1200` |
 | custom 기간인데 custom_seconds 범위가 잘못됨 | `custom_seconds must be between 1 and 31536000` |
 | non-custom 기간인데 custom_seconds 범위가 잘못됨 | `custom_seconds must be between 0 and 31536000` |
@@ -922,6 +956,8 @@ Query:
 
 - 조직 quota는 조직 전체 예산이다. 조직 구독 사용자도 최종적으로 조직 quota가 부족하면 요청이 실패한다.
 - 조직 구독 사용자는 개인 quota fallback을 하지 않는다.
+- 조직 지갑이 선차감을 감당하지 못하면 relay 오류 문구는 개인 잔액이 아니라 조직 지갑을 가리킨다(`organization quota insufficient, remaining: …`, HTTP 403).
+- 환급은 과금 때 고정한 조직으로 간다(비동기 작업 `TaskPrivateData.OrganizationId`, 레거시 Midjourney `midjourneys.organization_id`). 회원 한도는 그 조직에 아직 소속일 때만 돌려준다. 조직 `used_quota`도 고정한 조직에 쌓인다.
 - `/api/organization/subscription/plans/:id` 수정 API는 현재 부분 수정이어도 `title`을 요구한다.
 - 조직 쓰기 API는 strict JSON decoding을 사용한다. 문서에 없는 body 필드는 무시하지 않고 `unsupported field: <field>`로 거부한다.
 - 일부 query 숫자 필드는 파싱 실패 시 오류가 아니라 0으로 처리된다. 문서의 "실제 검증" 항목을 우선한다.
