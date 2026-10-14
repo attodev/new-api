@@ -6,9 +6,9 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
 | 공통(quota) | model/user.go:97-98,105-106 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint (gofmt가 이웃 줄 94-96, 99의 주석 정렬을 바꿈 — 공백만) | model/user_quota_columns_fork_test.go |
-| O5 문의 메일 | common/constants.go:113 | `var ContactEmail = ""` | controller/contact.go, controller/email.go, middleware/fork_access_token_routes.go |
+| O5 문의 메일 | common/constants.go:114 | `var ContactEmail = ""` | controller/contact.go, controller/email.go, middleware/fork_access_token_routes.go |
 | O5 문의 메일 | model/option.go:77 | InitOptionMap `OptionMap["ContactEmail"]` 한 줄 | controller/contact.go |
-| O5 문의 메일 | model/option.go:497-498 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
+| O5 문의 메일 | model/option.go:498-499 | updateOptionMap `case "ContactEmail":` | controller/contact.go |
 | O5 문의 메일 | router/api-router.go:284 | `registerForkPublicRoutes(apiRouter)` | router/fork-router.go |
 | O5 문의 메일 | router/api-router.go:96 | `registerForkSelfRoutes(selfRoute)` (O2가 채움) | router/fork-router.go |
 | O5 문의 메일 | router/api-router.go:157 | `registerForkAdminUserRoutes(adminRoute)` (O4, O3가 채움) | router/fork-router.go |
@@ -19,8 +19,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O2 PayPal | model/topup.go:26 | `TopUp.ProviderOrderId` 필드 + `// fork: O2` | model/topup_paypal.go, setting/payment_paypal.go |
 | O2 PayPal | model/topup.go:37,47 | `PaymentMethodPayPal` / `PaymentProviderPayPal` 상수 | model/topup_paypal.go |
 | O2 PayPal | model/topup.go:491 | `ManualCompleteTopUp` Stripe 조건에 `PaymentProviderPayPal` OR 추가 | model/topup_paypal.go |
-| O2 PayPal | model/option.go:102-108 | InitOptionMap `PayPal*` OptionMap 6줄 | setting/payment_paypal.go |
-| O2 PayPal | model/option.go:537-549 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
+| O2 PayPal | model/option.go:103-109 | InitOptionMap `PayPal*` OptionMap 6줄 | setting/payment_paypal.go |
+| O2 PayPal | model/option.go:540-552 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
 | O2 PayPal | controller/topup.go:78 | `payMethods = appendPayPalPayMethod(payMethods)` | controller/payment_availability_paypal.go |
 | O2 PayPal | controller/topup.go:105 | data map `"enable_paypal_topup"` | controller/payment_availability_paypal.go |
 | O2 PayPal | controller/topup.go:122 | data map `"paypal_min_topup"` | controller/payment_availability_paypal.go |
@@ -139,11 +139,11 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 (프런트) | web/src/routeTree.gen.ts | 생성 파일 — `bun run build`가 `/organization`, `/organization/dashboard`, `/organization/subscriptions`, `/organization/usage-logs/`, `/organization/usage-logs/$section` 라우트를 추가 | web/src/routes/_authenticated/organization/ |
 | O3 조직 (프런트) | web/src/routes/_authenticated/wallet/index.tsx:22-24, 26, 39-47 | import 4줄(`// fork: O3`)과 `RouteComponent`의 `// fork: O3` … `// fork: O3 end` 블록: `pickWalletView(useAuthStore(...))`가 `organization_owner`면 `OrganizationWallet`, `organization_member`면 `OrganizationMemberWalletSummary`, 아니면 기존 `Wallet` (검색 스키마는 `show_history`만 유지) | web/src/features/organizations/lib/wallet-view.ts, components/organization-wallet.tsx, components/organization-member-wallet-summary.tsx |
 | O3 조직 e2e | .gitignore:40-41 | `web/test-results/`, `web/playwright-report/` 2줄 (Playwright 산출물 무시) | web/playwright.config.ts, web/e2e/ |
-| O3 조직 e2e | web/package.json:19-21, 93; web/bun.lock | scripts `e2e`·`e2e:headed`·`e2e:install` 3줄, devDependency `@playwright/test` 한 줄; lockfile은 `bun install`이 갱신 (충돌 시 upstream lockfile을 받고 `bun install`을 다시 돌린다) | web/playwright.config.ts, web/e2e/organization.e2e.ts, web/e2e/README.md |
+| O3 조직 e2e | web/package.json:19-21, 94; web/bun.lock | scripts `e2e`·`e2e:headed`·`e2e:install` 3줄, devDependency `@playwright/test` 한 줄; lockfile은 `bun install`이 갱신 (충돌 시 upstream lockfile을 받고 `bun install`을 다시 돌린다) | web/playwright.config.ts, web/e2e/organization.e2e.ts, web/e2e/README.md |
 | 공통 (i18n) | web/src/i18n/locales/*.json (en, fr, ja, ru, vi, zh, zh-TW) | fork 화면의 영문 키를 `en.json`에 추가하고 `bun run i18n:sync`로 다른 locale에 영문 fallback을 채움 (O2·O3·O4·O5; 단계 C의 O6 `{{percent}}% off`·`Model discount`/`Vendor discount`·할인 편집기 키(`Discounts`, `Add vendor`, `Discount (%)` 등 16개), O7 키 3개(아래 행), O3 조직 키(멤버 조회 `Look up user` 등 5개 + 기존 `User not found` 번역, 회원 정지·메모 `Suspend`/`Resume`/`Organization note`·`Disabled by platform` 등 10개)는 7개 locale에 번역 포함). 충돌 시 upstream 쪽을 받고 fork 키를 `en.json`에 다시 넣은 뒤 sync | — |
 | O6 할인 | types/price_data.go:15-17 | `GroupRatioInfo.BaseGroupRatio/DiscountMultiplier/DiscountSource` 필드 3개 (빈 줄로 분리해 이웃 필드 정렬 유지) | setting/ratio_setting/model_discount.go |
-| O6 할인 | model/option.go:162-163 | InitOptionMap `OptionMap["ModelDiscount"]`, `OptionMap["VendorDiscount"]` 두 줄 | setting/ratio_setting/model_discount.go, model/pricing_discount.go |
-| O6 할인 | model/option.go:662-663 | updateOptionMap `case "ModelDiscount", "VendorDiscount": err = updateDiscountOption(key, value)` | model/pricing_discount.go |
+| O6 할인 | model/option.go:163-164 | InitOptionMap `OptionMap["ModelDiscount"]`, `OptionMap["VendorDiscount"]` 두 줄 | setting/ratio_setting/model_discount.go, model/pricing_discount.go |
+| O6 할인 | model/option.go:665-666 | updateOptionMap `case "ModelDiscount", "VendorDiscount": err = updateDiscountOption(key, value)` | model/pricing_discount.go |
 | O6 할인 | model/pricing.go:52,61 | `Pricing.DiscountPercent`, `PricingVendor.DiscountPercent` 필드 (각각 빈 줄로 분리해 이웃 필드 정렬 유지) | model/pricing_discount.go |
 | O6 할인 | model/pricing.go:225,227,234,436,454 | `updatePricing`의 `vendorNameByID`·로컬 `modelVendorNames` 선언과 채우기, 벤더 리터럴 `DiscountPercent: vendorDiscountPercent(v.Name)` (빈 줄로 분리), `applyPricingDiscount(&pricing, vendorNameByID, modelVendorNames)`, 루프 뒤 `publishModelVendorNames(modelVendorNames)` 스냅샷 교체 (각 한 줄). `InvalidatePricingCache`에는 훅이 없다 (이전 스냅샷 유지) | model/pricing_discount.go |
 | O6 할인 | relay/helper/price.go:63 | `HandleGroupRatio` return 직전 `foldDiscountIntoGroupRatio(&groupRatioInfo, relayInfo.OriginModelName, relayInfo.GetBillingModelName())` 한 줄 (할인은 origin 모델명 우선, billing 모델명 fallback — 마켓플레이스가 origin 이름으로 표시) — 모든 PriceData 기반 과금 경로(사전차감·정산·tiered·per-call·재시도·이미지·위반 수수료·MJ)에 할인을 한 번 접는다 | relay/helper/price_discount.go |
@@ -181,6 +181,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/dialogs/details-dialog.tsx:88, 98, 525, 746-761, 783-784 | `effectiveUseTimeSec`/`TimingBreakdownSection` import 두 줄, `const useTimeSec = effectiveUseTimeSec(other, props.log.use_time)` 한 줄, Response Time 행의 `props.log.use_time` 세 곳을 `useTimeSec`로 교체(`e2e_ms` 우선, 없으면 기존 `use_time`), 정보 그리드 뒤·Request Conversion 앞에 `<TimingBreakdownSection other showTiming />` 한 줄 (모델 제공자/게이트웨이 오버헤드 점유율 행은 키 세 개가 모두 있을 때만 표시) | web/src/features/usage-logs/components/dialogs/timing-breakdown-section.tsx, lib/timing-breakdown.ts, __tests__/timing-breakdown.test.tsx |
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/columns/common-logs-columns.tsx:70, 811 | import 한 줄, 표의 `TimingMetricsCell`에 `useTimeSec={effectiveUseTimeSec(other, useTime)}` (`other`는 같은 셀에서 이미 파싱됨) | web/src/features/usage-logs/lib/timing-breakdown.ts |
 | O7 타이밍 분해 (프런트) | web/src/features/usage-logs/components/common-log-mobile-card.tsx:37, 83, 204-205, 213 | import 한 줄, `const effectiveUseTime = effectiveUseTimeSec(other, log.use_time)` 한 줄, `StreamTpsCell`의 tokens/s 조건과 나눗셈이 `log.use_time` 대신 `effectiveUseTime`을 씀(2줄), 모바일 카드의 `useTimeSec={effectiveUseTimeSec(other, log.use_time)}` | web/src/features/usage-logs/lib/timing-breakdown.ts |
+| O7 타이밍 분해 (테스트) | web/src/features/usage-logs/components/__tests__/mobile-card.test.tsx:341-356 | 파일 끝 `// fork: O7` 주석 + 테스트 한 건(`use_time` 0, `e2e_ms` 2000, `completion_tokens` 100인 스트림 → `50 t/s`) (단계 D Task 11) | — |
 | O7 타이밍 분해 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json | `Timing Breakdown`, `Model Provider`, `Gateway Overhead` 키 3개 (`Vendor discount` 뒤) | — |
 | O9 한글 | web/package.json:27 | scripts에 `"i18n:ko": "node scripts/ko-locale.mjs"` 한 줄 (JSON이라 `// fork: O9` 주석을 달 수 없어 이 표로만 표시) | web/scripts/ko-locale.mjs, web/scripts/ko-locale.test.mjs |
 | O9 한글 (README) | README.md:14 | 언어 nav `<p align="center">`에 `  <a href="./README.kr.md">한국어</a> \| <!-- fork: O9 -->` 한 줄 (마지막 항목 `日本語` 앞에 넣어 구분자 `\|`가 유효하게 유지) | README.kr.md |
@@ -190,8 +191,9 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 (README) | README.fr.md:14 | 같은 nav 한 줄 | README.kr.md |
 | O9 한글 (README) | README.ja.md:14 | 같은 nav 한 줄 (마지막 항목 `<strong>日本語</strong>` 앞) | README.kr.md |
 | O9 한글 (README) | README.kr.md | 신규 파일(upstream 파일 아님). `README.md`(upstream 신판)를 절 단위로 번역. team `README.kr.md`(구판)와 같은 절(파트너·특별 감사·관련 프로젝트·라이선스·스타 히스토리·맺음말)은 그 문장을 재사용. 링크·배지·이미지·코드 블록은 원문 그대로. upstream이 README를 고치면 이 파일도 같은 절을 따라 고친다 | — |
-| O9 한글 | web/src/i18n/locales/ko.json | 신규 locale 파일(upstream 파일 아님). `node scripts/ko-locale.mjs seed`가 en.json 키 순서로 team `kr.json`의 한글 값과 영어 placeholder를 채우고, 이후 배치 번역으로 placeholder를 없앤다. `_extras`/`_reports`는 `sync-i18n.mjs` 관리 영역이라 쓰지 않는다 | docs/translation-glossary.ko.md, docs/i18n/ko-batches.json, docs/i18n/ko-skip.json |
+| O9 한글 | web/src/i18n/locales/ko.json | 신규 locale 파일(upstream 파일 아님). `node scripts/ko-locale.mjs seed`가 en.json 키 순서로 team `kr.json`의 한글 값과 영어 placeholder를 채우고, 이후 배치 번역(단계 D Task 3–8, 6배치)으로 placeholder를 없앴다(배치 목록 `docs/i18n/ko-batches.json`은 단계 D Task 12에서 삭제). `_extras`/`_reports`는 `sync-i18n.mjs` 관리 영역이라 쓰지 않는다. upstream 병합으로 en.json에 새 키가 생기면 ko.json에는 들어오지 않으므로 `node scripts/ko-locale.mjs check`가 `missing`으로 알려 준다 — 용어집대로 번역해 넣고(영어를 유지할 키는 `MANUAL_SKIP`과 `ko-skip.json`에) `check`·`status`를 0으로 맞춘다 | docs/translation-glossary.ko.md, docs/i18n/ko-skip.json, web/e2e/korean.e2e.ts |
 | O9 한글 | web/src/i18n/languages.ts:22,49,68 | `INTERFACE_LANGUAGE_OPTIONS`에 `ko`(한국어) 추가, `normalizeInterfaceLanguage`와 `convertDetectedLanguage`에 `kr`/`ko*` → `ko` 한 줄씩 (`kr`은 레거시 team 코드; Intl이 Kanuri로 읽으므로 내부 코드는 `ko`) | web/src/i18n/languages.test.ts |
+| O9 한글 | web/src/i18n/languages.test.ts:21-26, 56-88 | `convertDetectedLanguage` 한 줄 import를 4개 이름 import 블록으로 넓힘(oxfmt 줄바꿈), 파일 끝 `// fork: O9` 주석 + `describe('Korean interface language')` 5개 테스트(`ko`/`ko-KR`/`ko_KR`/`kr` → `ko`, `kok`·`kos`는 아님, 저장된 `kr` 정규화, 옵션 목록, `toIntlLocale('ko')`) | — |
 | O9 한글 | web/src/i18n/config.ts:27,39,50 | `ko.json` import, `resources.ko`, `supportedLngs`에 `'ko'` | web/src/i18n/locales/ko.json |
 | O9 한글 | web/scripts/sync-i18n.mjs:230 | 비라틴 스크립트 locale 목록(영어와 동일 값이면 미번역으로 판정)에 `ko` 추가 | - |
 | O9 한글 | web/src/components/date-picker.tsx:20,39 | `react-day-picker/locale`의 `ko` import와 `calendarLocales.ko` | - |
@@ -200,7 +202,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O9 한글 | web/src/features/security/components/dialogs/access-token-dialog.tsx:46, web/src/features/security/components/__tests__/access-token-create-dialog.test.tsx:318 | 생성된 액세스 토큰 라벨을 공용 키 `t('Token')` 대신 `t('Access token')`로 표시 (`Token`은 사용 로그의 API 키 열이라 ko에서 "API 키"이므로 액세스 토큰 대화상자에 쓸 수 없음). 키 `Access token`은 8개 locale 모두에 추가 | web/src/i18n/locales/*.json |
 | O9 한글 (백엔드) | i18n/i18n.go:23,45,58,198-199,214 | `LangKo = "ko"` 상수, embed 파일 목록에 `locales/ko.yaml`, `localizers[LangKo]`, `normalizeLang`의 zh 분기 앞 `kr`/`ko`/`ko-*` → `LangKo`(정확히 일치 또는 하이픈 접두사라 `kok`·`kos`는 한국어가 아님; `_`는 앞에서 `-`로 바뀜), `SupportedLanguages()`에 `LangKo` | i18n/locales/ko.yaml, i18n/ko_test.go |
 | O9 한글 (백엔드) | i18n/i18n_test.go:42-44 | `TestLanguageFromUserSetting` 케이스 표에 `ko`, `ko-KR`, `kr` 세 줄 | i18n/ko_test.go |
-| O9 한글 (백엔드) | common/constants.go:40-41 | `DefaultLanguage` 주석의 언어 목록에 `ko` 한 단어 | — |
+| O9 한글 (백엔드) | common/constants.go:40-42 | `DefaultLanguage` 주석의 언어 목록에 `ko` 한 단어 | — |
 | O9 한글 (백엔드) | i18n/locales/ko.yaml | 신규 locale 파일(upstream 파일 아님). `en.yaml` 66키 전부, 같은 순서·주석 구조. team `i18n/locales/ko.yaml`에 같은 키가 있는 19개는 그 값, 나머지 47개는 용어집으로 번역 | docs/translation-glossary.ko.md |
 | O9 한글 (fork 메시지) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json (끝 66키), web/src/i18n/locales/ko.json | fork 조직·결제·문의 파일이 `common.NewMessage`/`ApiErrorT`로 보내는 `message_key` 66개를 `Subscription status expired` 뒤에 추가. en은 키와 같은 값, ko는 용어집 번역, 나머지 6개 locale은 영어 placeholder(이번 단계에서 번역하지 않음) | controller/organization_i18n_test.go (`forkMessageSources`의 소스에서 키를 읽어 en.json에 있는지 검사) |
 | O9 한글 (fork 메시지) | web/src/lib/server-error-message.test.ts:22,99-123 | `ko.json` import 한 줄과 조직 `message_key`(`organization target permission denied`, `{{field}} is required` + params)가 ko에서 한국어로 렌더되는 테스트 한 건 | web/src/i18n/locales/ko.json |
@@ -219,6 +221,10 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O8 인터페이스 언어 (프런트) | web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json, web/src/i18n/locales/ko.json | 키 3개 `Interface languages`, `Languages offered in the language menu. The current language of a user stays available.`, `Select at least one language.` (`Failed to send the test email` 뒤). ko는 번역, 나머지 6개는 영어 placeholder | — |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
+
+O9 메모: 한국어 파일(`web/src/i18n/locales/ko.json`, `i18n/locales/ko.yaml`, `README.kr.md`)은 fork 파일이라 upstream 병합에서 충돌하지 않는다. 대신 upstream이 `en.json`·`en.yaml`에 키를 더하면 한국어 쪽에 그 키가 없다. 병합 뒤 `cd web && node scripts/ko-locale.mjs check`(빠진 키는 `missing`)와 `GOWORK=off go test ./i18n/`(`TestKoreanYamlCoversEveryEnglishKey`)로 찾아 용어집대로 채운다. 2026-10-15 리허설(qn/main 718a4e7f9)에서는 en.json에 9키가 생기고 2키가 빠졌다(가격 정렬 6, Vertex 3).
+
+O4 메모(go.sum): develop의 `go mod tidy`가 지운 moejs 구판 checksum 줄과 upstream의 moejs 버전 갱신 줄이 붙어 있어 `go.sum`이 충돌할 수 있다(2026-10-15 리허설). upstream 쪽을 받고 `GOWORK=off go mod tidy`로 excelize 의존 줄을 되살린다.
 
 ## 빌드·테스트 전제
 - `web/dist/index.html`이 있어야 루트 패키지가 빌드된다 (`cd web && bun run build`).

@@ -28,7 +28,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 | O6 | 모델/벤더 할인 계층(percent → multiplier, model > vendor), 가격 API·로그·설정 UI 노출 | `setting/ratio_setting/model_discount.go`, `relay/helper/price.go` 훅, `model/pricing.go`, usage-log 표시 | 102 + 훅 |
 | O7 | 요청 타이밍 분해(e2e/llm/gateway ms)와 로그 표시 | `middleware/request_timing.go`, `common/timing_response_writer.go`, `relay/common/relay_info.go` 필드, `service/log_info_generate.go` | 117 + 훅 |
 | O8 | 소형 설정: OIDC 이메일 도메인 화이트리스트(가입+로그인), OpenRouter 로그 vendor 이름 제거 옵션, 인터페이스 언어 en/ko 제한, 기본 첫 화면 콘솔, 가격 페이지 모델 상세 숨김, 정적 자산 rate limit 제외·캐시 헤더 (단계 A 결과: 인터페이스 언어 제한은 단계 D로, 기본 첫 화면 콘솔은 team에서 되돌려져 제외, 64-bit 옵션 파싱은 no-op) | 각 수십 줄 | ~300 |
-| O9 | 한글화: 프런트 `ko` locale(4,795 키 중 4,489 재사용 + upstream 신규 2,778 키 번역), 백엔드 `ko.yaml`(upstream 키 67개), `README.kr.md` | `web/default/src/i18n/locales/kr.json` | — |
+| O9 | 한글화: 프런트 `ko` locale(4,795 키 중 4,489 재사용 + upstream 신규 2,778 키 번역), 백엔드 `ko.yaml`(upstream 키 67개), `README.kr.md` (단계 D 결과: ko.json 7,538키 — team 재사용 4,412, 번역 2,943, 영어 유지 183; `ko.yaml` 66키; §4.8) | `web/default/src/i18n/locales/kr.json` | — |
 | O10 | unode 진단 도구 | `tools/unode-diagnostics/` | 3,424(독립) |
 | O11 | fork 고유 수정 중 upstream에 없는 것: Epay 콜백 트랜잭션 정산 + "fail" 응답 재시도, PayPal·조직 지갑 충전 전 수용량 검증, Gemini 프롬프트 IMAGE/VIDEO/DOCUMENT 귀속과 캐시·오디오 캡, Ali `thinking_budget` either-name 규칙 | 2026-10 동기화 기록 두 건 | 소 |
 | O12 | OpenWebUI 연동(OAuth2/OIDC 제공자, relay JWT 치환, 사용자 링크 관리) | `OpenWebUI` 브랜치(미병합, Go 34파일 9,457 LOC + 프런트 28) | 9,457 |
@@ -98,8 +98,16 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 - 2026-10-14 구현 메모(단계 C): 본문은 `service/log_timing_fork.go`다. `e2e_ms`/`llm_ms`/`gateway_ms`는 public, 내부 구간 `pre_llm_ms`/`post_llm_ms`는 admin 전용(`SetAdmin`)이고, hijack된 realtime WSS 로그에는 타이밍 키가 없다. `TimingResponseWriter.Unwrap()`으로 write deadline이 유지된다(team에도 같은 결함이 있어 역이식 필요). 기록 `docs/2026-10-14-rebase-phase-c.md` §2.
 
 ### 4.8 O9 한글
-- 프런트: `web/src/i18n/locales/ko.json` 생성. team `kr.json`의 4,489개 일치 키를 옮기고, upstream 신규 2,778개 키는 기계 번역 초안 후 용어집(`docs/translation-glossary.md`의 한글 규칙: 크레딧→잔액/요금 등)으로 검수. `languages.ts`에 `{ code: 'ko', label: '한국어' }` 추가, `normalizeInterfaceLanguage`에 ko 매핑. 인터페이스 언어 제한(O8)은 upstream의 옵션 메커니즘으로 en/ko만 노출.
-- 백엔드: upstream `i18n/locales/ko.yaml`(67키) 작성, `i18n.go`의 파일 목록에 추가.
+
+단계 D에서 아래처럼 구현했다(기록 `docs/2026-10-15-rebase-phase-d.md`). 처음 문안(team `kr.json` 4,489키 재사용 + 신규 2,778키 번역, `docs/translation-glossary.md`의 한글 규칙, 백엔드 67키, "upstream의 옵션 메커니즘으로 en/ko만 노출")은 아래 내용으로 대체됐다.
+
+- 언어 코드: 내부 코드는 BCP-47 `ko`다. team의 `kr`은 레거시 값으로만 받는다(`Intl`이 `kr`을 카누리어로 읽기 때문). 받는 곳: 프런트 `normalizeInterfaceLanguage`·`convertDetectedLanguage`(`kr`, `ko`, `ko-*` → `ko`; `kok`·`kos`는 아님), 로그인 직후 저장된 사용자 언어 정규화(`use-auth-redirect.ts`), 백엔드 `i18n.normalizeLang`(`Accept-Language`·사용자 설정), `common.ParseInterfaceLanguages`. 기존 team 사용자의 `setting.language = 'kr'`는 데이터 마이그레이션 없이 읽을 때 정규화한다.
+- 프런트 locale: fork 파일 `web/src/i18n/locales/ko.json`(en.json 키 순서, 단계 D 끝 7,538키). i18next `resources`·`supportedLngs`, `languages.ts` 옵션 `{ code: 'ko', label: '한국어' }`, 달력 `react-day-picker`의 `ko`는 한 줄 훅이다.
+- 번역 도구: `web/scripts/ko-locale.mjs`(`bun run i18n:ko`). `seed`는 team `kr.json`에서 검증을 통과한 한글 값을 재사용하고(4,412키) 나머지를 영어 placeholder로 채운다. ko.json이 있으면 `--force` 없이는 거부한다. `check`는 보간 `{{…}}`·Trans/이름 태그·printf·앞뒤 공백·`\n` 수·한글 포함을 검사하고, `status`는 남은 영어 placeholder 수를 센다. 영어를 유지할 키(브랜드·식별자·테마 이름)는 스크립트의 `MANUAL_SKIP`과 `docs/i18n/ko-skip.json`(183키)에 있다. 번역은 6배치 LLM 초안 + 용어집 검수 + 배치별 리뷰였고, 배치 목록 파일은 작업 뒤 지웠다.
+- 용어집: `docs/translation-glossary.ko.md`(문체 규칙과 용어 표). 주요 결정은 §9 결정 13.
+- 인터페이스 언어 제한(O8): team의 하드코딩(`[en, kr]`) 대신 옵션 `InterfaceLanguages`(쉼표로 구분한 코드, 기본 `en,ko`)다. `/api/status`가 `interface_languages`(허용 코드 `en, ko, zhCN, zhTW, fr, ru, ja, vi`, 대소문자 무시, `kr`→`ko`, 관리자 순서 유지, 비면 `["en"]`)를 내려 주고, 헤더 언어 메뉴와 프로필 언어 카드가 이 목록으로 거른다. 리소스는 8개 locale을 모두 로드한다. 사용자가 이미 고른 언어는 목록에 없어도 메뉴에 남는다. 관리 화면은 시스템 설정 → 운영 → 인터페이스 언어(체크박스, 하나 이상).
+- 백엔드: fork 파일 `i18n/locales/ko.yaml`(develop `en.yaml`과 같은 66키; team 값 19개 재사용 + 47개 번역), `i18n.go`의 `LangKo`·파일 목록·localizer·`SupportedLanguages()`. fork 파일에서 웹 콘솔 사용자에게 나가는 오류 41곳을 `common.NewMessage`/`ApiErrorT`(message_key) 경로로 옮겼고, 그 키 66개를 8개 locale JSON에 넣었다(ko 번역, 다른 6개는 영어). upstream 파일의 같은 패턴은 훅 규칙상 그대로 둔다.
+- README: `README.kr.md`(upstream 신판 `README.md` 기준 번역, team 구판의 같은 절 문장 재사용)와 6개 README의 언어 nav 한 줄(`<!-- fork: O9 -->`).
 
 ### 4.9 O11 fork 고유 수정
 - Epay 트랜잭션 정산(`model.RechargeEpay`, `EpayNotify` 응답 후행): team 커밋 2건을 upstream `controller/topup.go` 구조에 맞춰 재적용.
@@ -161,6 +169,16 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 
 6. 2026-10-14 확정: 조직 미소속 사용자 할당(I2)은 초대·수락 단계 없이 "정확 조회 + 개인 잔액이 있으면 거부"다. 할당 후보 목록(`GET /api/organization/assignable-users`)을 없애고 `GET /api/organization/users/lookup`(username 정확 일치, 없고 `@`가 있으면 email 정확 일치; 응답은 id·username·display_name·organization_id만)으로 바꿨다. 미소속 사용자는 `quota > 0`, `aff_quota > 0` 또는 활성 개인 구독이 있으면 할당이 거부된다(API·Excel 기존 사용자 행 모두; Excel이 새로 만드는 사용자는 해당 없음). 단계 C Task 8.
 7. 2026-10-14 확정: 플랫폼 사용자 필드(I7)는 조직 범위 필드로 분리했다. `users.organization_member_status`(1 active / 2 suspended)와 `users.organization_remark`(255자) 컬럼을 추가하고, 조직 API는 `member_status`·`organization_remark`만 쓰며 플랫폼 `status`·`remark`는 root 전용이다(옛 키는 `unsupported field`로 거부). 정지된 회원은 relay(403)·레거시 MJ·`/api/organization/*`의 GET이 아닌 요청이 모두 막히고, 로그인과 본인 조회(`/wallet` 요약, `subscription/self`, `topup/self`)는 된다. 조직을 떠나면 두 값은 초기화된다. 단계 C Task 9.
+
+단계 D(한국어·인터페이스 언어·메시지 경로)에서 정한 것. 2026-10-15 확정(기록 `docs/2026-10-15-rebase-phase-d.md` §5):
+
+8. 한국어 코드는 `ko`이고 `kr`은 레거시 입력으로만 받는다. 기존 `kr` 사용자 데이터는 마이그레이션하지 않고 읽을 때 정규화한다(§4.8).
+9. 다른 6개 locale(zh, zh-TW, fr, ru, ja, vi)의 단계 A~D fork 키 영어 placeholder는 이 단계에서 번역하지 않는다(단계 E 이후).
+10. 결정 4의 실행 방식: 6배치 LLM 초안 + 용어집 + 배치별 기계 검증(`ko-locale.mjs check`)과 표본 리뷰, 마지막에 전체 용어 통일. 사람 번역 전면 교체는 하지 않았다.
+11. O8 인터페이스 언어 제한은 옵션 `InterfaceLanguages`(기본 `en,ko`)로 한다. 리소스는 모두 로드하고 메뉴만 거르며, 사용자의 현재 언어는 유지한다(§4.8).
+12. 백엔드 `ko.yaml`은 develop `en.yaml`의 66키 기준이다. fork 파일의 사용자 대상 오류만 message_key 경로로 옮기고, upstream 파일의 같은 패턴은 손대지 않는다. Excel 조직 가져오기의 행 오류(포맷 문자열)는 구조화된 행 오류가 필요해 영어로 남긴다.
+13. 용어: Quota = 쿼터, Reset = 초기화, Vendor = 공급업체(Provider = 제공자와 구분), Tier = 등급, Revoke = 폐기, sk- 자격 증명 Token = API 키(개인 액세스 토큰 = 액세스 토큰), Redemption code = 충전 코드, 문체는 합쇼체·명사형 라벨(`docs/translation-glossary.ko.md`).
+14. 버려진 개인 충전·구독 주문은 관리자 `POST /api/user/topup/expire`(1시간 지난 pending만, 감사 `topup.expire`)로 만료한다. 조직 주문 만료(`POST /api/organizations/:id/topups/expire`)와 분리한다.
 
 ## 10. 리스크
 
