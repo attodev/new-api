@@ -420,6 +420,7 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	} else {
 		finalGroupRatio = groupRatio
 	}
+	finalGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(modelName) // fork: O6
 
 	// 计算 OtherRatios 乘积（视频折扣、时长等）
 	otherMultiplier := 1.0

@@ -119,6 +119,7 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
+	actualGroupRatio *= ratio_setting.GetEffectiveDiscountMultiplier(relayInfo.GetBillingModelName()) // fork: O6
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{
