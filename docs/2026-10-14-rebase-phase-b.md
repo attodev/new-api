@@ -50,7 +50,7 @@
 - upstream 훅: `stores/auth-store.ts:39-40`, `features/profile/types.ts:52-53`, `features/users/types.ts:49-50` (`organization_id`, `organization_role`).
 - 번역: 영문 키 126개를 `en.json`에 넣고 `bun run i18n:sync`(다른 locale은 영문 fallback). `조직에서 제거` → `Remove from organization`, `was` → `(was {{amount}})`.
 - 테스트: 조직 4파일 18개. 전체 vitest 192파일 / 2276개(수정 전 기준).
-- 미룬 minor: 다른 locale 번역(단계 D), 조직 `/waffo/amount` 클라이언트 없음, `Organization.description` 타입 optional화.
+- 미룬 minor: 다른 locale 번역(단계 D), `Organization.description` 타입 optional화. (조직 `/waffo/amount` 클라이언트는 최종 수정 wave M2에서 추가했다.)
 
 ### Task 9 — 공용 컴포넌트의 조직 범위 확장
 - 지갑: `wallet-stats-card.tsx:31,60-61`(`balanceDisplay`), `use-billing-history.ts:33,44,58-62,81,107`(`getBillingHistory`, `forceSelfHistory`), `billing-history-dialog.tsx:57,62,75-77,93,116`(`description`), `recharge-form-card.tsx:84,115,520,568`(`showRedemption`), `dashboard/lib/charts.ts:709,744,749,767,782,810`(`themeKey`).
@@ -137,7 +137,7 @@
 - root는 owner의 플랜을 할당·취소할 수 있다(owner 대상 규칙의 예외는 구독 할당·취소만). `ClearOrganizationMembership`은 요청한 조직 범위로 제한한다. 관리자가 Excel로 자기 한도를 올리는 경로는 남겨 둔다(§4).
 - 프런트 조직 사용 로그는 team의 prop 전달 대신 `UsageLogsProvider` 컨텍스트(`logsScope`, `organizationId`)로 범위를 넘기고 `getRouteApi`를 non-strict search로 바꾼다. upstream hunk가 더 적다.
 - Task 10 리뷰 minor 3건은 게이트·UX에 영향이 있어 바로 고쳤다: 새 파일 AGPL 헤더 1행, root Export/Import를 선택 조직으로 연결, 소유자가 아닌 관리자에게 owner의 플랜 대상 숨김.
-- 조직 Waffo는 확인 창 없이 `calculateOrganizationAmount`로 금액을 계산한다(team과 같음, `/api/organization/waffo/amount` 클라이언트 없음). 단계 E 결제 작업에서 다시 본다.
+- 조직 Waffo는 확인 창 없이 결제로 넘어간다(team과 같음). 금액은 최종 수정 wave(M2)부터 `/api/organization/waffo/amount`로 계산한다. 확인 창은 단계 E 결제 작업에서 다시 본다.
 - e2e 기본 관리자 비밀번호는 `12345678`이다(upstream setup이 8–128자를 요구해 계획의 `123456`은 거부됨).
 - e2e는 `E2E_ALLOW_EXTERNAL_DB=1`이 아니면 백엔드의 `SQL_DSN`·`LOG_SQL_DSN`·`REDIS_CONN_STRING`을 빈 값으로 덮어쓰고, `E2E_REUSE_SERVER=1`일 때만 기존 서버를 재사용한다.
 
@@ -170,6 +170,8 @@ Task 13에서 추가:
 - I5 나머지: 조직 로그·대시보드를 가입 시점 이후로 제한(`joined_at` 저장 또는 로그·`quota_data`에 과금 조직 표시)하고, 떠난 회원의 사용량을 조직 기록에 남기기. 조직 대시보드에는 아직 기간 제한이 없다.
 - M7: 레거시 MJ 사전 가드를 가격 이상(`>= price`)으로, WSS 사전 검사에 조직 지갑 포함.
 - M10 나머지: 조직에 들어올 때 이미 있던 개인 잔액·개인 구독의 처리(I2와 같이 결정).
+- M10 나머지(2): `POST /api/user/aff_transfer`(추천 적립을 본인 한도로 옮김 — 탈퇴 시 0이 된다)와 `POST /api/user/checkin`(출석 보상이 관리자가 정한 한도를 넘겨 조직 지갑이 부담)은 아직 조직 멤버를 막지 않는다. C1 가드와 같은 방식으로 막을지 결정한다.
+- M6 부작용: 대기 중 조직 충전 주문을 만료시키는 것은 Stripe 웹훅뿐이다. Epay·PayPal·Creem·Waffo 결제창을 열고 떠난 주문이 남으면 그 조직은 삭제할 수 없고, 만료시키는 API·UI가 없다. N시간 지난 pending 주문은 무시하거나 root용 만료 엔드포인트를 둔다. 그때까지는 DB에서 해당 `topups` 행의 status를 직접 `expired`로 바꾸는 것이 유일한 방법이다.
 - M11: `organization` casbin 리소스를 실제로 쓰거나(`RootAuth` 제거) root 전용이라고 명시.
 
 범위·환경:

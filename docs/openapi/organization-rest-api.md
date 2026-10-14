@@ -236,7 +236,7 @@ Path:
 처리 규칙:
 
 - owner 외 구성원이 남아 있으면 거부된다 (`organization has N non-owner members, remove them first`). 먼저 멤버십 제거 API로 구성원을 내보낸다.
-- 대기 중(`status = pending`)인 조직 충전 주문(`target_type = organization`)이 있으면 거부된다 (`organization has N pending top-up orders, wait for them to settle or expire first`). 결제 콜백이 삭제된 지갑에 정산하지 못하고 결제된 주문이 남는 것을 막는다.
+- 대기 중(`status = pending`)인 조직 충전 주문(`target_type = organization`)이 있으면 거부된다 (`organization has N pending top-up orders, wait for them to settle or expire first`). 현재 pending 주문을 만료시키는 것은 Stripe 웹훅뿐이므로, 다른 provider의 버려진 주문은 운영자가 `topups.status`를 직접 `expired`로 바꿔야 삭제가 가능하다(단계 C 항목). 결제 콜백이 삭제된 지갑에 정산하지 못하고 결제된 주문이 남는 것을 막는다.
 - 삭제 시 owner의 `organization_id`/`organization_role`을 비우고 owner의 `users.quota`를 0으로 만든다(조직이 배정한 한도이므로). 이전 값은 `organization.delete` 감사 로그의 `previous_quota`에 남는다.
 - 조직이 없으면 HTTP 404 `{"success": false, "message": "organization not found"}`.
 
