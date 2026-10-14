@@ -184,6 +184,14 @@ export function OrganizationUsersTable() {
   // Member mutations go through the organization-admin endpoints, which act
   // only for an admin of the organization; root views members read-only here.
   const canEditMembers = isOrganizationAdmin
+  // Excel import/export accept root with an explicit organization_id, so root
+  // can transfer the selected organization's members; admins use their own.
+  const transferOrganizationId = isRoot
+    ? (organizationId ?? undefined)
+    : undefined
+  const canTransferMembers = isRoot
+    ? organizationId !== null
+    : isOrganizationAdmin
   const [currentPage, setCurrentPage] = useState(1)
   const [totalUsers, setTotalUsers] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -471,7 +479,7 @@ export function OrganizationUsersTable() {
   async function handleExportOrgUsers() {
     setExporting(true)
     try {
-      await exportOrgUsers()
+      await exportOrgUsers(transferOrganizationId)
     } catch (error: unknown) {
       toast.error(errorMessage(error, t('Export failed')))
     } finally {
@@ -650,11 +658,12 @@ export function OrganizationUsersTable() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onSuccess={() => void loadUsers()}
+        organizationId={transferOrganizationId}
       />
       <div className='flex items-center justify-between gap-3'>
         <h1 className='text-xl font-semibold'>{t('Organization Users')}</h1>
         <div className='flex items-center gap-2'>
-          {isOrganizationAdmin && (
+          {canTransferMembers && (
             <>
               <Button
                 variant='outline'

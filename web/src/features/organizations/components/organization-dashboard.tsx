@@ -1,17 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
-import { VChart } from '@visactor/react-vchart'
-import {
-  Activity,
-  BarChart3,
-  Bot,
-  CalendarDays,
-  Database,
-  MousePointerClick,
-  UserRound,
-  Users,
-  Wallet,
-} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -30,6 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { VChart } from '@visactor/react-vchart'
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  CalendarDays,
+  Database,
+  MousePointerClick,
+  UserRound,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import {
   type ReactNode,
   useCallback,

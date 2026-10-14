@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -170,5 +171,54 @@ describe('OrganizationUsersTable', () => {
     await waitFor(() => expect(api.getOrganizationProfile).toHaveBeenCalled())
     expect(screen.queryByText('Assign Organization Member')).toBeNull()
     expect(api.getOrganizationUsers).not.toHaveBeenCalled()
+  })
+
+  it('lets root export the selected organization', async () => {
+    useAuthStore.getState().auth.setUser({
+      id: 99,
+      username: 'root',
+      role: 100,
+    })
+    api.getOrganizations.mockResolvedValue({
+      success: true,
+      data: {
+        page: 1,
+        page_size: 50,
+        total: 1,
+        items: [
+          {
+            id: 7,
+            name: 'Acme',
+            description: '',
+            status: 1,
+            owner_user_id: 1,
+            quota: 0,
+            used_quota: 0,
+          },
+        ],
+      },
+    })
+    api.exportOrgUsers.mockResolvedValue(undefined)
+    render(<OrganizationUsersTable />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Export' }))
+    expect(api.exportOrgUsers).toHaveBeenCalledWith(7)
+    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument()
+  })
+
+  it('hides import/export from root until an organization is selected', async () => {
+    useAuthStore.getState().auth.setUser({
+      id: 99,
+      username: 'root',
+      role: 100,
+    })
+    api.getOrganizations.mockResolvedValue({
+      success: true,
+      data: { page: 1, page_size: 50, total: 0, items: [] },
+    })
+    render(<OrganizationUsersTable />)
+
+    await waitFor(() => expect(api.getOrganizations).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull()
   })
 })

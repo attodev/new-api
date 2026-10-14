@@ -1,4 +1,3 @@
-import { Pencil, RefreshCw, Save, UserPlus, X } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Pencil, RefreshCw, Save, UserPlus, X } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -55,6 +55,7 @@ import {
   parseQuotaFromDollars,
   quotaUnitsToDollars,
 } from '@/lib/format'
+import { hasOrganizationOwnerRole } from '@/lib/organization-roles'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -179,9 +180,26 @@ export function OrganizationSubscriptionsPage() {
     () => getVisibleActiveOrganizationSubscriptionRecords(records),
     [records]
   )
-  const assignableUsers = useMemo(
-    () => getAssignableOrganizationSubscriptionUsers(users, records),
+  // Only the owner (or root) may manage the owner's plan.
+  const canManageOwner =
+    isRoot || hasOrganizationOwnerRole(user?.organization_role)
+  const ownerUserIds = useMemo(
+    () =>
+      new Set(
+        [...users, ...records.flatMap((record) => record.user ?? [])]
+          .filter((member) =>
+            hasOrganizationOwnerRole(member.organization_role)
+          )
+          .map((member) => member.id)
+      ),
     [records, users]
+  )
+  const assignableUsers = useMemo(
+    () =>
+      getAssignableOrganizationSubscriptionUsers(users, records).filter(
+        (member) => canManageOwner || !ownerUserIds.has(member.id)
+      ),
+    [canManageOwner, ownerUserIds, records, users]
   )
 
   const loadOrganizations = useCallback(async () => {
@@ -607,15 +625,17 @@ export function OrganizationSubscriptionsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {sub.status === 'active' && (
-                            <Button
-                              variant='ghost'
-                              size='icon'
-                              onClick={() => void cancelPlan(sub.user_id)}
-                            >
-                              <X className='size-4' />
-                            </Button>
-                          )}
+                          {sub.status === 'active' &&
+                            (canManageOwner ||
+                              !ownerUserIds.has(sub.user_id)) && (
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                onClick={() => void cancelPlan(sub.user_id)}
+                              >
+                                <X className='size-4' />
+                              </Button>
+                            )}
                         </TableCell>
                       </TableRow>
                     )
