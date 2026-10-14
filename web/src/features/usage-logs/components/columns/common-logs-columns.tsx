@@ -55,6 +55,7 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { LOG_TYPE_ALL_VALUE } from '../../constants'
 import type { UsageLog } from '../../data/schema'
+import { formatDiscountHint } from '../../lib/discount-hint' // fork: O6
 import {
   formatModelName,
   decodeBillingExprB64,
@@ -75,6 +76,7 @@ import {
 } from '../../lib/utils'
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
+import { DiscountHint } from '../discount-hint' // fork: O6
 import { LogCostDisplay } from '../log-cost-display'
 import { ModelBadge } from '../model-badge'
 import { TimingMetricsCell, StreamTpsCell } from '../timing-metrics-cell'
@@ -324,8 +326,9 @@ function buildTypeDetailSegments(
         : t('Group Ratio')
 
       if (effectiveRatio != null && Number.isFinite(effectiveRatio)) {
+        const discountHint = formatDiscountHint(other.discount_multiplier) // fork: O6
         segments.push({
-          text: `${ratioLabel} ${formatRatioCompact(effectiveRatio)}x`,
+          text: `${ratioLabel} ${formatRatioCompact(effectiveRatio)}x${discountHint ? ` ${discountHint}` : ''}`, // fork: O6
         })
       }
     }
@@ -630,6 +633,7 @@ export function useCommonLogsColumns(
         let group = log.group
         if (!group) group = other?.group || ''
         const groupRatio = getGroupRatio(other)
+        const discountHint = formatDiscountHint(other?.discount_multiplier) // fork: O6
 
         return (
           <div className='flex max-w-[200px] flex-col gap-0.5'>
@@ -652,7 +656,7 @@ export function useCommonLogsColumns(
                 )}
               </Tooltip>
             </TooltipProvider>
-            {(group || groupRatio != null) && (
+            {(group || groupRatio != null || discountHint) && ( // fork: O6
               <span className='block max-w-full truncate text-xs leading-none'>
                 {group ? (
                   <GroupBadge
@@ -669,6 +673,8 @@ export function useCommonLogsColumns(
                     {formatRatioCompact(groupRatio)}x
                   </span>
                 ) : null}
+                {/* fork: O6 */}
+                <DiscountHint multiplier={other?.discount_multiplier} />
               </span>
             )}
           </div>

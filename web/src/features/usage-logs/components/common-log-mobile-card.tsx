@@ -32,6 +32,7 @@ import dayjs from '@/lib/dayjs'
 import { formatLogQuota, formatTimestampToDate } from '@/lib/format'
 
 import type { UsageLog } from '../data/schema'
+import { formatDiscountHint } from '../lib/discount-hint' // fork: O6
 import { formatModelName, logTokenName, parseLogOther } from '../lib/format'
 import { effectiveUseTimeSec } from '../lib/timing-breakdown' // fork: O7
 import {
@@ -78,6 +79,7 @@ export function CommonLogMobileCard<TData>(props: {
     other?.user_group_ratio != null && other.user_group_ratio !== -1
       ? other.user_group_ratio
       : other?.group_ratio
+  const discountHint = formatDiscountHint(other?.discount_multiplier) // fork: O6
   const fields: Record<FieldName, LogField> = {
     model: {
       label: t('Model'),
@@ -281,11 +283,12 @@ export function CommonLogMobileCard<TData>(props: {
             )
           })}
           {groupRatio != null &&
-            groupRatio !== 1 &&
+            (groupRatio !== 1 || discountHint) && // fork: O6
             Number.isFinite(groupRatio) &&
             props.cells.has('token_name') && (
               <div className='text-muted-foreground col-span-2 [overflow-wrap:anywhere]'>
                 {t('Group Ratio')}: {groupRatio}×
+                {discountHint ? ` ${discountHint}` : null /* fork: O6 */}
               </div>
             )}
         </div>
