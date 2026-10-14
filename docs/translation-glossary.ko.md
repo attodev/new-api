@@ -137,7 +137,20 @@
 | Model discovery | 모델 검색 | 업스트림에서 모델 목록을 찾는 기능. 시드된 OIDC "검색"과 같은 계열입니다. |
 | Model analytics | 모델 분석 | 대시보드 차트. 배치 2의 "모델 분석" 문장과 맞춥니다. |
 | Invalid X | 유효하지 않은 X | 라벨형 오류 메시지. 시드된 "유효하지 않은 결제 리디렉션 URL"(11회)과 맞춥니다. |
-| Theme preset names | 영문 유지 | Lake View, Forest Whisper 같은 테마 이름은 team에서 영어로 두었고 화면의 `preset.*` 값도 영어라 `MANUAL_SKIP`에 넣었습니다. |
+| Theme preset names | 영문 유지 | Lake View, Forest Whisper 같은 테마 이름은 team에서 영어로 두었고 화면의 `preset.*` 값도 영어라 `MANUAL_SKIP`에 넣었습니다. 배치 4에서 `Ocean Breeze`와 `preset.*` 키 7개(`preset.ocean-breeze`, `preset.underground` 등)도 같은 이유로 넣었습니다. |
+| Native (route, forwarding) | 네이티브 | 프로토콜 변환 없이 그대로 보내는 방식. "Native forwarding"은 "네이티브 전달", "Native routes"는 "네이티브 라우트". 시드된 "Anthropic 네이티브 thinking 동작"과 맞춥니다. |
+| Forwarding | 전달 | 시드된 `Forwarding Routes` = "전달 라우트"와 맞춥니다. "compatibility forwarding"은 "호환 전달". |
+| Catch-all route | 포괄 라우트 | 시드된 "같은 수신 경로에서는 포괄 라우트가…"와 맞춥니다. |
+| X to Y (protocol conversion) | X → Y 변환 | 시드된 "Anthropic Messages → OpenAI Chat 변환"과 맞춥니다. API 이름(OpenAI Chat, Gemini Generate Content)은 영문 유지. |
+| Official (route preset) | 공식 | "Official OpenAI Chat"은 "공식 OpenAI Chat". 시드된 `Official` = "공식". |
+| Negate / Negation | 부정 / 부정 해제 | 과금 조건 편집기. "Negate condition"은 "조건 부정", "Remove negation"은 "부정 해제". |
+| Redirect (model) | 리디렉션 | 시드된 "모델 리디렉션"(25회)과 맞춥니다. |
+| Release (software) | 릴리스 | "Pre-release"는 "사전 릴리스". 시드된 "사전 릴리스", "릴리스 상세"와 맞춥니다. |
+| Product (payment) | 상품 | 시드된 `Product`, `Products`, `Product ID`, `Add product`가 "상품"이라 라벨 기준으로 "상품"을 씁니다. |
+| Operator (audit actor) | 작업자 | 감사 로그에서 작업을 수행한 사람. `Operator Admin`(운영자 관리자)과는 다른 개념입니다. |
+| Node (flow, instance) | 노드 | 시드된 "모든 노드", "노드 이름"과 맞춥니다. |
+| Other X (flow overflow) | 기타 X | 흐름 차트에서 상위 항목 밖을 묶은 이름. "Other tokens"은 "기타 API 키". |
+| Peak | 피크 | 시드된 "피크 처리량"과 맞춥니다. "Peak KV cache usage"는 "피크 KV 캐시 사용량". |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -162,3 +175,7 @@
 | 모델 마켓플레이스 (Model square) | 모델 스퀘어 | `Collect relay latency and success-rate metrics for the model square.` 1회. |
 | 모델 분석 (Model analytics) | 모델 데이터 분석 | `Model Analytics` 라벨 1회. |
 | 캐시 지우기 완료 토스트 (…cache cleared) | 지워짐 | 시드된 `Disk cache cleared` = "디스크 캐시 지워짐". 배치 3의 `Inactive disk cache cleared` = "비활성 디스크 캐시를 지웠습니다"처럼 "…지웠습니다"로 통일합니다. |
+| 리디렉션 (Redirect) | 리다이렉션 | `From model redirect, not yet added to models list`, `Redirecting to GitHub...` 2회. |
+| 릴리스 (Release) | 릴리즈 | `No release notes provided.`, `Open release` 2회. |
+| 상품 (Product, payment) | 제품 | Waffo Pancake·Creem 설명문 18회(`Select a product`, `Bound product:` 등). 라벨이 "상품"이라 "상품"으로 통일합니다. |
+| Turnstile (영문 유지) | 회전문 | `Enable Turnstile` = "회전문 활성화"(오역). 다른 Turnstile 키는 모두 영문을 유지합니다. |
