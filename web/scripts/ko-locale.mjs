@@ -85,7 +85,11 @@ const MANUAL_SKIP = new Set([
   'preset.rose-garden',
   'preset.sunset-glow',
   'preset.underground',
+  'Responses WebSocket',
+  'Rose Garden',
   'SGLang',
+  'Sunset Glow',
+  'Tencent',
   'Top P',
   'vLLM',
 ])

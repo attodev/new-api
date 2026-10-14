@@ -137,7 +137,7 @@
 | Model discovery | 모델 검색 | 업스트림에서 모델 목록을 찾는 기능. 시드된 OIDC "검색"과 같은 계열입니다. |
 | Model analytics | 모델 분석 | 대시보드 차트. 배치 2의 "모델 분석" 문장과 맞춥니다. |
 | Invalid X | 유효하지 않은 X | 라벨형 오류 메시지. 시드된 "유효하지 않은 결제 리디렉션 URL"(11회)과 맞춥니다. |
-| Theme preset names | 영문 유지 | Lake View, Forest Whisper 같은 테마 이름은 team에서 영어로 두었고 화면의 `preset.*` 값도 영어라 `MANUAL_SKIP`에 넣었습니다. 배치 4에서 `Ocean Breeze`와 `preset.*` 키 7개(`preset.ocean-breeze`, `preset.underground` 등)도 같은 이유로 넣었습니다. |
+| Theme preset names | 영문 유지 | Lake View, Forest Whisper 같은 테마 이름은 team에서 영어로 두었고 화면의 `preset.*` 값도 영어라 `MANUAL_SKIP`에 넣었습니다. 배치 4에서 `Ocean Breeze`와 `preset.*` 키 7개(`preset.ocean-breeze`, `preset.underground` 등)도 같은 이유로 넣었습니다. 배치 5에서 `Rose Garden`, `Sunset Glow`를 넣었습니다. |
 | Native (route, forwarding) | 네이티브 | 프로토콜 변환 없이 그대로 보내는 방식. "Native forwarding"은 "네이티브 전달", "Native routes"는 "네이티브 라우트". 시드된 "Anthropic 네이티브 thinking 동작"과 맞춥니다. |
 | Forwarding | 전달 | 시드된 `Forwarding Routes` = "전달 라우트"와 맞춥니다. "compatibility forwarding"은 "호환 전달". |
 | Catch-all route | 포괄 라우트 | 시드된 "같은 수신 경로에서는 포괄 라우트가…"와 맞춥니다. |
@@ -152,6 +152,17 @@
 | Other X (flow overflow) | 기타 X | 흐름 차트에서 상위 항목 밖을 묶은 이름. "Other tokens"은 "기타 API 키". |
 | Peak | 피크 | 시드된 "피크 처리량"과 맞춥니다. "Peak KV cache usage"는 "피크 KV 캐시 사용량". |
 | Passive recovery | 패시브 복구 | 채널 상태 점검 모드. "Passive recovery only"는 "패시브 복구만". "수동"은 manually disabled(수동으로 비활성화한)와 겹치므로 쓰지 않습니다. |
+| Revoke (access token, session) | 폐기 | 확인 대화상자에서 "취소"(Cancel) 버튼과 나란히 놓이므로 "취소"를 쓰지 않습니다. "Revoked access tokens"는 "폐기한 액세스 토큰". 세션 확인 제목 `Revoke session?`은 "세션을 종료하시겠습니까?"(배치 3의 "세션을 종료하지 못했습니다"와 맞춤). |
+| Sign out (session, device) | 로그아웃 / 세션 종료 | "Sign out other sessions"는 "다른 세션에서 로그아웃", "Session signed out"은 "세션을 종료했습니다". |
+| Simulation (request) | 시뮬레이션 | "Request simulation"은 "요청 시뮬레이션", "Simulated request body"는 "시뮬레이션 요청 본문". |
+| Sync (task mode) / Sync (data) | 동기 / 동기화 | 작업 실행 방식(Async = 비동기)과 짝인 `Sync`, `Synchronous`는 "동기". 메타데이터·가격·모델을 맞추는 동작은 "동기화". |
+| Dry run | 시험 실행 | 시드된 "시험 실행 결과"와 맞춥니다. |
+| Origin (HTTP) | 출처 | 시드된 "교차 출처 요청", "허용된 출처"와 맞춥니다. "upstream origin"은 "업스트림 출처". |
+| Built-in | 내장 | 시드된 `Built-in` = "내장". 작업 플러그인의 Factory(기본 제공)와 구분합니다. |
+| Task (plugin, async) | 작업 | "Task plugin"은 "작업 플러그인", "Task billing"은 "작업 과금", "Task pricing"은 "작업 가격". |
+| Target / Source (audit, vendor merge) | 대상 / 원본 | 감사 로그의 대상, 공급업체 병합의 "Source vendors"(원본 공급업체)와 "Target vendor"(대상 공급업체). 플러그인·마켓플레이스의 Source는 "소스", 설정값의 출처 표시는 "출처". |
+| Telegram | 영문 유지 | 시드된 "Telegram 계정 연결" 등과 맞춥니다. |
+| Tencent, Responses WebSocket | 영문 유지 | 채널 브랜드(Baidu, Doubao와 같음)와 API 이름이라 `MANUAL_SKIP`에 넣었습니다. |
 
 ## 번역 중 헷갈리기 쉬운 표현
 
@@ -180,3 +191,5 @@
 | 릴리스 (Release) | 릴리즈 | `No release notes provided.`, `Open release` 2회. |
 | 상품 (Product, payment) | 제품 | Waffo Pancake·Creem 설명문 18회(`Select a product`, `Bound product:` 등). 라벨이 "상품"이라 "상품"으로 통일합니다. |
 | Turnstile (영문 유지) | 회전문 | `Enable Turnstile` = "회전문 활성화"(오역). 다른 Turnstile 키는 모두 영문을 유지합니다. |
+| 폐기 (Revoke) | 취소 | 배치 1의 `Access token revoked` = "액세스 토큰 취소됨", `A token that never expires stays valid until you revoke it…` = "취소할 때까지", 시드된 `Create, revoke, and audit API tokens.` = "취소" 3회. |
+| Telegram (영문 유지) | 텔레그램 | 시드된 `Enable Telegram OAuth` = "텔레그램 OAuth 활성화" 1회. |
