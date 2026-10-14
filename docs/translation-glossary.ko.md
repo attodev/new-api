@@ -161,3 +161,4 @@
 | 패스스루 (Passthrough) | 통과, 전달 | `Enable Request Passthrough` = "요청 통과", `Disable store passthrough` = "매장 통과"(오역), `Field passthrough controls` = "필드 전달". |
 | 모델 마켓플레이스 (Model square) | 모델 스퀘어 | `Collect relay latency and success-rate metrics for the model square.` 1회. |
 | 모델 분석 (Model analytics) | 모델 데이터 분석 | `Model Analytics` 라벨 1회. |
+| 캐시 지우기 완료 토스트 (…cache cleared) | 지워짐 | 시드된 `Disk cache cleared` = "디스크 캐시 지워짐". 배치 3의 `Inactive disk cache cleared` = "비활성 디스크 캐시를 지웠습니다"처럼 "…지웠습니다"로 통일합니다. |
