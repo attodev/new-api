@@ -266,6 +266,13 @@ function removeTrailingZeros(str: string): string {
   return str.replace(/(\.[0-9]*?)0+$/, '$1').replace(/\.$/, '')
 }
 
+const SUFFIX_TIERS = [
+  { threshold: 1e12, suffix: 'T' },
+  { threshold: 1e9, suffix: 'B' },
+  { threshold: 1e6, suffix: 'M' },
+  { threshold: 1e3, suffix: 'k' },
+] as const
+
 function formatNumberWithSuffix(
   value: number,
   digitsLarge: number,
@@ -274,8 +281,13 @@ function formatNumberWithSuffix(
 ): string {
   const abs = Math.abs(value)
   if (abbreviate && abs >= 1000) {
-    const result = value / 1000
-    return `${removeTrailingZeros(result.toFixed(1))}k`
+    for (const tier of SUFFIX_TIERS) {
+      if (abs >= tier.threshold) {
+        return (
+          removeTrailingZeros((value / tier.threshold).toFixed(1)) + tier.suffix
+        )
+      }
+    }
   }
 
   const digits = getFractionDigits(value, digitsLarge, digitsSmall)

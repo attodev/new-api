@@ -26,31 +26,20 @@ type EntityLinkBaseProps = {
 }
 
 type ModelLinkProps = EntityLinkBaseProps & {
-  /** model_name as it appears in the pricing API. Used as the route param. */
+  /** model_name as it appears in the pricing API. */
   modelName: string
 }
 
 /**
- * Link wrapping a model name. Navigates to the existing model details
- * page (`/pricing/{modelName}`). Renders the model name itself by
- * default; pass `children` to wrap arbitrary content.
- *
- * A subtle persistent underline acts as the link affordance (so
- * clickability is obvious in lists with dozens of entries) and brightens
- * on hover.
+ * Model name label. Model detail pages are not exposed, so this renders
+ * plain text (kept as a component so call sites stay unchanged). Renders the
+ * model name itself by default; pass `children` to wrap arbitrary content.
  */
 export function ModelLink(props: ModelLinkProps) {
   return (
-    <Link
-      to='/pricing/$modelId'
-      params={{ modelId: props.modelName }}
-      className={cn(
-        'decoration-foreground/30 hover:decoration-foreground underline decoration-1 underline-offset-4 transition-colors',
-        props.className
-      )}
-    >
+    <span className={cn('text-foreground', props.className)}>
       {props.children ?? props.modelName}
-    </Link>
+    </span>
   )
 }
 

@@ -111,12 +111,10 @@ describe('model cards', () => {
       billing_mode: 'tiered_expr',
       billing_expr: 'tier("request", fixed(0.01))',
     })
-    const { rerender } = render(
-      <ModelCard model={model} onClick={vi.fn()} tokenUnit='K' />
-    )
+    const { rerender } = render(<ModelCard model={model} tokenUnit='K' />)
     expect(screen.getByText('$0.01')).toBeVisible()
     expect(screen.getByText('/ request')).toBeVisible()
-    rerender(<ModelCard model={model} onClick={vi.fn()} tokenUnit='M' />)
+    rerender(<ModelCard model={model} tokenUnit='M' />)
     expect(screen.getByText('$0.01')).toBeVisible()
     expect(screen.queryByText('/ 1M')).not.toBeInTheDocument()
   })
@@ -128,7 +126,7 @@ describe('model cards', () => {
       billing_expr:
         'hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12 ? tier("peak", p * 3 + c * 9) : tier("off_peak", p * 1.5 + c * 4.5)',
     })
-    render(<ModelCard model={model} onClick={vi.fn()} tokenUnit='M' />)
+    render(<ModelCard model={model} tokenUnit='M' />)
     expect(screen.getByText('Current period price')).toBeVisible()
     expect(screen.getByText('$1.5')).toBeVisible()
     act(() => vi.advanceTimersByTime(1000))
@@ -140,24 +138,18 @@ describe('model cards', () => {
     expect(screen.getByText('$1.5')).toBeVisible()
   })
 
-  it('copies the complete long model name without opening details', async () => {
+  it('copies the complete long model name without exposing a details button', async () => {
     const user = userEvent.setup()
-    const onClick = vi.fn()
     const name = 'provider/model-with-a-long-name-and-a-version-suffix-20260906'
-    render(
-      <ModelCard model={pricingModel({ model_name: name })} onClick={onClick} />
-    )
+    render(<ModelCard model={pricingModel({ model_name: name })} />)
     expect(screen.getByRole('heading', { name })).toHaveAttribute('title', name)
     await user.click(screen.getByRole('button', { name: 'Copy model name' }))
     expect(await navigator.clipboard.readText()).toBe(name)
-    expect(onClick).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Details' }))
-    expect(onClick).toHaveBeenCalledOnce()
-    expect(onClick).toHaveBeenCalledWith(name)
+    expect(screen.queryByRole('button', { name: 'Details' })).toBeNull()
   })
 
   it('shows missing values without placeholder bars when metrics are unavailable', () => {
-    render(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
+    render(<ModelCard model={pricingModel()} />)
     const metrics = screen.getByLabelText(
       'Performance metrics for the last 24 hours'
     )
@@ -171,14 +163,13 @@ describe('model cards', () => {
     expect(statusStrip).toHaveTextContent('—')
     expect(statusStrip.querySelectorAll('[aria-hidden]')).toHaveLength(0)
     expect(screen.getByText('No description available.')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Details' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Details' })).toBeNull()
   })
 
   it('uses fixed spacing between available status samples', () => {
     render(
       <ModelCard
         model={pricingModel()}
-        onClick={vi.fn()}
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -228,7 +219,6 @@ describe('model cards', () => {
             pricingModel({ model_name: 'active-model' }),
             pricingModel({ id: 2, model_name: 'idle-model' }),
           ]}
-          onModelClick={vi.fn()}
         />
       </QueryClientProvider>
     )
@@ -273,7 +263,6 @@ describe('model cards', () => {
           supported_endpoint_types: endpoints,
           tags: tags.join(','),
         })}
-        onClick={vi.fn()}
       />
     )
 
@@ -304,12 +293,7 @@ describe('model cards', () => {
   })
 
   it('omits metadata fields when the model has no groups, endpoints or tags', () => {
-    render(
-      <ModelCard
-        model={pricingModel({ enable_groups: [] })}
-        onClick={vi.fn()}
-      />
-    )
+    render(<ModelCard model={pricingModel({ enable_groups: [] })} />)
     expect(screen.queryByText('Groups')).not.toBeInTheDocument()
     expect(screen.queryByText('Endpoints')).not.toBeInTheDocument()
     expect(
@@ -327,7 +311,6 @@ describe('model cards', () => {
       render(
         <ModelCard
           model={pricingModel()}
-          onClick={vi.fn()}
           perf={{ avg_latency_ms: 1200, avg_tps: 42, success_rate }}
         />
       )
@@ -344,7 +327,6 @@ describe('model cards', () => {
   it('keeps group and recharge pricing correct when changing the token unit, including a free cache price', () => {
     const props = {
       model: pricingModel({ cache_ratio: 0 }),
-      onClick: vi.fn(),
       selectedGroup: 'premium',
       showRechargePrice: true,
       priceRate: 3,
@@ -376,7 +358,6 @@ describe('model cards', () => {
     render(
       <ModelCard
         model={pricingModel({ quota_type: 1, model_price: 0.4 })}
-        onClick={vi.fn()}
         selectedGroup='premium'
         showRechargePrice
         priceRate={3}
@@ -397,7 +378,6 @@ describe('model cards', () => {
           billing_mode: 'tiered_expr',
           billing_expr: 'tier("base", p * 3 + c * 15)',
         })}
-        onClick={vi.fn()}
         tokenUnit='K'
         selectedGroup='premium'
         showRechargePrice
@@ -420,7 +400,6 @@ describe('model cards', () => {
           billing_mode: 'tiered_expr',
           billing_expr: 'tier("base", p * 0.15 + c * 0.6 + cr * 0.003)',
         })}
-        onClick={vi.fn()}
         tokenUnit='M'
         selectedGroup='default'
       />
@@ -450,7 +429,6 @@ describe('model cards', () => {
             },
           ],
         })}
-        onClick={vi.fn()}
         tokenUnit='M'
         selectedGroup='default'
       />
@@ -465,7 +443,6 @@ describe('model cards', () => {
           billing_mode: 'tiered_expr',
           billing_expr: 'tier("base", cr * 0.5)',
         })}
-        onClick={vi.fn()}
         tokenUnit='M'
         selectedGroup='default'
       />
@@ -487,7 +464,6 @@ describe('model cards', () => {
             mode: { enum: ['std', 'pro'] },
           },
         })}
-        onClick={vi.fn()}
         tokenUnit='K'
       />
     )
@@ -502,7 +478,6 @@ describe('model cards', () => {
         model={pricingModel({
           billing_usage_schema: { seconds: { type: 'number', unit: 'second' } },
         })}
-        onClick={vi.fn()}
       />
     )
     expect(
@@ -526,7 +501,6 @@ describe('model cards', () => {
             { label: '480p · 5s', facts: { tokens: 48000, mode: 'std' } },
           ],
         })}
-        onClick={vi.fn()}
         tokenUnit='K'
       />
     )
@@ -546,7 +520,6 @@ describe('model cards', () => {
           billing_expr: expression,
           billing_usage_schema: { seconds: { type: 'number', unit: 'second' } },
         })}
-        onClick={vi.fn()}
       />
     )
     expect(screen.getByText('Special billing expression')).toBeVisible()
@@ -557,10 +530,9 @@ describe('model cards', () => {
     const request = vi
       .spyOn(api, 'get')
       .mockRejectedValue(new Error('metrics unavailable'))
-    const onModelClick = vi.fn()
     render(
       <QueryClientProvider client={queryClient}>
-        <ModelCardGrid models={[pricingModel()]} onModelClick={onModelClick} />
+        <ModelCardGrid models={[pricingModel()]} />
       </QueryClientProvider>
     )
     await waitFor(() =>
@@ -581,9 +553,7 @@ describe('model cards', () => {
         screen.getByLabelText('Performance metrics for the last 24 hours')
       ).getAllByText(/^—/)
     ).toHaveLength(4)
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Details' }))
-    expect(onModelClick).toHaveBeenCalledWith('example-model')
+    expect(screen.queryByRole('button', { name: 'Details' })).toBeNull()
   })
 
   it('paginates the model cards and disables navigation at both boundaries', async () => {
@@ -596,7 +566,7 @@ describe('model cards', () => {
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
-        <ModelCardGrid models={models} onModelClick={vi.fn()} />
+        <ModelCardGrid models={models} />
       </QueryClientProvider>
     )
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
@@ -627,7 +597,7 @@ describe('model cards', () => {
     })
     render(
       <QueryClientProvider client={queryClient}>
-        <ModelCardGrid models={[pricingModel()]} onModelClick={vi.fn()} />
+        <ModelCardGrid models={[pricingModel()]} />
       </QueryClientProvider>
     )
     const grid = screen
@@ -646,7 +616,6 @@ describe('model cards', () => {
     render(
       <ModelCard
         model={pricingModel()}
-        onClick={vi.fn()}
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -678,7 +647,6 @@ describe('model cards', () => {
     render(
       <ModelCard
         model={pricingModel()}
-        onClick={vi.fn()}
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -723,7 +691,6 @@ describe('model cards', () => {
     render(
       <ModelCard
         model={pricingModel()}
-        onClick={vi.fn()}
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
@@ -751,7 +718,6 @@ describe('model cards', () => {
       render(
         <ModelCard
           model={pricingModel()}
-          onClick={vi.fn()}
           perf={{
             avg_latency_ms: 1200,
             avg_tps: 42,
@@ -777,7 +743,6 @@ describe('model cards', () => {
     render(
       <ModelCard
         model={pricingModel()}
-        onClick={vi.fn()}
         perf={{
           avg_latency_ms: 1200,
           avg_tps: 42,
