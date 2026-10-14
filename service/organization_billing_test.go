@@ -102,12 +102,48 @@ func TestOrganizationWalletFundingPinsOrganizationAcrossMembershipChange(t *test
 
 	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
 	require.NoError(t, funding.PreConsume(25))
-	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 2).Update("organization_id", 2).Error)
+	// The member leaves organization 1 (cap zeroed) and joins organization 2
+	// before the request is refunded.
+	previousQuota, err := model.ClearOrganizationMembership(2, 1)
+	require.NoError(t, err)
+	require.Equal(t, 75, previousQuota)
+	require.NoError(t, model.AssignUserToOrganization(2, 2, model.OrganizationRoleMember))
+	require.NoError(t, funding.Refund())
+
+	require.Equal(t, 0, getUserQuotaForBillingTest(t, 2), "an ex-member's cap is not refunded into a balance")
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 1).Quota, "the pinned organization is refunded")
+	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 2).Quota)
+}
+
+func TestOrganizationWalletFundingRefundCreditsMemberStillInPinnedOrganization(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.NoError(t, funding.PreConsume(25))
 	require.NoError(t, funding.Refund())
 
 	require.Equal(t, 100, getUserQuotaForBillingTest(t, 2))
 	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 1).Quota)
-	require.Equal(t, int64(1000), getOrganizationForBillingTest(t, 2).Quota)
+}
+
+func TestOrganizationWalletFundingRefundAfterRemovalDoesNotMintPersonalBalance(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 1, "owner", 1000, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 2, "member", 100, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 1)
+
+	funding := &OrganizationWalletFunding{memberId: 2, organizationId: 1}
+	require.NoError(t, funding.PreConsume(25))
+	_, err := model.ClearOrganizationMembership(2, 1)
+	require.NoError(t, err)
+	// A negative settlement (actual usage below the pre-charge) after removal.
+	require.NoError(t, funding.Settle(-10))
+
+	require.Equal(t, 0, getUserQuotaForBillingTest(t, 2))
+	require.Equal(t, int64(985), getOrganizationForBillingTest(t, 1).Quota)
 }
 
 func TestOrganizationWalletFundingRollsBackMemberWhenOrganizationInsufficient(t *testing.T) {

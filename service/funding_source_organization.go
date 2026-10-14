@@ -48,18 +48,42 @@ func adjustWalletQuotaForOrganization(userId int, organizationId int, delta int)
 	}
 
 	refund := -delta
-	if err := model.IncreaseUserQuota(userId, refund, false); err != nil {
+	memberCredited, err := refundMemberLimit(userId, organizationId, refund)
+	if err != nil {
 		return err
 	}
 	if organizationId > 0 {
 		if err := model.IncreaseOrganizationQuota(organizationId, int64(refund)); err != nil {
-			if rollbackErr := model.DecreaseUserQuota(userId, refund, false); rollbackErr != nil {
-				common.SysLog(common.LogText("error rolling back member limit refund (userId=%d, organizationId=%d, amount=%d): %s", userId, organizationId, refund, rollbackErr.Error()))
+			if memberCredited {
+				if rollbackErr := model.DecreaseUserQuota(userId, refund, false); rollbackErr != nil {
+					common.SysLog(common.LogText("error rolling back member limit refund (userId=%d, organizationId=%d, amount=%d): %s", userId, organizationId, refund, rollbackErr.Error()))
+				}
 			}
 			return err
 		}
 	}
 	return nil
+}
+
+// refundMemberLimit credits the member limit of the pinned organization only
+// while the user is still in it: an ex-member's cap was zeroed on removal and
+// must not come back as personal balance. The organization wallet is refunded
+// by the caller either way.
+func refundMemberLimit(userId int, organizationId int, refund int) (bool, error) {
+	if organizationId <= 0 {
+		if err := model.IncreaseUserQuota(userId, refund, false); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	credited, err := model.IncreaseOrganizationMemberQuota(userId, organizationId, refund)
+	if err != nil {
+		return false, err
+	}
+	if !credited {
+		common.SysLog(common.LogText("skipped member limit refund: user %d is no longer in organization %d (amount=%d)", userId, organizationId, refund))
+	}
+	return credited, nil
 }
 
 func reserveWalletQuotaForOrganization(userId int, organizationId int, amount int) error {

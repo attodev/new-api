@@ -42,9 +42,12 @@ func CheckMidjourneyOrganizationBilling(userId int) error {
 }
 
 // prepareMidjourneyOrganizationBilling pins the member's organization on the
-// relay info. Organization plan members are rejected: legacy Midjourney cannot
-// bill a plan and a plan member must not fall back to personal quota.
-func prepareMidjourneyOrganizationBilling(relayInfo *relaycommon.RelayInfo) error {
+// relay info and on the task row (midjourneys.organization_id), so a refund
+// returns to the organization that was charged. Organization plan members are
+// rejected: legacy Midjourney cannot bill a plan and a plan member must not
+// fall back to personal quota.
+func prepareMidjourneyOrganizationBilling(relayInfo *relaycommon.RelayInfo, task *model.Midjourney) error {
+	task.OrganizationId = 0
 	user, err := model.GetUserById(relayInfo.UserId, false)
 	if err != nil {
 		return err
@@ -60,29 +63,31 @@ func prepareMidjourneyOrganizationBilling(relayInfo *relaycommon.RelayInfo) erro
 		return errors.New("legacy Midjourney billing does not support organization plans")
 	}
 	relayInfo.BillingOrganizationId = user.OrganizationId
+	task.OrganizationId = user.OrganizationId
 	return nil
 }
 
+// refundMidjourneyUserQuota replaces upstream's IncreaseUserQuota in
+// RefundMidjourneyQuota. A task charged to an organization credits the member
+// limit only while the user is still in that organization (refundMemberLimit);
+// a personal task refunds the user exactly as upstream does.
+func refundMidjourneyUserQuota(task *model.Midjourney, quota int) error {
+	_, err := refundMemberLimit(task.UserId, task.OrganizationId, quota)
+	return err
+}
+
 // refundMidjourneyOrganizationQuota is the organization half of
-// RefundMidjourneyQuota; upstream has already refunded the member limit with
-// IncreaseUserQuota, so only the organization wallet and used_quota are
-// restored here. The midjourneys row stores no organization id, so the refund
-// goes to the member's current organization (the one charged unless the
-// member changed organization while the task ran).
-func refundMidjourneyOrganizationQuota(userId int, quota int) {
-	if quota <= 0 {
+// RefundMidjourneyQuota: the organization wallet and used_quota of the
+// organization stored on the task row are restored. Personal tasks
+// (organization_id 0) touch no organization, even if the user joined one since.
+func refundMidjourneyOrganizationQuota(task *model.Midjourney, quota int) {
+	if quota <= 0 || task.OrganizationId <= 0 {
 		return
 	}
-	organizationId, err := resolveOrganizationForWallet(userId)
-	if err != nil {
-		common.SysLog(common.LogText("error resolving organization for Midjourney refund (userId=%d): %s", userId, err.Error()))
-		return
+	if err := model.IncreaseOrganizationQuota(task.OrganizationId, int64(quota)); err != nil {
+		common.SysLog(common.LogText("error refunding organization wallet for Midjourney task (userId=%d, organizationId=%d, quota=%d): %s", task.UserId, task.OrganizationId, quota, err.Error()))
 	}
-	if organizationId <= 0 {
-		return
+	if err := model.UpdateOrganizationUsedQuota(task.OrganizationId, int64(-quota)); err != nil {
+		common.SysLog(common.LogText("error updating organization used quota for Midjourney refund (organizationId=%d, quota=%d): %s", task.OrganizationId, quota, err.Error()))
 	}
-	if err := model.IncreaseOrganizationQuota(organizationId, int64(quota)); err != nil {
-		common.SysLog(common.LogText("error refunding organization wallet for Midjourney task (userId=%d, organizationId=%d, quota=%d): %s", userId, organizationId, quota, err.Error()))
-	}
-	UpdateOrganizationUsedQuotaForUser(userId, -quota)
 }

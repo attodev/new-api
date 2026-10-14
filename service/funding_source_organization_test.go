@@ -61,8 +61,11 @@ func TestTaskRefundUsesPinnedOrganization(t *testing.T) {
 	require.NoError(t, model.DB.Create(second).Error)
 	seedOrganizationUser(t, 10, "member", 500, 1, model.OrganizationRoleMember)
 	task := &model.Task{UserId: 10, Quota: 100, PrivateData: model.TaskPrivateData{BillingSource: BillingSourceWallet, OrganizationId: 1}}
-	// Member moved to organization 2 after the task was charged.
-	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 10).Update("organization_id", 2).Error)
+	// The member left organization 1 (cap zeroed) and joined organization 2
+	// after the task was charged.
+	_, err := model.ClearOrganizationMembership(10, 1)
+	require.NoError(t, err)
+	require.NoError(t, model.AssignUserToOrganization(10, 2, model.OrganizationRoleMember))
 	handled, err := taskAdjustOrganizationFunding(task, -100)
 	require.True(t, handled)
 	require.NoError(t, err)
@@ -70,4 +73,22 @@ func TestTaskRefundUsesPinnedOrganization(t *testing.T) {
 	q2, _ := model.GetOrganizationQuota(2)
 	require.EqualValues(t, 1100, q1, "refund goes to the pinned organization")
 	require.EqualValues(t, 1000, q2)
+	memberQuota, err := model.GetUserQuota(10, true)
+	require.NoError(t, err)
+	require.Zero(t, memberQuota, "an ex-member's cap is not refunded into a balance")
+}
+
+func TestTaskRefundCreditsMemberStillInPinnedOrganization(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 10)
+	seedOrganizationUser(t, 10, "member", 500, 1, model.OrganizationRoleMember)
+	task := &model.Task{UserId: 10, Quota: 100, PrivateData: model.TaskPrivateData{BillingSource: BillingSourceWallet, OrganizationId: 1}}
+	handled, err := taskAdjustOrganizationFunding(task, -100)
+	require.True(t, handled)
+	require.NoError(t, err)
+	q1, _ := model.GetOrganizationQuota(1)
+	require.EqualValues(t, 1100, q1)
+	memberQuota, err := model.GetUserQuota(10, true)
+	require.NoError(t, err)
+	require.Equal(t, 600, memberQuota)
 }

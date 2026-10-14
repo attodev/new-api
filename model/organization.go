@@ -119,6 +119,35 @@ func TryReserveOrganizationQuota(organizationId int, quota int64) (bool, error) 
 	return result.RowsAffected == 1, result.Error
 }
 
+// IncreaseOrganizationMemberQuota refunds quota to a member limit only while
+// the user is still a member of organizationId. Removal zeroes users.quota so
+// the cap never becomes personal money; a refund that arrives after removal
+// must not undo that. credited=false (and no write) when the user has left.
+func IncreaseOrganizationMemberQuota(userId int, organizationId int, quota int) (credited bool, err error) {
+	if quota < 0 {
+		return false, errors.New("quota cannot be negative")
+	}
+	if userId <= 0 || organizationId <= 0 {
+		return false, errors.New("invalid organization member")
+	}
+	if quota == 0 {
+		return true, nil
+	}
+	result := DB.Model(&User{}).
+		Where("id = ? AND organization_id = ?", userId, organizationId).
+		Update("quota", gorm.Expr("quota + ?", quota))
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+	if err := InvalidateUserCache(userId); err != nil {
+		common.SysLog(common.LogText("failed to invalidate user cache after organization member refund (userId=%d): %s", userId, err.Error()))
+	}
+	return true, nil
+}
+
 func UpdateOrganizationUsedQuota(organizationId int, quota int64) error {
 	if organizationId <= 0 || quota == 0 {
 		return nil

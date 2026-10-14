@@ -26,6 +26,7 @@ func TestPrepareMidjourneyOrganizationBillingPinsOrganization(t *testing.T) {
 	require.True(t, prepared)
 	require.Equal(t, 1, info.BillingOrganizationId)
 	require.Equal(t, 100, task.Quota)
+	require.Equal(t, 1, task.OrganizationId, "the charged organization is stored on the task row")
 
 	// Member with an organization plan: legacy Midjourney cannot bill a plan.
 	planInfo := &relaycommon.RelayInfo{UserId: 3}
@@ -42,6 +43,21 @@ func TestPrepareMidjourneyOrganizationBillingPinsOrganization(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, prepared)
 	require.Equal(t, 0, soloInfo.BillingOrganizationId)
+}
+
+func TestMidjourneyTaskRowPersistsPinnedOrganization(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 500, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+
+	task := &model.Midjourney{UserId: 2, MjId: "mj-pinned"}
+	_, err := PrepareMidjourneyTaskBilling(&relaycommon.RelayInfo{UserId: 2}, task, 100, true)
+	require.NoError(t, err)
+	require.NoError(t, task.Insert())
+
+	var reloaded model.Midjourney
+	require.NoError(t, model.DB.First(&reloaded, task.Id).Error)
+	require.Equal(t, 1, reloaded.OrganizationId)
 }
 
 func TestSettleMidjourneyChargesMemberLimitAndOrganizationWallet(t *testing.T) {
@@ -70,11 +86,57 @@ func TestRefundMidjourneyOrganizationQuota(t *testing.T) {
 	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).
 		Updates(map[string]any{"quota": 900, "used_quota": 100}).Error)
 
-	task := &model.Midjourney{UserId: 2, MjId: "mj-refund", Quota: 100}
+	task := &model.Midjourney{UserId: 2, MjId: "mj-refund", Quota: 100, OrganizationId: 1}
 	require.NoError(t, task.Insert())
 	require.True(t, RefundMidjourneyQuota(context.Background(), task, "failed"))
 
 	require.Equal(t, 500, getUserQuotaForBillingTest(t, 2), "member refunded exactly once")
+	org := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, int64(1000), org.Quota)
+	require.Equal(t, int64(0), org.UsedQuota)
+}
+
+// A member charged in organization 1, removed, then added to organization 2
+// before the task fails: organization 1 gets its money back, organization 2 is
+// untouched and the ex-member's zeroed cap is not credited.
+func TestRefundMidjourneyAfterMemberMovedRefundsPinnedOrganizationOnly(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 400, 1, model.OrganizationRoleMember)
+	seedOrganizationUser(t, 3, "owner-two", 0, 2, model.OrganizationRoleOwner)
+	seedOrganization(t, 1, 2)
+	second := &model.Organization{Id: 2, Name: "org-two", OwnerUserId: 3, Status: model.OrganizationStatusEnabled, Quota: 1000}
+	require.NoError(t, model.DB.Create(second).Error)
+	require.NoError(t, model.DB.Model(&model.Organization{}).Where("id = ?", 1).
+		Updates(map[string]any{"quota": 900, "used_quota": 100}).Error)
+	task := &model.Midjourney{UserId: 2, MjId: "mj-moved", Quota: 100, OrganizationId: 1}
+	require.NoError(t, task.Insert())
+
+	_, err := model.ClearOrganizationMembership(2, 1)
+	require.NoError(t, err)
+	require.NoError(t, model.AssignUserToOrganization(2, 2, model.OrganizationRoleMember))
+	require.True(t, RefundMidjourneyQuota(context.Background(), task, "failed"))
+
+	require.Equal(t, 0, getUserQuotaForBillingTest(t, 2))
+	first := getOrganizationForBillingTest(t, 1)
+	require.Equal(t, int64(1000), first.Quota)
+	require.Equal(t, int64(0), first.UsedQuota)
+	moved := getOrganizationForBillingTest(t, 2)
+	require.Equal(t, int64(1000), moved.Quota)
+	require.Equal(t, int64(0), moved.UsedQuota)
+}
+
+// A task charged to a personal user who joins an organization before the
+// refund refunds the user only; the organization never paid for it.
+func TestRefundMidjourneyPersonalTaskDoesNotCreditJoinedOrganization(t *testing.T) {
+	truncate(t)
+	seedOrganizationUser(t, 2, "member", 400, 1, model.OrganizationRoleMember)
+	seedOrganization(t, 1, 2)
+	task := &model.Midjourney{UserId: 2, MjId: "mj-personal", Quota: 100}
+	require.NoError(t, task.Insert())
+
+	require.True(t, RefundMidjourneyQuota(context.Background(), task, "failed"))
+
+	require.Equal(t, 500, getUserQuotaForBillingTest(t, 2))
 	org := getOrganizationForBillingTest(t, 1)
 	require.Equal(t, int64(1000), org.Quota)
 	require.Equal(t, int64(0), org.UsedQuota)
