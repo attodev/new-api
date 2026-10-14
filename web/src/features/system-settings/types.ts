@@ -326,6 +326,12 @@ export type BillingSettings = {
   StripeUnitPrice: number
   StripeMinTopUp: number
   StripePromotionCodesEnabled: boolean
+  PayPalClientId: string
+  PayPalClientSecret: string
+  PayPalWebhookID: string
+  PayPalSandbox: boolean
+  PayPalUnitPrice: number
+  PayPalMinTopUp: number
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean

@@ -7286,6 +7286,19 @@
     "Select .xlsx file": "Select .xlsx file",
     "Import failed": "Import failed",
     "Errors": "Errors",
-    "Export failed": "Export failed"
+    "Export failed": "Export failed",
+    "PayPal Gateway": "PayPal Gateway",
+    "Configuration for PayPal payment integration": "Configuration for PayPal payment integration",
+    "Callback Configuration:": "Callback Configuration:",
+    "Return URL:": "Return URL:",
+    "PayPal Developer Dashboard": "PayPal Developer Dashboard",
+    "Enter PayPal Client ID": "Enter PayPal Client ID",
+    "PayPal Client ID (public identifier)": "PayPal Client ID (public identifier)",
+    "PayPal application Client Secret": "PayPal application Client Secret",
+    "Leave blank unless updating": "Leave blank unless updating",
+    "Webhook ID": "Webhook ID",
+    "Webhook ID from PayPal Developer Dashboard": "Webhook ID from PayPal Developer Dashboard",
+    "Used to verify PayPal webhook signatures": "Used to verify PayPal webhook signatures",
+    "Use the PayPal sandbox environment": "Use the PayPal sandbox environment"
   }
 }
