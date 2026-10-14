@@ -46,7 +46,7 @@ describe('BillingBreakdown discount row', () => {
     expect(screen.getByText('Group Ratio')).toBeInTheDocument()
     expect(screen.getByText('0.9000x')).toBeInTheDocument()
     expect(screen.getByText('Model discount')).toBeInTheDocument()
-    expect(screen.getByText('×0.7000')).toBeInTheDocument()
+    expect(screen.getByText('0.7000x')).toBeInTheDocument()
     expect(screen.queryByText('Vendor discount')).toBeNull()
   })
 
@@ -57,8 +57,18 @@ describe('BillingBreakdown discount row', () => {
       discount_source: 'vendor',
     })
     expect(screen.getByText('Vendor discount')).toBeInTheDocument()
-    expect(screen.getByText('×0.8000')).toBeInTheDocument()
+    expect(screen.getByText('0.8000x')).toBeInTheDocument()
     expect(screen.queryByText('Model discount')).toBeNull()
+  })
+
+  it('keeps the row for a full (100% off) vendor discount', () => {
+    renderBreakdown({
+      group_ratio: 1,
+      discount_multiplier: 0,
+      discount_source: 'vendor',
+    })
+    expect(screen.getByText('Vendor discount')).toBeInTheDocument()
+    expect(screen.getByText('0.0000x')).toBeInTheDocument()
   })
 
   it('omits the row without a discount', () => {

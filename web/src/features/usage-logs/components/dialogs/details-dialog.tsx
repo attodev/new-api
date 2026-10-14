@@ -250,7 +250,7 @@ export function BillingBreakdown(props: {
         other.discount_source === 'vendor'
           ? t('Vendor discount')
           : t('Model discount'),
-      value: `×${formatRatio(other.discount_multiplier)}`,
+      value: `${formatRatio(other.discount_multiplier)}x`,
     })
   }
 
