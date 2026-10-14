@@ -91,17 +91,17 @@ type User struct {
 	OidcId               string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
 	WeChatId             string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
 	TelegramId           string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode     string                     `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
-	AccessToken          *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
-	AccessTokenCreatedAt *int64                     `json:"-" gorm:"type:bigint;column:access_token_created_at"`    // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
-	Quota                int                        `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota            int                        `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	VerificationCode     string                     `json:"verification_code" gorm:"-:all"`                            // this field is only for Email verification, don't save it to database!
+	AccessToken          *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"`    // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
+	AccessTokenCreatedAt *int64                     `json:"-" gorm:"type:bigint;column:access_token_created_at"`       // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
+	Quota                int                        `json:"quota" gorm:"type:bigint;default:0"`                        // fork: wallet columns stay bigint (docs/fork-overlays.md)
+	UsedQuota            int                        `json:"used_quota" gorm:"type:bigint;default:0;column:used_quota"` // fork: bigint
+	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`                  // request number
 	Group                string                     `json:"group" gorm:"type:varchar(64);default:'default'"`
 	AffCode              string                     `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	AffCount             int                        `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota             int                        `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
-	AffHistoryQuota      int                        `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
+	AffQuota             int                        `json:"aff_quota" gorm:"type:bigint;default:0;column:aff_quota"`           // fork: bigint
+	AffHistoryQuota      int                        `json:"aff_history_quota" gorm:"type:bigint;default:0;column:aff_history"` // fork: bigint
 	InviterId            int                        `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
 	DeletedAt            gorm.DeletedAt             `gorm:"index"`
 	LinuxDOId            string                     `json:"linux_do_id" gorm:"column:linux_do_id;index"`

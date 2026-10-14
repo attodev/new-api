@@ -5,7 +5,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
-| (Task별로 채운다) | | | |
+| 공통(quota) | model/user.go:97-104 | Quota/UsedQuota/AffQuota/AffHistoryQuota 태그 type:bigint | model/user_quota_columns_fork_test.go |
 
 ## 빌드·테스트 전제
 - `web/dist/index.html`이 있어야 루트 패키지가 빌드된다 (`cd web && bun run build`).
