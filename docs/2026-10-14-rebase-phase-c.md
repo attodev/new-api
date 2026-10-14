@@ -94,8 +94,8 @@
 
 ### 결정 6(I2) 확정 — Task 8
 - 초대·수락 단계는 없다. `GET /api/organization/assignable-users`를 없애고 `GET /api/organization/users/lookup`(새 fork 파일 `controller/organization_member_lookup.go`)으로 바꿨다. `?username=` 정확 일치 또는 `?email=` 정확 일치(대소문자 무시), 범위는 `role < admin`이고 미소속이거나 같은 조직. 정확히 한 명일 때만 `{id, username, display_name, organization_id}`, 아니면 404 `user not found`. 라우트 수는 38 그대로.
-- 미소속 사용자는 `quota > 0`, `aff_quota > 0` 또는 활성 개인 구독이 있으면 할당이 거부된다(`AssignUserToOrganization` 트랜잭션 안, 사용자 행을 잠근 직후). 같은 조직 구성원의 역할 변경은 해당 없다.
-- 화면: `Username or email` → `Look up user` → 결과 줄 → `Add`. username을 먼저 조회하고, 없으면서 `@`가 있으면 email로 다시 조회한다. 이미 구성원이면 `Already a member`로 `Add`를 막는다. 거부되면 `This user still has a personal balance or subscription`.
+- 미소속 사용자는 `quota > 0`, `aff_quota > 0`, 활성 개인 구독 또는 결제 대기 중인 개인 주문(최종 수정 I2)이 있으면 할당이 거부된다(`AssignUserToOrganization` 트랜잭션 안, 사용자 행을 잠근 직후). 같은 조직 구성원의 역할 변경은 해당 없다.
+- 화면: `Username or email` → `Look up user` → 결과 줄 → `Add`. username을 먼저 조회하고, 없으면서 `@`가 있으면 email로 다시 조회한다. 이미 구성원이면 `Already a member`로 `Add`를 막는다. 거부되면 `This user still has a personal balance, subscription or pending orders`(최종 수정 I2 전에는 `This user still has a personal balance or subscription`).
 - Excel 가져오기: 기존 미소속 사용자 행은 같은 규칙으로 행 오류. 가져오기가 새로 만드는 사용자는 검사하지 않는다(§4 ruling).
 
 ### 결정 7(I7) 확정 — Task 9
@@ -123,6 +123,18 @@
 - `docs/openapi/organization-rest-api.md`, `docs/manuals/organization-management-manual.md`, `docs/manuals/organization-test-guide.md`는 Task 8–10이 고쳤다. Task 11에서 관리 매뉴얼에 남은 것(관리자에게도 충전 버튼이 보인다는 문장, 조직 삭제 전 만료 API, 조직 회원의 추천·출석 거부, 로그 상세의 할인·타이밍)을 고쳤다. 화면 매뉴얼 `organization-user-manual.md`에 남아 있던 단계 B 흐름(할당 후보 목록, `Disable`, 플랫폼 remark)도 조회·정지·조직 메모로 바꿨다.
 - 할인 문서(`docs/discount/`): team 문서 두 개를 가져와 고쳤다. 경로 `web/default/src` → `web/src`, "Show formula" 절 → `Billing Details`의 `Model discount 0.7500x` 행, 설정 위치 → Billing & Payment → Group Pricing → Discounts 탭·저장 `Save group settings`, 파일 맵 → 이 계획의 파일 구조(`tool_billing.go`는 develop에 없음), 우선순위 → 요청 모델 우선 4단계, `pre/post_llm_ms`는 admin 전용. 스크린샷은 Task 3·5에서 develop 화면으로 찍은 두 장이다.
 
+## 3a. 최종 수정 웨이브 (전체 브랜치 리뷰 I1·I2·M1–M6)
+
+리뷰: `.superpowers/sdd/2026-10-14-rebase-phase-c/final-review.md`. 결과: `final-fix-report.md`.
+
+| 커밋 | 항목 | 내용 |
+|---|---|---|
+| 55cd4692d | I1 | `updatePricing`이 모델→벤더 맵을 지역 맵으로 만들고 루프 뒤 `publishModelVendorNames`로 한 번에 교체한다. `InvalidatePricingCache`는 맵을 지우지 않는다. resolver는 스냅숏만 읽고, 스냅숏이 아직 없을 때(첫 시작)만 1분에 한 번 `GetPricing()`을 부른다(음수 캐시 타임스탬프) |
+| e9033aaf3 | I2·M4 | 가입 거부에 결제 대기 개인 주문 추가(`top_ups`의 pending이면서 조직 지갑이 아닌 것, `subscription_orders`의 pending). 메시지 `…subscription or pending orders…`, 화면 안내 `This user still has a personal balance, subscription or pending orders`(7개 locale). Excel 기존 사용자 배정 + 회원 필드를 한 트랜잭션(`AssignUserToOrganizationWithMemberFields`)으로 |
+| 6754b2b08 | M1·M2·M5 | 출석 테스트의 비회원 경로를 가드 직접 검사로 바꿔 `-race` 경합 제거. 무료 모델 판정 4곳이 할인 전 group ratio(`freeModelGroupRatio`)를 본다. `/api/organization/*` 비-GET 가드가 actor 행을 한 번 읽어 gin context에 두고 `getOrganizationActor`가 재사용(회원 정보 읽기 3 → 1) |
+| 662e9e2b1 | M3 | 사용 로그 목록(데스크톱 토큰 칸·요약 세그먼트·모바일 카드)의 group ratio 옆에 `−{percent}%` |
+| (이 문서 커밋) | M6 | `details-dialog.tsx:170`, `group-ratio-form.tsx:69`(oxfmt가 줄 끝 주석을 옮기므로 export 바로 앞 줄), `relay_info_test.go:8`(줄 끝)에 `fork:` 표식. 관리 매뉴얼 문제 해결 제목이 화면 안내 문구를 인용하게 한 것은 I2 문구 변경과 함께 e9033aaf3에 들어갔다 |
+
 ## 4. 결정 사항
 
 계획 단계(계획 하단 1–10): §1–3에 반영. 계획 결정 3(과금 모델명 기준 fold)은 아래 첫 ruling으로 대체됐고, 계획 결정 4의 "pre/post는 저장만"은 아래 셋째 ruling으로 admin 범위가 정해졌다.
@@ -134,6 +146,9 @@
 - (Task 6) timing writer에 쓴 기록이 없으면(hijack된 realtime WebSocket) `e2e_ms`를 포함해 타이밍 키를 쓰지 않는다. 세션 나이를 지연 시간으로 보고하지 않기 위해서다. 대가: WSS 로그에는 타이밍이 없다(원래 의미 있는 값이 없었음).
 - (Task 8) Excel 가져오기가 **새로 만드는** 사용자는 개인 잔액 검사 없이 배정한다(개인 돈이 없었고, 가입 보너스는 결제 잔액이 아니며 시트의 quota 칸이 한도를 정함). 대가: 시트가 quota를 덮지 않으면 `QuotaForNewUser` 보너스가 그 회원의 한도로 시작한다.
 - (Task 9) 정지된 회원은 `/api/organization/*`의 GET이 아닌 요청을 하나도 할 수 없다(Phase B 미들웨어에서 root가 아닌 actor에 적용; owner는 정지할 수 없어 충전은 영향 없음). 대가: 정지된 관리자는 재개될 때까지 관리 화면에서 아무것도 바꿀 수 없다.
+- (최종 수정 I1) 벤더명 맵은 불변 스냅숏이다. 재구축은 지역 맵을 채운 뒤 한 번에 바꾸고, `InvalidatePricingCache`는 맵을 nil로 만들지 않는다. 대가: 벤더 소속이 바뀐 모델은 다음 재구축(최대 1분 또는 `/api/pricing` 호출)까지 이전 벤더 할인을 받는다. 첫 시작에 가격 재구축이 실패하면 1분 동안은 벤더 할인 없이 청구된다(음수 캐시, DB 장애 때 재구축 폭주 방지).
+- (최종 수정 I2) 결제 대기 중인 개인 충전·구독 주문이 있으면 조직 가입을 거부한다(정산은 가입 여부를 다시 보지 않으므로, 가입 전에 연 결제가 가입 뒤 끝나면 사용자 돈이 조직 한도가 된다). 대가: 결제사가 만료시키지 않는 버려진 주문(예: Epay 충전)은 운영자가 그 주문의 `status`를 `expired`로 바꿀 때까지 가입을 막는다(§5).
+- (최종 수정 M2) 할인(100% 포함)은 `FreeModel`을 바꾸지 않는다. 무료 모델 판정은 할인 전 group ratio로 한다. 100% 할인 모델도 결제 세션을 거쳐 0을 예약하므로 정지된 회원·비활성 조직은 막히고, 로그에는 `discount_multiplier` 0이 남는다.
 - (Task 10) root가 만료시킨 "결제 완료됐지만 아직 pending인" 조직 주문은 뒤늦은 웹훅으로도 적립되지 않는다(upstream Stripe 만료와 같음). 1시간 나이 기준과 OpenAPI §3.5의 운영자 안내로 경합을 좁힌다. 대가: 만료 호출 중에 결제된 주문은 provider 환불로만 복구된다.
 
 이미 확정해 둔 사실(재확인):
@@ -141,23 +156,23 @@
 - `GroupRatioInfo.BaseGroupRatio`가 있어 100% 할인(배수 0)에서도 로그의 `group_ratio`가 기저값으로 남고 나눗셈이 없다.
 - `pre_llm_ms`/`post_llm_ms`는 admin 전용, hijack된 WSS 로그에는 타이밍 키가 없다.
 - `TimingResponseWriter.Unwrap()`이 write deadline 공백을 막는다. 같은 공백이 team에도 있다 — team으로 역이식할 버그다.
-- 결정 6·7은 Task 8·9로 구현됐다: 초대 흐름 없음, 정확 조회, quota·aff_quota·활성 구독이면 거부, 조직 범위 `organization_member_status`·`organization_remark`, 정지된 회원은 relay·MJ·`/api/organization/*`의 모든 비-GET에서 차단.
+- 결정 6·7은 Task 8·9로 구현됐다: 초대 흐름 없음, 정확 조회, quota·aff_quota·활성 구독·결제 대기 개인 주문(최종 수정 I2)이면 거부, 조직 범위 `organization_member_status`·`organization_remark`, 정지된 회원은 relay·MJ·`/api/organization/*`의 모든 비-GET에서 차단.
 - 조직 충전 만료 엔드포인트는 조직이 비활성이 아니면 1시간 나이 기준이 있다.
 
 ## 5. 단계 D로 넘기는 것
 
 번역·표시:
 - 할인·타이밍·조직 단계 C 키는 7개 locale에 번역을 넣었지만 검수는 하지 않았다. 단계 D의 ko locale(O9)에는 이 키들도 포함해야 한다. 단계 B 조직 키 126개 이상은 여전히 영문 fallback이다.
-- MJ·태스크·위반 수수료 로그에는 할인 항이 없다. 접힌(할인된) `group_ratio`만 남는다. 태스크 재계산은 요청 모델명을 두 번 넘긴다(태스크는 과금 모델명을 저장하지 않음).
+- MJ·태스크·위반 수수료 로그에는 할인 항이 없다. 접힌(할인된) `group_ratio`만 남고, 그래서 목록의 `−{percent}%` 표시(최종 수정 M3)도 없다. 태스크 재계산은 요청 모델명을 두 번 넘긴다(태스크는 과금 모델명을 저장하지 않음).
 - 동적가격(billingexpr) 모델은 배지 옆에 정가 계산값이 보인다(과금은 할인됨). 표의 Cached 열은 취소선 없이 할인가만 보인다. 모델 상세(`ModelDetails`)는 upstream 화면에서 열 수 없어 단위 테스트로만 확인했다.
 - 모바일 카드의 tokens/s는 여전히 `use_time`으로 나눠서, `use_time` 0이고 `e2e_ms > 0`이면 tokens/s가 나오지 않는다.
 - 할인 편집기: 중복 이름은 경고만 하고 마지막 값이 저장된다. 저장되지 않은 행은 Visual ↔ JSON 전환 때 사라진다. 벤더 목록 조회가 끝나기 전에는 자유 입력칸이 잠깐 보인다.
 
 동작:
 - `doRequest`를 우회하는 어댑터(`DoWssRequest`, AWS Bedrock SDK, coze 완료 폴링, dify·replicate 업로드와 baidu 토큰 같은 보조 호출)는 `llm_ms`가 없거나 일부만 잡힌다(team과 같음). 보조 호출 시간은 `pre_llm_ms`에 들어간다.
-- 가격 데이터가 비어 있으면 벤더명 캐시가 nil로 남아 resolve마다 `GetPricing()`을 부른다(벤더 할인이 하나라도 있을 때만, rate limit 있음).
-- 조직에 들어오기 **전에** 만든 개인 충전·구독 주문은 들어온 뒤에도 완료될 수 있다(가드는 주문 생성 때만 돈다). root의 조직 생성은 owner를 잔액 검사 없이 배정한다(운영자 작업).
-- 무료(가격 0) 모델은 과금 세션을 거치지 않아 정지된 회원·비활성 조직도 막지 않는다. 이미 열린 realtime WebSocket은 정지해도 바로 끊기지 않는다(연결 시작 때만 검사).
+- root의 조직 생성은 owner를 잔액 검사 없이 배정한다(운영자 작업).
+- 결제사 만료 콜백이 없는 버려진 개인 주문(예: Epay 충전)은 pending으로 남아 그 사용자의 조직 가입을 막는다(최종 수정 I2). 지금은 운영자가 DB에서 `status`를 `expired`로 바꿔야 한다. 개인 주문용 root 만료 엔드포인트는 단계 D 후보.
+- 무료(가격·배율 또는 group ratio 0) 모델은 `EnableFreeModelPreConsume`이 꺼져 있으면 과금 세션을 거치지 않아 정지된 회원·비활성 조직도 막지 않는다. 100% 할인 모델은 더 이상 여기에 해당하지 않는다(최종 수정 M2). 남은 가장자리: tiered 모델의 자동 그룹 재시도가 무료 그룹에서 100% 할인된 유료 그룹으로 바뀌면 `service/tiered_settle.go`가 접힌 `snap.GroupRatio == 0`을 보고 세션을 만들지 않는다(upstream 파일, 드묾). 이미 열린 realtime WebSocket은 정지해도 바로 끊기지 않는다(연결 시작 때만 검사).
 - 단계 B 이전에 조직 관리자가 `users.remark`에 쓴 메모는 `organization_remark`로 옮기지 않았다(root도 쓴 컬럼이라 운영자 결정).
 - WSS 조직 지갑 검사는 읽고-청구하는 사전 검사(예약 없음)라 동시 realtime 세션은 조금 초과할 수 있다(upstream 사용자 잔액 검사와 같음). 레거시 MJ 사전 가드는 조직 지갑 `> 0`만 본다(M7).
 - 단계 B I5 나머지: 조직 로그·대시보드를 가입 시점 이후로 제한하고 떠난 회원 사용량을 조직 기록에 남기기, 조직 대시보드 기간 제한 — 단계 C에서 다루지 않았다.
@@ -168,6 +183,8 @@
 - 실제 결제 provider 정산·만료 경합은 sandbox에서 확인하지 않았다(단계 E 결제 작업과 함께).
 
 테스트 공백:
+- 사용 로그 목록의 할인 표시(`−30%`)는 숫자뿐이라 번역이 없고, 그룹 이름도 배율도 없는 행(드묾)에는 데스크톱 토큰 칸에 단독으로 보인다.
+- `common-log-mobile-card.tsx:381`(O3 `&& showUserInfo`)은 행에는 있지만 줄에 `fork:` 표식이 없다(JSX 조건 중간).
 - ratio_setting 이식 테스트가 전역 map을 정리하지 않는다(순서 의존, 지금은 무해). `SetWriteDeadline` 테스트는 writer를 손으로 감싼다(common이 middleware를 import할 수 없음).
 - `gateway_ms` 0 + `e2e_ms > 0` → `0.0%` 단언 없음, `DetailsDialog` 안의 Timing 섹션 배치는 직접 테스트하지 않음(섹션 컴포넌트만), `discount_source`가 `vendor`가 아니면 모두 `Model discount`로 표시(백엔드는 model/vendor만 보냄).
 - 조직 사용 로그 화면의 할인·타이밍 행은 브라우저로 보지 않았다(같은 `DetailsDialog`).
@@ -180,6 +197,15 @@ HEAD 005b796ca(이 문서 커밋 직전)에서 실행.
 - `bun run typecheck`(`tsgo -b`): 종료 코드 0. `bun run test`: 207 파일 / 2384 테스트 pass(단계 B 끝 203 / 2318에서 +4 / +66). `bun run build`: 성공, `routeTree.gen.ts` 변경 없음.
 - `bun run e2e`: 새 SQLite(`$TMPDIR/new-api-e2e.db`, HEAD로 빌드한 바이너리, `POST /api/setup` root/12345678, rate limit 3종 끔, `E2E_REUSE_SERVER=1`)로 **20 passed (48.5s)**. Task 9가 정지·재개 시나리오를 더해 19 → 20.
 - `docs/fork-overlays.md`: `git grep -n "fork: O"`와 행을 대조했다. 단계 C 파일의 `// fork:` 표시 줄은 모두 행 범위 안에 있다. 고친 것(단계 C 훅이 줄을 밀어 생긴 drift): O5 `model/option.go:495-496` → 497-498, O3 `model/user.go:538` → 541·`:253` → 256, `relay/common/relay_info.go:148` → 151, `service/log_info_generate.go:196` → 198·`199-201` → 201-203, `common-logs-columns.tsx:396, 403-407, 561, 570` → 397, 404-408, 562, 571, `common-log-mobile-card.tsx:67, 377` → 68, 378, O6 `details-dialog.tsx:168, 242-255` → 170, 244-257. 추가한 행: O7 `relay/common/relay_info_test.go:8, 403-432`. 공통 i18n 행에 단계 C의 번역된 키를 적었다. `edf553e5f..HEAD`에서 바뀐 upstream 파일 41개(locale 7개 포함)가 모두 표에 있다. 행 수: O3 89, O6 26, O7 12.
+
+### 최종 수정 웨이브 검증 (2026-10-15)
+
+HEAD 662e9e2b1 + 이 문서 커밋의 표식 변경(주석만)에서 실행.
+- `GOWORK=off go vet ./...`: 종료 코드 0. `GOWORK=off go test ./... -count=1`: 종료 코드 0, `ok` 44 / `no test files` 39 / FAIL 0.
+- `GOWORK=off go test -race ./controller/ -run 'CheckIn|Organization' -count=1`: ok. 수정 전에는 같은 명령을 `-count=3`으로 돌리면 `TestOrganizationMemberCannotCheckIn`이 `race detected`로 실패했고, 수정 뒤 `-count=3`도 ok.
+- `bun run typecheck`: 종료 코드 0. `bun run test`: 209 파일 / 2398 테스트 pass(Task 11의 207 / 2384에서 +2 / +14). `bun run build`: 성공, `routeTree.gen.ts` 변경 없음. 바뀐 프런트 파일의 `oxlint`·`oxfmt --check`: 새 문제 없음.
+- `bun run e2e`: 새 SQLite, 이 HEAD로 빌드한 바이너리, `POST /api/setup` root/12345678, rate limit 3종 끔, `E2E_REUSE_SERVER=1`로 **20 passed (49.0s)**.
+- `docs/fork-overlays.md`: 이번에 건드린 upstream 파일(`model/pricing.go`, `relay/helper/price.go`, `service/task_billing_test.go`, `common-logs-columns.tsx`, `common-log-mobile-card.tsx`, `details-dialog.tsx`, `group-ratio-form.tsx`, `relay_info_test.go`)의 행 줄 번호를 스크립트로 `fork:` 표식과 대조해 고쳤다. 새 행: O6 `relay/helper/price.go:142,248,262,387`, O6 프런트 `common-logs-columns.tsx`·`common-log-mobile-card.tsx`의 할인 표시.
 
 ### 수동 시나리오 실행
 

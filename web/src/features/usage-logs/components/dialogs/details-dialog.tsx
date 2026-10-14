@@ -167,6 +167,7 @@ function quotaSaturationKindLabel(
   return t('Invalid (NaN)')
 }
 
+// fork: O6 — exported for the discount test
 export function BillingBreakdown(props: {
   log: UsageLog
   other: LogOtherData

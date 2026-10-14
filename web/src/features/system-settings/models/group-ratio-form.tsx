@@ -66,6 +66,7 @@ import {
   type GroupSettingsSection,
 } from './group-ratio-visual-editor'
 
+// fork: O6 — exported for the discount panel
 export type GroupFormValues = {
   GroupRatio: string
   TopupGroupRatio: string
