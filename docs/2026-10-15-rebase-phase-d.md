@@ -42,7 +42,7 @@
 
 4,412 + 2,873 + 70 + 183 = 7,538. 한글 값 7,353개, 영어와 같은 값 183개(skip 목록과 정확히 일치), 한글 없이 영어와 다른 값 2개(Gemini 접미사 조각 `HANGUL_OPTIONAL` 1개 포함).
 
-배치별 수정 라운드: 배치 1–5는 리뷰 1라운드씩(14·9·10·18·10키), 배치 5는 용어(Tier) 결정으로 2라운드, 배치 6과 전체 통일(Task 8)은 2라운드(74키, `Access token` 키 분리). Task 1 도구는 2라운드, Task 2 연결은 1라운드.
+배치별 수정 라운드: 배치 1–4는 리뷰 1라운드씩(14·9·11·18키), 배치 5는 2라운드(1라운드 9키 + 용어집 1행, 2라운드 용어(Tier) 결정), 배치 6과 전체 통일(Task 8)은 2라운드(74키, `Access token` 키 분리). Task 1 도구는 2라운드, Task 2 연결은 1라운드.
 
 ### 용어 통일 (Task 8)
 
@@ -54,9 +54,9 @@
 ### 도구와 연결 (Task 1–2)
 
 - `web/scripts/ko-locale.mjs`(`bun run i18n:ko`): `seed [--force]`(ko.json이 있으면 `--force` 없이 거부), `check [--batch N]`(보간 `{{…}}`, Trans·이름 태그, printf, 앞뒤 공백, `\n` 수, 한글 포함), `status`(남은 영어 placeholder). 테스트 `ko-locale.test.mjs` 17개.
-- 배치 목록 `docs/i18n/ko-batches.json`은 Task 12에서 지웠다(계획 결정 10). `check`(파일 전체)·`status`는 그 파일을 읽지 않는다. `check --batch N`은 이제 "no batch list"로 종료 코드 2를 낸다. `seed`는 ko.json이 있으므로 여전히 `--force` 없이 거부한다.
+- 배치 목록 `docs/i18n/ko-batches.json`은 Task 12에서 지웠다(계획 결정 10). `check`(파일 전체)·`status`는 그 파일을 읽지 않는다. `check --batch N`은 이제 "no batch list"로 종료 코드 2를 낸다. `seed`는 ko.json이 있으므로 여전히 `--force` 없이 거부한다. `seed --force`는 ko.json을 team 값과 영어 placeholder로 덮어쓰고(번역 작업이 사라짐) 지운 `docs/i18n/ko-batches.json`도 다시 만든다 — 실행했다면 둘 다 되돌린다.
 - 연결: `config.ts`(`resources.ko`, `supportedLngs`), `languages.ts`(옵션 `한국어`, `kr`/`ko`/`ko-*` → `ko`; `kok`·`kos`는 아님), `sync-i18n.mjs:230`(비라틴 locale 판정), 달력 두 곳(`react-day-picker` `ko`), 로그인 직후 저장된 사용자 언어 정규화(`use-auth-redirect.ts:64`).
-- 스크린샷: `docs/i18n/images/`(login, dashboard, tokens, usage-logs, wallet, settings).
+- 스크린샷: `docs/i18n/images/` 6장(login, dashboard, tokens, usage-logs, wallet, settings). login은 Task 2, 나머지 5장은 Task 8(ledger의 "screenshots 5"는 Task 8분)이다.
 
 ## 2. 백엔드 한국어와 메시지 경로 (Task 9)
 
@@ -130,7 +130,7 @@ Automatic merge failed; fix conflicts and then commit the result.
 - 충돌 원인: develop의 `go mod tidy`(O4 excelize)가 지운 moejs `v0.1.0-alpha.5` checksum 두 줄 자리와, upstream이 alpha.6 → alpha.7로 바꾼 두 줄이 붙어 있다. 해소: upstream 쪽(alpha.7)을 받고 `GOWORK=off go mod tidy`로 excelize 간접 의존 줄을 되살린다(`docs/fork-overlays.md` O4 메모).
 - 충돌 집합 검사: 충돌 파일 {`go.sum`} ⊆ overlay upstream 파일 집합(O4 `go.mod, go.sum` 행). 양쪽이 모두 바꾼 11파일(`go.mod`, `go.sum`, `service/text_quota.go`, `web/src/features/pricing/lib/price.ts`, locale 7개)도 모두 표에 있다(O4, O3 `service/text_quota.go:449`, O6 `price.ts`, 공통 i18n 행). 표에 없는 충돌(기록되지 않은 훅)은 없다. 예상 후보였던 README nav 줄과 `languages.ts`는 upstream이 이번 범위에서 건드리지 않아 충돌하지 않았다.
 - 자동 병합 확인: locale JSON 7개는 충돌 표식 없이 병합됐고 키가 7,538 → 7,545(upstream +9, −2)가 됐다. fork 키(`Interface languages`, `Access token`, `{{field}} is required` 등)는 남아 있다. `service/text_quota.go`(`// fork: O3` 1줄)·`price.ts`(`// fork: O6` 8줄)의 표식 수는 병합 전과 같다.
-- ko.json은 fork 파일이라 병합되지 않는다. 실제 병합 뒤에는 upstream의 새 9키(가격 정렬 `Input/Output/Per-request Price: High to Low/Low to High` 6개, `Vertex AI Project ID`, `e.g., my-project-123`, Vertex 리전 안내 1개)가 ko.json에 없으므로 `ko-locale.mjs check`가 `missing`으로 알린다. 번역해 넣고 `check`·`status`를 0으로 맞춘다(overlay O9 메모).
+- ko.json은 fork 파일이라 병합되지 않는다. 실제 병합 뒤 공통 (i18n) 행대로 `bun run i18n:sync`를 돌리면 upstream의 새 9키(가격 정렬 `Input/Output/Per-request Price: High to Low/Low to High` 6개, `Vertex AI Project ID`, `e.g., my-project-123`, Vertex 리전 안내 1개)가 ko.json에 영어 값으로 들어오므로 `ko-locale.mjs check`가 `untranslated (equals english)`로 알리고(sync 전이면 `missing`), `bun run test`의 `src/i18n/__tests__/ko-coverage.test.ts`(최종 수정 M7)가 실패한다. 번역해 넣고 `check`·`status`를 0으로 맞춘다(overlay O9 메모).
 - `git merge --abort` 종료 코드 0, MERGE_HEAD 없음, `git status --short` 0줄. 실제 병합은 다음 동기화에서 한다.
 
 ## 5. 결정 사항
@@ -158,12 +158,13 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 번역·표시:
 - 다른 6개 locale(zh, zh-TW, fr, ru, ja, vi)의 영어 placeholder: 단계 A–C의 fork 키 160개에 단계 D가 locale마다 69개(fork 메시지 66 + 인터페이스 언어 3)를 더했다(`Access token`은 8개 모두 번역). 이 단계에서는 번역하지 않았다(ruling).
-- 반영어 ko 값: 수동 확인에서 사용 로그 상세 대화상자 제목이 `Log 상세`(`Log Details`)로 보였다. 같은 꼴이 `Key 지문`(`Key Fingerprint`), `Key 출처`(`Key Sources`), `Key 다이제스트`(`Key Summary`)에도 있다. `check`는 한글만 있으면 통과시키므로 잡지 못한다. 그 밖의 경계 값(`Merchant ID은(는)`, `Thinking을 콘텐츠로 변환`, `Discovery 구성…`, `Root 불가`, `© 2025 Your Company`)은 Task 8에서 브랜드·기술 용어로 두었다.
+- 반영어 ko 값: 수동 확인에서 본 `Log 상세`와 `Key 지문`·`Key 출처`·`Key 다이제스트`, 최종 리뷰가 찾은 `Per 요청`·`Top 모델`은 최종 수정(§8)에서 고쳤다. `check`는 한글만 있으면 통과시키므로 이런 값을 잡지 못한다(ASCII 단어 스캔은 수동). 남은 경계 값(`Thinking을 콘텐츠로 변환`, `Discovery 구성…`, `Root 불가`, `Worker 설정`)은 기술 용어로 둔다. seed된 가격 편집기 값에 I2 같은 오역이 더 있는지 감사가 필요하다.
 - 남은 용어 혼용: Billing 결제/청구(`Billing Details` = 청구 상세), `Compact` = 촘촘하게 vs 설명의 컴팩트.
 - Excel 조직 가져오기 행 오류는 영어(ruling). 구조화된 행 오류와 프런트 표시가 필요하다.
 - relay·과금의 조직 오류(AI 클라이언트로 가는 OpenAI 형식)는 `ko.yaml`에 없다. 번역하려면 `i18n/keys.go`에 키를 더해야 한다.
-- 감사 액션 `topup.expire`, `organization.topup.expire`는 프런트 라벨이 없어 원래 액션 이름으로 보인다.
-- shadcn 기본 컴포넌트의 sr-only 영어(`Toggle Sidebar`, `Command Palette`)는 upstream 코드라 그대로다. API 키 화면의 빈 상태 설명이 표 오른쪽에서 잘린다(ko 문구 길이).
+- 감사 로그(최종 리뷰 M6, 보류): `topup.expire`와 모든 `organization.*` 액션(`organization.topup.expire` 포함)은 `web/src/features/usage-logs/lib/format.ts`의 `AUDIT_TEMPLATES`에 항목이 없어, 한국어 관리자가 감사 뷰어에서 영어 `content` 원문과 액션 이름을 본다.
+- shadcn 기본 컴포넌트의 sr-only 영어(`Toggle Sidebar`, `Command Palette`)는 upstream 코드라 그대로다.
+- API 키 화면의 빈 상태 설명이 표 오른쪽에서 잘린다(ko 문구 길이, 보류). 방문이 많은 화면이라 릴리스 전에 화면으로 확인해야 한다(최종 수정에서는 시각 확인을 하지 않았다).
 - `<html lang>`은 ko에서도 `en`이다(기존 동작).
 - README의 문서 링크는 `docs.newapi.ai/en` 그대로다(upstream에 한국어 문서 사이트 없음).
 
@@ -182,7 +183,7 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 환경:
 - MySQL/PostgreSQL 미실행(컨테이너 런타임 없음). 이 단계는 스키마 변경이 없다. 새 SQL 조각은 `ExpirePendingPersonalTopUps`의 GORM `Where`(`target_type IS NULL OR target_type <> ?`, `create_time < ?`)뿐이고 세 DB 공통이다.
-- 결제 provider sandbox 미실행(개인 주문 만료와 늦은 웹훅 경합 포함).
+- 결제 provider sandbox 미실행(개인 주문 만료와 늦은 웹훅 경합 포함). 최종 수정 I3으로 만료 나이 기준을 Stripe 세션 유효 기간인 24시간으로 올려 경합 창을 줄였지만, 24시간보다 오래 열려 있는 결제(PayPal 승인 링크 등)와 비활성 조직 전체 만료는 여전히 수동 대사가 필요할 수 있다.
 
 ## 7. 검증
 
@@ -238,3 +239,25 @@ HEAD 6275fd416 + 이 단계 Task 12의 도구·테스트 변경(`web/e2e/korean.
 - O9 메모(병합 뒤 ko.json·ko.yaml 빠진 키 확인 절차), O4 메모(go.sum 충돌 해소).
 
 표식 없이 행만 있는 곳(의도): JSON(`web/package.json:27`, `:19-21, 94`, `.oxlintrc.json`, `.oxfmtrc.json`), 단계 C의 `details-dialog.tsx:746-761`(Response Time 세 곳), `languages.test.ts:21-26` import 블록.
+
+## 8. 최종 수정 (whole-branch 리뷰, 2026-10-15)
+
+최종 리뷰(`.superpowers/sdd/2026-10-15-rebase-phase-d/final-review.md`)의 Important 3건과 Minor 중 controller가 고른 것을 고쳤다.
+
+| 커밋 | 내용 |
+|---|---|
+| 0e62b83ca | fix(billing): keep checkouts payable for a day before expiry and require user_id |
+| 1d657ff31 | fix(i18n): finish half-English and mistranslated Korean values |
+| c218351dd | test(i18n): gate merges on Korean coverage and lock in the known-vendor path |
+| (이 문서 커밋) | docs: record the phase D final fix wave |
+
+- I3(돈): 개인·조직 충전 만료의 나이 기준을 1시간 → 24시간(`personalTopUpExpireAge`, `organizationTopUpExpireAge`). Stripe 결제 세션은 24시간 동안 결제할 수 있고 정산은 pending 주문만 적립하므로, 더 일찍 만료하면 실제 결제가 적립되지 않는다. `POST /api/user/topup/expire`는 `user_id > 0`이 필수다(없거나 0이면 `user_id is required`, 8개 locale에 키 추가, ko 번역). 전체 사용자 만료는 없앴다. 비활성 조직의 전체 만료는 root의 명시적 정리로 남기고, 결제 누락 위험을 주석과 OpenAPI §3.5에 적었다. 테스트: 25시간 전 주문은 만료, 2시간 전 주문은 남음(개인·조직), `user_id` 누락·0·빈 body 거부와 무변경·무감사.
+- I1·I2·M1–M3(ko.json, 병합 스크립트로만 수정): 반영어 6키(`로그 상세`, `키 지문`, `키 출처`, `키 다이제스트`, `요청당`, `인기 모델`), 가격 라벨 `입력 가격`·`출력 가격`·`출력 가격 ($/1M 토큰)`과 같은 계열(`Enter Completion price…` 완료 가격 → 출력 가격, `Audio comp.` 오디오 완성 → 오디오 출력), `Operations` = 운영, `FunctionCall thoughtSignature 채우기 활성화`, 조사 수정(`결제가 시작되었습니다`, `잔액 및 충전 관리`, `Merchant ID는`, `Per request` = 요청당)과 `Rule {{line}} …` 8키 전부(`{{line}}번째 규칙에 …가 없습니다`). ASCII 단어(4글자 이상) 스캔으로 반번역 5개(`reasoning_content` 대소문자, `New API 콘솔`, `핵심 API`, `회사 이름`, `핑 간격`), 2–3글자 스캔으로 2개(`Configure at:` = 설정 위치, `예: 사내 GitLab`)를 더 고쳤고, 값에 섞인 zero-width space 3개를 지웠다. 그 밖의 ASCII 단어는 브랜드·제품·API 이름·식별자·프로토콜로 두었다.
+- M4: `README.kr.md` 기능 표의 콘솔 언어 목록에 한국어.
+- M5: `controller/topup_expire_admin.go`, `model/topup_expire_fork.go`를 `forkMessageSources`에 넣고 `errPersonalTopUpExpireUser`를 `common.NewMessage("Invalid user ID")`(8개 locale에 이미 있는 키)로 바꿨다.
+- M7: `web/src/i18n/__tests__/ko-coverage.test.ts`가 `ko-locale.mjs`의 `findLocaleIssues`(새 export, `check`와 공유, 타입은 `ko-locale.d.mts`)로 en/ko 전체를 검사한다. 병합 뒤 sync가 채운 영어 placeholder나 빠진 키가 있으면 `bun run test`가 실패한다. overlay·기록의 병합 뒤 증상 문구(`missing` → `untranslated (equals english)`)를 고쳤다.
+- M9·Task 12 minor: §1의 배치 수정 라운드 문장과 배치 3 수(11), 스크린샷 수(6)를 고치고, `seed --force`가 `ko-batches.json`을 다시 만든다는 점을 기록·overlay·spec에 적었다. `web/e2e/README.md`의 `fork: O9` 표식은 O3 fork 파일 안의 한국어 스모크 단락을 가리키며 overlay O9 메모에 적었다(upstream 파일이 아니라 행은 없음).
+- M10: `TestApplyPricingDiscountKnownVendorBeatsPreviousSnapshot` — 재구축이 아는 벤더(이름 변경, 다른 벤더로 옮긴 모델)가 이전 스냅숏을 이긴다. `known` 분기를 지우는 변형에서 실패함을 확인했다.
+- M11: `common/constants.go`의 `// fork: O9` 표식을 주석 문장 밖 43행 `var DefaultLanguage string` 줄 끝으로 옮겼다(overlay 행 40-43).
+- 보류(§6): M6 감사 템플릿, API 키 화면 빈 상태 잘림(시각 확인 필요). M8(upstream hunk의 여러 줄 import)은 overlay 행에 적혀 있어 수용한다.
+- 검증(c218351dd + 이 문서 수정): `GOWORK=off go vet ./...` 깨끗, `GOWORK=off go test ./...` `ok` 44 / `no test files` 39 / FAIL 0, `go test -race ./model/ -run 'Vendor|Pricing|Discount'` ok. `bun run typecheck` 0, `bun run test` **213 파일 / 2,417 테스트 pass**(새 ko-coverage 2건), `node scripts/ko-locale.mjs check` `7539/7539 ok`, `status` 0, `bun run i18n:sync` 뒤 8개 locale md5 불변, `bun run build` 성공.
