@@ -239,6 +239,16 @@ O9 메모: 한국어 파일(`web/src/i18n/locales/ko.json`, `i18n/locales/ko.yam
 
 O4 메모(go.sum): develop의 `go mod tidy`가 지운 moejs 구판 checksum 줄과 upstream의 moejs 버전 갱신 줄이 붙어 있어 `go.sum`이 충돌할 수 있다(2026-10-15 리허설). upstream 쪽을 받고 `GOWORK=off go mod tidy`로 excelize 의존 줄을 되살린다.
 
+## O11 fork 고유 수정
+
+upstream에 없는 과금 정확성 수정(team에서 옮김). 로직은 fork 파일에 두고 upstream 파일에는 훅 한 줄만 둔다. relaykit/는 upstream 그대로다.
+
+| overlay | upstream 파일 | 훅 | fork 전용 파일 |
+|---|---|---|---|
+| O11 Gemini 이미지 토큰 상한 | service/billing_usage.go:21 | `effectiveBillingUsage`가 canonical usage를 `capGeminiImagePromptTokens(billingUsage)`로 감싸 돌려줌 (`// fork: O11`; Gemini 의미의 usage만 `ImageTokens`를 `max(PromptTokens - CachedTokens - AudioTokens, 0)`로 자르고 남는 양을 `TextTokens`로 돌림. `usageBillingPathForLog`는 그대로) — team af1eddc8e, c20c6d664 | service/gemini_image_cap_fork.go, service/gemini_image_cap_fork_test.go |
+
+O11 메모: 상한은 `effectiveBillingUsage`를 거치는 텍스트 정산(`PostTextConsumeQuota` → `calculateTextQuotaSummary`, `BuildTieredTokenParams`)에만 걸린다. `PostAudioConsumeQuota`처럼 raw usage를 쓰는 경로와 BillingUsage 스냅샷이 없는 Gemini usage에는 걸리지 않는다. 티어 과금식의 `img` 변수도 잘린 값을 본다.
+
 ## 삭제한 upstream 파일
 
 단계 E Task 1 (team 66d421d13과 같은 결정): 화면 언어는 영어와 한국어만 둔다.
