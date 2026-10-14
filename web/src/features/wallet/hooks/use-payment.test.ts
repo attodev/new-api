@@ -33,6 +33,7 @@ describe('payment amount routing', () => {
         calls.push('stripe')
         return { success: true, data: '2' }
       },
+      paypal: async () => ({ success: true, data: '0' }),
       waffo: async (request) => {
         calls.push(`waffo:${request.amount}`)
         return { success: true, data: '18.75' }
@@ -45,5 +46,34 @@ describe('payment amount routing', () => {
 
     expect(amount).toBe(18.75)
     expect(calls).toEqual(['waffo:120'])
+  })
+
+  test('uses the dedicated PayPal amount calculator', async () => {
+    const calls: string[] = []
+    const amount = await requestPaymentAmount(50, PAYMENT_TYPES.PAYPAL, {
+      regular: async () => {
+        calls.push('regular')
+        return { success: true, data: '1' }
+      },
+      stripe: async () => {
+        calls.push('stripe')
+        return { success: true, data: '2' }
+      },
+      paypal: async (request) => {
+        calls.push(`paypal:${request.amount}`)
+        return { success: true, data: '50.00' }
+      },
+      waffo: async () => {
+        calls.push('waffo')
+        return { success: true, data: '3' }
+      },
+      waffoPancake: async () => {
+        calls.push('pancake')
+        return { success: true, data: '4' }
+      },
+    })
+
+    expect(calls).toEqual(['paypal:50'])
+    expect(amount).toBe(50)
   })
 })

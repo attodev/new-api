@@ -24,14 +24,17 @@ import { handleServerError } from '@/lib/handle-server-error'
 
 import {
   calculateAmount,
+  calculatePayPalAmount,
   calculateStripeAmount,
   calculateWaffoAmount,
   calculateWaffoPancakeAmount,
   requestPayment,
+  requestPayPalPayment,
   requestStripePayment,
   isApiSuccess,
 } from '../api'
 import {
+  isPayPalPayment,
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
@@ -48,6 +51,7 @@ type AmountCalculator = (request: AmountRequest) => Promise<AmountResponse>
 export interface PaymentAmountCalculators {
   regular: AmountCalculator
   stripe: AmountCalculator
+  paypal: AmountCalculator
   waffo: AmountCalculator
   waffoPancake: AmountCalculator
 }
@@ -55,6 +59,7 @@ export interface PaymentAmountCalculators {
 const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
   regular: calculateAmount,
   stripe: calculateStripeAmount,
+  paypal: calculatePayPalAmount,
   waffo: calculateWaffoAmount,
   waffoPancake: calculateWaffoPancakeAmount,
 }
@@ -67,6 +72,8 @@ export async function requestPaymentAmount(
   let calculator = calculators.regular
   if (isStripePayment(paymentType)) {
     calculator = calculators.stripe
+  } else if (isPayPalPayment(paymentType)) {
+    calculator = calculators.paypal
   } else if (isWaffoPayment(paymentType)) {
     calculator = calculators.waffo
   } else if (isWaffoPancakePayment(paymentType)) {
@@ -114,32 +121,48 @@ export function usePayment() {
         setProcessing(true)
 
         const isStripe = isStripePayment(paymentType)
+        const isPayPal = isPayPalPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
-        const response = isStripe
-          ? await requestStripePayment({
-              amount,
-              payment_method: 'stripe',
-            })
-          : await requestPayment({
-              amount,
-              payment_method: paymentType,
-            })
+        let response
+        if (isStripe) {
+          response = await requestStripePayment({
+            amount,
+            payment_method: 'stripe',
+          })
+        } else if (isPayPal) {
+          response = await requestPayPalPayment({
+            amount,
+            payment_method: 'paypal',
+          })
+        } else {
+          response = await requestPayment({
+            amount,
+            payment_method: paymentType,
+          })
+        }
 
         if (!isApiSuccess(response)) {
           handleServerError(response, i18next.t('Payment request failed'))
           return false
         }
 
-        // Handle Stripe payment
-        if (isStripe && response.data?.pay_link) {
-          window.open(response.data.pay_link as string, '_blank')
+        // Handle Stripe / PayPal payment
+        if ((isStripe || isPayPal) && response.data?.pay_link) {
+          const payLink = response.data.pay_link as string
+          if (isPayPal) {
+            // Server-side return flow: PayPal sends the browser back to
+            // /api/paypal/capture, so navigate the current window.
+            window.location.href = payLink
+          } else {
+            window.open(payLink, '_blank')
+          }
           toast.success(i18next.t('Redirecting to payment page...'))
           return true
         }
 
         // Handle non-Stripe payment
-        if (!isStripe && response.data) {
+        if (!isStripe && !isPayPal && response.data) {
           const url = (response as unknown as { url?: string }).url
           if (url) {
             submitPaymentForm(url, response.data)
