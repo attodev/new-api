@@ -17,10 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -35,6 +39,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
 
+import { sendTestEmail } from '../api'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -64,6 +69,11 @@ const createEmailSchema = (t: (key: string) => string) =>
     SMTPStartTLSEnabled: z.boolean(),
     SMTPInsecureSkipVerify: z.boolean(),
     SMTPForceAuthLogin: z.boolean(),
+    ContactEmail: z.string().refine((value) => {
+      const trimmed = value.trim()
+      if (!trimmed) return true
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+    }, t('Enter a valid email or leave blank')),
   })
 
 type EmailFormValues = z.infer<ReturnType<typeof createEmailSchema>>
@@ -90,6 +100,21 @@ export function EmailSettingsSection({
   const updateOption = useUpdateOption()
   const emailSchema = createEmailSchema(t)
 
+  const [testTo, setTestTo] = useState('')
+  const testEmailMutation = useMutation({
+    mutationFn: () => sendTestEmail(testTo.trim()),
+    onSuccess: (data) => {
+      if (data.success) toast.success(t('Test email sent successfully'))
+      else toast.error(data.message || t('Failed to send test email'))
+    },
+    onError: (error: unknown) => {
+      const msg =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || t('Failed to send test email')
+      toast.error(msg)
+    },
+  })
+
   const form = useForm<EmailFormValues>({
     resolver: zodResolver(emailSchema),
     defaultValues,
@@ -109,6 +134,7 @@ export function EmailSettingsSection({
       SMTPStartTLSEnabled: securityMode === 'starttls',
       SMTPInsecureSkipVerify: values.SMTPInsecureSkipVerify,
       SMTPForceAuthLogin: values.SMTPForceAuthLogin,
+      ContactEmail: values.ContactEmail.trim(),
     }
 
     const initial = {
@@ -121,6 +147,7 @@ export function EmailSettingsSection({
       SMTPStartTLSEnabled: defaultValues.SMTPStartTLSEnabled,
       SMTPInsecureSkipVerify: defaultValues.SMTPInsecureSkipVerify,
       SMTPForceAuthLogin: defaultValues.SMTPForceAuthLogin,
+      ContactEmail: defaultValues.ContactEmail.trim(),
     }
 
     const updates: Array<{ key: string; value: string | boolean }> = []
@@ -171,6 +198,10 @@ export function EmailSettingsSection({
         key: 'SMTPForceAuthLogin',
         value: sanitized.SMTPForceAuthLogin,
       })
+    }
+
+    if (sanitized.ContactEmail !== initial.ContactEmail) {
+      updates.push({ key: 'ContactEmail', value: sanitized.ContactEmail })
     }
 
     for (const update of updates) {
@@ -405,6 +436,57 @@ export function EmailSettingsSection({
               </FormItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name='ContactEmail'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Contact Recipient Email')}</FormLabel>
+                <FormControl>
+                  <Input
+                    autoComplete='off'
+                    type='email'
+                    placeholder={t('contact@yourcompany.com')}
+                    {...field}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Inquiry emails from the landing page will be sent to this address'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormItem>
+            <FormLabel>{t('Send Test Email')}</FormLabel>
+            <div className='flex gap-2'>
+              <FormControl>
+                <Input
+                  autoComplete='off'
+                  type='email'
+                  placeholder={t('Enter recipient address')}
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                />
+              </FormControl>
+              <Button
+                type='button'
+                variant='outline'
+                disabled={!testTo.trim() || testEmailMutation.isPending}
+                onClick={() => testEmailMutation.mutate()}
+              >
+                {testEmailMutation.isPending ? t('Sending...') : t('Send')}
+              </Button>
+            </div>
+            <FormDescription>
+              {t('Send a test message to verify your SMTP configuration')}
+            </FormDescription>
+          </FormItem>
         </SettingsForm>
       </Form>
     </SettingsSection>

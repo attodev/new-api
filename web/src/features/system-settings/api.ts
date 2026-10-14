@@ -125,3 +125,12 @@ export async function fetchUpstreamRatios(request: FetchUpstreamRatiosRequest) {
   )
   return res.data
 }
+
+export async function sendTestEmail(to: string) {
+  const res = await api.post<{ success: boolean; message: string }>(
+    '/api/admin/test-email',
+    { to },
+    { skipErrorHandler: true }
+  )
+  return res.data
+}
