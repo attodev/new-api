@@ -311,6 +311,10 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 		writeSecurityOperationError(c, err)
 		return
 	}
+	if err := enforceOIDCEmailDomain(provider, oauthUser); err != nil { // fork: O8
+		common.ApiErrorT(c, err.Error())
+		return
+	}
 	user, migration, err := findOrCreateOAuthUser(c, provider, oauthUser, token, payload.AffiliateCode)
 	if err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
@@ -329,10 +333,6 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 		default:
 			writeSecurityOperationError(c, err)
 		}
-		return
-	}
-	if err := enforceOIDCEmailDomain(provider, oauthUser); err != nil { // fork: O8
-		common.ApiErrorT(c, err.Error())
 		return
 	}
 

@@ -33,7 +33,7 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O1 랜딩·가이드 | web/public/favicon.ico, web/public/logo.png | 브랜드 파일 2개를 web/landing/public 것으로 교체 | web/landing/public/favicon.ico, web/landing/public/logo.png |
 | O1 랜딩·가이드 | web/.oxlintrc.json:25 | `ignorePatterns`에 `"landing/**"` (`bun run lint`가 web/landing을 건너뜀) | web/landing/public/*.js |
 | O1 랜딩·가이드 | web/.oxfmtrc.json:26 | `ignorePatterns`에 `"landing/**"` (`bun run format`이 web/landing을 건너뜀) | web/landing/public/*.{js,css} |
-| O8 OIDC 도메인 | controller/oauth.go:334-337 | `handleOAuthLogin`의 `findOrCreateOAuthUser` 오류 처리 뒤 `enforceOIDCEmailDomain(provider, oauthUser)` 4줄 (`// fork: O8`) | controller/oauth_email_domain.go |
+| O8 OIDC 도메인 | controller/oauth.go:314-317 | `handleOAuthLogin`에서 payload 디코딩 직후, `findOrCreateOAuthUser` 앞에 `enforceOIDCEmailDomain(provider, oauthUser)` 4줄 (사용자 행 생성 전에 거부) (`// fork: O8`) | controller/oauth_email_domain.go |
 | O8 로그 라우팅 숨김 | model/log_other.go:259 | `formatLogOtherJSON` user 분기 끝에 `deleteLogOtherKeys(values, forkUserHiddenLogOtherKeys)` 한 줄 (`is_model_mapped`, `upstream_model_name`) | model/log_other_fork.go |
 
 O8 메모: 옵션 64-bit 파싱은 적용하지 않는다 (upstream의 Go `int`가 이미 64-bit이므로 no-op). 정적 자산 rate limit/캐시는 O1의 `landingStatic`이 담당하며 SPA 자산은 upstream 정책을 유지한다.
