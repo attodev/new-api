@@ -1,6 +1,6 @@
 # team 재현 감사 — develop이 team의 자체 커밋을 모두 담고 있는가
 
-작성: 2026-10-15. 대상: `team` 팁 `9ef93eb8c` vs `develop` `1bc33c01b`. 상태: 빈틈 처리 결정 대기.
+작성: 2026-10-15. 대상: `team` 팁 `9ef93eb8c` vs `develop` `1bc33c01b`. 상태: 옮김 9건 포팅 완료(2026-10-15, 커밋 5ff2f1b5c..5c6f345f9); 1번은 보류; 결정 항목 대기
 
 ## 1. 범위와 방법
 
@@ -31,9 +31,9 @@
 
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
-| e24c060c0, 93b81b0bd | 채널 설정 `UsageSemantic` 덮어쓰기(OpenAI 호환 채널로 Claude를 중계할 때 캐시 토큰 해석)와 이를 모델 glob으로 제한하는 `UsageSemanticModels`, 채널 편집 UI | `service/text_quota.go:377 usageSemanticFromUsage`에 덮어쓰기 없음(기본값을 0으로 자르기만). 해당 채널에서 **과금이 적게** 될 수 있다 | 옮김 |
-| b5d733722 | 이미지 스트림 이벤트의 `"error": null`을 오류로 보지 않기 | `relay/channel/openai/relay_image.go:227,244`가 `len(payload.Error) > 0`으로 판정해 `null`(길이 4)을 오류로 분류 | 옮김 |
-| ecc9c511d | 관리자 채널 테스트에서 이미지 생성 요청에 `Stream` 전달 | `controller/channel-test.go:716` `ImageRequest`에 `Stream` 없음 → stream=true 테스트가 SSE 경로를 못 탐 | 옮김 |
+| e24c060c0, 93b81b0bd | 채널 설정 `UsageSemantic` 덮어쓰기(OpenAI 호환 채널로 Claude를 중계할 때 캐시 토큰 해석)와 이를 모델 glob으로 제한하는 `UsageSemanticModels`, 채널 편집 UI | `service/text_quota.go:377 usageSemanticFromUsage`에 덮어쓰기 없음(기본값을 0으로 자르기만). 해당 채널에서 **과금이 적게** 될 수 있다 | 보류 — relaykit dto.ChannelSettings 제약; 별도 설계(원문 JSON을 fork가 읽는 방식) 필요 |
+| b5d733722 | 이미지 스트림 이벤트의 `"error": null`을 오류로 보지 않기 | `relay/channel/openai/relay_image.go:227,244`가 `len(payload.Error) > 0`으로 판정해 `null`(길이 4)을 오류로 분류 | 옮김 → develop 5ff2f1b5c |
+| ecc9c511d | 관리자 채널 테스트에서 이미지 생성 요청에 `Stream` 전달 | `controller/channel-test.go:716` `ImageRequest`에 `Stream` 없음 → stream=true 테스트가 SSE 경로를 못 탐 | 옮김 → develop 5ff2f1b5c |
 | 3cfc88575, 5e6c6a716 | 토큰·지갑 캐시 델타를 동기로 적용하고 DB 실패 시 보상 | develop은 upstream의 비동기 고루틴(`model/token.go:384`, `model/user.go:1398`)을 유지. 지갑 쪽은 O12 복구 목록이 캐시 쓰기 실패를 덮지만 순서·보상은 아님 | 결정 — O12가 지갑은 실질적으로 막았고, 토큰은 §6 한계로 기록됨. 토큰 해시만 동기 델타로 바꿀지 결정 |
 | f1dd2da1e(토큰 부분) | 토큰 배치 DB 쓰기 실패 시 재큐 | `model/utils.go:92-101`은 로그만 남기고 버림. 지갑은 O12 Task 6이 재큐함 | 결정 — 토큰 한도 차감 손실이 생길 수 있음. 지갑과 같은 방식의 작은 fork 훅으로 가능 |
 
@@ -41,19 +41,19 @@
 
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
-| 203690366 | Epay가 설정되지 않으면 기본 Alipay/WeChat 결제 수단을 숨김 | `controller/topup.go:30 GetTopUpInfo`가 compliance만 보고 `PayMethods`를 그대로 노출 | 옮김 |
+| 203690366 | Epay가 설정되지 않으면 기본 Alipay/WeChat 결제 수단을 숨김 | `controller/topup.go:30 GetTopUpInfo`가 compliance만 보고 `PayMethods`를 그대로 노출 | 옮김 → develop d1ee2f430 |
 | 3f6ab2e33(일부) | `ComplianceConfirmed` 기본값 true | develop 기본값 false → 새 설치는 관리자가 확인하기 전까지 결제 수단이 안 보임 | 결정 — 관리자 화면에서 한 번 확인하면 되므로 운영 절차로 대신할 수 있음 |
-| 23d10ffb4 | 결제 설정의 Stripe/PayPal 자격 증명 "지우기" 버튼(확인 대화상자) | `payment-settings-section.tsx`에 없음 | 옮김 |
+| 23d10ffb4 | 결제 설정의 Stripe/PayPal 자격 증명 "지우기" 버튼(확인 대화상자) | `payment-settings-section.tsx`에 없음 | 옮김 → develop 5c6f345f9 |
 
 ### 3.3 동작·안정성 (작은 수정)
 
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
-| 2c619a31e(일반 부분) | `normalizeRateLimitParameters`: 잘못된 rate-limit 설정값을 안전 범위로 보정 | 없음(`middleware/rate-limit.go`) | 옮김 |
-| cb220505e(일부) | 프런트 쿼리가 429에 재시도하지 않음 | `web/src/lib/query-client.ts:44`가 401/403만 제외 | 옮김 |
-| f7ec7628c | 가격·상태 API 호출 8초 타임아웃 | 없음 | 옮김 |
-| 490d215a4 | 대시보드 요약 카드 잔액을 새로 가져와 갱신(staleTime 0, auth store 동기화) | `summary-cards.tsx`가 auth store의 로그인 시 값만 읽음 → 잔액이 안 바뀜 | 옮김 |
-| 338576ab2 | 시작 시 `tokenkit.Warm()`으로 OpenAI 코덱 예열 | 없음. 첫 토큰 계산이 수백 ms 느림 | 옮김(성능) |
+| 2c619a31e(일반 부분) | `normalizeRateLimitParameters`: 잘못된 rate-limit 설정값을 안전 범위로 보정 | 없음(`middleware/rate-limit.go`) | 옮김 → develop d1ee2f430, 779b1000d |
+| cb220505e(일부) | 프런트 쿼리가 429에 재시도하지 않음 | `web/src/lib/query-client.ts:44`가 401/403만 제외 | 옮김 → develop 0367daf86 |
+| f7ec7628c | 가격·상태 API 호출 8초 타임아웃 | 없음 | 옮김 → develop 0367daf86 |
+| 490d215a4 | 대시보드 요약 카드 잔액을 새로 가져와 갱신(staleTime 0, auth store 동기화) | `summary-cards.tsx`가 auth store의 로그인 시 값만 읽음 → 잔액이 안 바뀜 | 옮김 → develop 9a13e5913 |
+| 338576ab2 | 시작 시 `tokenkit.Warm()`으로 OpenAI 코덱 예열 | 없음. 첫 토큰 계산이 수백 ms 느림 | 옮김(성능) → develop 5ff2f1b5c |
 | 43c0105ff | Midjourney 환불 로그에 제출 노드 `NodeName` 기록 | `model/midjourney.go`에 NodeName 없음. develop은 NodeName을 소비 로그 내보내기에만 씀 | 보류 — upstream 설계상 큰 의미 없음 |
 
 ### 3.4 화면·운영 편의 (결정)
@@ -65,7 +65,7 @@
 | 3757c8244(일부) | SPA `index.html`의 챗봇 위젯 스크립트(`chatbot.alrouter.ai`) | 랜딩에만 있고 SPA에는 없음 | 결정 |
 | d5e459993, 330d46466 | SPA 가격 페이지의 프로모션 안내문(`Alert` variant `notice`) | 랜딩 팝업에만 있음 | 결정 |
 | 7daa397a1(일부) | 가입 화면 "계약 도메인만 가입 가능" 안내(ShieldCheck), 사용 로그 열 이름 "토큰 (입력/출력)" | 없음 | 결정 |
-| 6fc579349 | 관리자 쿼터 조정 대화상자의 빠른 금액 버튼($1/5/10/100) | 조직 멤버 표에는 있고 `user-quota-dialog.tsx`에는 없음 | 옮김(작음) |
+| 6fc579349 | 관리자 쿼터 조정 대화상자의 빠른 금액 버튼($1/5/10/100) | 조직 멤버 표에는 있고 `user-quota-dialog.tsx`에는 없음 | 옮김(작음) → develop 0367daf86 |
 | 7fe52317f(일부) | 설정 가이드 완료 시 접기(오래된 펼침 상태 무시), 오류 "(Error Code: N)" fallback | 없음 | 보류 |
 | 7c0e34323(일부) | 404 페이지 "탭 닫기" fallback(history 1일 때), 브랜드 링크 `/dashboard/overview` | 없음 / `/` | 보류 |
 
