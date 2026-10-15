@@ -286,6 +286,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		if !ok {
 			return nil, fmt.Errorf("expected Anthropic Messages request, got %T", result.Value)
 		}
+		claude.NormalizeAdaptiveThinkingDisplay(claudeReq.Thinking) // fork: O11
 		vertexClaudeReq := copyRequest(claudeReq, anthropicVersion)
 		c.Set("request_model", claudeReq.Model)
 		info.UpstreamModelName = claudeReq.Model

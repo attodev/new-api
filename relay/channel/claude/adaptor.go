@@ -40,6 +40,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 	if err := relayconvert.ApplyClaudeThinkingModel(request, info); err != nil {
 		return nil, err
 	}
+	NormalizeAdaptiveThinkingDisplay(request.Thinking) // fork: O11
 	// A model reasoning suffix replaces the client's thinking config, but
 	// block_binding is a conversation control, not a reasoning setting. Keep
 	// the client's value when the rendered mode is still adaptive.
@@ -133,6 +134,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
+	normalizeConvertedThinkingDisplay(result.Value) // fork: O11
 	return result.Value, nil
 }
 
