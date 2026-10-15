@@ -629,7 +629,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	}
 
 	// 提交事务
-	return tx.Commit().Error
+	return commitAffTransfer(tx, user.Id, quota) // fork: O12
 }
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {

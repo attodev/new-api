@@ -279,6 +279,7 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 | O12 정보 신선 기한 (읽기) | model/user_cache.go:138 | `cacheGetUserBase`에서 floor 검사 다음에 `if userInfoStale(&userCache) { // fork: O12` + `return nil, errUserInfoStale` + `}` (gofmt로 3줄; 상주가 켜져 있고 `FreshUntil`이 없거나 지났으면 miss와 같은 DB 경로로) | model/user_cache_fresh_fork.go, model/user_cache_fresh_fence_fork_test.go |
 | O12 정보 다시 읽은 뒤 캐시 잔액 반환 | model/user_cache.go:115 | `GetUserCache` 끝의 `return user.ToBaseUser(), nil`을 `return userBaseAfterPopulate(user) // fork: O12`로 (상주가 켜져 있으면 쓰기 뒤 해시를 다시 읽어 캐시 잔액을 돌려주고, 읽지 못하면 DB 값) | model/user_cache_fresh_fork.go |
 | O12 캐시 쓰기 규칙 | model/user_auth_cache.go:49 | `writeUserCache`의 nil/Redis 검사 다음에 `if quotaCacheResidencyEnabled() { // fork: O12` + `return writeUserCacheResident(user, includeQuota)` + `}` (gofmt로 3줄) | model/user_cache_fresh_fork.go |
+| O12 추천 적립 이전 캐시 동기화 | model/user.go:632 | `TransferAffQuotaToQuota` 끝의 `return tx.Commit().Error`를 `return commitAffTransfer(tx, user.Id, quota) // fork: O12`로 (커밋 성공 뒤 `cacheIncrUserQuota`로 캐시 잔액에 이전 금액을 더하고, 캐시 오류는 로그만 남긴다) | model/aff_transfer_cache_fork.go, model/aff_transfer_cache_fork_test.go |
 
 O12 메모(스크립트 복사본): `userQuotaReserveResidentScript`/`userQuotaDeltaResidentScript`는 upstream `userQuotaReserveScript`/`userQuotaDeltaScript`(`model/quota_reserve.go:19-38`)의 복사본에 성공 경로 `EXPIRE KEYS[1] ARGV[4]`만 더한 것이다. upstream 복사본이므로 병합 때 원본 스크립트가 바뀌면 `model/user_quota_scripts_fork.go`에도 반영한다. 상주가 꺼져 있으면(`QUOTA_CACHE_TTL` 0 이하) upstream 스크립트를 그대로 쓴다.
 
