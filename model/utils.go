@@ -119,7 +119,7 @@ func batchUpdate() {
 		userIDs[key] = struct{}{}
 	}
 	for key := range userIDs {
-		flushUserQuotaRow(key, userQuotaStore[key], usedQuotaStore[key], requestCountStore[key]) // fork: O12
+		flushUserQuotaRow(key, userQuotaStore, usedQuotaStore[key], requestCountStore[key]) // fork: O12
 	}
 	common.SysLog(common.LogText("batch update finished"))
 }

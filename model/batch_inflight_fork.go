@@ -1,5 +1,10 @@
 package model
 
+import (
+	"github.com/QuantumNous/new-api/common"
+	"gorm.io/gorm"
+)
+
 // fork: O12 — 배치가 큐를 꺼내 DB에 쓰는 동안(운영 기준 3~5초) 그 사용자는
 // 여전히 "DB에 반영되지 않은 차감"을 가진다. 큐를 꺼내는 순간 같은 락 안에서
 // 사용자를 반영 중으로 표시하고, 행을 쓴 직후 한 사용자씩 푼다.
@@ -42,7 +47,41 @@ func userQuotaBatchPending(id int) bool {
 	return queued || userQuotaInFlight[id] > 0
 }
 
-func flushUserQuotaRow(id int, quota int, usedQuota int, requestCount int) {
-	defer clearUserQuotaInFlight(id)
-	updateUserQuotaUsedQuotaAndRequestCount(id, quota, usedQuota, requestCount)
+// flushUserQuotaRow is upstream updateUserQuotaUsedQuotaAndRequestCount with the
+// error returned: a failed write is re-queued instead of dropped (design §4.12-2).
+// upstream 복사본, 병합 때 원본 변경 반영.
+//
+// quotaStore is the user-quota store this batch took. Only ids in it were marked in
+// flight (takeBatchStoreLocked), so only those are cleared; an id that appears only in
+// the used-quota or request-count store must not erase another batch's mark.
+// The re-queue happens before the deferred clear, so the user never reads as
+// not-pending in between.
+func flushUserQuotaRow(id int, quotaStore map[int]int, usedQuota int, requestCount int) {
+	quota, taken := quotaStore[id]
+	if taken {
+		defer clearUserQuotaInFlight(id)
+	}
+	if quota == 0 && usedQuota == 0 && requestCount == 0 {
+		return
+	}
+	err := DB.Model(&User{}).Where("id = ?", id).Updates(
+		map[string]any{
+			"quota":         gorm.Expr("quota + ?", quota),
+			"used_quota":    gorm.Expr("used_quota + ?", usedQuota),
+			"request_count": gorm.Expr("request_count + ?", requestCount),
+		},
+	).Error
+	if err == nil {
+		return
+	}
+	common.SysError(common.LogText("failed to batch update user %d quota, requeued: %s", id, err.Error()))
+	if quota != 0 {
+		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
+	}
+	if usedQuota != 0 {
+		addNewRecord(BatchUpdateTypeUsedQuota, id, usedQuota)
+	}
+	if requestCount != 0 {
+		addNewRecord(BatchUpdateTypeRequestCount, id, requestCount)
+	}
 }

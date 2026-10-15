@@ -1,9 +1,11 @@
 package model
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -102,4 +104,115 @@ func TestBatchUpdateClearsInFlightPerRow(t *testing.T) {
 	require.False(t, userQuotaBatchPending(b.Id))
 	require.Equal(t, 900, getUserQuotaFromDB(t, a.Id))
 	require.Equal(t, 800, getUserQuotaFromDB(t, b.Id))
+}
+
+// takeUserQuotaStoreForTest takes the user-quota store the way batchUpdate does
+// (marking its users in flight) and returns it.
+func takeUserQuotaStoreForTest(t *testing.T) map[int]int {
+	t.Helper()
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	store := takeBatchStoreLocked(BatchUpdateTypeUserQuota)
+	batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int)
+	return store
+}
+
+func TestFlushUserQuotaRowRequeuesOnDBError(t *testing.T) {
+	truncateTables(t)
+	enableBatchForResidencyTest(t)
+	resetUserQuotaInFlightForTest(t)
+	user := insertUserForPaymentGuardTest(t, 9601, 1000)
+	addNewRecord(BatchUpdateTypeUserQuota, user.Id, -100)
+	quotaStore := takeUserQuotaStoreForTest(t)
+	require.Equal(t, -100, quotaStore[user.Id])
+
+	// Make the single users-row write fail once.
+	const cbName = "fork_test_fail_users_update"
+	failed := false
+	require.NoError(t, DB.Callback().Update().Before("gorm:update").Register(cbName, func(tx *gorm.DB) {
+		if failed || tx.Statement.Schema == nil || tx.Statement.Schema.Table != "users" {
+			return
+		}
+		failed = true
+		_ = tx.AddError(errors.New("injected users update failure"))
+	}))
+	t.Cleanup(func() { _ = DB.Callback().Update().Remove(cbName) })
+
+	flushUserQuotaRow(user.Id, quotaStore, 100, 1)
+	require.True(t, failed)
+
+	require.True(t, userQuotaBatchPending(user.Id), "requeued after failure")
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	require.Equal(t, -100, batchUpdateStores[BatchUpdateTypeUserQuota][user.Id])
+	require.Equal(t, 0, userQuotaInFlight[user.Id], "mark cleared after requeue")
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	batchUpdateLocks[BatchUpdateTypeUsedQuota].Lock()
+	require.Equal(t, 100, batchUpdateStores[BatchUpdateTypeUsedQuota][user.Id])
+	batchUpdateLocks[BatchUpdateTypeUsedQuota].Unlock()
+	batchUpdateLocks[BatchUpdateTypeRequestCount].Lock()
+	require.Equal(t, 1, batchUpdateStores[BatchUpdateTypeRequestCount][user.Id])
+	batchUpdateLocks[BatchUpdateTypeRequestCount].Unlock()
+	require.Equal(t, 1000, getUserQuotaFromDB(t, user.Id), "failed write changed nothing")
+
+	batchUpdate()
+	require.Equal(t, 900, getUserQuotaFromDB(t, user.Id), "retry landed")
+	var dbUser User
+	require.NoError(t, DB.First(&dbUser, user.Id).Error)
+	require.Equal(t, 100, dbUser.UsedQuota)
+	require.Equal(t, 1, dbUser.RequestCount)
+	require.False(t, userQuotaBatchPending(user.Id))
+}
+
+func TestFlushUserQuotaRowKeepsMarkForIDNotTaken(t *testing.T) {
+	truncateTables(t)
+	enableBatchForResidencyTest(t)
+	resetUserQuotaInFlightForTest(t)
+	user := insertUserForPaymentGuardTest(t, 9603, 1000)
+
+	// Another batch took this user's quota delta and is still writing it.
+	addNewRecord(BatchUpdateTypeUserQuota, user.Id, -50)
+	_ = takeUserQuotaStoreForTest(t)
+	require.True(t, userQuotaBatchPending(user.Id))
+
+	// This batch only has a used-quota/request-count entry for the user: its
+	// quota store does not contain the id, so it never took a mark.
+	flushUserQuotaRow(user.Id, map[int]int{}, 7, 1)
+
+	require.True(t, userQuotaBatchPending(user.Id), "other batch's mark must survive")
+	var dbUser User
+	require.NoError(t, DB.First(&dbUser, user.Id).Error)
+	require.Equal(t, 7, dbUser.UsedQuota)
+	require.Equal(t, 1000, dbUser.Quota)
+	clearUserQuotaInFlight(user.Id) // the other batch finishes
+	require.False(t, userQuotaBatchPending(user.Id))
+}
+
+func TestFlushBatchUpdatesWritesQueuedDeltas(t *testing.T) {
+	truncateTables(t)
+	enableBatchForResidencyTest(t)
+	resetUserQuotaInFlightForTest(t)
+	user := insertUserForPaymentGuardTest(t, 9602, 1000)
+	addNewRecord(BatchUpdateTypeUserQuota, user.Id, -300)
+	FlushBatchUpdates()
+	require.Equal(t, 700, getUserQuotaFromDB(t, user.Id))
+	require.False(t, userQuotaBatchPending(user.Id))
+}
+
+func TestFlushBatchUpdatesIsNoopWhenBatchDisabled(t *testing.T) {
+	truncateTables(t)
+	resetUserQuotaInFlightForTest(t)
+	old := common.BatchUpdateEnabled
+	common.BatchUpdateEnabled = false
+	t.Cleanup(func() { common.BatchUpdateEnabled = old })
+	user := insertUserForPaymentGuardTest(t, 9604, 1000)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	batchUpdateStores[BatchUpdateTypeUserQuota][user.Id] = -300
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	t.Cleanup(func() {
+		batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+		delete(batchUpdateStores[BatchUpdateTypeUserQuota], user.Id)
+		batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+	})
+	FlushBatchUpdates()
+	require.Equal(t, 1000, getUserQuotaFromDB(t, user.Id))
 }
