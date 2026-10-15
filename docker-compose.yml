@@ -34,6 +34,7 @@ services:
       - REDIS_CONN_STRING=redis://:123456@redis:6379 # ⚠️ IMPORTANT: Change the password in production!
 #      - REDIS_SENTINEL_ADDRS=sentinel1:26379,sentinel2:26379,sentinel3:26379 # OPTIONAL: Connect through Redis Sentinel; the host in REDIS_CONN_STRING is ignored (credentials and DB number are still used) # fork: O12
 #      - REDIS_SENTINEL_MASTER_NAME=mymaster # OPTIONAL: Sentinel master name, default mymaster # fork: O12
+#      - REDIS_SENTINEL_USERNAME= # OPTIONAL: ACL username of the Sentinels themselves, used with REDIS_SENTINEL_PASSWORD # fork: O12
 #      - REDIS_SENTINEL_PASSWORD= # OPTIONAL: password of the Sentinels themselves # fork: O12
       - TZ=Asia/Shanghai
       - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)

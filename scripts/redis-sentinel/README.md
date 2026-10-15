@@ -43,6 +43,8 @@ sleep 10                                    # down-after-milliseconds 2초 + 선
 docker compose exec sentinel1 redis-cli -p 26379 sentinel get-master-addr-by-name mymaster   # redis-replica 6380
 ```
 
+장애 조치 직후에는 `get-master-addr-by-name`이 옛 주소를 돌려주거나 실패할 수 있으니 몇 초 뒤 다시 실행한다.
+
 그 뒤 위 연결 테스트를 같은 명령으로 다시 실행한다. 새 master(원래 replica)로 붙어 `PASS`가 나와야 한다. master를 되돌리려면 `docker compose start redis-master`(replica로 합류한다).
 
 ## 앱에서 쓰기
@@ -53,7 +55,7 @@ REDIS_SENTINEL_ADDRS=localhost:26379,localhost:26380,localhost:26381
 REDIS_SENTINEL_MASTER_NAME=mymaster
 ```
 
-`REDIS_CONN_STRING`의 호스트는 무시하고 사용자 이름·비밀번호·DB 번호만 쓴다. 시작 로그에 `Redis Sentinel enabled: master mymaster via …`가 남는다.
+`REDIS_CONN_STRING`의 호스트는 무시하고 사용자 이름·비밀번호·DB 번호와 TLS·타임아웃 같은 연결 옵션을 쓴다. `rediss://`의 TLS는 master와 Sentinel 연결에 같이 적용되고, 인증서 `ServerName`은 `REDIS_CONN_STRING`의 호스트 그대로다. 시작 로그에 `Redis Sentinel enabled: master mymaster via …`가 남는다.
 
 ## 정리
 
@@ -64,3 +66,4 @@ docker compose down -v
 ## 참고
 
 - Sentinel이 `sentinel.conf`를 직접 고쳐 쓰기 때문에 compose는 설정을 `/tmp`로 복사해 실행한다. 저장소의 파일은 바뀌지 않는다.
+- Sentinel끼리는 컨테이너 IP를 서로 알려 주므로 호스트에서 일부 주소로 접속하지 못하는 시도가 더 생길 수 있다. `localhost` 시드 주소로는 무해하다.

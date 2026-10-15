@@ -165,8 +165,9 @@ develop의 `batchUpdate`(`model/utils.go`)는 배치를 시작할 때 큐를 통
 
 `common/redis.go`의 클라이언트 생성 한 곳(`redis.NewClient(opt)`)을 fork 함수로 바꾼다. Sentinel 설정이 있으면 go-redis의 failover 클라이언트(`redis.NewFailoverClient`)를, 없으면 지금처럼 단일 노드 클라이언트를 만든다. 반환 타입은 둘 다 `*redis.Client`라 `common.RDB`와 나머지 코드는 바뀌지 않는다.
 
-- 환경 변수: `REDIS_SENTINEL_ADDRS`(쉼표로 구분한 `host:port` 목록, 비어 있으면 단일 노드), `REDIS_SENTINEL_MASTER_NAME`(기본 `mymaster`), `REDIS_SENTINEL_PASSWORD`(Sentinel 자체의 비밀번호, 선택).
+- 환경 변수: `REDIS_SENTINEL_ADDRS`(쉼표로 구분한 `host:port` 목록, 비어 있으면 단일 노드), `REDIS_SENTINEL_MASTER_NAME`(기본 `mymaster`), `REDIS_SENTINEL_USERNAME`(Sentinel ACL 사용자 이름, 선택), `REDIS_SENTINEL_PASSWORD`(Sentinel 자체의 비밀번호, 선택).
 - `REDIS_CONN_STRING`은 그대로 필수다. Redis 사용 여부의 스위치이고, master에 붙을 사용자 이름·비밀번호·DB 번호를 여기서 가져온다. 호스트 부분은 Sentinel 모드에서 무시하며 시작 로그에 그 사실을 남긴다.
+- `redis.ParseURL`이 `REDIS_CONN_STRING`에서 정하는 연결 옵션은 모두 failover 클라이언트로 넘긴다(TLS 설정, 재시도·백오프, 연결·읽기·쓰기 타임아웃, 풀 크기·FIFO·유휴·수명 설정). `rediss://`의 TLS는 master와 Sentinel 연결에 같이 적용되고 인증서 `ServerName`은 `REDIS_CONN_STRING`의 호스트 그대로다.
 - 장애 조치 중 연결 오류는 지금의 Redis 오류 처리(DB 우회 차감, §4.12의 캐시 반영 실패 목록)로 흡수된다.
 - 테스트: 옵션을 만드는 순수 함수의 단위 테스트, 그리고 `REDIS_SENTINEL_TEST_ADDRS`가 있을 때만 도는 실제 Sentinel 연결 테스트. 로컬 재현용 Sentinel docker-compose를 `scripts/redis-sentinel/`에 둔다(이 Mac에는 Docker가 없어 운영자 작업).
 
