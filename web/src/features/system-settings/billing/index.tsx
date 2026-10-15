@@ -71,8 +71,8 @@ const defaultBillingSettings: BillingSettings = {
   PayMethods: '',
   'payment_setting.amount_options': '',
   'payment_setting.amount_discount': '',
-  'payment_setting.compliance_confirmed': false,
-  'payment_setting.compliance_terms_version': '',
+  'payment_setting.compliance_confirmed': true, // fork: O11
+  'payment_setting.compliance_terms_version': 'v1', // fork: O11
   'payment_setting.compliance_confirmed_at': 0,
   'payment_setting.compliance_confirmed_by': 0,
   'payment_setting.compliance_confirmed_ip': '',

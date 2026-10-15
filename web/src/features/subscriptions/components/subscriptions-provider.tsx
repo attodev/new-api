@@ -51,8 +51,9 @@ export function SubscriptionsProvider({
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { data } = useSystemOptions()
   const complianceOptions = getOptionValue(data?.data, {
-    'payment_setting.compliance_confirmed': false,
-    'payment_setting.compliance_terms_version': '',
+    'payment_setting.compliance_confirmed': true, // fork: O11
+    'payment_setting.compliance_terms_version':
+      CURRENT_COMPLIANCE_TERMS_VERSION, // fork: O11
   })
   const complianceConfirmed =
     complianceOptions['payment_setting.compliance_confirmed'] &&
