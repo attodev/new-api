@@ -31,7 +31,8 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 | O9 | 한글화: 프런트 `ko` locale(4,795 키 중 4,489 재사용 + upstream 신규 2,778 키 번역), 백엔드 `ko.yaml`(upstream 키 67개), `README.kr.md` (단계 D 결과: ko.json 7,538키 — team 재사용 4,412, 번역 2,943, 영어 유지 183; `ko.yaml` 66키. 단계 E 기준 현재: ko.json 7,578키, `ko.yaml` 75키; §4.8) | `web/default/src/i18n/locales/kr.json` | — |
 | O10 | unode 진단 도구 | `tools/unode-diagnostics/` | 3,424(독립) |
 | O11 | fork 고유 수정 중 upstream에 없는 것: Epay 콜백 트랜잭션 정산 + "fail" 응답 재시도, PayPal·조직 지갑 충전 전 수용량 검증, Gemini 프롬프트 IMAGE/VIDEO/DOCUMENT 귀속과 캐시·오디오 캡, Ali `thinking_budget` either-name 규칙 (단계 E 결과: Epay 정산과 결제 전 수용량 검증은 upstream·단계 A·B에 이미 있어 재적용하지 않음. Gemini 이미지 상한, Ali 예산, 출석·초대 전송의 지갑 상한 세 가지를 올림; §4.9) | 2026-10 동기화 기록 두 건 | 소 |
-| O12 | OpenWebUI 연동(OAuth2/OIDC 제공자, relay JWT 치환, 사용자 링크 관리) | `OpenWebUI` 브랜치(미병합, Go 34파일 9,457 LOC + 프런트 28) | 9,457 |
+| O12 | 사용자 잔액 Redis 캐시 상주(`QUOTA_CACHE_TTL`, 기본 24시간)와 정보 신선 기한, 배치 반영 중 표시·실패 재시도·종료 시 비우기, 캐시 반영 실패 복구 목록, 잔액 어긋남 감지 로그, Redis Sentinel 직접 연결 (단계 E 뒤 별도 작업; 설계 `docs/superpowers/specs/2026-10-15-quota-cache-residency-design.md`, 기록 `docs/2026-10-15-quota-cache-residency.md`, 훅 `docs/fork-overlays.md` "O12 잔액 캐시 상주·Sentinel" 절) | develop 신규(team `10ade7045`·`cf2cf300f`·`9ef93eb8c`는 가져오지 않음) | 556(fork 파일 10개) + 훅 17 |
+| O13 | OpenWebUI 연동(OAuth2/OIDC 제공자, relay JWT 치환, 사용자 링크 관리) (처음 문안의 O12. 잔액 캐시 상주가 코드 표식 `fork: O12`를 먼저 써서 번호를 옮김) | `OpenWebUI` 브랜치(미병합, Go 34파일 9,457 LOC + 프런트 28) | 9,457 |
 
 ### 2.2 가져가지 않는 것
 
@@ -120,7 +121,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 - **지갑 상한(출석·초대 전송):** upstream에는 없지만 team이 막았던 구멍이라 fork로 유지한다. 출석 보상은 원자적 `quota <= max` UPDATE(`model/checkin.go:103`, SQLite 경로도 같은 트랜잭션 `:124`), 초대 쿼터 전송은 잠근 행으로 검사(`model/user.go:618`). 로직은 `model/wallet_ceiling_fork.go`.
 - Claude 5.x native thinking passthrough와 gpt-5 Chat 능력 표는 upstream(relaykit `reasoning/claude.go`, `GetOpenAIChatCapabilities`) 설계를 따른다. team의 Claude 재작성과 채널 테스트 한 줄(`d9a7cc12a`)은 옮기지 않는다.
 
-### 4.10 O12 OpenWebUI
+### 4.10 O13 OpenWebUI
 - `service/oidc`, `service/openwebui`, `controller/oauth2_provider.go`, `openwebui_link.go`, 모델·라우트·설정 파일은 복사. `middleware/auth.go`의 TokenAuth 치환 훅은 upstream의 `classifyDashboardCredential`/`lookupAccessToken` 구조에 맞춰 다시 쓴다(OpenWebUI 서비스 키 → 사용자 토큰 치환이 scoped access token 경로와 충돌하지 않도록 relay 경로의 `TokenAuth`에만 둔다). 프런트 28파일은 `web/src`로 이식.
 - 이 overlay는 마지막에 하고, 그 전까지 `OpenWebUI` 브랜치는 그대로 둔다.
 
@@ -155,7 +156,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 | C | O6 할인, O7 타이밍, usage-log·가격 UI | 할인 가이드 시나리오 통과 |
 | D | O9 한글 | ko locale, 용어집 검수 |
 | E | O11 fork 고유 수정 | 기록 문서 |
-| F | O12 OpenWebUI | OpenWebUI 통합 테스트 스택(`deploy/openwebui-test`) 통과 |
+| F | O13 OpenWebUI | OpenWebUI 통합 테스트 스택(`deploy/openwebui-test`) 통과 |
 | G | 스테이징 → `team` 교체(`team-legacy-2026-10` 보존), `docs/fork-overlays.md`와 동기화 절차 문서 | 전환 |
 
 각 단계는 독립 PR/브랜치로 리뷰·병합하고, 단계마다 별도의 구현 계획(`docs/superpowers/plans/`)을 쓴다. 단계 A가 끝나면 이후 upstream 동기화 리허설(`git merge qn/main`)을 한 번 해 보고 충돌 파일 수를 기록한다. 그 수가 규칙 3 목록과 일치해야 한다.
@@ -193,6 +194,10 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 18. 출석 보상과 초대 쿼터 전송에 지갑 상한을 둔다(upstream에는 없음, fork 유지).
 19. AI 클라이언트로 가는 조직 오류는 upstream `i18n.T` + yaml 경로를 쓴다(`en.yaml`에는 끝의 fork 블록만). Excel 행 오류는 기존 `errors []string`을 유지하고 `error_details`를 더한다. 조직 로그·대시보드는 현재 멤버의 전체 기록을 보여 준다(가입 시점 제한 없음, 사용자 결정).
 20. Redis 쿼터 캐시 TTL은 단계 E에서 upstream 상태(`SYNC_FREQUENCY` 기본 60초, 사용 중 갱신 없음)로 두고, 단계 F 전에 이것만 따로 다룬다(team `10ade7045`·`cf2cf300f`·`9ef93eb8c`와 develop 배치 모드 재수화 구멍을 테스트로 재현한 뒤 결정). team 브랜치(`TimingResponseWriter.Unwrap()` 역이식 등)는 team 쪽에서 별도로 확인한다.
+
+잔액 캐시 상주(단계 E 뒤, 단계 F 전)에서 정한 것. 2026-10-15 확정(기록 `docs/2026-10-15-quota-cache-residency.md` §4):
+
+21. 결정 20의 결론: 사용자 잔액 해시를 Redis에 상주시킨다(잔액 TTL 기본 86400초, 잔액이 바뀔 때만 연장; 사용자 정보는 해시 필드 `FreshUntil`로 `SYNC_FREQUENCY`마다 다시 읽음). 요청을 막거나(team `10ade7045`) DB로 우회하지 않고, API 키 캐시·인증 fence·세션 캐시는 upstream 그대로다. 어긋난 잔액은 로그만 남기고 고치지 않는다. Redis HA는 Sentinel 직접 연결로 한다(클러스터 모드 없음). overlay 번호는 O12이고, 처음 문안의 O12 OpenWebUI는 O13으로 옮긴다.
 
 ## 10. 리스크
 
