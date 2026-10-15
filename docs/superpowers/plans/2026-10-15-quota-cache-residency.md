@@ -820,7 +820,12 @@ func TestFlushUserQuotaRowRequeuesOnDBError(t *testing.T) {
 	truncateTables(t)
 	enableBatchForResidencyTest(t)
 	user := insertUserForPaymentGuardTest(t, 9601, 1000)
-	markUserQuotaInFlight(map[int]struct{}{user.Id: {}})
+	// Put the user in the in-flight state the way batchUpdate does (Task 5 ruling).
+	addNewRecord(BatchUpdateTypeUserQuota, user.Id, -100)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+	_ = takeBatchStoreLocked(BatchUpdateTypeUserQuota)
+	batchUpdateStores[BatchUpdateTypeUserQuota] = make(map[int]int)
+	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 
 	// Make the write fail: drop the table behind GORM for this call only.
 	require.NoError(t, DB.Exec("ALTER TABLE users RENAME TO users_hidden").Error)
