@@ -30,8 +30,6 @@ import (
 // 남는 한계: 이름에 user가 없는 User 변수의 Save, Model(인자)가 리터럴이 아닌
 // Model(param).Updates(map), 패키지 수준 `var f = func…` 본문, 함수 단위라서
 // 허용된 함수 안에 더해지는 두 번째 쓰기, 다른 패키지(service·controller 밖)의 쓰기.
-// 로 채운 맵을 넘기는 Updates(x), Model(&User{})에 식별자 맵을 넘기는 Updates(x),
-// 이름에 user가 든 식별자의 Save/Updates. 목록에 있는데 검출되지 않는 항목도 실패한다.
 var userQuotaWriteAllowlist = map[string]string{
 	// users.quota — cache is kept in step
 	"model/quota_reserve.go:persistUserQuotaDelta":          "cache decremented first (TryReserveUserQuota)",
