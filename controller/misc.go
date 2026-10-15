@@ -95,6 +95,8 @@ func GetStatus(c *gin.Context) {
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
 
+		"email_domain_restriction_enabled": common.EmailDomainRestrictionEnabled, // fork: O11
+
 		"usd_exchange_rate": operation_setting.USDExchangeRate,
 		"price":             operation_setting.Price,
 		"stripe_unit_price": setting.StripeUnitPrice,

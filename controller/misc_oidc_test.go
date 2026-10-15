@@ -58,3 +58,28 @@ func TestGetStatusReturnsEffectiveOIDCDisplayName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStatusExposesEmailDomainRestriction(t *testing.T) {
+	original := common.EmailDomainRestrictionEnabled
+	originalOptionMap := common.OptionMap
+	t.Cleanup(func() {
+		common.EmailDomainRestrictionEnabled = original
+		common.OptionMap = originalOptionMap
+	})
+	common.OptionMap = map[string]string{}
+
+	for _, want := range []bool{true, false} {
+		common.EmailDomainRestrictionEnabled = want
+		response := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(response)
+		context.Request = httptest.NewRequest(http.MethodGet, "/api/status", nil)
+
+		GetStatus(context)
+
+		var payload struct {
+			Data map[string]any `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &payload))
+		assert.Equal(t, want, payload.Data["email_domain_restriction_enabled"])
+	}
+}

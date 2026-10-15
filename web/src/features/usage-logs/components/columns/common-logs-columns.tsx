@@ -732,7 +732,8 @@ export function useCommonLogsColumns(
       },
       {
         accessorKey: 'prompt_tokens',
-        header: t('Tokens', { context: 'usage' }),
+        header: t('tokenInOut'), // fork: O11
+        meta: { label: t('tokenInOut') }, // fork: O11
         cell: ({ row }) => {
           const log = row.original
           if (!isDisplayableLogType(log.type)) return null
