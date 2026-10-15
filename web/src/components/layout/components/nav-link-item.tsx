@@ -21,6 +21,7 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 
 import type { TopNavLink } from '../types'
+import { ForceReloadNavLinkItem } from './force-reload-nav-anchor-fork' // fork: O11
 
 interface NavLinkItemProps {
   link: TopNavLink
@@ -50,6 +51,10 @@ export function NavLinkItem({ link, className }: NavLinkItemProps) {
         {link.title}
       </a>
     )
+  }
+
+  if (link.forceReload) {
+    return <ForceReloadNavLinkItem link={link} className={linkClassName} /> // fork: O11
   }
 
   return (

@@ -36,6 +36,8 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
+import { BrandLink } from './brand-link-fork' // fork: O11
+import { ForceReloadPublicNavLink } from './force-reload-nav-anchor-fork' // fork: O11
 import { HeaderLogo } from './header-logo'
 
 const AUTH_PROMPT_SECONDS = 5
@@ -216,8 +218,9 @@ export function PublicHeader(props: PublicHeaderProps) {
           >
             {/* Logo */}
             <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1 lg:min-w-36'>
-              <Link
-                to={homeUrl}
+              <BrandLink // fork: O11
+                isAuthenticated={isAuthenticated}
+                homeUrl={homeUrl}
                 className='group flex min-w-0 items-center gap-2.5'
               >
                 <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
@@ -233,7 +236,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     displaySiteName
                   )}
                 </span>
-              </Link>
+              </BrandLink>
               <SystemUpdateAction presentation='version' />
             </div>
 
@@ -259,6 +262,18 @@ export function PublicHeader(props: PublicHeaderProps) {
                     >
                       {t(link.title)}
                     </a>
+                  )
+                }
+                if (link.forceReload) {
+                  // fork: O11
+                  return (
+                    <ForceReloadPublicNavLink
+                      key={`${link.title}:${link.href}`}
+                      link={link}
+                      label={t(link.title)}
+                      isActive={isActive}
+                      onClick={(event) => handleNavLinkClick(event, link)}
+                    />
                   )
                 }
                 return (
@@ -389,6 +404,20 @@ export function PublicHeader(props: PublicHeaderProps) {
                   >
                     {t(link.title)}
                   </a>
+                )
+              }
+              if (link.forceReload) {
+                // fork: O11
+                return (
+                  <ForceReloadPublicNavLink
+                    key={`${link.title}:${link.href}`}
+                    link={link}
+                    label={t(link.title)}
+                    isActive={isActive}
+                    onClick={(event) => handleNavLinkClick(event, link, true)}
+                    className={linkClassName}
+                    style={transitionStyle}
+                  />
                 )
               }
               return (

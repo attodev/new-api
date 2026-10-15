@@ -29,6 +29,7 @@ export type TopNavLink = {
   disabled?: boolean
   requiresAuth?: boolean
   external?: boolean
+  forceReload?: boolean // fork: O11
 }
 
 /**
@@ -64,7 +65,7 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Home
   if (modules?.home !== false) {
-    links.push({ title: t('Home'), href: '/' })
+    links.push({ title: t('Home'), href: '/', forceReload: true }) // fork: O11
   }
 
   // Console -> /dashboard (new console path)

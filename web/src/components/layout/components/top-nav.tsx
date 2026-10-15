@@ -30,6 +30,8 @@ import {
 import { cn } from '@/lib/utils'
 
 import { type TopNavLink } from '../types'
+import { withoutForceReload } from './force-reload-links-fork' // fork: O11
+import { ForceReloadTopNavItems } from './force-reload-nav-anchor-fork' // fork: O11
 
 type TopNavProps = React.HTMLAttributes<HTMLElement> & {
   links: TopNavLink[]
@@ -39,7 +41,8 @@ type TopNavProps = React.HTMLAttributes<HTMLElement> & {
  * 顶部导航栏组件
  * 在大屏幕显示水平导航，在小屏幕显示下拉菜单
  */
-export function TopNav({ className, links, ...props }: TopNavProps) {
+export function TopNav({ className, links: allLinks, ...props }: TopNavProps) {
+  const links = useMemo(() => withoutForceReload(allLinks), [allLinks]) // fork: O11
   // 规范化链接，确保所有可选属性都有默认值
   const normalizedLinks = useMemo(
     () =>
@@ -63,6 +66,8 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
             <Menu />
           </DropdownMenuTrigger>
           <DropdownMenuContent side='bottom' align='start'>
+            {/* fork: O11 */}
+            <ForceReloadTopNavItems links={allLinks} variant='menu' />
             {normalizedLinks.map(
               ({ title, href, isActive, disabled, external }) => (
                 <DropdownMenuItem
@@ -102,6 +107,8 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
         )}
         {...props}
       >
+        {/* fork: O11 */}
+        <ForceReloadTopNavItems links={allLinks} variant='bar' />
         {normalizedLinks.map(({ title, href, isActive, disabled, external }) =>
           external ? (
             <a
