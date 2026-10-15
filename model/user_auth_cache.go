@@ -46,6 +46,9 @@ func writeUserCache(user *UserBase, includeQuota bool) error {
 	if user == nil || user.Id <= 0 || !common.RedisEnabled {
 		return nil
 	}
+	if quotaCacheResidencyEnabled() { // fork: O12
+		return writeUserCacheResident(user, includeQuota)
+	}
 	user.CacheSchema = userCacheSchemaVersion
 	if user.AuthVersion <= 0 {
 		return fmt.Errorf("invalid user auth version")

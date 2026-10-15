@@ -275,8 +275,14 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 | O12 QUOTA_CACHE_TTL 설정 | common/init.go:113 | `InitEnv`에서 `SyncFrequency` 다음 줄 `QuotaCacheTTL = GetEnvOrDefault("QUOTA_CACHE_TTL", 86400) // fork: O12` (0 이하면 상주 끔) | common/quota_cache_ttl_fork.go, model/user_quota_residency_fork.go, model/user_quota_residency_fork_test.go |
 | O12 잔액 차감 TTL 연장 (reserve) | model/quota_reserve.go:82 | `cacheTryReserveUserQuota`의 Eval 호출을 `result, err := evalUserQuotaReserve(userID, amount) // fork: O12` 한 줄로 대체 (상주가 켜져 있으면 성공 경로에서만 `EXPIRE`) | model/user_quota_scripts_fork.go, model/user_quota_scripts_fork_test.go, model/user_quota_residency_regression_test.go |
 | O12 잔액 정산 TTL 연장 (delta) | model/quota_reserve.go:87 | `cacheApplyUserQuotaDelta`의 Eval 호출을 `result, err := evalUserQuotaDelta(userID, delta) // fork: O12` 한 줄로 대체 | model/user_quota_scripts_fork.go |
+| O12 정보 신선 기한 (필드) | model/user_cache.go:27 | `UserBase`에 `` FreshUntil  int64  `json:"-"` // fork: O12 `` 한 줄 (`CacheSchema` 다음 줄, `common.RedisHGetObj`가 해시 필드 `FreshUntil`을 채움) | model/user_cache_fresh_fork.go, model/user_cache_fresh_fork_test.go |
+| O12 정보 신선 기한 (읽기) | model/user_cache.go:138 | `cacheGetUserBase`에서 floor 검사 다음에 `if userInfoStale(&userCache) { // fork: O12` + `return nil, errUserInfoStale` + `}` (gofmt로 3줄; 상주가 켜져 있고 `FreshUntil`이 없거나 지났으면 miss와 같은 DB 경로로) | model/user_cache_fresh_fork.go |
+| O12 정보 다시 읽은 뒤 캐시 잔액 반환 | model/user_cache.go:115 | `GetUserCache` 끝의 `return user.ToBaseUser(), nil`을 `return userBaseAfterPopulate(user) // fork: O12`로 (상주가 켜져 있으면 쓰기 뒤 해시를 다시 읽어 캐시 잔액을 돌려주고, 읽지 못하면 DB 값) | model/user_cache_fresh_fork.go |
+| O12 캐시 쓰기 규칙 | model/user_auth_cache.go:49 | `writeUserCache`의 nil/Redis 검사 다음에 `if quotaCacheResidencyEnabled() { // fork: O12` + `return writeUserCacheResident(user, includeQuota)` + `}` (gofmt로 3줄) | model/user_cache_fresh_fork.go |
 
 O12 메모(스크립트 복사본): `userQuotaReserveResidentScript`/`userQuotaDeltaResidentScript`는 upstream `userQuotaReserveScript`/`userQuotaDeltaScript`(`model/quota_reserve.go:19-38`)의 복사본에 성공 경로 `EXPIRE KEYS[1] ARGV[4]`만 더한 것이다. upstream 복사본이므로 병합 때 원본 스크립트가 바뀌면 `model/user_quota_scripts_fork.go`에도 반영한다. 상주가 꺼져 있으면(`QUOTA_CACHE_TTL` 0 이하) upstream 스크립트를 그대로 쓴다.
+
+O12 메모(upstream 스크립트 복사본, `writeUserCacheResident`): `model/user_cache_fresh_fork.go`의 `writeUserCacheResident`는 upstream `writeUserCache`(`model/user_auth_cache.go:45-99`, 스크립트 :61-86)의 복사본이다. 다른 점은 세 가지다. (1) 사용자 정보 `HSET`에 `'FreshUntil', ARGV[13]`(지금 + `SYNC_FREQUENCY`)을 더한다. (2) `EXPIRE`는 해시에 TTL이 없을 때(`TTL < 0`, 새로 채운 해시)만 실행해 정보를 다시 읽어도 잔액 TTL이 연장되지 않는다. (3) `ARGV[12]`는 `userCacheTTLSeconds()` 대신 `quotaCacheTTLSeconds()`다. 인증 버전 비교, fence 확인, committed floor 갱신, "Quota 필드가 있으면 쓰지 않음" 규칙은 그대로다. upstream 복사본이므로 병합 때 원본 스크립트나 인자 순서가 바뀌면 `writeUserCacheResident`에도 반영한다. 상주가 꺼져 있으면 upstream `writeUserCache`가 그대로 실행되고 `FreshUntil`은 쓰지 않으며 읽기에서도 확인하지 않는다.
 
 ## 삭제한 upstream 파일
 

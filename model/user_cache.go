@@ -24,6 +24,7 @@ type UserBase struct {
 	Setting     string `json:"setting"`
 	AuthVersion int64  `json:"-"`
 	CacheSchema int    `json:"-"`
+	FreshUntil  int64  `json:"-"` // fork: O12
 }
 
 func (user *UserBase) WriteContext(c *gin.Context) {
@@ -111,7 +112,7 @@ func GetUserCache(userId int) (*UserBase, error) {
 			common.SysLog(common.LogText("failed to synchronously populate user cache: %s", err.Error()))
 		}
 	}
-	return user.ToBaseUser(), nil
+	return userBaseAfterPopulate(user) // fork: O12
 }
 
 func cacheGetUserBase(userId int) (*UserBase, error) {
@@ -133,6 +134,9 @@ func cacheGetUserBase(userId int) (*UserBase, error) {
 	}
 	if floor > userCache.AuthVersion {
 		return nil, ErrUserAuthCachePending
+	}
+	if userInfoStale(&userCache) { // fork: O12
+		return nil, errUserInfoStale
 	}
 	return &userCache, nil
 }
