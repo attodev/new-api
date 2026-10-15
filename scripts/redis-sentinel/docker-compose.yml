@@ -1,0 +1,43 @@
+# 로컬 Sentinel 재현용(master 1, replica 1, sentinel 3). 사용법은 README.md.
+# Sentinel은 설정 파일을 직접 고쳐 쓰므로 sentinel.conf를 /tmp로 복사해 실행한다
+# (저장소의 파일이 바뀌지 않게).
+x-sentinel: &sentinel
+  image: redis:7
+  command: ["sh", "-c", "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf"]
+  volumes:
+    - ./sentinel.conf:/etc/redis/sentinel.conf:ro
+  depends_on:
+    - redis-master
+    - redis-replica
+
+services:
+  redis-master:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--replica-announce-ip", "redis-master"]
+    ports:
+      - "6379:6379"
+
+  redis-replica:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--port", "6380", "--replicaof", "redis-master", "6379", "--replica-announce-ip", "redis-replica"]
+    ports:
+      - "6380:6380"
+    depends_on:
+      - redis-master
+
+  sentinel1:
+    <<: *sentinel
+    ports:
+      - "26379:26379"
+
+  sentinel2:
+    <<: *sentinel
+    command: ["sh", "-c", "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf --port 26380"]
+    ports:
+      - "26380:26380"
+
+  sentinel3:
+    <<: *sentinel
+    command: ["sh", "-c", "cp /etc/redis/sentinel.conf /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf --port 26381"]
+    ports:
+      - "26381:26381"
