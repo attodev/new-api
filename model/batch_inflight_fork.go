@@ -5,7 +5,10 @@ package model
 // 사용자를 반영 중으로 표시하고, 행을 쓴 직후 한 사용자씩 푼다.
 // 설계 §4.11. userQuotaInFlight는 batchUpdateLocks[BatchUpdateTypeUserQuota]로 보호한다.
 
-var userQuotaInFlight = map[int]struct{}{}
+// userQuotaInFlight is a refcount: overlapping batches (e.g. a shutdown flush racing
+// the ticker's batch) may hold the same user, and one batch's clear must not erase
+// the other's mark.
+var userQuotaInFlight = map[int]int{}
 
 // takeBatchStoreLocked returns the store for type i; the caller holds batchUpdateLocks[i].
 // For the user quota type it marks every queued user as in flight under that same lock,
@@ -14,7 +17,7 @@ func takeBatchStoreLocked(i int) map[int]int {
 	store := batchUpdateStores[i]
 	if i == BatchUpdateTypeUserQuota {
 		for id := range store {
-			userQuotaInFlight[id] = struct{}{}
+			userQuotaInFlight[id]++
 		}
 	}
 	return store
@@ -23,7 +26,11 @@ func takeBatchStoreLocked(i int) map[int]int {
 func clearUserQuotaInFlight(id int) {
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
 	defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
-	delete(userQuotaInFlight, id)
+	if userQuotaInFlight[id] <= 1 {
+		delete(userQuotaInFlight, id)
+		return
+	}
+	userQuotaInFlight[id]--
 }
 
 // userQuotaBatchPending reports whether this process still owes the database a
@@ -32,8 +39,7 @@ func userQuotaBatchPending(id int) bool {
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
 	defer batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 	_, queued := batchUpdateStores[BatchUpdateTypeUserQuota][id]
-	_, inFlight := userQuotaInFlight[id]
-	return queued || inFlight
+	return queued || userQuotaInFlight[id] > 0
 }
 
 func flushUserQuotaRow(id int, quota int, usedQuota int, requestCount int) {
