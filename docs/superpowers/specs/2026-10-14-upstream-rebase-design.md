@@ -30,7 +30,7 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 | O8 | 소형 설정: OIDC 이메일 도메인 화이트리스트(가입+로그인), OpenRouter 로그 vendor 이름 제거 옵션, 인터페이스 언어 en/ko 제한, 기본 첫 화면 콘솔, 가격 페이지 모델 상세 숨김, 정적 자산 rate limit 제외·캐시 헤더 (단계 A 결과: 인터페이스 언어 제한은 단계 D로, 기본 첫 화면 콘솔은 team에서 되돌려져 제외, 64-bit 옵션 파싱은 no-op) | 각 수십 줄 | ~300 |
 | O9 | 한글화: 프런트 `ko` locale(4,795 키 중 4,489 재사용 + upstream 신규 2,778 키 번역), 백엔드 `ko.yaml`(upstream 키 67개), `README.kr.md` (단계 D 결과: ko.json 7,538키 — team 재사용 4,412, 번역 2,943, 영어 유지 183; `ko.yaml` 66키; §4.8) | `web/default/src/i18n/locales/kr.json` | — |
 | O10 | unode 진단 도구 | `tools/unode-diagnostics/` | 3,424(독립) |
-| O11 | fork 고유 수정 중 upstream에 없는 것: Epay 콜백 트랜잭션 정산 + "fail" 응답 재시도, PayPal·조직 지갑 충전 전 수용량 검증, Gemini 프롬프트 IMAGE/VIDEO/DOCUMENT 귀속과 캐시·오디오 캡, Ali `thinking_budget` either-name 규칙 | 2026-10 동기화 기록 두 건 | 소 |
+| O11 | fork 고유 수정 중 upstream에 없는 것: Epay 콜백 트랜잭션 정산 + "fail" 응답 재시도, PayPal·조직 지갑 충전 전 수용량 검증, Gemini 프롬프트 IMAGE/VIDEO/DOCUMENT 귀속과 캐시·오디오 캡, Ali `thinking_budget` either-name 규칙 (단계 E 결과: Epay 정산과 결제 전 수용량 검증은 upstream·단계 A·B에 이미 있어 재적용하지 않음. Gemini 이미지 상한, Ali 예산, 출석·초대 전송의 지갑 상한 세 가지를 올림; §4.9) | 2026-10 동기화 기록 두 건 | 소 |
 | O12 | OpenWebUI 연동(OAuth2/OIDC 제공자, relay JWT 치환, 사용자 링크 관리) | `OpenWebUI` 브랜치(미병합, Go 34파일 9,457 LOC + 프런트 28) | 9,457 |
 
 ### 2.2 가져가지 않는 것
@@ -105,15 +105,20 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 - 프런트 locale: fork 파일 `web/src/i18n/locales/ko.json`(en.json 키 순서, 단계 D 끝 7,538키). i18next `resources`·`supportedLngs`, `languages.ts` 옵션 `{ code: 'ko', label: '한국어' }`, 달력 `react-day-picker`의 `ko`는 한 줄 훅이다.
 - 번역 도구: `web/scripts/ko-locale.mjs`(`bun run i18n:ko`). `seed`는 team `kr.json`에서 검증을 통과한 한글 값을 재사용하고(4,412키) 나머지를 영어 placeholder로 채운다. ko.json이 있으면 `--force` 없이는 거부한다. `check`는 보간 `{{…}}`·Trans/이름 태그·printf·앞뒤 공백·`\n` 수·한글 포함을 검사하고, `status`는 남은 영어 placeholder 수를 센다. 영어를 유지할 키(브랜드·식별자·테마 이름)는 스크립트의 `MANUAL_SKIP`과 `docs/i18n/ko-skip.json`(183키)에 있다. 번역은 6배치 LLM 초안 + 용어집 검수 + 배치별 리뷰였고, 배치 목록 파일은 작업 뒤 지웠다(`seed --force`는 ko.json을 덮어쓰고 `docs/i18n/ko-batches.json`도 다시 만드므로 쓰지 않는다). 병합 게이트는 `web/src/i18n/__tests__/ko-coverage.test.ts`다: en.json 키가 ko.json에 없거나 skip 목록 밖의 키가 영어 값이면 `bun run test`가 실패한다.
 - 용어집: `docs/translation-glossary.ko.md`(문체 규칙과 용어 표). 주요 결정은 §9 결정 13.
-- 인터페이스 언어 제한(O8): team의 하드코딩(`[en, kr]`) 대신 옵션 `InterfaceLanguages`(쉼표로 구분한 코드, 기본 `en,ko`)다. `/api/status`가 `interface_languages`(허용 코드 `en, ko, zhCN, zhTW, fr, ru, ja, vi`, 대소문자 무시, `kr`→`ko`, 관리자 순서 유지, 비면 `["en"]`)를 내려 주고, 헤더 언어 메뉴와 프로필 언어 카드가 이 목록으로 거른다. 리소스는 8개 locale을 모두 로드한다. 사용자가 이미 고른 언어는 목록에 없어도 메뉴에 남는다. 관리 화면은 시스템 설정 → 운영 → 인터페이스 언어(체크박스, 하나 이상).
-- 백엔드: fork 파일 `i18n/locales/ko.yaml`(develop `en.yaml`과 같은 66키; team 값 19개 재사용 + 47개 번역), `i18n.go`의 `LangKo`·파일 목록·localizer·`SupportedLanguages()`. fork 파일에서 웹 콘솔 사용자에게 나가는 오류 41곳을 `common.NewMessage`/`ApiErrorT`(message_key) 경로로 옮겼고, 그 키 66개를 8개 locale JSON에 넣었다(ko 번역, 다른 6개는 영어). upstream 파일의 같은 패턴은 훅 규칙상 그대로 둔다.
+- 인터페이스 언어 제한(O8): team의 하드코딩(`[en, kr]`) 대신 옵션 `InterfaceLanguages`(쉼표로 구분한 코드, 기본 `en,ko`)다. `/api/status`가 `interface_languages`(대소문자 무시, `kr`→`ko`, 관리자 순서 유지, 비면 `["en"]`)를 내려 주고, 헤더 언어 메뉴와 프로필 언어 카드가 이 목록으로 거른다. 관리 화면은 시스템 설정 → 운영 → 인터페이스 언어(체크박스, 하나 이상). 단계 D에는 허용 코드가 8개(`en, ko, zhCN, zhTW, fr, ru, ja, vi`)였고 리소스도 8개를 모두 로드했다.
+- **UI 언어는 en/ko다(단계 E, 기록 `docs/2026-10-15-rebase-phase-e.md` §1).** team 66d421d13과 같이 upstream locale 8개(프런트 `zh, zh-TW, fr, ja, ru, vi` JSON, 백엔드 `zh-CN, zh-TW` yaml)를 지웠다(`docs/fork-overlays.md` "삭제한 upstream 파일" — upstream이 고치면 modify/delete 충돌, `git rm`으로 삭제 유지). i18next `resources`·`supportedLngs`와 `INTERFACE_LANGUAGE_OPTIONS`는 en·ko, 백엔드 번들은 en·ko(`SupportedLanguages()` = `{en, ko}`), `ParseInterfaceLanguages`의 허용 코드는 en·ko다. `InterfaceLanguages`는 저장할 때도 정규화한다(`model/option.go:277` 훅, 알려진 코드만, 비면 `en`). 지운 언어를 저장한 기존 사용자와 그 언어 브라우저(`zh-CN` 등)는 영어로 열린다(데이터 마이그레이션 없음). 남긴 것: `README.*.md` 번역본, 서버 로그 언어 `common/log_text.zh-CN.json`(`DEFAULT_LANGUAGE=zh-CN`은 서버 로그만 바꿈), 콘텐츠 언어 값(플러그인 changelog, 모델 동기화 `SyncLocale`, `localized-text.ts`의 `zhcn`).
+- 백엔드: fork 파일 `i18n/locales/ko.yaml`(develop `en.yaml`과 같은 66키; team 값 19개 재사용 + 47개 번역), `i18n.go`의 `LangKo`·파일 목록·localizer·`SupportedLanguages()`. fork 파일에서 웹 콘솔 사용자에게 나가는 오류 41곳을 `common.NewMessage`/`ApiErrorT`(message_key) 경로로 옮겼고, 그 키 66개를 8개 locale JSON에 넣었다(ko 번역, 다른 6개는 영어 — 단계 E에서 그 6개 파일을 지움). upstream 파일의 같은 패턴은 훅 규칙상 그대로 둔다. 단계 E에서 AI 클라이언트로 가는 조직 relay·MJ 오류 9키를 `i18n/keys_fork.go`와 `en.yaml`·`ko.yaml` 끝의 `# fork: O3` 블록으로 옮겨(지금 각 75키) 요청이 밝힌 언어로 렌더하고, 조직·충전 만료 감사 14개 액션과 Excel 가져오기 행 오류(`error_details`)도 번역 경로에 넣었다.
 - README: `README.kr.md`(upstream 신판 `README.md` 기준 번역, team 구판의 같은 절 문장 재사용)와 6개 README의 언어 nav 한 줄(`<!-- fork: O9 -->`).
 
 ### 4.9 O11 fork 고유 수정
-- Epay 트랜잭션 정산(`model.RechargeEpay`, `EpayNotify` 응답 후행): team 커밋 2건을 upstream `controller/topup.go` 구조에 맞춰 재적용.
-- 충전 전 수용량 검증은 upstream에 epay/Stripe/Creem/Waffo 용이 있으므로 PayPal·조직 지갑 진입점에만 team 패턴을 추가.
-- Gemini modality 귀속·캡: upstream `relaykit/dto/usage_merge.go`와 `relay-gemini.go`를 읽고 같은 효과가 없으면 호스트 정산 쪽(`service/text_quota.go` 진입점)에 캡을 둔다.
-- Ali `thinking_budget` either-name: 규칙 6에 따라 호스트 어댑터에서.
+
+단계 E에서 아래처럼 정리했다(기록 `docs/2026-10-15-rebase-phase-e.md` §2–3, 훅 위치는 `docs/fork-overlays.md` "O11 fork 고유 수정" 절). 처음 문안의 앞 두 항목(Epay 정산 재적용, PayPal·조직 수용량 검증 추가)은 다시 할 일이 없었다.
+
+- **Epay·수용량 검증은 upstream이 해결.** Epay 트랜잭션 정산은 upstream `50e5377ea`(`model.RechargeEpay`가 주문 잠금·상태 확인·지급을 한 트랜잭션에서 하고, 실패하면 주문은 pending, 콜백은 `fail`)로 develop에 이미 있다. 결제 전 수용량 검증은 upstream `47ba9d2c6`·`2a0ce3475`의 `rejectInvalidCreditedQuota`/`rejectInvalidTopUpQuota`가 모든 pay/amount 진입점(Epay `RequestEpay`·`RequestAmount`, Stripe·Creem·Waffo·Waffo Pancake, fork PayPal `RequestPayPalPay`·`RequestPayPalAmount`)에서 돌고, 단계 B의 O3 훅(`controller/topup.go:266, 278` `validateTopUpTargetCapacity`)이 조직 주문을 조직 지갑 상한으로 검사한다(조직 결제 라우트는 대상 지정 뒤 같은 함수를 부름). not-found·다른 provider·만료 주문에도 `fail`을 답하는 upstream 동작은 그대로 둔다.
+- **Gemini 이미지 토큰 상한:** relaykit은 그대로 두고, 정산 소비자 두 곳에서 그 경로가 따로 값을 매기는 몫만큼 `ImageTokens`를 자른다 — 정률 `service/text_quota.go:248`(캐시는 항상, 오디오는 모델에 Gemini 오디오 입력 단가가 있을 때), 티어 `service/tiered_settle.go:27`(식이 `cr`을 쓰면 캐시, `ai`를 쓰면 오디오). 로직은 `service/gemini_image_cap_fork.go`. 처음 계획(`effectiveBillingUsage` 한 지점)은 `cr`을 쓰지 않는 티어 식(`p + img*2`)에서 캐시와 겹치는 이미지 토큰까지 텍스트 단가로 낮춰 받았다(3089 대신 2500). VIDEO·DOCUMENT의 `TextTokens` 귀속(표시 차이)은 옮기지 않고, `PostAudioConsumeQuota`와 채널 테스트 정산은 raw usage라 상한이 없다.
+- **Ali `thinking_budget` either-name:** 규칙 6대로 Ali 어댑터에서 한다. `requestOpenAI2Ali`(`relay/channel/ali/text.go:12`)는 클라이언트 이름이나 매핑 뒤 이름 중 하나가 Qwen/QwQ면 유지하고, relaykit 마샬러가 매핑 뒤 이름으로 지우는 경우에는 `ConvertOpenAIRequest`(`adaptor.go:146`)가 raw 값을 gin 컨텍스트에 두었다가 `DoRequest`(`adaptor.go:186`)가 본문에 다시 넣는다(`relay/channel/ali/thinking_budget_fork.go`). 채널 ParamOverride가 `thinking_budget`을 언급하면 다시 넣지 않고, chat completions 본문이면서 `model`이 업스트림 이름과 같을 때만 넣는다. Responses API 경로는 다루지 않는다.
+- **지갑 상한(출석·초대 전송):** upstream에는 없지만 team이 막았던 구멍이라 fork로 유지한다. 출석 보상은 원자적 `quota <= max` UPDATE(`model/checkin.go:103`, SQLite 경로도 같은 트랜잭션 `:124`), 초대 쿼터 전송은 잠근 행으로 검사(`model/user.go:618`). 로직은 `model/wallet_ceiling_fork.go`.
+- Claude 5.x native thinking passthrough와 gpt-5 Chat 능력 표는 upstream(relaykit `reasoning/claude.go`, `GetOpenAIChatCapabilities`) 설계를 따른다. team의 Claude 재작성과 채널 테스트 한 줄(`d9a7cc12a`)은 옮기지 않는다.
 
 ### 4.10 O12 OpenWebUI
 - `service/oidc`, `service/openwebui`, `controller/oauth2_provider.go`, `openwebui_link.go`, 모델·라우트·설정 파일은 복사. `middleware/auth.go`의 TokenAuth 치환 훅은 upstream의 `classifyDashboardCredential`/`lookupAccessToken` 구조에 맞춰 다시 쓴다(OpenWebUI 서비스 키 → 사용자 토큰 치환이 scoped access token 경로와 충돌하지 않도록 relay 경로의 `TokenAuth`에만 둔다). 프런트 28파일은 `web/src`로 이식.
@@ -179,6 +184,15 @@ team 브랜치는 upstream(QuantumNous/new-api) `74985fa87`(2026-05-26)에서 �
 12. 백엔드 `ko.yaml`은 develop `en.yaml`의 66키 기준이다. fork 파일의 사용자 대상 오류만 message_key 경로로 옮기고, upstream 파일의 같은 패턴은 손대지 않는다. Excel 조직 가져오기의 행 오류(포맷 문자열)는 구조화된 행 오류가 필요해 영어로 남긴다.
 13. 용어: Quota = 쿼터, Reset = 초기화, Vendor = 공급업체(Provider = 제공자와 구분), Tier = 등급, Revoke = 폐기, sk- 자격 증명 Token = API 키(개인 액세스 토큰 = 액세스 토큰), Redemption code = 충전 코드, 문체는 합쇼체·명사형 라벨(`docs/translation-glossary.ko.md`).
 14. 버려진 개인 충전·구독 주문은 관리자 `POST /api/user/topup/expire`(`user_id` 필수 — 전체 사용자 만료 없음, 24시간 지난 pending만, 감사 `topup.expire`)로 만료한다. 조직 주문 만료(`POST /api/organizations/:id/topups/expire`)와 분리한다. 두 만료 모두 나이 기준은 24시간이다: Stripe 결제 세션이 24시간 동안 결제 가능하고 정산은 pending 주문만 적립하므로, 더 일찍 만료시키면 실제 결제가 적립되지 않을 수 있다(단계 D 최종 수정, 처음 결정은 1시간). 비활성 조직의 전체 만료는 root의 명시적 정리로 유지하되, 비활성화 전에 연 결제가 나중에 결제되면 수동 대사가 필요하다.
+
+단계 E(UI 언어·O11·한국어 이월)에서 정한 것. 2026-10-15 확정(기록 `docs/2026-10-15-rebase-phase-e.md` §5):
+
+15. UI 언어는 team처럼 en/ko만 둔다. upstream locale 8개를 지우고 그 파일의 upstream 수정은 `git rm`으로 삭제를 유지한다. 지운 언어를 저장한 사용자와 그 언어 브라우저는 영어로 열린다(데이터 마이그레이션 없음). 결정 9(다른 6개 locale의 placeholder)는 파일이 없어져 닫혔고, 결정 11의 허용 코드와 리소스는 en·ko로 줄었다(§4.8).
+16. Epay 트랜잭션 정산과 결제 전 수용량 검증(PayPal·조직 포함)은 upstream·단계 A·B가 이미 같은 동작을 하므로 다시 적용하지 않는다. Claude 5.x native passthrough와 gpt-5 능력 표는 upstream 설계를 따른다(§4.9).
+17. Gemini 이미지 상한은 정산 소비자 두 곳(`service/text_quota.go`, `service/tiered_settle.go`)에서 그 경로가 따로 값을 매기는 몫(캐시·오디오)만 뺀다. Ali 예산 재삽입은 채널 ParamOverride가 `thinking_budget`을 언급하면 하지 않고 chat completions 본문이면서 모델이 업스트림 이름과 같을 때만 한다(§4.9).
+18. 출석 보상과 초대 쿼터 전송에 지갑 상한을 둔다(upstream에는 없음, fork 유지).
+19. AI 클라이언트로 가는 조직 오류는 upstream `i18n.T` + yaml 경로를 쓴다(`en.yaml`에는 끝의 fork 블록만). Excel 행 오류는 기존 `errors []string`을 유지하고 `error_details`를 더한다. 조직 로그·대시보드는 현재 멤버의 전체 기록을 보여 준다(가입 시점 제한 없음, 사용자 결정).
+20. Redis 쿼터 캐시 TTL은 단계 E에서 upstream 상태(`SYNC_FREQUENCY` 기본 60초, 사용 중 갱신 없음)로 두고, 단계 F 전에 이것만 따로 다룬다(team `10ade7045`·`cf2cf300f`·`9ef93eb8c`와 develop 배치 모드 재수화 구멍을 테스트로 재현한 뒤 결정). team 브랜치(`TimingResponseWriter.Unwrap()` 역이식 등)는 team 쪽에서 별도로 확인한다.
 
 ## 10. 리스크
 
