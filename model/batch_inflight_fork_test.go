@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
@@ -215,4 +216,81 @@ func TestFlushBatchUpdatesIsNoopWhenBatchDisabled(t *testing.T) {
 	})
 	FlushBatchUpdates()
 	require.Equal(t, 1000, getUserQuotaFromDB(t, user.Id))
+}
+
+func TestFlushBatchUpdatesWaitsForRunningBatch(t *testing.T) {
+	truncateTables(t)
+	enableBatchForResidencyTest(t)
+	resetUserQuotaInFlightForTest(t)
+	user := insertUserForPaymentGuardTest(t, 9605, 1000)
+	addNewRecord(BatchUpdateTypeUserQuota, user.Id, -200)
+
+	blocked := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	const cbName = "fork_test_block_users_update"
+	require.NoError(t, DB.Callback().Update().Before("gorm:update").Register(cbName, func(tx *gorm.DB) {
+		if tx.Statement.Schema == nil || tx.Statement.Schema.Table != "users" {
+			return
+		}
+		once.Do(func() {
+			close(blocked)
+			<-release
+		})
+	}))
+	t.Cleanup(func() { _ = DB.Callback().Update().Remove(cbName) })
+
+	batchDone := make(chan struct{})
+	go func() { batchUpdate(); close(batchDone) }()
+	select {
+	case <-blocked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first batch never reached the users write")
+	}
+
+	// The ticker batch already swapped the stores: they are empty now, yet the
+	// flush must still wait for that batch to finish.
+	flushDone := make(chan struct{})
+	go func() { FlushBatchUpdates(); close(flushDone) }()
+	select {
+	case <-flushDone:
+		t.Fatal("FlushBatchUpdates returned while a batch was still writing")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case <-flushDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("FlushBatchUpdates did not return after the batch finished")
+	}
+	<-batchDone
+	require.Equal(t, 800, getUserQuotaFromDB(t, user.Id))
+	require.False(t, userQuotaBatchPending(user.Id))
+}
+
+func TestFlushBatchUpdatesDrainsRowsEnqueuedDuringFirstPass(t *testing.T) {
+	truncateTables(t)
+	enableBatchForResidencyTest(t)
+	resetUserQuotaInFlightForTest(t)
+	a := insertUserForPaymentGuardTest(t, 9606, 1000)
+	b := createReserveTestUser(t, 1000)
+	addNewRecord(BatchUpdateTypeUserQuota, a.Id, -100)
+
+	var once sync.Once
+	const cbName = "fork_test_enqueue_during_pass"
+	require.NoError(t, DB.Callback().Update().Before("gorm:update").Register(cbName, func(tx *gorm.DB) {
+		if tx.Statement.Schema == nil || tx.Statement.Schema.Table != "users" {
+			return
+		}
+		// Like a post-response goroutine (e.g. an async refund) enqueuing mid-flush.
+		once.Do(func() { addNewRecord(BatchUpdateTypeUserQuota, b.Id, -30) })
+	}))
+	t.Cleanup(func() { _ = DB.Callback().Update().Remove(cbName) })
+
+	FlushBatchUpdates()
+
+	require.Equal(t, 900, getUserQuotaFromDB(t, a.Id))
+	require.Equal(t, 970, getUserQuotaFromDB(t, b.Id), "second pass wrote the row enqueued during the first")
+	require.True(t, batchStoresEmpty())
 }
