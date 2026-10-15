@@ -67,6 +67,7 @@ import { AnnouncementsPanel } from './announcements-panel'
 import { ApiInfoPanel } from './api-info-panel'
 import { FAQPanel } from './faq-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
+import { QuickstartPdfLink } from './quickstart-pdf-link-fork' // fork: O11
 import { SummaryCards } from './summary-cards'
 import { UptimePanel } from './uptime-panel'
 
@@ -372,6 +373,8 @@ function RequestPreview(props: {
           </Button>
         )}
       </div>
+      {/* fork: O11 (team 9b4ee5213) */}
+      <QuickstartPdfLink />
 
       <div className='bg-foreground/[0.035] my-3 rounded-xl p-3 font-mono text-xs'>
         <div className='mb-2 flex items-center gap-1.5'>

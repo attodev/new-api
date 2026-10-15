@@ -238,4 +238,16 @@ describe('overview setup guide', () => {
       screen.queryByRole('button', { name: 'Setup guide' })
     ).not.toBeInTheDocument()
   })
+
+  // fork: O11 (team 9b4ee5213, a3e606bc9)
+  it('offers the quick start guide PDF next to the API key action', async () => {
+    useAuthStore
+      .getState()
+      .auth.setUser({ id: 1, username: 'new-user', role: 1 })
+    await renderOverview()
+
+    expect(
+      await screen.findByRole('link', { name: 'Quick Start Guide(PDF)' })
+    ).toHaveAttribute('href', '/AlRouter%20Quick%20Start%20Guide_EN_v1.0.pdf')
+  })
 })
