@@ -31,6 +31,7 @@ var forkMessageSources = []string{
 	"controller/topup_expire_admin.go",
 	"model/topup_expire_fork.go",
 	"model/wallet_ceiling_fork.go",
+	"controller/email_send_error_fork.go",
 }
 
 // forkMessageConstants are message keys the fork files pass to NewMessage as

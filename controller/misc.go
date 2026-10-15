@@ -240,7 +240,7 @@ func SendEmailVerification(c *gin.Context) {
 		i18n.T(c, i18n.MsgEmailVerificationValidity, map[string]any{"Minutes": common.VerificationValidMinutes}))
 	err = common.SendEmail(subject, email, content)
 	if err != nil {
-		common.ApiError(c, err)
+		apiEmailSendFailed(c, err) // fork: O11
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

@@ -7581,6 +7581,7 @@
     "Quick amount": "Quick amount",
     "Clear all Stripe credentials and disable Stripe payments?": "Clear all Stripe credentials and disable Stripe payments?",
     "Clear all PayPal credentials and disable PayPal payments?": "Clear all PayPal credentials and disable PayPal payments?",
-    "Credentials cleared": "Credentials cleared"
+    "Credentials cleared": "Credentials cleared",
+    "Failed to send email": "Failed to send email"
   }
 }
