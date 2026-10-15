@@ -176,10 +176,12 @@ develop에서 사용자 지갑 잔액(`users.quota`)을 바꾸는 경로를 모�
 
 | 분류 | 경로 | 상주 후 |
 |---|---|---|
-| 캐시에 차이를 더함 | 사전 차감·정산(`quota_reserve.go`, `IncreaseUserQuota`, `DecreaseUserQuota`), 배치 반영(캐시는 이미 반영), 관리자 잔액 조정(`user_quota_adjustment.go`, 차이만 반영), 결제 충전(`creditTopUpTarget` → `syncCreditUserQuotaCache`), 리딤 코드, 출석 보상, 잔액으로 구독 구매(`cacheDecrUserQuota`) | 문제없음 |
-| DB를 고친 뒤 해시를 지움 | 조직 멤버 배정·수정·제거, 소유자 변경, Excel 잔액 가져오기(`SetOrganizationMemberQuota`), 사용자 삭제 | 다음 요청에서 DB를 새로 읽음. 지운 순간의 배치 대기분만큼 오차 가능(§6) |
-| 캐시를 맞추지 않음 | 추천 적립 이전(`TransferAffQuotaToQuota`) | §4.6에서 고침 |
-| 해당 없음 | 관리자 사용자 수정(`Update`·`Edit`은 `quota`를 `Omit`), 신규 가입(해시 없음) | 문제없음 |
+| 캐시에 차이를 더함 | 사전 차감·정산(`quota_reserve.go`의 `persistUserQuotaDelta`·`reserveUserQuotaDB`, `IncreaseUserQuota`, `DecreaseUserQuota`), 배치 반영(`updateUserQuotaUsedQuotaAndRequestCount`, fork 복사본 `flushUserQuotaRow`; 캐시는 이미 반영), 관리자 잔액 조정(`AdjustUserQuota`, 커밋된 차이만 반영), 충전·리딤·출석(`creditTopUpQuota`; 호출자가 `syncCreditTopUpCache`·`syncCreditUserQuotaCache`·`cacheIncrUserQuota`로 반영), 잔액으로 구독 구매(`PurchaseSubscriptionWithBalance`, `cacheDecrUserQuota`) | 문제없음 |
+| 캐시를 맞춤(§4.6) | 추천 적립 이전(`TransferAffQuotaToQuota`, `commitAffTransfer`) | 문제없음 |
+| DB를 고친 뒤 해시를 지움 | Excel 잔액 가져오기(`SetOrganizationMemberQuota`; `service/org_user_export.go`의 두 호출 모두 바로 뒤에서 `InvalidateUserCache`), 조직 멤버 한도 환불(`IncreaseOrganizationMemberQuota`가 직접 지움), 조직 멤버 한도 수정(`updateOrganizationMemberFieldsTx`; `quota` 키는 `controller.UpdateOrganizationUser`만 넣고 그 뒤 지움, 가져오기·배정 맵에는 `quota`가 없음), 조직 멤버 제거·소유자 변경·조직 삭제(`clearOrganizationMembershipTx`가 `quota`를 0으로; 호출자 `RemoveOrganizationUser`, `DeleteOrganization`(소유자), 가져오기의 `removeAbsent`가 모두 지움), 사용자 삭제 | 다음 요청에서 DB를 새로 읽음. 지운 순간의 배치 대기분만큼 오차 가능(§6) |
+| 해당 없음(`users.quota`를 바꾸지 않음) | 관리자 사용자 수정(`UpdateWithTx`는 `Omit`에 `quota`), 신규 가입(해시 없음), 비밀번호 변경(`ChangeUserPassword` 맵에 `quota` 없음), 조직 지갑(`organizations.quota`: `IncreaseOrganizationQuota`·`DecreaseOrganizationQuota`·`TryReserveOrganizationQuota`·`creditOrganizationQuota`), 작업 쿼터(`tasks.quota`: `task.go:UpdateQuota`), 사용 통계(`quota_data.quota`: `usedata.go:increaseQuotaData`) | 문제없음 |
+
+이 표는 `model/user_quota_write_sites_fork_test.go`의 허용 목록과 같은 항목이다(§8 12번). 허용 목록 테스트가 검출하지 못하는 쓰기는 `Update(변수 열, …)`처럼 열 이름이 변수인 호출이다. 지금은 `UpdateUserBindColumn`과 계정 연동 해제가 바인딩 열 화이트리스트로만 호출해 `quota`가 아니다.
 
 계획의 첫 단계에서 이 표를 다시 확인한다(코드가 바뀌었을 수 있다).
 
