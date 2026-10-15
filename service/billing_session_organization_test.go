@@ -58,5 +58,5 @@ func TestSuspendedOrganizationMemberMidjourneyIsRefused(t *testing.T) {
 	seedOrganization(t, 1, 2)
 	suspendOrganizationMemberForTest(t, 2)
 
-	require.ErrorIs(t, CheckMidjourneyOrganizationBilling(2), model.ErrOrganizationMemberSuspended)
+	require.ErrorIs(t, CheckMidjourneyOrganizationBilling(nil, 2), model.ErrOrganizationMemberSuspended)
 }

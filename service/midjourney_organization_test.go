@@ -154,8 +154,8 @@ func TestCheckMidjourneyOrganizationBilling(t *testing.T) {
 	empty := &model.Organization{Id: 2, Name: "org-empty", OwnerUserId: 5, Status: model.OrganizationStatusEnabled, Quota: 0}
 	require.NoError(t, model.DB.Create(empty).Error)
 
-	require.NoError(t, CheckMidjourneyOrganizationBilling(4), "non-member")
-	require.NoError(t, CheckMidjourneyOrganizationBilling(2), "member without plan, wallet > 0")
-	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(3), "does not support organization plans")
-	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(5), "organization quota insufficient")
+	require.NoError(t, CheckMidjourneyOrganizationBilling(nil, 4), "non-member")
+	require.NoError(t, CheckMidjourneyOrganizationBilling(nil, 2), "member without plan, wallet > 0")
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(nil, 3), "does not support organization plans")
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(nil, 5), "organization quota insufficient")
 }

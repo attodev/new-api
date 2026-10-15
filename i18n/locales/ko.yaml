@@ -74,3 +74,14 @@ channel.upstream_update_added_models: "추가된 모델 예시({{.Shown}}/{{.Tot
 channel.upstream_update_removed_models: "제거된 모델 예시({{.Shown}}/{{.Total}}개 표시): {{.Models}}"
 channel.upstream_update_failed_channels: "실패한 채널 ID({{.Shown}}/{{.Total}}개 표시): {{.Ids}}"
 channel.upstream_update_more_omitted: " ({{.Count}}개 더 생략됨)"
+
+# fork: O3 — organization relay errors
+organization.disabled: "조직이 비활성화되었습니다"
+organization.member_suspended: "조직 멤버십이 일시 정지되었습니다"
+organization.wallet_insufficient: "조직 지갑 쿼터가 부족합니다: {{.Error}}"
+organization.member_quota_insufficient: "멤버 쿼터가 부족합니다: {{.Error}}"
+organization.mj_plan_unsupported: "레거시 Midjourney 과금은 조직 플랜을 지원하지 않습니다"
+organization.quota_insufficient: "조직 쿼터가 부족합니다"
+organization.quota_insufficient_remaining: "조직 쿼터가 부족합니다. 남은 쿼터: {{.Remaining}}"
+organization.pre_charge_insufficient: "조직 쿼터 사전 차감에 실패했습니다. 남은 쿼터 {{.Remaining}}, 필요한 사전 차감 쿼터 {{.Required}}"
+organization.wallet_reserve_insufficient: "조직 지갑 쿼터가 부족합니다"

@@ -73,3 +73,14 @@ channel.upstream_update_added_models: "Added model examples (showing {{.Shown}}/
 channel.upstream_update_removed_models: "Removed model examples (showing {{.Shown}}/{{.Total}}): {{.Models}}"
 channel.upstream_update_failed_channels: "Failed channel IDs (showing {{.Shown}}/{{.Total}}): {{.Ids}}"
 channel.upstream_update_more_omitted: " ({{.Count}} more omitted)"
+
+# fork: O3 — organization relay errors
+organization.disabled: "organization is disabled"
+organization.member_suspended: "organization membership is suspended"
+organization.wallet_insufficient: "organization wallet quota insufficient: {{.Error}}"
+organization.member_quota_insufficient: "member quota insufficient: {{.Error}}"
+organization.mj_plan_unsupported: "legacy Midjourney billing does not support organization plans"
+organization.quota_insufficient: "organization quota insufficient"
+organization.quota_insufficient_remaining: "organization quota insufficient, remaining: {{.Remaining}}"
+organization.pre_charge_insufficient: "organization pre-charge failed, remaining quota: {{.Remaining}}, required pre-charge quota: {{.Required}}"
+organization.wallet_reserve_insufficient: "organization wallet quota insufficient"

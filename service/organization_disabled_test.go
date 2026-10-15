@@ -49,5 +49,5 @@ func TestDisabledOrganizationMidjourneyIsRefused(t *testing.T) {
 	seedOrganization(t, 1, 2)
 	disableOrganizationForTest(t, 1)
 
-	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(2), "organization is disabled")
+	require.ErrorContains(t, CheckMidjourneyOrganizationBilling(nil, 2), "organization is disabled")
 }

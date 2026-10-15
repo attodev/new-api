@@ -24,8 +24,10 @@ func isOrganizationSubscriptionSource(source string) bool {
 	return source == BillingSourceOrganizationSubscription
 }
 
-func orgQuotaError(c *gin.Context, msg string) *types.NewAPIError {
-	return types.NewErrorWithStatusCode(errors.New(msg), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+// orgQuotaError is the 403 of an organization quota shortfall; err carries the
+// client text (organizationError).
+func orgQuotaError(err error) *types.NewAPIError {
+	return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 		types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 }
 
@@ -35,21 +37,22 @@ func requireOrganizationQuota(c *gin.Context, organizationId int, need int64) *t
 		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 	}
 	if organizationQuota <= 0 {
-		return orgQuotaError(c, fmt.Sprintf("organization quota insufficient, remaining: %s", logger.FormatQuota(int(organizationQuota))))
+		return orgQuotaError(organizationError(i18n.StatedLang(c), nil, i18n.MsgOrganizationQuotaInsufficientRemaining,
+			map[string]any{"Remaining": logger.FormatQuota(int(organizationQuota))}))
 	}
 	if organizationQuota-need < 0 {
-		return orgQuotaError(c, fmt.Sprintf("organization pre-charge failed, remaining quota: %s, required pre-charge quota: %s",
-			logger.FormatQuota(int(organizationQuota)), logger.FormatQuota(int(need))))
+		return orgQuotaError(organizationError(i18n.StatedLang(c), nil, i18n.MsgOrganizationPreChargeInsufficient,
+			map[string]any{"Remaining": logger.FormatQuota(int(organizationQuota)), "Required": logger.FormatQuota(int(need))}))
 	}
 	return nil
 }
 
 // requireActiveOrganization refuses relay requests of a disabled organization's
 // members with 403 before anything is charged.
-func requireActiveOrganization(organizationId int) *types.NewAPIError {
+func requireActiveOrganization(c *gin.Context, organizationId int) *types.NewAPIError {
 	if err := model.RequireActiveOrganization(organizationId); err != nil {
 		if errors.Is(err, model.ErrOrganizationDisabled) {
-			return types.NewErrorWithStatusCode(err, types.ErrorCodeAccessDenied, http.StatusForbidden,
+			return types.NewErrorWithStatusCode(organizationError(i18n.StatedLang(c), err, i18n.MsgOrganizationDisabled), types.ErrorCodeAccessDenied, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
@@ -61,9 +64,10 @@ func requireActiveOrganization(organizationId int) *types.NewAPIError {
 // organization admin suspended (users.organization_member_status) with 403
 // before anything is charged. memberStatus comes from the same read as the
 // organization id (model.GetUserOrganizationMembership).
-func requireActiveOrganizationMember(memberStatus int) *types.NewAPIError {
+func requireActiveOrganizationMember(c *gin.Context, memberStatus int) *types.NewAPIError {
 	if memberStatus == model.OrganizationMemberStatusSuspended {
-		return types.NewErrorWithStatusCode(model.ErrOrganizationMemberSuspended, types.ErrorCodeAccessDenied, http.StatusForbidden,
+		return types.NewErrorWithStatusCode(
+			organizationError(i18n.StatedLang(c), model.ErrOrganizationMemberSuspended, i18n.MsgOrganizationMemberSuspended), types.ErrorCodeAccessDenied, http.StatusForbidden,
 			types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 	return nil
@@ -81,10 +85,10 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 	if organizationId <= 0 {
 		return nil, nil, false
 	}
-	if apiErr := requireActiveOrganization(organizationId); apiErr != nil {
+	if apiErr := requireActiveOrganization(c, organizationId); apiErr != nil {
 		return nil, apiErr, true
 	}
-	if apiErr := requireActiveOrganizationMember(memberStatus); apiErr != nil {
+	if apiErr := requireActiveOrganizationMember(c, memberStatus); apiErr != nil {
 		return nil, apiErr, true
 	}
 	hasOrgSub, err := model.HasActiveOrganizationUserSubscription(organizationId, relayInfo.UserId)
@@ -147,7 +151,7 @@ func newOrganizationBillingSession(c *gin.Context, relayInfo *relaycommon.RelayI
 // FundingSource.PreConsume to a 403 that names the organization wallet; upstream
 // preConsume would otherwise report the member's personal balance. Hook:
 // BillingSession.preConsume, before its ErrInsufficientWalletQuota branch.
-func organizationPreConsumeError(funding FundingSource, err error) *types.NewAPIError {
+func organizationPreConsumeError(c *gin.Context, funding FundingSource, err error) *types.NewAPIError {
 	if !errors.Is(err, ErrInsufficientOrganizationWalletQuota) {
 		return nil
 	}
@@ -162,12 +166,8 @@ func organizationPreConsumeError(funding FundingSource, err error) *types.NewAPI
 	if quotaErr != nil {
 		remaining = 0
 	}
-	return orgQuotaError(nil, fmt.Sprintf("organization quota insufficient, remaining: %s", logger.FormatQuota(int(remaining))))
-}
-
-func orgReserveInsufficientError(err error) *types.NewAPIError {
-	return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-		types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+	return orgQuotaError(organizationError(i18n.StatedLang(c), err, i18n.MsgOrganizationQuotaInsufficientRemaining,
+		map[string]any{"Remaining": logger.FormatQuota(int(remaining))}))
 }
 
 // reserveOrganizationFunding is the reserveFunding case for both organization fundings.
@@ -180,10 +180,10 @@ func reserveOrganizationFunding(funding FundingSource, delta int, requireAvailab
 		if requireAvailableQuota {
 			if err := reserveWalletQuotaForOrganization(f.memberId, f.organizationId, delta); err != nil {
 				if errors.Is(err, ErrInsufficientOrganizationWalletQuota) {
-					return orgReserveInsufficientError(err)
+					return orgQuotaError(organizationError(lang, err, i18n.MsgOrganizationWalletReserveInsufficient))
 				}
 				if errors.Is(err, ErrInsufficientWalletQuota) {
-					return orgReserveInsufficientError(fmt.Errorf("member quota insufficient: %w", err))
+					return orgQuotaError(organizationError(lang, err, i18n.MsgOrganizationMemberQuotaInsufficient, map[string]any{"Error": err.Error()}))
 				}
 				return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
@@ -191,7 +191,7 @@ func reserveOrganizationFunding(funding FundingSource, delta int, requireAvailab
 			return nil
 		}
 		if err := f.Settle(delta); err != nil {
-			return types.NewErrorWithStatusCode(fmt.Errorf("organization wallet quota insufficient: %s", err.Error()),
+			return types.NewErrorWithStatusCode(organizationWalletSettleError(lang, err),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		f.consumed += delta
@@ -228,7 +228,7 @@ func reserveOrganizationSubscriptionAtomically(f *OrganizationSubscriptionFundin
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 		}
-		return orgReserveInsufficientError(ErrInsufficientOrganizationWalletQuota)
+		return orgQuotaError(organizationError(lang, ErrInsufficientOrganizationWalletQuota, i18n.MsgOrganizationWalletReserveInsufficient))
 	}
 	f.organizationWalletConsumed += d
 	return nil

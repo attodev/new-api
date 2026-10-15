@@ -136,6 +136,7 @@ func TestLocalesRenderEveryKey(t *testing.T) {
 		}
 		return true
 	})
+	declared = append(declared, forkDeclaredKeys(t)...) // fork: O3
 	slices.Sort(declared)
 
 	keysByLang := make(map[string][]string)

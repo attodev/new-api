@@ -4,8 +4,10 @@ import (
 	"errors"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
 )
 
 // fork: O3 — legacy Midjourney creates no BillingSession, so the organization
@@ -15,8 +17,9 @@ import (
 // CheckMidjourneyOrganizationBilling is the pre-call guard for legacy
 // Midjourney (relay/mjproxy_handler.go). Billing is prepared only after the
 // upstream call, so organization plan members and empty organization wallets
-// must be rejected before the request is sent.
-func CheckMidjourneyOrganizationBilling(userId int) error {
+// must be rejected before the request is sent. Errors reach the Midjourney
+// client as the task description, in the language c states.
+func CheckMidjourneyOrganizationBilling(c *gin.Context, userId int) error {
 	organizationId, memberStatus, err := model.GetUserOrganizationMembership(userId)
 	if err != nil {
 		return err
@@ -24,25 +27,29 @@ func CheckMidjourneyOrganizationBilling(userId int) error {
 	if organizationId <= 0 {
 		return nil
 	}
+	lang := i18n.StatedLang(c)
 	if err := model.RequireActiveOrganization(organizationId); err != nil {
+		if errors.Is(err, model.ErrOrganizationDisabled) {
+			return organizationError(lang, err, i18n.MsgOrganizationDisabled)
+		}
 		return err
 	}
 	if memberStatus == model.OrganizationMemberStatusSuspended {
-		return model.ErrOrganizationMemberSuspended
+		return organizationError(lang, model.ErrOrganizationMemberSuspended, i18n.MsgOrganizationMemberSuspended)
 	}
 	hasPlan, err := model.HasActiveOrganizationUserSubscription(organizationId, userId)
 	if err != nil {
 		return err
 	}
 	if hasPlan {
-		return errors.New("legacy Midjourney billing does not support organization plans")
+		return organizationError(lang, nil, i18n.MsgOrganizationMjPlanUnsupported)
 	}
 	organizationQuota, err := model.GetOrganizationQuota(organizationId)
 	if err != nil {
 		return err
 	}
 	if organizationQuota <= 0 {
-		return errors.New("organization quota insufficient")
+		return organizationError(lang, nil, i18n.MsgOrganizationQuotaInsufficient)
 	}
 	return nil
 }
@@ -66,6 +73,8 @@ func prepareMidjourneyOrganizationBilling(relayInfo *relaycommon.RelayInfo, task
 		return err
 	}
 	if hasPlan {
+		// Only logged by the Midjourney handler (never sent to the client), so
+		// it stays English like the other billing log lines.
 		return errors.New("legacy Midjourney billing does not support organization plans")
 	}
 	relayInfo.BillingOrganizationId = organizationId
