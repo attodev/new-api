@@ -82,7 +82,7 @@ func batchUpdate() {
 	stores := make([]map[int]int, BatchUpdateTypeCount)
 	for i := range BatchUpdateTypeCount {
 		batchUpdateLocks[i].Lock()
-		stores[i] = batchUpdateStores[i]
+		stores[i] = takeBatchStoreLocked(i) // fork: O12
 		batchUpdateStores[i] = make(map[int]int)
 		batchUpdateLocks[i].Unlock()
 	}
@@ -119,7 +119,7 @@ func batchUpdate() {
 		userIDs[key] = struct{}{}
 	}
 	for key := range userIDs {
-		updateUserQuotaUsedQuotaAndRequestCount(key, userQuotaStore[key], usedQuotaStore[key], requestCountStore[key])
+		flushUserQuotaRow(key, userQuotaStore[key], usedQuotaStore[key], requestCountStore[key]) // fork: O12
 	}
 	common.SysLog(common.LogText("batch update finished"))
 }
