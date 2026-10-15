@@ -1,6 +1,6 @@
 # team 재현 감사 — develop이 team의 자체 커밋을 모두 담고 있는가
 
-작성: 2026-10-15. 대상: `team` 팁 `9ef93eb8c` vs `develop` `1bc33c01b`. 상태: 옮김 9건 + 결정 항목 10건 포팅 완료(2026-10-15); 보류: UsageSemantic 덮어쓰기(relaykit), API 키 캐시 동기 델타(키 한도만 영향)
+작성: 2026-10-15. 대상: `team` 팁 `9ef93eb8c` vs `develop` `1bc33c01b`. 상태: 옮김 9건 + 결정 항목 10건 포팅 완료(2026-10-15); 진행하지 않음(사용자 결정 2026-10-15): UsageSemantic 덮어쓰기(Claude 채널은 Claude API를 직접 쓰는 구성으로 고정; relaykit 영향 회피), API 키 캐시 동기 델타(키 한도만 영향); 운영 환경 확인은 docs/manuals/operator-verification-checklist.ko.md
 
 ## 1. 범위와 방법
 
@@ -31,7 +31,7 @@
 
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
-| e24c060c0, 93b81b0bd | 채널 설정 `UsageSemantic` 덮어쓰기(OpenAI 호환 채널로 Claude를 중계할 때 캐시 토큰 해석)와 이를 모델 glob으로 제한하는 `UsageSemanticModels`, 채널 편집 UI | `service/text_quota.go:377 usageSemanticFromUsage`에 덮어쓰기 없음(기본값을 0으로 자르기만). 해당 채널에서 **과금이 적게** 될 수 있다 | 보류 — relaykit dto.ChannelSettings 제약; 별도 설계(원문 JSON을 fork가 읽는 방식) 필요 |
+| e24c060c0, 93b81b0bd | 채널 설정 `UsageSemantic` 덮어쓰기(OpenAI 호환 채널로 Claude를 중계할 때 캐시 토큰 해석)와 이를 모델 glob으로 제한하는 `UsageSemanticModels`, 채널 편집 UI | `service/text_quota.go:377 usageSemanticFromUsage`에 덮어쓰기 없음(기본값을 0으로 자르기만). 해당 채널에서 **과금이 적게** 될 수 있다 | 진행하지 않음 — 사용자 결정(2026-10-15): Claude 채널은 Claude API를 직접 쓰는 구성으로 고정하면 이 경우가 생기지 않고, relaykit 쪽 영향을 피한다. relaykit `dto.ChannelSettings` 제약도 있음 |
 | b5d733722 | 이미지 스트림 이벤트의 `"error": null`을 오류로 보지 않기 | `relay/channel/openai/relay_image.go:227,244`가 `len(payload.Error) > 0`으로 판정해 `null`(길이 4)을 오류로 분류 | 옮김 → develop 5ff2f1b5c |
 | ecc9c511d | 관리자 채널 테스트에서 이미지 생성 요청에 `Stream` 전달 | `controller/channel-test.go:716` `ImageRequest`에 `Stream` 없음 → stream=true 테스트가 SSE 경로를 못 탐 | 옮김 → develop 5ff2f1b5c |
 | 3cfc88575, 5e6c6a716 | 토큰·지갑 캐시 델타를 동기로 적용하고 DB 실패 시 보상 | develop은 upstream의 비동기 고루틴(`model/token.go:384`, `model/user.go:1398`)을 유지. 지갑 쪽은 O12 복구 목록이 캐시 쓰기 실패를 덮지만 순서·보상은 아님 | 보류 (사용자 결정 2026-10-15: 키 한도·키 통계에만 영향, 전체 차감 무관) |
