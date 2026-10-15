@@ -227,6 +227,11 @@ func TestFlushBatchUpdatesWaitsForRunningBatch(t *testing.T) {
 
 	blocked := make(chan struct{})
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseBatch := func() { releaseOnce.Do(func() { close(release) }) }
+	// A failed assertion must not leave the batch goroutine parked inside the
+	// callback holding batchRunMu, or every later batchUpdate caller deadlocks.
+	t.Cleanup(releaseBatch)
 	var once sync.Once
 	const cbName = "fork_test_block_users_update"
 	require.NoError(t, DB.Callback().Update().Before("gorm:update").Register(cbName, func(tx *gorm.DB) {
@@ -258,7 +263,7 @@ func TestFlushBatchUpdatesWaitsForRunningBatch(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 
-	close(release)
+	releaseBatch()
 	select {
 	case <-flushDone:
 	case <-time.After(5 * time.Second):
