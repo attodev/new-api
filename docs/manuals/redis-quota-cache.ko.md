@@ -156,7 +156,7 @@ GOWORK=off go test ./common/ -run TestNewRedisClientConnectsThroughSentinel -v
 1. 같은 사용자의 로그를 찾는다: `failed to batch update user <id> quota, requeued`(DB 장애, 재시도 중. DB가 회복된 뒤에도 `diff > 0`이 그대로면 6.4절의 이중 반영), 종료 로그(6.3절)의 `queue empty: false`, 최근의 직접 DB 수정 기록, 서버의 강제 종료 기록.
 2. DB 장애로 재시도 중이면 기다린다. DB가 회복되면 재시도가 반영하고 차이가 사라진다. 회복 뒤에도 `diff > 0`이 같은 값으로 남으면 6.4절의 대조 절차를 따른다(해시를 지우지 않는다).
 3. DB가 맞으면(직접 수정 등): 대기분이 반영된 뒤(3절 2단계) `DEL user:<id>`. 다음 요청이 DB 잔액으로 다시 채운다.
-4. 캐시가 맞으면(차감분이 DB에 반영되지 못함): 해시를 지우면 DB의 큰 잔액으로 돌아가 그만큼 더 쓸 수 있게 된다. 그 사용자가 요청을 보내지 않는 동안 DB를 캐시 값에 맞춘다(`users.quota`를 로그의 `cache` 값으로). 해시는 지우지 않는다. 판단이 서지 않으면 3단계(DB 기준)를 따른다 — 상주 전 develop과 같은 결과다.
+4. 캐시가 맞으면(차감분이 DB에 반영되지 못함): 해시를 지우면 DB의 큰 잔액으로 돌아가 그만큼 더 쓸 수 있게 된다. DB를 상대값으로 고친다: `UPDATE users SET quota = quota + (<diff>) WHERE id = <user>` (`diff`는 로그의 `cache - db`). 절대값(`= cache`)으로 쓰지 않는다. 사용자가 요청을 보내는 중이어도 배치 반영이 상대값 UPDATE라 섞이지 않는다(§6.4와 같은 방식). 해시는 지우지 않는다. 판단이 서지 않으면 3단계(DB 기준)를 따른다 — 상주 전 develop과 같은 결과다.
 5. 다음 `SYNC_FREQUENCY` 주기 뒤 같은 사용자의 로그가 더 나오지 않는지 확인한다(차이가 0이면 기억을 지운다).
 
 ### 6.2 캐시 반영 실패 복구 목록 (설계 §4.12-3)
