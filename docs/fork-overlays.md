@@ -277,6 +277,7 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 | O11 토큰 코덱 예열 (import) | main.go:36 | import 블록에 `"github.com/QuantumNous/new-api/tokenkit" // fork: O11` 한 줄 (이 줄 때문에 아래 main.go 행 번호가 +1 밀렸다) | — |
 | O11 Epay 미설정 결제 수단 숨김 | controller/topup.go:30 | `GetTopUpInfo`의 `payMethods := operation_setting.PayMethods` + compliance 미확인 시 빈 슬라이스로 바꾸는 4줄 블록을 `payMethods := visibleEpayPayMethods(complianceConfirmed) // fork: O11` 한 줄로 (compliance 확인이고 `isEpayTopUpEnabled()`일 때만 하드코딩 기본 Alipay/WeChat `PayMethods`를 노출하고, 아니면 빈 슬라이스. Stripe 등 다른 결제 수단 추가는 그대로. 이 변경으로 이 파일의 아래 행 번호가 -3 밀렸다) — team 203690366 | controller/topup_pay_methods_fork.go, controller/topup_pay_methods_fork_test.go |
 | O11 rate-limit 설정값 보정 | middleware/rate-limit.go:149 | `rateLimitFactory` 본문 첫 줄에 `maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration) // fork: O11` (요청 수 0 이하는 1로, 기간 0 이하는 1초로, 기간이 키 만료(`RateLimitKeyExpirationDuration`, 20분)를 넘으면 그 값으로. 잘못된 설정이 모두를 막거나 키 만료보다 긴 창을 만드는 일을 막는다. 경고는 값 없는 고정 문구로 한 번만 남긴다) — team 2c619a31e | middleware/rate_limit_normalize_fork.go, middleware/rate_limit_normalize_fork_test.go |
+| O11 rate-limit 설정값 보정 (사용자 키) | middleware/rate-limit.go:221 | `userRateLimitFactory` 본문 첫 줄에 같은 `maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration) // fork: O11` (사용자 ID 키 제한기도 같은 보정을 거친다) — team 2c619a31e | middleware/rate_limit_normalize_fork.go, middleware/rate_limit_normalize_fork_test.go |
 
 ## O12 잔액 캐시 상주·Sentinel
 

@@ -56,3 +56,24 @@ func TestRateLimitFactoryUsesNormalizedValues(t *testing.T) {
 	require.False(t, limited())
 	require.True(t, limited())
 }
+
+func TestUserRateLimitFactoryUsesNormalizedValues(t *testing.T) {
+	// memory limiter path: 0 requests must not block every user outright
+	old := common.RedisEnabled
+	common.RedisEnabled = false
+	t.Cleanup(func() { common.RedisEnabled = old })
+
+	gin.SetMode(gin.TestMode)
+	handler := userRateLimitFactory(0, 60, "fork-normalize-user-test")
+	limited := func() bool {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		c.Set("id", 7200901)
+		handler(c)
+		return c.IsAborted() && c.Writer.Status() == http.StatusTooManyRequests
+	}
+	// first request passes (normalized to 1 request / 60s), second is limited
+	require.False(t, limited())
+	require.True(t, limited())
+}

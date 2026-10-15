@@ -218,6 +218,7 @@ func UploadRateLimit() func(c *gin.Context) {
 // instead of client IP, making it resistant to proxy rotation attacks.
 // Must be used AFTER authentication middleware (UserAuth).
 func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration) // fork: O11
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			userID := c.GetInt("id")
