@@ -7577,6 +7577,7 @@
     "the organization owner cannot be changed by an import": "조직 소유자는 가져오기로 변경할 수 없습니다",
     "username is empty": "username이 비어 있습니다",
     "{{error}}": "{{error}}",
-    "Line {{line}}": "{{line}}행"
+    "Line {{line}}": "{{line}}행",
+    "Quick amount": "빠른 금액"
   }
 }

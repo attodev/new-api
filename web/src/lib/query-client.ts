@@ -41,7 +41,7 @@ export function createAppQueryClient(
       queries: {
         retry: (failureCount, error) => {
           if (import.meta.env.DEV || failureCount > 3) return false
-          return ![401, 403].includes(getServerErrorStatus(error) ?? 0)
+          return ![401, 403, 429].includes(getServerErrorStatus(error) ?? 0) // fork: O11 (team cb220505e) — a 429 is a rate limit; retrying it only adds load
         },
         refetchOnWindowFocus: false,
         staleTime: 10 * 1000,

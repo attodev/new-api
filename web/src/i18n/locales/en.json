@@ -7577,6 +7577,7 @@
     "the organization owner cannot be changed by an import": "the organization owner cannot be changed by an import",
     "username is empty": "username is empty",
     "{{error}}": "{{error}}",
-    "Line {{line}}": "Line {{line}}"
+    "Line {{line}}": "Line {{line}}",
+    "Quick amount": "Quick amount"
   }
 }

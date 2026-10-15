@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 
 import { adjustUserQuota } from '../api'
 import type { QuotaAdjustMode } from '../types'
+import { UserQuotaQuickAmounts } from './user-quota-quick-amounts-fork' // fork: O11
 
 interface UserQuotaDialogProps {
   open: boolean
@@ -162,6 +163,10 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
           <Label>
             {t('Amount')} ({currencyLabel})
           </Label>
+          {!tokensOnly && (
+            <UserQuotaQuickAmounts onPick={(v) => setAmount(String(v))} />
+          )}
+          {/* fork: O11 */}
           <Input
             type='number'
             step={tokensOnly ? 1 : 0.000001}

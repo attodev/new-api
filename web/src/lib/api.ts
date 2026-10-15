@@ -71,7 +71,8 @@ export async function getUserGroups(): Promise<{
 // ============================================================================
 
 export async function getStatus() {
-  const res = await api.get('/api/status')
+  // fork: O11 (team f7ec7628c) — reject a stalled cold backend/Redis first load so React Query retries it
+  const res = await api.get('/api/status', { timeout: 8000 }) // fork: O11
   return requireServerSuccess(res.data)?.data as Record<string, unknown>
 }
 
