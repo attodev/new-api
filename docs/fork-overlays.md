@@ -295,6 +295,12 @@ O12 메모(스크립트 복사본): `userQuotaReserveResidentScript`/`userQuotaD
 
 O12 메모(upstream 스크립트 복사본, `writeUserCacheResident`): `model/user_cache_fresh_fork.go`의 `writeUserCacheResident`는 upstream `writeUserCache`(`model/user_auth_cache.go:45-99`, 스크립트 :61-86)의 복사본이다. 다른 점은 세 가지다. (1) 사용자 정보 `HSET`에 `'FreshUntil', ARGV[13]`(지금 + `SYNC_FREQUENCY`)을 더한다. (2) `EXPIRE`는 해시에 TTL이 없을 때(`TTL < 0`, 새로 채운 해시)만 실행해 정보를 다시 읽어도 잔액 TTL이 연장되지 않는다. (3) `ARGV[12]`는 `userCacheTTLSeconds()` 대신 `quotaCacheTTLSeconds()`다. 인증 버전 비교, fence 확인, committed floor 갱신, "Quota 필드가 있으면 쓰지 않음" 규칙은 그대로다. upstream 복사본이므로 병합 때 원본 스크립트나 인자 순서가 바뀌면 `writeUserCacheResident`에도 반영한다. 상주가 꺼져 있으면 upstream `writeUserCache`가 그대로 실행되고 `FreshUntil`은 쓰지 않으며 읽기에서도 확인하지 않는다.
 
+O12 메모(잔액 어긋남 감지 로그, upstream 훅 없음): `model/user_quota_drift_fork.go`의 `observeUserQuotaDrift`는 fork 파일 `userBaseAfterPopulate`(`model/user_cache_fresh_fork.go`)에서만 호출되므로 upstream 파일을 건드리지 않는다. `SYNC_FREQUENCY`마다 사용자 정보를 다시 읽을 때 캐시 잔액과 DB 잔액을 비교하며, 이 서버의 배치 큐에 대기분이 있거나 반영 중이면 건너뛴다. 캐시 잔액과 차이(캐시 − DB)가 두 번 연속 같고 0이 아닐 때만 `SysError`로 한 줄을 남긴다(다른 서버의 대기분은 두 관찰 사이에 반영되어 차이가 바뀌므로 걸리지 않는다, 설계 §4.7). 로그를 남길 뿐 잔액은 고치지 않는다. 운영자는 아래 문구로 검색한다.
+
+```
+user quota cache drift: user=<id> cache=<캐시 잔액> db=<DB 잔액> diff=<캐시 − DB>
+```
+
 ## 삭제한 upstream 파일
 
 단계 E Task 1 (team 66d421d13과 같은 결정): 화면 언어는 영어와 한국어만 둔다.

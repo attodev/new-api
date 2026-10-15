@@ -89,5 +89,6 @@ func userBaseAfterPopulate(user *User) (*UserBase, error) {
 	if err != nil {
 		return user.ToBaseUser(), nil
 	}
+	observeUserQuotaDrift(user.Id, cached.Quota, user.Quota)
 	return cached, nil
 }
