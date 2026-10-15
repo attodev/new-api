@@ -201,3 +201,23 @@ func TestFlushBatchUpdatesRunsRepairWithBatchOff(t *testing.T) {
 	require.False(t, server.Exists(getUserCacheKey(user.Id)), "repair pass ran on shutdown")
 	require.False(t, userCacheRepairListed(user.Id))
 }
+
+// A reserve that misses the hash and cannot hydrate it (here: an auth fence newer
+// than the database row) falls back to the database with a nil error. The hash may be
+// written later from a pre-deduction snapshot, so the user is listed for repair too.
+func TestReserveMissFallbackWithoutErrorIsListed(t *testing.T) {
+	truncateTables(t)
+	resetUserCacheRepairForTest(t)
+	server := useUserCacheMiniRedis(t)
+	withQuotaCacheTTL(t, 3600)
+	user := insertUserForPaymentGuardTest(t, 9703, 1000)
+	require.False(t, server.Exists(getUserCacheKey(user.Id)), "hash absent")
+	require.NoError(t, SetUserAuthVersionFence(user.Id, 99))
+
+	ok, err := TryReserveUserQuota(user.Id, 100)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, 900, getUserQuotaFromDB(t, user.Id), "served by the database fallback")
+	require.False(t, server.Exists(getUserCacheKey(user.Id)), "fence rejected hydration")
+	require.True(t, userCacheRepairListed(user.Id), "nil-error miss fallback is listed")
+}

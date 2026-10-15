@@ -74,7 +74,10 @@ func flushUserQuotaRow(id int, quotaStore map[int]int, usedQuota int, requestCou
 	if err == nil {
 		return
 	}
-	common.SysError(common.LogText("failed to batch update user %d quota, requeued: %s", id, err.Error()))
+	// The amounts let an operator reconcile an ambiguous failure (the UPDATE applied
+	// but the error came back, so the retry applies it twice; design §6).
+	common.SysError(common.LogText("failed to batch update user %d quota, requeued quota=%d used=%d requests=%d: %s",
+		id, quota, usedQuota, requestCount, err.Error()))
 	if quota != 0 {
 		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
 	}

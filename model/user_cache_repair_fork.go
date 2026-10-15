@@ -1,6 +1,8 @@
 package model
 
 import (
+	"cmp"
+	"errors"
 	"sync"
 	"time"
 
@@ -26,6 +28,17 @@ func noteUserCacheSyncFailure(userID int, err error) error {
 	userCacheRepairIDs[userID] = struct{}{}
 	userCacheRepairMu.Unlock()
 	return err
+}
+
+// errUserQuotaCacheMiss stands in for a nil error when a reserve fell back to the
+// database because the hash was absent and could not be hydrated.
+var errUserQuotaCacheMiss = errors.New("user quota cache miss")
+
+// noteUserQuotaFallback lists the user whenever a reserve fell back to the database,
+// including a nil-error miss: a hash written later from a pre-deduction snapshot would
+// hold more than the database (design §4.12-3).
+func noteUserQuotaFallback(userID int, err error) {
+	noteUserCacheSyncFailure(userID, cmp.Or(err, errUserQuotaCacheMiss))
 }
 
 // takeUserCacheRepairIDs atomically snapshots and clears the repair list, so a

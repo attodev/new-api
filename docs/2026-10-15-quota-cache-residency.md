@@ -63,7 +63,7 @@ API 키 캐시(`token:<hmac>`)도 같은 결과(DB 800, 캐시 900)였다. 해�
 
 ### 2.2 어긋남 감지 규칙 (설계 §4.7)
 
-정보를 다시 읽을 때(`userBaseAfterPopulate`에서만) 캐시 잔액과 DB 잔액을 비교한다. 이 서버에 그 사용자의 배치 대기분이 있거나 반영 중이면 건너뛴다. 사용자별로 (캐시 잔액, 차이)를 한 쌍만 기억하고, 다음 관찰에서 둘 다 그대로이고 차이가 0이 아니면 `user quota cache drift: user=… cache=… db=… diff=…`를 `SysError`로 남긴다. 다른 서버의 대기분은 두 관찰 사이(최소 `SYNC_FREQUENCY`)에 DB에 반영되어 차이가 바뀌므로 걸리지 않는다(HA 가정). 값은 고치지 않는다.
+정보를 다시 읽을 때(`userBaseAfterPopulate`에서만) 캐시 잔액과 DB 잔액을 비교한다. 이 서버에 그 사용자의 배치 대기분이 있거나 반영 중이면 건너뛴다. 사용자별로 (캐시 잔액, 차이, 관찰 시각)을 한 쌍만 기억하고, `SYNC_FREQUENCY` 이상 지난 다음 관찰에서 둘 다 그대로이고 차이가 0이 아니면(그보다 가까운 관찰은 기억을 두고 무시) `user quota cache drift: user=… cache=… db=… diff=…`를 `SysError`로 남긴다. 다른 서버의 대기분은 두 관찰 사이(최소 `SYNC_FREQUENCY`)에 DB에 반영되어 차이가 바뀌므로 걸리지 않는다(HA 가정). 값은 고치지 않는다.
 
 ### 2.3 DB 반영 누락 보강 세 가지 (설계 §4.11–4.12)
 
@@ -88,7 +88,7 @@ API 키 캐시(`token:<hmac>`)도 같은 결과(DB 800, 캐시 900)였다. 해�
 | main.go:250 | `model.FlushBatchUpdates()` | model/batch_shutdown_fork.go |
 | model/quota_reserve.go:82 | `result, err := evalUserQuotaReserve(userID, amount)` | model/user_quota_scripts_fork.go |
 | model/quota_reserve.go:87 | `result, err := evalUserQuotaDelta(userID, delta)` | model/user_quota_scripts_fork.go |
-| model/quota_reserve.go:180 | `noteUserCacheSyncFailure(id, err)` (DB 우회 분기 첫 줄) | model/user_cache_repair_fork.go |
+| model/quota_reserve.go:180 | `noteUserQuotaFallback(id, err)` (DB 우회 분기 첫 줄, nil 오류 miss도 목록에) | model/user_cache_repair_fork.go |
 | model/quota_reserve.go:193 | `noteUserCacheSyncFailure(id, compensateErr)` (보상 실패 블록) | model/user_cache_repair_fork.go |
 | model/user_cache.go:27 | `UserBase.FreshUntil` 필드 | model/user_cache_fresh_fork.go |
 | model/user_cache.go:115 | `return userBaseAfterPopulate(user)` | model/user_cache_fresh_fork.go, model/user_quota_drift_fork.go |
@@ -156,6 +156,7 @@ upstream 훅 없는 fork 장치: 어긋남 감지(`model/user_quota_drift_fork.g
 - **API 키 잔액:** 키 캐시는 그대로라 잔액 한도가 있는 키는 60초 만료 때 대기분만큼 초과될 수 있다. 지갑 차감 요청은 지갑이 지켜지지만, 구독 플랜처럼 지갑을 차감하지 않는 요청은 키 한도 초과가 남는다.
 - **직접 DB 수정:** 운영 절차(`DEL user:<id>`)를 따르지 않으면 어긋남이 남는다. 감지 로그로 드러난다.
 - **배치 반영 실패가 길어지는 경우:** 재시도가 계속 실패하면(DB 장애) DB가 뒤처진다. 캐시가 맞는 쪽이고 감지 로그가 가리킨다. DB가 회복되면 재시도가 반영한다.
+- **배치 쓰기의 이중 반영:** 재시도는 세 값을 모두 다시 넣는다(최종 리뷰 ruling). 쓰기 시간 초과·연결 끊김이 DB에 이미 적용된 뒤 오류로 돌아오면 재시도가 같은 증감을 한 번 더 적용해 DB가 캐시보다 그만큼 적어진다(사용자에게 불리, `used_quota`·`request_count`도 과다). 틀린 쪽은 DB다. 재큐잉 로그가 몰린 뒤 감지 로그가 같은 `diff > 0`을 계속 보인다. 재큐잉 로그의 세 금액으로 대조한다(운영 문서 6.4절). 한 번만 적용하려면 장부가 필요하다(설계 §9).
 - **배치 비활성 환경:** 원래 문제가 없다. 상주는 DB 읽기를 조금 줄일 뿐이다.
 - **비정상 종료(OOM, SIGKILL):** 배치 큐와 복구 목록이 사라진다. 캐시가 맞고 DB가 대기분만큼 뒤처지며 24시간 뒤 해시가 사라질 때 DB 값으로 돌아간다(지금 develop도 60초 뒤 같은 손실). 사용 중인 동안은 감지 로그에 걸리지 않는다.
 - **병합으로 들어오는 새 쓰기 경로:** 허용 목록 테스트가 병합 직후 드러낸다(검출 공백은 5.2).
@@ -180,6 +181,14 @@ upstream 훅 없는 fork 장치: 어긋남 감지(`model/user_quota_drift_fork.g
 
 - **상주를 켜면 실패하는 upstream 테스트 2개:** 테스트 기본값은 상주 꺼짐(`common.QuotaCacheTTL` 0, `TestMain`이 `InitEnv`를 부르지 않음)이다. `init()`에서 `common.QuotaCacheTTL = 86400`을 넣는 임시 테스트 파일(커밋하지 않고 지움)을 model·service·controller·middleware에 두고 돌린 결과 실패는 `model.TestUserAuthFenceRollbackExpiresAndRecovers`("1m2s is not greater than 24h0m0s" — 해시 TTL이 fence TTL보다 짧다고 가정)와 `service.TestIndependentRedisAuthVersionAdvanceConvergesAfterCacheTTL`(miniredis `FastForward(3s)`로 해시 만료를 기대, 상주에서는 `FreshUntil`이 실제 시계라 아직 신선 → `login session is revoked`) 두 개뿐이다. 두 번 돌려 같았다. 같은 시나리오는 상주를 켠 fork 테스트(`model/user_cache_fresh_fence_fork_test.go`의 `TestResidentHashRecoversAfterRolledBackFenceExpires`, `TestResidentHashConvergesAfterIndependentNodeAdvancesAuthVersion`, `TestResidentHashRejectedByCommittedFloorConvergesFromDB`)가 다룬다(ruling 3). controller·middleware·pkg/wsmanager·router는 상주를 켜도 통과했다.
 - **기존 테스트 전용 data race:** `go test -race ./model/ -run 'Quota|Batch|Drift|Repair|Fresh|Aff|Flush|InFlight' -count=3`이 upstream 테스트 `TestTokenCacheInitPreservesLiveQuotaAndFenceBlocksStaleSnapshot`에서 race로 실패한다. upstream 테스트 `TestBatchUpdateAccumulatesTwoMaximumRequestCharges`의 `DecreaseUserQuota`가 띄운 fire-and-forget gopool 고루틴이 `common.RedisEnabled`를 읽고(`model/user_cache.go:148`, upstream 줄), 다음 테스트의 `useUserCacheMiniRedis`(`model/user_cache_auth_version_test.go:23`)가 같은 변수를 쓴다. 두 테스트 파일 모두 upstream과 같다. 이 계획 전 베이스 41684baa2에서도 2/2 재현되고(qn/main 718a4e7f9에서는 2/2 재현 안 됨, 그 사이 fork 테스트가 실행 순서를 바꾼 것으로 보임), model 패키지 전체를 `-race`로 돌리면 통과한다. 이 테스트 하나를 `-skip`하면 같은 패턴이 55개 테스트 × 3 = 165 PASS, race 0이다. 제품 코드가 아니라 테스트 사이 전역 변수 공유 문제라 이 작업에서는 고치지 않았다.
+
+### 5.5 최종 전체 리뷰에서 정한 것
+
+- 어긋남 감지가 두 관찰 사이 최소 간격(`SYNC_FREQUENCY`)을 지키지 않아, 신선 기한 경계에서 함께 다시 읽은 두 요청과 다른 서버의 대기분이 겹치면 거짓 로그가 날 수 있었다 → 관찰 시각을 기억하고 간격 안쪽 관찰은 무시하도록 고쳤다.
+- 사전 차감이 nil 오류 miss(해시 없음, 채우기 거부)로 DB에 우회해도 복구 목록에 오르지 않았다 → `noteUserQuotaFallback`으로 목록에 올린다.
+- 배치 쓰기의 이중 반영은 5.1에 남는 한계로 적고 재큐잉 로그에 금액을 남겼다.
+- `batchUpdate` 안에서 panic이 나면 반영 중 표시가 풀리지 않고 남는다. 다만 upstream 티커 고루틴이 panic에 이미 죽으므로(그 뒤 배치 자체가 돌지 않음) 남은 표시보다 그쪽이 지배적인 문제다. 따로 고치지 않았다.
+- `model/user.go`의 upstream `updateUserQuotaUsedQuotaAndRequestCount`는 훅 뒤 호출하는 곳이 없다. 여러 줄 hunk를 피하려고 남긴다(지우지 않는다).
 
 ## 6. 검증과 운영자 작업
 

@@ -177,7 +177,7 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 		}
 	}
 	if err != nil || result == cacheQuotaMiss {
-		noteUserCacheSyncFailure(id, err) // fork: O12
+		noteUserQuotaFallback(id, err) // fork: O12
 		if err != nil {
 			common.SysLog(common.LogText("user quota cache reserve unavailable, falling back to database: %s", err.Error()))
 		}
