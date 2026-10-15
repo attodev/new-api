@@ -28,6 +28,7 @@ import { translateServerText } from '@/lib/server-error-message'
 
 import type { UsageLog } from '../data/schema'
 import type { LogOtherData } from '../types'
+import { FORK_AUDIT_TEMPLATES } from './fork-audit-templates' // fork: O3
 import { buildQuotaAuditOperation } from './quota-audit-operation'
 
 export { normalizeTierLabel }
@@ -449,6 +450,7 @@ export function formatDuration(
  * translatable instead of being frozen to whatever language was written to DB.
  */
 const AUDIT_TEMPLATES: Record<string, string> = {
+  ...FORK_AUDIT_TEMPLATES, // fork: O3
   'token.create': 'API token creation',
   'token.update': 'API token configuration update',
   'token.status_update': 'API token status update',

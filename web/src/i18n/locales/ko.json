@@ -7540,6 +7540,20 @@
     "Interface languages": "인터페이스 언어",
     "Languages offered in the language menu. The current language of a user stays available.": "언어 메뉴에 표시할 언어입니다. 사용자가 현재 사용 중인 언어는 계속 선택할 수 있습니다.",
     "Select at least one language.": "언어를 하나 이상 선택하세요.",
-    "user_id is required": "user_id는 필수입니다"
+    "user_id is required": "user_id는 필수입니다",
+    "Created organization “{{name}}” (ID {{organization_id}}) with owner {{owner_user_id}}": "조직 “{{name}}”(ID {{organization_id}})을(를) 생성했습니다. 소유자: {{owner_user_id}}",
+    "Updated organization {{organization_id}}": "조직 {{organization_id}}을(를) 수정했습니다",
+    "Deleted organization {{organization_id}} (owner {{owner_user_id}})": "조직 {{organization_id}}(소유자 {{owner_user_id}})을(를) 삭제했습니다",
+    "Assigned user {{user_id}} to organization {{organization_id}} as {{organization_role}}": "사용자 {{user_id}}을(를) 조직 {{organization_id}}에 {{organization_role}} 역할로 할당했습니다",
+    "Updated member {{user_id}} of organization {{organization_id}}": "조직 {{organization_id}}의 멤버 {{user_id}} 정보를 수정했습니다",
+    "Removed user {{user_id}} from organization {{organization_id}}": "사용자 {{user_id}}을(를) 조직 {{organization_id}}에서 제거했습니다",
+    "Imported members into organization {{organization_id}} from Excel (assigned {{assigned}}, created {{created}}, updated {{updated}}, removed {{removed}}, errors {{errors}})": "조직 {{organization_id}}에 Excel로 멤버를 가져왔습니다 (할당 {{assigned}}, 생성 {{created}}, 수정 {{updated}}, 제거 {{removed}}, 오류 {{errors}})",
+    "Created subscription plan “{{title}}” (ID {{plan_id}}) for organization {{organization_id}}": "조직 {{organization_id}}의 구독 플랜 “{{title}}”(ID {{plan_id}})을(를) 생성했습니다",
+    "Updated subscription plan {{plan_id}} of organization {{organization_id}}": "조직 {{organization_id}}의 구독 플랜 {{plan_id}}을(를) 수정했습니다",
+    "Disabled subscription plan {{plan_id}} of organization {{organization_id}}": "조직 {{organization_id}}의 구독 플랜 {{plan_id}}을(를) 비활성화했습니다",
+    "Assigned subscription plan {{plan_id}} of organization {{organization_id}} to user {{user_id}}": "조직 {{organization_id}}의 구독 플랜 {{plan_id}}을(를) 사용자 {{user_id}}에게 할당했습니다",
+    "Cancelled the active subscription of user {{user_id}} in organization {{organization_id}}": "조직 {{organization_id}}에서 사용자 {{user_id}}의 활성 구독을 취소했습니다",
+    "Expired {{expired}} pending top-up orders of organization {{organization_id}}": "조직 {{organization_id}}의 대기 중인 충전 주문 {{expired}}건을 만료 처리했습니다",
+    "Expired {{expired}} pending top-ups and {{expired_subscriptions}} subscription orders of user {{user_id}}": "사용자 {{user_id}}의 대기 중인 충전 {{expired}}건과 구독 주문 {{expired_subscriptions}}건을 만료 처리했습니다"
   }
 }
