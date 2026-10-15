@@ -55,6 +55,7 @@ services:
 #      - SYNC_FREQUENCY=60  # Uncomment if regular database syncing is needed
 #      - QUOTA_CACHE_TTL=86400  # user quota cache residency TTL (seconds); <=0 disables
 #      - GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX  # Google Analytics 的测量 ID (Google Analytics Measurement ID)
+#      - GOOGLE_ANALYTICS_ID=G-Z73Y7213LF  # 운영 GA4 ID — team(350662f4c)은 코드에 고정했고 develop은 환경 변수로 읽는다. 배포 설정에 반드시 넣을 것
 #      - UMAMI_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  # Umami 网站 ID (Umami Website ID)
 #      - UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js  # Umami 脚本 URL，默认为官方地址 (Umami Script URL, defaults to official URL)
 
