@@ -19,6 +19,13 @@ func resetUserCacheRepairForTest(t *testing.T) {
 	})
 }
 
+func userCacheRepairListed(id int) bool {
+	userCacheRepairMu.Lock()
+	defer userCacheRepairMu.Unlock()
+	_, ok := userCacheRepairIDs[id]
+	return ok
+}
+
 func TestUserCacheRepairDeletesStaleHashAfterRedisError(t *testing.T) {
 	truncateTables(t)
 	resetUserCacheRepairForTest(t)
@@ -60,9 +67,25 @@ func TestUserCacheRepairWaitsForPendingBatch(t *testing.T) {
 
 	repairUserCaches()
 	require.True(t, server.Exists(getUserCacheKey(user.Id)), "kept while a delta is pending")
+	require.True(t, userCacheRepairListed(user.Id), "re-added while pending")
 	batchUpdate()
 	repairUserCaches()
 	require.False(t, server.Exists(getUserCacheKey(user.Id)))
+	require.False(t, userCacheRepairListed(user.Id), "removed once repaired")
+}
+
+func TestUserCacheRepairKeepsNoteRecordedDuringPass(t *testing.T) {
+	resetUserCacheRepairForTest(t)
+	useUserCacheMiniRedis(t)
+	_ = noteUserCacheSyncFailure(31, errors.New("boom"))
+	ids := takeUserCacheRepairIDs()
+	require.Equal(t, []int{31}, ids)
+	require.False(t, userCacheRepairListed(31), "list cleared by the take")
+	// a failure noted while the pass is in progress
+	_ = noteUserCacheSyncFailure(32, errors.New("boom"))
+	repairUserCachesFor(ids)
+	require.False(t, userCacheRepairListed(31))
+	require.True(t, userCacheRepairListed(32), "note during the pass survives")
 }
 
 func TestNoteUserCacheSyncFailureIgnoresNil(t *testing.T) {

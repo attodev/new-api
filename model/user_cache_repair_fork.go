@@ -28,26 +28,41 @@ func noteUserCacheSyncFailure(userID int, err error) error {
 	return err
 }
 
-// repairUserCaches deletes the hash of each listed user with no pending batch delta.
-// Users whose delete fails stay listed for the next pass.
-func repairUserCaches() {
+// takeUserCacheRepairIDs atomically snapshots and clears the repair list, so a
+// failure noted while a pass is running lands in the fresh map and is never lost.
+func takeUserCacheRepairIDs() []int {
 	userCacheRepairMu.Lock()
+	defer userCacheRepairMu.Unlock()
 	ids := make([]int, 0, len(userCacheRepairIDs))
 	for id := range userCacheRepairIDs {
 		ids = append(ids, id)
 	}
+	userCacheRepairIDs = map[int]struct{}{}
+	return ids
+}
+
+func requeueUserCacheRepair(userID int) {
+	userCacheRepairMu.Lock()
+	userCacheRepairIDs[userID] = struct{}{}
 	userCacheRepairMu.Unlock()
+}
+
+// repairUserCaches deletes the hash of each listed user with no pending batch delta.
+// Users still pending, or whose delete fails, are put back for the next pass.
+func repairUserCaches() {
+	repairUserCachesFor(takeUserCacheRepairIDs())
+}
+
+func repairUserCachesFor(ids []int) {
 	for _, id := range ids {
 		if userQuotaBatchPending(id) {
+			requeueUserCacheRepair(id)
 			continue
 		}
 		if err := invalidateUserCache(id); err != nil {
+			requeueUserCacheRepair(id)
 			common.SysLog(common.LogText("user cache repair for %d deferred: %s", id, err.Error()))
-			continue
 		}
-		userCacheRepairMu.Lock()
-		delete(userCacheRepairIDs, id)
-		userCacheRepairMu.Unlock()
 	}
 }
 
