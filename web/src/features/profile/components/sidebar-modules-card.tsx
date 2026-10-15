@@ -59,7 +59,7 @@ export function SidebarModulesCard() {
   const sectionDefs: SectionDef[] = [
     {
       key: 'chat',
-      title: t('Chat Area'),
+      title: t('Chat'), // fork: O11
       description: t('Playground and chat functions'),
       modules: [
         {
@@ -76,17 +76,17 @@ export function SidebarModulesCard() {
     },
     {
       key: 'console',
-      title: t('Console Area'),
+      title: t('General'), // fork: O11
       description: t('Data management and log viewing'),
       modules: [
         {
           key: 'detail',
-          title: t('Dashboard'),
+          title: t('Overview · Dashboard'), // fork: O11
           description: t('System data statistics'),
         },
         {
           key: 'token',
-          title: t('Token Management'),
+          title: t('API Keys'), // fork: O11
           description: t('API token management'),
         },
         {
@@ -113,17 +113,17 @@ export function SidebarModulesCard() {
     },
     {
       key: 'personal',
-      title: t('Personal Center Area'),
+      title: t('Personal'), // fork: O11
       description: t('User personal functions'),
       modules: [
         {
           key: 'topup',
-          title: t('Wallet Management'),
+          title: t('Wallet'), // fork: O11
           description: t('Balance and top-up management'),
         },
         {
           key: 'personal',
-          title: t('Personal Settings'),
+          title: t('Profile'), // fork: O11
           description: t('Personal info settings'),
         },
         {
