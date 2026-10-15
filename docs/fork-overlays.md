@@ -273,6 +273,10 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|
 | O12 QUOTA_CACHE_TTL 설정 | common/init.go:113 | `InitEnv`에서 `SyncFrequency` 다음 줄 `QuotaCacheTTL = GetEnvOrDefault("QUOTA_CACHE_TTL", 86400) // fork: O12` (0 이하면 상주 끔) | common/quota_cache_ttl_fork.go, model/user_quota_residency_fork.go, model/user_quota_residency_fork_test.go |
+| O12 잔액 차감 TTL 연장 (reserve) | model/quota_reserve.go:82 | `cacheTryReserveUserQuota`의 Eval 호출을 `result, err := evalUserQuotaReserve(userID, amount) // fork: O12` 한 줄로 대체 (상주가 켜져 있으면 성공 경로에서만 `EXPIRE`) | model/user_quota_scripts_fork.go, model/user_quota_scripts_fork_test.go, model/user_quota_residency_regression_test.go |
+| O12 잔액 정산 TTL 연장 (delta) | model/quota_reserve.go:87 | `cacheApplyUserQuotaDelta`의 Eval 호출을 `result, err := evalUserQuotaDelta(userID, delta) // fork: O12` 한 줄로 대체 | model/user_quota_scripts_fork.go |
+
+O12 메모(스크립트 복사본): `userQuotaReserveResidentScript`/`userQuotaDeltaResidentScript`는 upstream `userQuotaReserveScript`/`userQuotaDeltaScript`(`model/quota_reserve.go:19-38`)의 복사본에 성공 경로 `EXPIRE KEYS[1] ARGV[4]`만 더한 것이다. upstream 복사본이므로 병합 때 원본 스크립트가 바뀌면 `model/user_quota_scripts_fork.go`에도 반영한다. 상주가 꺼져 있으면(`QUOTA_CACHE_TTL` 0 이하) upstream 스크립트를 그대로 쓴다.
 
 ## 삭제한 upstream 파일
 

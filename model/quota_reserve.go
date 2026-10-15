@@ -79,14 +79,12 @@ func quotaResultFromLua(result int, err error) (cacheQuotaResult, error) {
 }
 
 func cacheTryReserveUserQuota(userID int, amount int64) (cacheQuotaResult, error) {
-	result, err := common.RDB.Eval(context.Background(), userQuotaReserveScript,
-		[]string{getUserCacheKey(userID)}, amount, userID, userCacheSchemaVersion).Int()
+	result, err := evalUserQuotaReserve(userID, amount) // fork: O12
 	return quotaResultFromLua(result, err)
 }
 
 func cacheApplyUserQuotaDelta(userID int, delta int64) (cacheQuotaResult, error) {
-	result, err := common.RDB.Eval(context.Background(), userQuotaDeltaScript,
-		[]string{getUserCacheKey(userID)}, delta, userID, userCacheSchemaVersion).Int()
+	result, err := evalUserQuotaDelta(userID, delta) // fork: O12
 	return quotaResultFromLua(result, err)
 }
 
