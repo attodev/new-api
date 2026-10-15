@@ -169,6 +169,7 @@ func main() {
 		common.SysLog(common.LogText("batch update enabled with interval %ss", strconv.Itoa(common.BatchUpdateInterval)))
 		model.InitBatchUpdater()
 	}
+	model.StartUserCacheSyncRepair() // fork: O12
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		gopool.Go(func() {

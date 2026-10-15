@@ -149,7 +149,7 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 		return nil
 	}
 	_, err := cacheApplyUserQuotaDelta(userId, delta)
-	return err
+	return noteUserCacheSyncFailure(userId, err) // fork: O12
 }
 
 func cacheDecrUserQuota(userId int, delta int64) error {

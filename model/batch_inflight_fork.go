@@ -10,9 +10,9 @@ import (
 // 사용자를 반영 중으로 표시하고, 행을 쓴 직후 한 사용자씩 푼다.
 // 설계 §4.11. userQuotaInFlight는 batchUpdateLocks[BatchUpdateTypeUserQuota]로 보호한다.
 
-// userQuotaInFlight is a refcount: overlapping batches (e.g. a shutdown flush racing
-// the ticker's batch) may hold the same user, and one batch's clear must not erase
-// the other's mark.
+// userQuotaInFlight is a refcount: overlapping batchUpdate callers (serialized by
+// batchRunMu since Task 6; the refcount remains as a safety net) may hold the same
+// user, and one batch's clear must not erase the other's mark.
 var userQuotaInFlight = map[int]int{}
 
 // takeBatchStoreLocked returns the store for type i; the caller holds batchUpdateLocks[i].

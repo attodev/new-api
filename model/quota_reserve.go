@@ -177,6 +177,7 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 		}
 	}
 	if err != nil || result == cacheQuotaMiss {
+		noteUserCacheSyncFailure(id, err) // fork: O12
 		if err != nil {
 			common.SysLog(common.LogText("user quota cache reserve unavailable, falling back to database: %s", err.Error()))
 		}
@@ -189,6 +190,7 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 		compensated, compensateErr := cacheApplyUserQuotaDelta(id, int64(quota))
 		if compensateErr != nil || compensated != cacheQuotaOK {
 			common.SysError(common.LogText("failed to compensate reserved user quota: result=%d error=%v", compensated, compensateErr))
+			noteUserCacheSyncFailure(id, compensateErr) // fork: O12
 		}
 		return false, err
 	}
