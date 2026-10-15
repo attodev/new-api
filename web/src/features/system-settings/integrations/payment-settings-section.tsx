@@ -63,6 +63,7 @@ import { safeNumberFieldProps } from '../utils/numeric-field'
 import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
+import { ClearPaymentCredentialsButton } from './payment-credentials-clear-fork' // fork: O11
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
 import {
   formatJsonForEditor,
@@ -1318,6 +1319,12 @@ export function PaymentSettingsSection({
                     {t('Configuration for Stripe payment integration')}
                   </p>
                 </div>
+                {/* fork: O11 */}
+                <ClearPaymentCredentialsButton
+                  provider='stripe'
+                  form={form}
+                  initialRef={initialRef}
+                />
 
                 <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
                   <p className='mb-2 font-medium'>
@@ -1510,6 +1517,12 @@ export function PaymentSettingsSection({
                     {t('Configuration for PayPal payment integration')}
                   </p>
                 </div>
+                {/* fork: O11 */}
+                <ClearPaymentCredentialsButton
+                  provider='paypal'
+                  form={form}
+                  initialRef={initialRef}
+                />
 
                 <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
                   <p className='mb-2 font-medium'>

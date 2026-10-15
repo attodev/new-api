@@ -7578,6 +7578,9 @@
     "username is empty": "username이 비어 있습니다",
     "{{error}}": "{{error}}",
     "Line {{line}}": "{{line}}행",
-    "Quick amount": "빠른 금액"
+    "Quick amount": "빠른 금액",
+    "Clear all Stripe credentials and disable Stripe payments?": "Stripe 자격 증명을 모두 지우고 Stripe 결제를 끌까요?",
+    "Clear all PayPal credentials and disable PayPal payments?": "PayPal 자격 증명을 모두 지우고 PayPal 결제를 끌까요?",
+    "Credentials cleared": "자격 증명을 지웠습니다"
   }
 }
