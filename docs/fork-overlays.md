@@ -266,6 +266,14 @@ O11 메모(지갑 상한): 출석 보상과 초대 쿼터 전송은 새로 만�
 
 O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `requestOpenAI2Ali`(fork 훅으로 대체)와 relaykit `GeneralOpenAIRequest.MarshalJSON`(매핑 뒤 `r.Model` 기준, 규칙 6으로 수정 불가)이다. 그래서 `ConvertOpenAIRequest`가 "유지인데 마샬러가 지울 경우"(매핑 뒤 이름이 Qwen이 아님)에만 원래 raw 값을 gin 컨텍스트 키 `fork_ali_thinking_budget`에 넣고, Ali `DoRequest`가 본문에 그 필드가 없을 때만 `sjson`으로 다시 넣는다(`0`도 raw 그대로). 다시 넣은 본문은 `bytes.Reader`라 net/http가 `ContentLength`/`GetBody`를 채운다(원래의 `ReplayableBody` 대신 메모리 사본). 다시 넣기는 `RemoveDisabledFields`·`ParamOverride` 뒤에 일어나므로, 채널 ParamOverride를 마샬한 문자열에 `thinking_budget`이 들어 있으면 stash를 만들지 않는다(`paramOverrideMentionsThinkingBudget`). 그래서 운영자가 지운 필드는 되살아나지 않고, 값을 넣는 override는 본문에 필드가 이미 있어 그대로 이긴다. 부분 문자열 비교라서 조건식이나 값 등 다른 곳에 `thinking_budget`이 나오기만 해도 다시 넣기가 꺼진다(운영자 규칙 쪽으로 기우는 보수적 선택). 매핑 뒤 이름이 Qwen이면 마샬러가 유지하므로 stash를 만들지 않고, 그 뒤 단계가 지운 필드는 되살리지 않는다. 재시도는 같은 gin 컨텍스트를 쓰므로 `ConvertOpenAIRequest`마다 키를 다시 쓰고(유지가 아니면 비움), `DoRequest`가 소비하며 비운다. 변환을 거치지 않은 본문에는 넣지 않는다: 본문 패스스루(전역 또는 채널), `info.RelayMode`가 chat completions가 아닐 때(Responses 경유 chat completions는 `DoRequest` 동안 Responses로 바뀐다), 본문 `model`이 `info.UpstreamModelName`과 다를 때는 stash를 버린다. Claude 형식 요청이 chat으로 변환되는 경로(RelayMode unknown)는 다시 넣지 않지만, Claude→chat 변환은 `thinking_budget`을 만들지 않으므로 잃는 값이 없다. 다른 어댑터는 키를 읽지 않는다.
 
+## O12 잔액 캐시 상주·Sentinel
+
+사용자 잔액 Redis 캐시를 TTL 만료 없이 상주시키고(차감 때 TTL 연장) Redis Sentinel 연결을 지원하는 fork 고유 기능이다. 설계는 `docs/superpowers/specs/2026-10-15-quota-cache-residency-design.md`에 있다. 로직은 `*_fork.go`에 두고 upstream 파일에는 `// fork: O12` 훅 한 줄만 둔다.
+
+| overlay | upstream 파일 | 훅 | fork 전용 파일 |
+|---|---|---|---|
+| O12 QUOTA_CACHE_TTL 설정 | common/init.go:113 | `InitEnv`에서 `SyncFrequency` 다음 줄 `QuotaCacheTTL = GetEnvOrDefault("QUOTA_CACHE_TTL", 86400) // fork: O12` (0 이하면 상주 끔) | common/quota_cache_ttl_fork.go, model/user_quota_residency_fork.go, model/user_quota_residency_fork_test.go |
+
 ## 삭제한 upstream 파일
 
 단계 E Task 1 (team 66d421d13과 같은 결정): 화면 언어는 영어와 한국어만 둔다.
