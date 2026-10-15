@@ -583,3 +583,60 @@ func TestImportOrgUsersKeepsExistingUserOutsideWhenMemberFieldWriteFails(t *test
 	require.NoError(t, err)
 	require.Zero(t, organizationId, "a failed member-field write must roll back the assignment")
 }
+
+func TestImportOrgUsersReturnsStructuredRowErrors(t *testing.T) {
+	truncate(t)
+	withDefaultQuotaPerUnit(t)
+	seedOrganization(t, 1, 20)
+	seedOrganizationUser(t, 20, "owner_20", 0, 1, model.OrganizationRoleOwner)
+	seedOrganizationUser(t, 21, "member_21", 100, 1, model.OrganizationRoleMember)
+
+	f := newImportWorkbook(t, [][]any{
+		{"username", "organization_role", "member_status", "quota", "initial_password"},
+		{"", "member", "", "", ""},
+		{"bad_role", "superuser", "", "", ""},
+		{"member_21", "member", "disabled", "", ""},
+		{"member_21", "member", "", "18014398510", ""},
+	})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{
+		"line 2: username is empty",
+		`line 3 (bad_role): invalid organization_role "superuser" (only member or admin can be imported)`,
+		`line 4 (member_21): invalid member_status "disabled" (use active or suspended)`,
+		fmt.Sprintf(`line 5 (member_21): invalid quota "18014398510": quota exceeds the wallet limit %d`, common.MaxWalletQuota),
+	}, result.Errors, "the English Errors text is unchanged")
+
+	require.Len(t, result.ErrorDetails, len(result.Errors))
+	require.Equal(t, OrgImportRowError{Line: 2, MessageKey: "username is empty"}, result.ErrorDetails[0])
+	require.Equal(t, OrgImportRowError{
+		Line: 3, Username: "bad_role",
+		MessageKey: "invalid organization_role {{role}} (only member or admin can be imported)",
+		Params:     map[string]any{"role": `"superuser"`},
+	}, result.ErrorDetails[1])
+
+	// A nested error that is a common.Message keeps its own key and params.
+	statusErr := result.ErrorDetails[2]
+	require.Equal(t, "{{error}}", statusErr.MessageKey)
+	require.Equal(t, `invalid member_status "disabled" (use active or suspended)`, statusErr.Params["error"])
+	require.Equal(t, "invalid member_status {{status}} (use active or suspended)", statusErr.Params["error_key"])
+	require.Equal(t, map[string]any{"status": `"disabled"`}, statusErr.Params["error_params"])
+
+	quotaErr := result.ErrorDetails[3]
+	require.Equal(t, "invalid quota {{quota}}: {{error}}", quotaErr.MessageKey)
+	require.Equal(t, `"18014398510"`, quotaErr.Params["quota"])
+	require.Equal(t, "quota exceeds the wallet limit {{limit}}", quotaErr.Params["error_key"])
+	require.Equal(t, map[string]any{"limit": common.MaxWalletQuota}, quotaErr.Params["error_params"])
+}
+
+func TestImportOrgUsersErrorDetailsIsAlwaysAnArray(t *testing.T) {
+	truncate(t)
+	seedOrganization(t, 1, 20)
+	f := newImportWorkbook(t, [][]any{{"username"}})
+	result, err := ImportOrgUsersFromFile(f, 1, 0, false)
+	require.NoError(t, err)
+	payload, err := common.Marshal(result)
+	require.NoError(t, err)
+	require.Contains(t, string(payload), `"error_details":[]`)
+}

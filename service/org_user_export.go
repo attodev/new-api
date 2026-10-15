@@ -19,13 +19,13 @@ import (
 // common.MaxWalletQuota instead of a bare float->int conversion.
 func importedWalletQuota(usd float64) (int, error) {
 	if math.IsNaN(usd) || math.IsInf(usd, 0) {
-		return 0, fmt.Errorf("quota must be a finite number")
+		return 0, common.NewMessage("quota must be a finite number")
 	}
 	quota, err := common.WalletQuotaFromDecimalStrict(
 		decimal.NewFromFloat(usd).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).Truncate(0),
 	)
 	if err != nil {
-		return 0, fmt.Errorf("quota exceeds the wallet limit %d", common.MaxWalletQuota)
+		return 0, common.NewMessage("quota exceeds the wallet limit {{limit}}", map[string]any{"limit": common.MaxWalletQuota})
 	}
 	return quota, nil
 }
@@ -75,13 +75,13 @@ func orgImportMemberFields(memberStatusCell string, remarkPresent bool, remarkCe
 	if memberStatusCell != "" {
 		status, ok := stringToMemberStatus(memberStatusCell)
 		if !ok {
-			return nil, fmt.Errorf("invalid member_status %q (use active or suspended)", memberStatusCell)
+			return nil, common.NewMessage("invalid member_status {{status}} (use active or suspended)", map[string]any{"status": fmt.Sprintf("%q", memberStatusCell)})
 		}
 		fields["organization_member_status"] = status
 	}
 	if remarkPresent {
 		if utf8.RuneCountInString(remarkCell) > orgImportMaxRemarkLength {
-			return nil, fmt.Errorf("organization_remark must be at most %d characters", orgImportMaxRemarkLength)
+			return nil, common.NewMessage("organization_remark must be at most {{max}} characters", map[string]any{"max": orgImportMaxRemarkLength})
 		}
 		fields["organization_remark"] = remarkCell
 	}
@@ -146,6 +146,9 @@ type OrgImportResult struct {
 	Removed          int      `json:"removed"`
 	RemovedUsernames []string `json:"removed_usernames"`
 	Errors           []string `json:"errors"`
+	// ErrorDetails is Errors in a form the web console translates (see
+	// addRowError); both list the same rows in the same order.
+	ErrorDetails []OrgImportRowError `json:"error_details"`
 }
 
 // ImportOrgUsersFromFile parses an Excel file and assigns/creates users for an org.
@@ -158,6 +161,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		UpdatedUsernames: []string{},
 		RemovedUsernames: []string{},
 		Errors:           []string{},
+		ErrorDetails:     []OrgImportRowError{},
 	}
 	listedUsernames := map[string]bool{}
 
@@ -202,7 +206,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 
 		username := getCell(row, "username")
 		if username == "" {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d: username is empty", lineNum))
+			result.addRowError(lineNum, "", "username is empty", nil)
 			continue
 		}
 
@@ -218,7 +222,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			orgRole = model.OrganizationRoleMember
 		}
 		if orgRole != model.OrganizationRoleMember && orgRole != model.OrganizationRoleAdmin {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid organization_role %q (only member or admin can be imported)", lineNum, username, orgRole))
+			result.addRowError(lineNum, username, "invalid organization_role {{role}} (only member or admin can be imported)", map[string]any{"role": fmt.Sprintf("%q", orgRole)})
 			continue
 		}
 
@@ -227,12 +231,12 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		userExists := existingUser.Id > 0
 
 		if dbErr != nil && !isNotFound(dbErr) {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): db error: %v", lineNum, username, dbErr))
+			result.addRowError(lineNum, username, "db error: {{error}}", rowErrorParams(dbErr, nil))
 			continue
 		}
 
 		if userExists && actorId > 0 && existingUser.Id == actorId {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): an import cannot change the importing admin's own row", lineNum, username))
+			result.addRowError(lineNum, username, "an import cannot change the importing admin's own row", nil)
 			continue
 		}
 
@@ -240,12 +244,12 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 			// Mirror CanManageOrganizationTarget: an import never edits platform
 			// admins, and never demotes the organization owner.
 			if existingUser.Role >= common.RoleAdminUser {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): platform administrators cannot be managed by an import", lineNum, username))
+				result.addRowError(lineNum, username, "platform administrators cannot be managed by an import", nil)
 				continue
 			}
 			if existingUser.OrganizationId == organizationId {
 				if model.HasOrganizationOwnerRole(existingUser.OrganizationRole) {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): the organization owner cannot be changed by an import", lineNum, username))
+					result.addRowError(lineNum, username, "the organization owner cannot be changed by an import", nil)
 					continue
 				}
 				// Validate the imported balance before touching the row, so an
@@ -255,7 +259,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 					if usd, err := strconv.ParseFloat(qs, 64); err == nil {
 						quota, err := importedWalletQuota(usd)
 						if err != nil {
-							result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q: %v", lineNum, username, qs, err))
+							result.addRowError(lineNum, username, "invalid quota {{quota}}: {{error}}", rowErrorParams(err, map[string]any{"quota": fmt.Sprintf("%q", qs)}))
 							continue
 						}
 						importedQuota = &quota
@@ -263,7 +267,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				}
 				updates, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
 				if err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+					result.addRowError(lineNum, username, "{{error}}", rowErrorParams(err, nil))
 					continue
 				}
 				if dn := getCell(row, "display_name"); dn != "" {
@@ -275,12 +279,12 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				// Scoped to the organization: a member removed since the row was
 				// read is not written (ErrOrganizationMembershipChanged).
 				if err := model.UpdateOrganizationMemberFields(existingUser.Id, organizationId, updates); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to update: %v", lineNum, username, err))
+					result.addRowError(lineNum, username, "failed to update: {{error}}", rowErrorParams(err, nil))
 					continue
 				}
 				if importedQuota != nil {
 					if err := model.SetOrganizationMemberQuota(existingUser.Id, organizationId, *importedQuota); err != nil {
-						result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+						result.addRowError(lineNum, username, "failed to set quota: {{error}}", rowErrorParams(err, nil))
 					}
 				}
 				if err := model.InvalidateUserCache(existingUser.Id); err != nil {
@@ -291,21 +295,21 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				continue
 			}
 			if existingUser.OrganizationId > 0 {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): belongs to another organization", lineNum, username))
+				result.addRowError(lineNum, username, "belongs to another organization", nil)
 				continue
 			}
 			memberFields, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
 			if err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+				result.addRowError(lineNum, username, "{{error}}", rowErrorParams(err, nil))
 				continue
 			}
 			// One transaction: a failed member-field write leaves the user outside.
 			if err := model.AssignUserToOrganizationWithMemberFields(existingUser.Id, organizationId, orgRole, memberFields); err != nil {
 				var fieldsErr *model.OrganizationMemberFieldsError
 				if errors.As(err, &fieldsErr) {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set member status or note: %v", lineNum, username, err))
+					result.addRowError(lineNum, username, "failed to set member status or note: {{error}}", rowErrorParams(err, nil))
 				} else {
-					result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to assign: %v", lineNum, username, err))
+					result.addRowError(lineNum, username, "failed to assign: {{error}}", rowErrorParams(err, nil))
 				}
 				continue
 			}
@@ -319,12 +323,12 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		// User does not exist — create then assign
 		password := getCell(row, "initial_password")
 		if password == "" {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): initial_password is required for new users", lineNum, username))
+			result.addRowError(lineNum, username, "initial_password is required for new users", nil)
 			continue
 		}
 		memberFields, err := orgImportMemberFields(getCell(row, "member_status"), hasColumn("organization_remark"), getCell(row, "organization_remark"))
 		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+			result.addRowError(lineNum, username, "{{error}}", rowErrorParams(err, nil))
 			continue
 		}
 
@@ -333,12 +337,12 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		if qs := getCell(row, "quota"); qs != "" {
 			usd, err := strconv.ParseFloat(qs, 64)
 			if err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q", lineNum, username, qs))
+				result.addRowError(lineNum, username, "invalid quota {{quota}}", map[string]any{"quota": fmt.Sprintf("%q", qs)})
 				continue
 			}
 			quota, err = importedWalletQuota(usd)
 			if err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid quota %q: %v", lineNum, username, qs, err))
+				result.addRowError(lineNum, username, "invalid quota {{quota}}: {{error}}", rowErrorParams(err, map[string]any{"quota": fmt.Sprintf("%q", qs)}))
 				continue
 			}
 			quotaProvided = true
@@ -359,20 +363,20 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 
 		// Same struct validation CreateUser applies (username/display name length, password length).
 		if err := common.Validate.Struct(newUser); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): invalid user: %v", lineNum, username, err))
+			result.addRowError(lineNum, username, "invalid user: {{error}}", rowErrorParams(err, nil))
 			continue
 		}
 
 		// Insert, assignment and member fields share one transaction: a
 		// failure leaves no account behind.
 		if err := model.CreateUserInOrganization(newUser, organizationId, orgRole, memberFields); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): %v", lineNum, username, err))
+			result.addRowError(lineNum, username, "{{error}}", rowErrorParams(err, nil))
 			continue
 		}
 
 		if quotaProvided {
 			if err := model.SetOrganizationMemberQuota(newUser.Id, organizationId, quota); err != nil {
-				result.Errors = append(result.Errors, fmt.Sprintf("line %d (%s): failed to set quota: %v", lineNum, username, err))
+				result.addRowError(lineNum, username, "failed to set quota: {{error}}", rowErrorParams(err, nil))
 			}
 			if err := model.InvalidateUserCache(newUser.Id); err != nil {
 				common.SysLog("ImportOrgUsersFromFile: failed to invalidate cache for user " + username)
@@ -387,7 +391,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 		if err := model.DB.
 			Where("organization_id = ? AND organization_role != ? AND role < ?", organizationId, model.OrganizationRoleOwner, common.RoleAdminUser).
 			Find(&currentMembers).Error; err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("remove-absent: failed to query members: %v", err))
+			result.addRowError(0, "", "failed to query members: {{error}}", rowErrorParams(err, nil))
 		} else {
 			for _, member := range currentMembers {
 				if listedUsernames[member.Username] || member.Id == actorId {
@@ -396,7 +400,7 @@ func ImportOrgUsersFromFile(f *excelize.File, organizationId int, actorId int, r
 				// Leaving zeroes the member quota cap (model.ClearOrganizationMembership),
 				// so an imported cap never survives as a personal balance.
 				if _, err := model.ClearOrganizationMembership(member.Id, organizationId); err != nil {
-					result.Errors = append(result.Errors, fmt.Sprintf("remove-absent (%s): failed to remove: %v", member.Username, err))
+					result.addRowError(0, member.Username, "failed to remove: {{error}}", rowErrorParams(err, nil))
 					continue
 				}
 				if err := model.InvalidateUserCache(member.Id); err != nil {

@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { importOrgUsers } from '@/features/organizations/api'
+import { listOrgImportErrors } from '@/features/organizations/lib/org-import-row-error'
 import type { OrgImportResult } from '@/features/organizations/types'
 
 interface OrgUsersImportDialogProps {
@@ -88,6 +89,8 @@ export function OrgUsersImportDialog({
     setRemoveAbsent(false)
     onOpenChange(false)
   }
+
+  const importErrors = result ? listOrgImportErrors(t, result) : []
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -152,12 +155,12 @@ export function OrgUsersImportDialog({
                   : {result.removed_usernames.join(', ')}
                 </p>
               )}
-              {result.errors.length > 0 && (
+              {importErrors.length > 0 && (
                 <div className='text-red-600'>
                   <p>{t('Errors')}:</p>
                   <ul className='list-inside list-disc'>
-                    {result.errors.map((message) => (
-                      <li key={message}>{message}</li>
+                    {importErrors.map(({ key, message }) => (
+                      <li key={key}>{message}</li>
                     ))}
                   </ul>
                 </div>

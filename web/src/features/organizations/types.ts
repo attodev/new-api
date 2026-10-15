@@ -103,6 +103,19 @@ export interface OrganizationUpdatePayload {
   status?: number
 }
 
+/**
+ * One rejected import row: `message_key` is the English template (a key of the
+ * locale files) and `params` fill it. When the row failed on a nested message,
+ * `params.error_key`/`params.error_params` carry that message's own key.
+ * Line 0 is a failure of the remove-absent step.
+ */
+export interface OrgImportRowError {
+  line: number
+  username?: string
+  message_key: string
+  params?: Record<string, unknown>
+}
+
 export interface OrgImportResult {
   assigned: number
   created: number
@@ -110,7 +123,9 @@ export interface OrgImportResult {
   updated_usernames: string[]
   removed: number
   removed_usernames: string[]
+  /** English text of each rejected row; `error_details` is the translatable form. */
   errors: string[]
+  error_details?: OrgImportRowError[]
 }
 
 export type OrganizationDashboardRangePreset = 'today' | '7d' | '30d' | 'custom'

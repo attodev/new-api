@@ -54,6 +54,7 @@ const PRINTF = /%(?:\d+\$)?[sdfiu](?![A-Za-z])/g
 const MANUAL_SKIP = new Set([
   '_copy',
   '{{operation}} (ID: {{id}})',
+  '{{error}}',
   '{{value}}ms',
   '，and ',
   '(ID: {{id}})',

@@ -43,8 +43,9 @@ var forkMessageConstants = []string{
 }
 
 // A message key is the first argument of NewMessage or the key of ApiErrorT /
-// ApiSuccessT, written as one Go string literal.
-var forkMessageKeyPattern = regexp.MustCompile(`(?:NewMessage\(|Api(?:Error|Success)T\(c, )("(?:[^"\\]|\\.)*")`)
+// ApiSuccessT, or the third argument of an import result's addRowError (after
+// the line and the username), written as one Go string literal.
+var forkMessageKeyPattern = regexp.MustCompile(`(?:NewMessage\(|Api(?:Error|Success)T\(c, |addRowError\([^,]+, [^,]+, )("(?:[^"\\]|\\.)*")`)
 
 // Every web console message of the fork files is a key of the web console's
 // English locale, so the console can translate it (message_key + params).
