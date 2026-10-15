@@ -163,10 +163,6 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
           <Label>
             {t('Amount')} ({currencyLabel})
           </Label>
-          {!tokensOnly && (
-            <UserQuotaQuickAmounts onPick={(v) => setAmount(String(v))} />
-          )}
-          {/* fork: O11 */}
           <Input
             type='number'
             step={tokensOnly ? 1 : 0.000001}
@@ -178,6 +174,10 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
               if (e.key === 'Enter') handleConfirm()
             }}
           />
+          {/* fork: O11 */}
+          {!tokensOnly && (
+            <UserQuotaQuickAmounts onPick={(v) => setAmount(String(v))} />
+          )}
         </div>
       </div>
     </Dialog>

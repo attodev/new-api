@@ -37,6 +37,7 @@ const STORE_QUOTA = 1_000_000
 const SERVER_QUOTA = 5_000_000
 let client: QueryClient
 let selfResponse: { success: boolean; data?: Record<string, unknown> }
+let selfError: Error | null = null
 
 beforeEach(() => {
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
@@ -48,6 +49,7 @@ beforeEach(() => {
     used_quota: 1000,
     request_count: 1,
   })
+  selfError = null
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   selfResponse = {
     success: true,
@@ -63,6 +65,7 @@ beforeEach(() => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     switch (url) {
       case '/api/user/self':
+        if (selfError) throw selfError
         return { data: selfResponse }
       case '/api/data/self':
         return { data: { success: true, data: [] } }
@@ -115,6 +118,21 @@ describe('summary cards balance', () => {
     await vi.waitFor(() =>
       expect(api.get).toHaveBeenCalledWith('/api/user/self', expect.anything())
     )
+    expect(
+      screen.queryByText(formatQuota(SERVER_QUOTA))
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps showing the store balance when the server fetch rejects', async () => {
+    selfError = new Error('Network Error')
+    await renderCards()
+
+    await vi.waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('/api/user/self', expect.anything())
+    )
+    expect(
+      (await screen.findAllByText(formatQuota(STORE_QUOTA))).length
+    ).toBeGreaterThan(0)
     expect(
       screen.queryByText(formatQuota(SERVER_QUOTA))
     ).not.toBeInTheDocument()

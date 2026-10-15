@@ -149,7 +149,7 @@ describe('ClearPaymentCredentialsButton', () => {
     expect(toast.success).not.toHaveBeenCalled()
   })
 
-  it('keeps form values and shows no success toast when a save fails', async () => {
+  it('keeps the unsaved form values and shows no success toast when a save fails', async () => {
     mutateAsync
       .mockResolvedValueOnce({ success: true })
       .mockRejectedValueOnce(new Error('boom'))
@@ -164,8 +164,14 @@ describe('ClearPaymentCredentialsButton', () => {
     )
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2))
-    expect(formRef.getValues('StripeApiSecret')).toBe('sk_live_x')
-    expect(initialRef.current.StripeApiSecret).toBe('sk_live_x')
+    // the first key was saved, so form and baseline follow the server
+    expect(formRef.getValues('StripeApiSecret')).toBe('')
+    expect(initialRef.current.StripeApiSecret).toBe('')
+    // the failed key and the one after it are untouched
+    expect(formRef.getValues('StripeWebhookSecret')).toBe('whsec_x')
+    expect(initialRef.current.StripeWebhookSecret).toBe('whsec_x')
+    expect(formRef.getValues('StripePriceId')).toBe('price_x')
+    expect(initialRef.current.StripePriceId).toBe('price_x')
     expect(toast.success).not.toHaveBeenCalled()
   })
 })

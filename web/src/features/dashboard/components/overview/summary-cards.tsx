@@ -140,14 +140,13 @@ const HEALTH_CONFIG: Record<
 
 export function SummaryCards() {
   const { t } = useTranslation()
-  const user = useAuthStore((state) => state.auth.user)
+  const user = useLiveSelf(useAuthStore((state) => state.auth.user)) // fork: O11 (team 490d215a4)
   const { status, loading } = useStatus()
 
   const summaryTimeRange = useMemo(() => computeTimeRange(1), [])
-  const liveUser = useLiveSelf(user) // fork: O11 (team 490d215a4)
-  const remainQuota = Number(liveUser?.quota ?? 0)
-  const usedQuota = Number(liveUser?.used_quota ?? 0)
-  const requestCount = Number(liveUser?.request_count ?? 0)
+  const remainQuota = Number(user?.quota ?? 0)
+  const usedQuota = Number(user?.used_quota ?? 0)
+  const requestCount = Number(user?.request_count ?? 0)
 
   const usageTrendQuery = useQuery({
     queryKey: [

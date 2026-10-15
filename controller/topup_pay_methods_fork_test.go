@@ -120,3 +120,20 @@ func TestGetTopUpInfoPayMethodsShowsConfiguredEpay(t *testing.T) {
 	useEpayTestState(t, true, true)
 	require.Contains(t, getTopUpInfoPayMethodTypes(t), "alipay")
 }
+
+func TestGetTopUpInfoDoesNotMutateSharedPayMethods(t *testing.T) {
+	useEpayTestState(t, true, true)
+	// Spare capacity makes a stray append write into the shared backing array.
+	shared := make([]map[string]string, 1, 4)
+	shared[0] = map[string]string{"type": "alipay", "name": "Alipay"}
+	operation_setting.PayMethods = shared
+
+	setting.StripeApiSecret = "sk_test"
+	setting.StripeWebhookSecret = "whsec_test"
+	setting.StripePriceId = "price_test"
+	require.Contains(t, getTopUpInfoPayMethodTypes(t), "stripe")
+
+	require.Len(t, operation_setting.PayMethods, 1)
+	require.Equal(t, "alipay", operation_setting.PayMethods[0]["type"])
+	require.Nil(t, shared[:2][1], "append must not write into the shared backing array")
+}

@@ -1,6 +1,10 @@
 package controller
 
-import "github.com/QuantumNous/new-api/setting/operation_setting"
+import (
+	"slices"
+
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+)
 
 // fork: O11 — operation_setting.PayMethods carries hard-coded defaults
 // (Alipay/WeChat). Expose them only when the Epay gateway is actually
@@ -8,7 +12,8 @@ import "github.com/QuantumNous/new-api/setting/operation_setting"
 // (team 203690366).
 func visibleEpayPayMethods(complianceConfirmed bool) []map[string]string {
 	if complianceConfirmed && isEpayTopUpEnabled() {
-		return operation_setting.PayMethods
+		// Clone so GetTopUpInfo's appends never write into the shared backing array.
+		return slices.Clone(operation_setting.PayMethods)
 	}
 	return []map[string]string{}
 }

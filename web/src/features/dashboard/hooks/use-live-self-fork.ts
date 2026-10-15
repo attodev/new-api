@@ -23,7 +23,7 @@ import type { AuthUser } from '@/stores/auth-store'
 
 /**
  * Current user from the server, falling back to `fallback` (the login-time
- * snapshot in the auth store) until the fetch lands or when it fails.
+ * snapshot in the auth store) until the fetch lands or when it fails (errors are swallowed, no toast).
  *
  * The auth store is only written at login, so balance and usage read straight
  * from it go stale. staleTime 0 re-fetches on every mount.
@@ -33,10 +33,16 @@ export function useLiveSelf(fallback: AuthUser | null | undefined) {
   const selfQuery = useQuery({
     queryKey: ['user', 'self'],
     queryFn: async () => {
-      const result = await getSelf()
-      return result.success && result.data ? (result.data as AuthUser) : null
+      // A failed refresh must not break the page: fall back to the store value.
+      try {
+        const result = await getSelf()
+        return result.success && result.data ? (result.data as AuthUser) : null
+      } catch {
+        return null
+      }
     },
     staleTime: 0,
+    meta: { errorToast: false },
   })
 
   return selfQuery.data ?? fallback

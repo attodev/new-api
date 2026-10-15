@@ -58,11 +58,10 @@ export function ClearPaymentCredentialsButton(
   const handleConfirm = async () => {
     setClearing(true)
     try {
-      const keys = PROVIDER_KEYS[provider]
-      for (const key of keys) {
+      for (const key of PROVIDER_KEYS[provider]) {
         await updateOption.mutateAsync({ key, value: '' })
-      }
-      for (const key of keys) {
+        // Sync per key so a mid-sequence failure leaves the form matching the
+        // server for the keys that were already cleared.
         form.setValue(key, '')
         initialRef.current[key] = ''
       }
