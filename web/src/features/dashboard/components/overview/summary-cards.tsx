@@ -26,6 +26,7 @@ import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { useSummaryCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
+import { useLiveSelf } from '@/features/dashboard/hooks/use-live-self-fork' // fork: O11
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { useStatus } from '@/hooks/use-status'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
@@ -143,9 +144,10 @@ export function SummaryCards() {
   const { status, loading } = useStatus()
 
   const summaryTimeRange = useMemo(() => computeTimeRange(1), [])
-  const remainQuota = Number(user?.quota ?? 0)
-  const usedQuota = Number(user?.used_quota ?? 0)
-  const requestCount = Number(user?.request_count ?? 0)
+  const liveUser = useLiveSelf(user) // fork: O11 (team 490d215a4)
+  const remainQuota = Number(liveUser?.quota ?? 0)
+  const usedQuota = Number(liveUser?.used_quota ?? 0)
+  const requestCount = Number(liveUser?.request_count ?? 0)
 
   const usageTrendQuery = useQuery({
     queryKey: [
