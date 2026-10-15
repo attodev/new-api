@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,4 +140,64 @@ func TestUserCacheRepairKeepsListedUserWhenRedisStillDown(t *testing.T) {
 	_, listed = userCacheRepairIDs[88]
 	userCacheRepairMu.Unlock()
 	require.False(t, listed)
+}
+
+func TestUserCacheRepairRechecksPendingAfterDelete(t *testing.T) {
+	truncateTables(t)
+	resetUserCacheRepairForTest(t)
+	server := useUserCacheMiniRedis(t)
+	withQuotaCacheTTL(t, 3600)
+	enableBatchForResidencyTest(t)
+	user := insertUserForPaymentGuardTest(t, 9703, 1000)
+	_, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	_ = noteUserCacheSyncFailure(user.Id, errors.New("boom"))
+
+	userCacheRepairAfterDelete = func(id int) { addNewRecord(BatchUpdateTypeUserQuota, id, -100) }
+	t.Cleanup(func() { userCacheRepairAfterDelete = nil })
+	repairUserCaches()
+	userCacheRepairAfterDelete = nil
+	require.False(t, server.Exists(getUserCacheKey(user.Id)))
+	require.True(t, userCacheRepairListed(user.Id), "delta slipped in after the check: listed again")
+
+	batchUpdate()
+	repairUserCaches()
+	require.False(t, userCacheRepairListed(user.Id))
+}
+
+func TestUserCacheRepairRedisDownRequeuesRemainingOnce(t *testing.T) {
+	resetUserCacheRepairForTest(t)
+	server := useUserCacheMiniRedis(t)
+	for _, id := range []int{41, 42, 43} {
+		_ = noteUserCacheSyncFailure(id, errors.New("boom"))
+	}
+	server.SetError("simulated outage")
+	repairUserCaches()
+	server.SetError("")
+	for _, id := range []int{41, 42, 43} {
+		require.True(t, userCacheRepairListed(id), "id %d stays listed", id)
+	}
+	repairUserCaches()
+	for _, id := range []int{41, 42, 43} {
+		require.False(t, userCacheRepairListed(id))
+	}
+}
+
+func TestFlushBatchUpdatesRunsRepairWithBatchOff(t *testing.T) {
+	truncateTables(t)
+	resetUserCacheRepairForTest(t)
+	server := useUserCacheMiniRedis(t)
+	withQuotaCacheTTL(t, 3600)
+	user := insertUserForPaymentGuardTest(t, 9704, 1000)
+	_, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.True(t, server.Exists(getUserCacheKey(user.Id)))
+	_ = noteUserCacheSyncFailure(user.Id, errors.New("boom"))
+
+	prev := common.BatchUpdateEnabled
+	common.BatchUpdateEnabled = false
+	t.Cleanup(func() { common.BatchUpdateEnabled = prev })
+	FlushBatchUpdates()
+	require.False(t, server.Exists(getUserCacheKey(user.Id)), "repair pass ran on shutdown")
+	require.False(t, userCacheRepairListed(user.Id))
 }

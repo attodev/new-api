@@ -37,10 +37,18 @@ func batchStoresEmpty() bool {
 // FlushBatchUpdates writes the queued deltas. batchUpdate waits for any batch that is
 // already running; rows re-queued by a failed write or enqueued meanwhile (e.g. by
 // post-response goroutines) get further passes, up to flushBatchUpdatesMaxPasses.
+// Afterwards it runs one cache repair pass (O12 §4.12-3), also when batch mode is off,
+// because the repair list is in-process and would otherwise be lost on shutdown.
 func FlushBatchUpdates() {
-	if !common.BatchUpdateEnabled {
-		return
+	if common.BatchUpdateEnabled {
+		flushBatchQueue()
 	}
+	if common.RedisEnabled {
+		repairUserCaches()
+	}
+}
+
+func flushBatchQueue() {
 	common.SysLog(common.LogText("flushing batch updates before shutdown"))
 	passes := 0
 	for passes < flushBatchUpdatesMaxPasses {

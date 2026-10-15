@@ -53,15 +53,32 @@ func repairUserCaches() {
 	repairUserCachesFor(takeUserCacheRepairIDs())
 }
 
+// userCacheRepairAfterDelete is a test seam invoked right after a successful delete (nil in production).
+var userCacheRepairAfterDelete func(id int)
+
+// repairUserCachesFor deletes each id's hash unless a batch delta is pending. On the
+// first delete error (Redis still down) it puts the failed and all untried ids back,
+// logs one line and ends the pass.
 func repairUserCachesFor(ids []int) {
-	for _, id := range ids {
+	for i, id := range ids {
 		if userQuotaBatchPending(id) {
 			requeueUserCacheRepair(id)
 			continue
 		}
 		if err := invalidateUserCache(id); err != nil {
+			for _, rest := range ids[i:] {
+				requeueUserCacheRepair(rest)
+			}
+			common.SysLog(common.LogText("user cache repair deferred for %d user(s): %s", len(ids)-i, err.Error()))
+			return
+		}
+		if hook := userCacheRepairAfterDelete; hook != nil {
+			hook(id)
+		}
+		// A reserve may have slipped in between the pending check and the delete and
+		// queued a delta against the hash we just removed; delete again after the flush.
+		if userQuotaBatchPending(id) {
 			requeueUserCacheRepair(id)
-			common.SysLog(common.LogText("user cache repair for %d deferred: %s", id, err.Error()))
 		}
 	}
 }
