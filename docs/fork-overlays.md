@@ -21,9 +21,9 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O2 PayPal | model/topup.go:491 | `ManualCompleteTopUp` Stripe 조건에 `PaymentProviderPayPal` OR 추가 | model/topup_paypal.go |
 | O2 PayPal | model/option.go:103-109 | InitOptionMap `PayPal*` OptionMap 6줄 | setting/payment_paypal.go |
 | O2 PayPal | model/option.go:541-553 | updateOptionMap `case "PayPal*":` 6개 | setting/payment_paypal.go |
-| O2 PayPal | controller/topup.go:78 | `payMethods = appendPayPalPayMethod(payMethods)` | controller/payment_availability_paypal.go |
-| O2 PayPal | controller/topup.go:105 | data map `"enable_paypal_topup"` | controller/payment_availability_paypal.go |
-| O2 PayPal | controller/topup.go:122 | data map `"paypal_min_topup"` | controller/payment_availability_paypal.go |
+| O2 PayPal | controller/topup.go:75 | `payMethods = appendPayPalPayMethod(payMethods)` | controller/payment_availability_paypal.go |
+| O2 PayPal | controller/topup.go:102 | data map `"enable_paypal_topup"` | controller/payment_availability_paypal.go |
+| O2 PayPal | controller/topup.go:119 | data map `"paypal_min_topup"` | controller/payment_availability_paypal.go |
 | O2 PayPal | router/access_token_scope_test.go | exempt 목록에 `"GET /api/paypal/capture"`, `"POST /api/paypal/webhook"` 2줄 | router/fork-router.go, controller/topup_paypal.go |
 | O2 PayPal | middleware/access_token_routes.go (레지스트리) | 없음 — `POST /api/user/paypal/pay`(wallet:write), `POST /api/user/paypal/amount`(wallet:read)를 fork 레지스트리에 선언 | middleware/fork_access_token_routes.go |
 | O1 랜딩·가이드 | router/web-router.go:20-22 | 빈 줄 + `WebAssets.LandingPublicFS` / `LandingTemplatesFS` 필드 (`fs.FS`, `io/fs` import) | router/landing-router.go, web/landing/{templates,public} |
@@ -109,8 +109,8 @@ upstream(QuantumNous/new-api)과 동기화할 때 충돌이 나는 파일은 이
 | O3 조직 라우트 | router/access_token_scope_test.go:83-89 | `accessTokenHelperRoutes`에 `// fork: O3` 주석 + `/api/organizations/` 4줄, 빈 줄 + 충전 주문 만료 1줄(89, 빈 줄로 gofmt 정렬 분리) (handlePermissionRoute 자동 선언: organization:read/write) | router/organization-router.go, service/authz/resources_organization.go |
 | O3 조직 라우트 | middleware/access_token_routes.go (레지스트리) | 없음 — `/api/organization/*` 34개를 fork 레지스트리에 선언(session 전용 20개; `wallet`·`topup/self`와 `.../amount` 5개, 합계 7개는 wallet:read, `.../pay` 6개는 wallet:write, `subscription/self`는 profile:read) | middleware/fork_access_token_routes.go |
 | O3 조직 권한 | service/authz/authz_test.go:161-162, 195-196 | `TestSetUserPermissionsStoresOnlyOverrides` 기대 맵 2곳에 빈 줄 + `ResourceOrganization: {ActionRead: false, ActionWrite: false}` (등록된 리소스 전체를 열거하는 테스트; 빈 줄로 gofmt 정렬 분리) | service/authz/resources_organization.go |
-| O3 조직 충전 | controller/topup.go:266, 278 | `rejectInvalidCreditedQuota`·`rejectInvalidTopUpQuota`의 `model.ValidateTopUpQuotaCapacity(userId, …)` → `validateTopUpTargetCapacity(c, userId, …)` (조직 주문은 조직 지갑 상한으로 검사하고 비활성 조직은 거부; 개인 주문은 조직 회원이면 거부 — 모든 pay/amount 흐름이 지나는 단일 지점) | controller/topup_target.go, model/topup_target.go, model/organization_personal_wallet.go |
-| O3 조직 충전 | controller/topup.go:351-352 | `RequestEpay` `&model.TopUp{`에 `TargetType: getTopUpTargetType(c)`, `TargetId: getTopUpTargetId(c)` 2줄 | controller/topup_target.go |
+| O3 조직 충전 | controller/topup.go:263, 275 | `rejectInvalidCreditedQuota`·`rejectInvalidTopUpQuota`의 `model.ValidateTopUpQuotaCapacity(userId, …)` → `validateTopUpTargetCapacity(c, userId, …)` (조직 주문은 조직 지갑 상한으로 검사하고 비활성 조직은 거부; 개인 주문은 조직 회원이면 거부 — 모든 pay/amount 흐름이 지나는 단일 지점) | controller/topup_target.go, model/topup_target.go, model/organization_personal_wallet.go |
+| O3 조직 충전 | controller/topup.go:348-349 | `RequestEpay` `&model.TopUp{`에 `TargetType: getTopUpTargetType(c)`, `TargetId: getTopUpTargetId(c)` 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_stripe.go:121-122 | Stripe `RequestPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_creem.go:119-120 | Creem `RequestPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
 | O3 조직 충전 | controller/topup_waffo.go:226-227 | `RequestWaffoPay` `&model.TopUp{`에 같은 2줄 | controller/topup_target.go |
@@ -275,6 +275,8 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 | O11 채널 테스트 이미지 Stream | controller/channel-test.go:721 | `buildTestRequest`의 이미지 생성 분기 `dto.ImageRequest` 리터럴에 `Stream: lo.ToPtr(isStream), // fork: O11` 한 줄 — team ecc9c511d | controller/channel_test_image_stream_fork_test.go |
 | O11 토큰 코덱 예열 | main.go:174 | `model.StartUserCacheSyncRepair()` 다음 줄 `go tokenkit.Warm() // fork: O11` (o200k·cl100k 코덱을 시작 때 만들어 첫 GPT 요청의 지연을 없앰) — team 338576ab2 | tokenkit/warm_fork.go, tokenkit/warm_fork_test.go |
 | O11 토큰 코덱 예열 (import) | main.go:36 | import 블록에 `"github.com/QuantumNous/new-api/tokenkit" // fork: O11` 한 줄 (이 줄 때문에 아래 main.go 행 번호가 +1 밀렸다) | — |
+| O11 Epay 미설정 결제 수단 숨김 | controller/topup.go:30 | `GetTopUpInfo`의 `payMethods := operation_setting.PayMethods` + compliance 미확인 시 빈 슬라이스로 바꾸는 4줄 블록을 `payMethods := visibleEpayPayMethods(complianceConfirmed) // fork: O11` 한 줄로 (compliance 확인이고 `isEpayTopUpEnabled()`일 때만 하드코딩 기본 Alipay/WeChat `PayMethods`를 노출하고, 아니면 빈 슬라이스. Stripe 등 다른 결제 수단 추가는 그대로. 이 변경으로 이 파일의 아래 행 번호가 -3 밀렸다) — team 203690366 | controller/topup_pay_methods_fork.go, controller/topup_pay_methods_fork_test.go |
+| O11 rate-limit 설정값 보정 | middleware/rate-limit.go:149 | `rateLimitFactory` 본문 첫 줄에 `maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration) // fork: O11` (요청 수 0 이하는 1로, 기간 0 이하는 1초로, 기간이 키 만료(`RateLimitKeyExpirationDuration`, 20분)를 넘으면 그 값으로. 잘못된 설정이 모두를 막거나 키 만료보다 긴 창을 만드는 일을 막는다. 경고는 값 없는 고정 문구로 한 번만 남긴다) — team 2c619a31e | middleware/rate_limit_normalize_fork.go, middleware/rate_limit_normalize_fork_test.go |
 
 ## O12 잔액 캐시 상주·Sentinel
 

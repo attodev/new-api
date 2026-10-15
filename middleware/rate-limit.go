@@ -146,6 +146,7 @@ func writeRateLimited(c *gin.Context, retryAfterSeconds int64) {
 }
 
 func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	maxRequestNum, duration = normalizeRateLimitParameters(maxRequestNum, duration) // fork: O11
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			redisRateLimiter(c, maxRequestNum, duration, mark)
