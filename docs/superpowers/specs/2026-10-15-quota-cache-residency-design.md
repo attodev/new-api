@@ -156,10 +156,19 @@ develop의 `batchUpdate`(`model/utils.go`)는 배치를 시작할 때 큐를 통
 잔액이 최대 24시간 Redis에만 있는 구조이므로, Redis 운영 구성이 §6의 손실 폭을 정한다. 운영은 직접 관리하는 Redis다(ElastiCache 아님).
 
 - **연결:** new-api는 `REDIS_CONN_STRING` 주소 하나에만 붙는 단일 노드 클라이언트다(`common/redis.go`). Sentinel 직접 연결과 클러스터 모드는 지원하지 않는다. 클러스터는 upstream 인증 fence가 사용자 해시·fence 키·버전 키를 한 Lua 스크립트와 `MGET`으로 함께 다루므로(서로 다른 슬롯) 키 이름을 바꾸기 전에는 불가능하다. 메모리가 §7 수준이라 샤딩이 필요하지도 않다.
-- **HA:** 장애 조치는 앱 바깥에서 투명하게 일어나야 한다(Sentinel 승격 + HAProxy/keepalived VIP, 또는 DNS 전환). Sentinel 직접 연결이 필요하면 `common/redis.go`의 클라이언트 생성 한 곳을 go-redis failover 클라이언트로 바꾸는 별도 작은 작업으로 한다(이 설계의 범위 밖). 복제는 비동기이므로 장애 조치 순간 마지막 몇 ms의 쓰기가 빠질 수 있다.
+- **HA:** Sentinel로 자동 장애 조치를 하고, 앱이 Sentinel에 직접 붙는다(§4.14). 복제는 비동기이므로 장애 조치 순간 마지막 몇 ms의 쓰기가 빠질 수 있다. 클러스터 모드는 쓰지 않는다. 샤딩이 필요 없고, 다중 키 명령 때문에 upstream 키 이름을 바꿔야 하며, 병합 때마다 새 다중 키 명령을 확인해야 하는 비용이 계속 들기 때문이다.
 - **영속성:** `appendonly yes`, `appendfsync everysec`을 권장한다. 재시작 때 해시가 남아 손실이 마지막 1초 분량으로 줄어든다. 영속성이 없으면 재시작 때 모든 활성 사용자가 DB에서 다시 읽히며, 각 노드의 배치 대기분(10초 안팎)만큼 초과 사용이 가능하다.
 - **메모리:** `maxmemory`를 §7 추정의 수십 배로 넉넉히 잡는다. 메모리가 차면 `noeviction`은 쓰기 실패(앱이 DB로 우회 차감, 캐시는 그대로 남아 초과 사용 방향), eviction 정책은 해시 삭제(§6 첫 항목)로 이어진다. 다른 용도와 Redis를 같이 쓰면 new-api 전용 인스턴스나 DB 번호를 분리한다.
 - **감시:** `evicted_keys` = 0, `rdb_last_bgsave_status`·`aof_last_write_status` = ok, 장애 조치 횟수, 앱 로그의 "falling back to database" 빈도.
+
+### 4.14 Sentinel 직접 연결
+
+`common/redis.go`의 클라이언트 생성 한 곳(`redis.NewClient(opt)`)을 fork 함수로 바꾼다. Sentinel 설정이 있으면 go-redis의 failover 클라이언트(`redis.NewFailoverClient`)를, 없으면 지금처럼 단일 노드 클라이언트를 만든다. 반환 타입은 둘 다 `*redis.Client`라 `common.RDB`와 나머지 코드는 바뀌지 않는다.
+
+- 환경 변수: `REDIS_SENTINEL_ADDRS`(쉼표로 구분한 `host:port` 목록, 비어 있으면 단일 노드), `REDIS_SENTINEL_MASTER_NAME`(기본 `mymaster`), `REDIS_SENTINEL_PASSWORD`(Sentinel 자체의 비밀번호, 선택).
+- `REDIS_CONN_STRING`은 그대로 필수다. Redis 사용 여부의 스위치이고, master에 붙을 사용자 이름·비밀번호·DB 번호를 여기서 가져온다. 호스트 부분은 Sentinel 모드에서 무시하며 시작 로그에 그 사실을 남긴다.
+- 장애 조치 중 연결 오류는 지금의 Redis 오류 처리(DB 우회 차감, §4.12의 캐시 반영 실패 목록)로 흡수된다.
+- 테스트: 옵션을 만드는 순수 함수의 단위 테스트, 그리고 `REDIS_SENTINEL_TEST_ADDRS`가 있을 때만 도는 실제 Sentinel 연결 테스트. 로컬 재현용 Sentinel docker-compose를 `scripts/redis-sentinel/`에 둔다(이 Mac에는 Docker가 없어 운영자 작업).
 
 ## 5. 잔액 쓰기 경로 점검
 
