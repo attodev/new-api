@@ -615,6 +615,10 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 		return common.NewMessage("Invitation quota is insufficient!")
 	}
 
+	if err := checkAffTransferCeiling(user.Quota, quota); err != nil { // fork: O11
+		return err
+	}
+
 	// 更新用户额度
 	user.AffQuota -= quota
 	user.Quota += quota
