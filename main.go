@@ -33,6 +33,7 @@ import (
 	"github.com/QuantumNous/new-api/service/authz"
 	_ "github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/tokenkit" // fork: O11
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -170,6 +171,7 @@ func main() {
 		model.InitBatchUpdater()
 	}
 	model.StartUserCacheSyncRepair() // fork: O12
+	go tokenkit.Warm()               // fork: O11
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		gopool.Go(func() {
