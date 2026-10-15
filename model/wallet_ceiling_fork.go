@@ -22,7 +22,8 @@ func creditCheckinReward(tx *gorm.DB, userId, quota int) error {
 		return nil
 	}
 	if err := creditTopUpQuota(tx, userId, quota, nil); err != nil {
-		if errors.Is(err, ErrTopUpQuotaLimitExceeded) {
+		// ErrInvalidTopUpQuota: the reward alone exceeds the wallet ceiling.
+		if errors.Is(err, ErrTopUpQuotaLimitExceeded) || errors.Is(err, ErrInvalidTopUpQuota) {
 			return ErrCheckinWalletLimit
 		}
 		return errCheckinQuotaUpdate

@@ -95,6 +95,24 @@ func TestUserCheckinWithTransactionAtWalletCeilingRollsBack(t *testing.T) {
 	requireUserQuota(t, user.Id, common.MaxWalletQuota)
 }
 
+// A reward larger than the whole wallet ceiling is rejected as the wallet
+// limit (creditTopUpQuota reports it as an invalid top-up quota).
+func TestUserCheckinRewardAboveCeilingIsReportedAsWalletLimit(t *testing.T) {
+	truncateTables(t)
+	disableUserQuotaBatchForWalletCeilingTest(t)
+	user := insertUserForPaymentGuardTest(t, 806, 5)
+
+	checkin := &Checkin{UserId: user.Id, CheckinDate: "2026-10-15", QuotaAwarded: common.MaxWalletQuota + 1, CreatedAt: common.GetTimestamp()}
+	result, err := userCheckinWithTransaction(checkin, user.Id, common.MaxWalletQuota+1)
+	require.Nil(t, result)
+	require.ErrorIs(t, err, ErrCheckinWalletLimit)
+	requireUserQuota(t, user.Id, 5)
+
+	var count int64
+	require.NoError(t, DB.Model(&Checkin{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	require.Zero(t, count)
+}
+
 func TestUserCheckinZeroRewardStillRecords(t *testing.T) {
 	truncateTables(t)
 	disableUserQuotaBatchForWalletCeilingTest(t)
