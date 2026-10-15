@@ -31,6 +31,7 @@ import {
   PricingToolbar,
   ModelCardGrid,
 } from './components'
+import { PricingPromoNotice } from './components/pricing-promo-notice-fork' // fork: O11
 import { EXCLUDED_GROUPS, VIEW_MODES } from './constants'
 import { useFilters } from './hooks/use-filters'
 import { usePricingData } from './hooks/use-pricing-data'
@@ -169,6 +170,8 @@ export function Pricing() {
                 'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
               )}
             </p>
+            {/* fork: O11 (team d5e459993) */}
+            <PricingPromoNotice />
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}
