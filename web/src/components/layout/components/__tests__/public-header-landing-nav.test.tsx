@@ -36,8 +36,9 @@ import { PublicHeader } from '../public-header'
 import { SystemBrand } from '../system-brand'
 import { TopNav } from '../top-nav'
 
-// fork: O11 - the logo and the Home link must leave the SPA for the
-// server-rendered landing page (full page load) instead of a router Link.
+// fork: O11 - the public header logo and the Home link must leave the SPA for
+// the server-rendered landing page (full page load) instead of a router Link;
+// the signed-in SystemBrand logo stays a router Link to /dashboard.
 
 function Page() {
   return <PublicHeader showNotifications={false} />
@@ -140,21 +141,43 @@ describe('forceReload nav links outside the public header', () => {
 })
 
 describe('SystemBrand inline variant', () => {
-  it('links to the landing page with a plain same-tab anchor', () => {
+  // Mounted only in the signed-in layout: the logo stays inside the SPA.
+  it('links to the dashboard through the router', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({
       data: { success: true, data: {} },
     })
+    const root = createRootRoute({
+      component: () => <SystemBrand variant='inline' />,
+    })
+    const index = createRoute({
+      getParentRoute: () => root,
+      path: '/',
+      component: () => null,
+    })
+    const dashboard = createRoute({
+      getParentRoute: () => root,
+      path: '/dashboard',
+      component: () => null,
+    })
+    const router = createRouter({
+      routeTree: root.addChildren([index, dashboard]),
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    })
+    await router.load()
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
     render(
       <QueryClientProvider client={client}>
-        <SystemBrand variant='inline' />
+        <RouterProvider router={router} />
       </QueryClientProvider>
     )
-    const link = screen.getByRole('link', { name: 'Go to home' })
-    expect(link.getAttribute('href')).toBe('/')
-    expect(link.hasAttribute('data-status')).toBe(false)
+    const link = await screen.findByRole('link', { name: 'Go to home' })
+    expect(link.getAttribute('href')).toBe('/dashboard')
     expect(link.hasAttribute('target')).toBe(false)
+    await userEvent.click(link)
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/dashboard')
+    )
   })
 })

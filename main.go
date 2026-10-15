@@ -209,6 +209,7 @@ func main() {
 	middleware.SetUpLogger(server)
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()
+	InjectChatbotWidget() // fork: O11
 
 	// 设置路由
 	router.SetRouter(server, router.WebAssets{

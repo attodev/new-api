@@ -42,7 +42,7 @@
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
 | 203690366 | Epay가 설정되지 않으면 기본 Alipay/WeChat 결제 수단을 숨김 | `controller/topup.go:30 GetTopUpInfo`가 compliance만 보고 `PayMethods`를 그대로 노출 | 옮김 → develop d1ee2f430 |
-| 3f6ab2e33(일부) | `ComplianceConfirmed` 기본값 true | develop 기본값 false → 새 설치는 관리자가 확인하기 전까지 결제 수단이 안 보임 | 옮김 → develop a11f954be (fork `init()` 기본값; DB 저장값이 이기므로 기존 운영 DB는 그대로) |
+| 3f6ab2e33(일부) | `ComplianceConfirmed` 기본값 true | develop 기본값 false → 확인값이 저장되지 않은 설치는 관리자가 확인하기 전까지 결제 수단이 안 보임 | 옮김 → develop 1be1f3e2a (fork `init()` 기본값; 저장된 값이 있으면 그 값이 이긴다. stored compliance rows가 없는 모든 설치는 확인 없이 결제 수단이 보인다. upstream이 `CurrentComplianceTermsVersion`을 올리면 그런 설치는 자동 수용되므로 그때 다시 결정; `billing/index.tsx:75`의 'v1' 하드코딩도 같이 볼 것) |
 | 23d10ffb4 | 결제 설정의 Stripe/PayPal 자격 증명 "지우기" 버튼(확인 대화상자) | `payment-settings-section.tsx`에 없음 | 옮김 → develop 5c6f345f9 |
 
 ### 3.3 동작·안정성 (작은 수정)
@@ -60,14 +60,14 @@
 
 | team 커밋 | 내용 | develop 상태 | 권장 |
 |---|---|---|---|
-| a05006778, 4e787397f | 로고·Home 링크가 서버 렌더 랜딩으로 전체 새로고침(`forceReload`), 로그인 시 `/dashboard/overview` | SPA Home 페이지로 클라이언트 이동 | 옮김 → develop 6c4d05794, 7edcd6abd (Home 링크와 로그아웃 상태 로고가 전체 새로고침으로 서버 렌더 랜딩에 감; 로그인 상태 로고는 라우터로 `/dashboard`) |
-| 9b4ee5213, a3e606bc9 | 대시보드 "빠른 시작 가이드(PDF)" 다운로드(ko/en PDF) | 없음 | 옮김 → develop 2b3b8818c ("Create API Key" 버튼은 그대로 두고 옆에 링크 추가; PDF 두 개는 바이너리로 추가 — 내용이 upstream 새 UI와 맞는지는 운영자가 확인) |
-| 3757c8244(일부) | SPA `index.html`의 챗봇 위젯 스크립트(`chatbot.alrouter.ai`) | 랜딩에만 있고 SPA에는 없음 | 옮김 → develop bb570b8c8, 6e98af596 (`#root` 뒤에 둬 첫 렌더를 막지 않음; CSP 없음) |
-| d5e459993, 330d46466 | SPA 가격 페이지의 프로모션 안내문(`Alert` variant `notice`) | 랜딩 팝업에만 있음 | 옮김 → develop 9d90031b4 |
-| 7daa397a1(일부) | 가입 화면 "계약 도메인만 가입 가능" 안내(ShieldCheck), 사용 로그 열 이름 "토큰 (입력/출력)" | 없음 | 옮김 → develop 9fe84570a, 7b3a0e596 (가입 안내는 이메일 도메인 화이트리스트가 켜져 있을 때만 표시; 열 이름은 "토큰 (입력/출력)") |
+| a05006778, 4e787397f | 로고·Home 링크가 서버 렌더 랜딩으로 전체 새로고침(`forceReload`), 로그인 시 `/dashboard/overview` | SPA Home 페이지로 클라이언트 이동 | 옮김 → develop 502d5d840, 502d5d840 (Home 링크와 로그아웃 상태 로고가 전체 새로고침으로 서버 렌더 랜딩에 감; 로그인 상태 로고는 라우터로 `/dashboard`) |
+| 9b4ee5213, a3e606bc9 | 대시보드 "빠른 시작 가이드(PDF)" 다운로드(ko/en PDF) | 없음 | 옮김 → develop c5eb94e70 ("Create API Key" 버튼은 그대로 두고 옆에 링크 추가; PDF 두 개는 바이너리로 추가 — 내용이 upstream 새 UI와 맞는지는 운영자가 확인) |
+| 3757c8244(일부) | SPA `index.html`의 챗봇 위젯 스크립트(`chatbot.alrouter.ai`) | 랜딩에만 있고 SPA에는 없음 | 옮김 → develop 340a8d71e, 340a8d71e, 이후 환경 변수 게이트로 수정 (`index.html`에는 `#root` 뒤 자리표시자만 두고, Go가 `CHATBOT_WIDGET_URL`이 있을 때만 `defer` 스크립트를 주입; 운영 값 `https://chatbot.alrouter.ai`; CSP 없음; 랜딩 템플릿의 고정 스크립트는 그대로) |
+| d5e459993, 330d46466 | SPA 가격 페이지의 프로모션 안내문(`Alert` variant `notice`) | 랜딩 팝업에만 있음 | 옮김 → develop c056694d2 |
+| 7daa397a1(일부) | 가입 화면 "계약 도메인만 가입 가능" 안내(ShieldCheck), 사용 로그 열 이름 "토큰 (입력/출력)" | 없음 | 옮김 → develop b8c8c30d7, b8c8c30d7 (가입 안내는 이메일 도메인 화이트리스트가 켜져 있을 때만 표시; 열 이름은 "토큰 (입력/출력)") |
 | 6fc579349 | 관리자 쿼터 조정 대화상자의 빠른 금액 버튼($1/5/10/100) | 조직 멤버 표에는 있고 `user-quota-dialog.tsx`에는 없음 | 옮김(작음) → develop 0367daf86 |
 | 7fe52317f(일부) | 설정 가이드 완료 시 접기(오래된 펼침 상태 무시), 오류 "(Error Code: N)" fallback | 없음 | 보류 |
-| 7c0e34323(일부) | 404 페이지 "탭 닫기" fallback(history 1일 때), 브랜드 링크 `/dashboard/overview` | 없음 / `/` | 보류 |
+| 7c0e34323(일부) | 404 페이지 "탭 닫기" fallback(history 1일 때), 브랜드 링크 `/dashboard/overview` | 없음 / `/` | 404 fallback은 보류. 앱 상단 바 브랜드 로고(`SystemBrand`)는 옮김 → 라우터 `<Link to='/dashboard'>` |
 
 ### 3.5 스타일 (보류)
 
@@ -82,13 +82,13 @@
 | team 커밋 | 내용 | 확인할 것 |
 |---|---|---|
 | 350662f4c | GA4 ID `G-Z73Y7213LF`를 코드에 고정 | GA 운영값 문서화(2026-10-15). develop은 `GOOGLE_ANALYTICS_ID` 환경 변수를 읽고(`router/landing-router.go:52`, `main.go` `InjectGoogleAnalytics`) upstream 테스트가 "환경 변수 없음 = GA 없음"을 고정하므로 코드에 고정하지 않는다. **배포 설정:** 운영 환경에 `GOOGLE_ANALYTICS_ID=G-Z73Y7213LF`를 반드시 넣을 것(`.env.example`·`docker-compose.yml`에 주석으로 적어 둠). 넣지 않으면 team과 달리 분석이 꺼진다 |
-| a2f680700 | 상단 Home 링크 전체 새로고침(프로필 배지는 §4.2로 뺌) | 옮김 → develop 6c4d05794 (3.4의 랜딩 이동에 포함) |
-| c1325db97 | 프로필 화면 배치, 사이드바 모듈 카드 이름, 메뉴 순서 | 라벨만 옮김 → develop da75d4ac4 (사이드바 모듈 카드 이름 7개). 프로필 배치·passkey/2FA 카드·메뉴 순서는 upstream `/security` 구조 유지 |
+| a2f680700 | 상단 Home 링크 전체 새로고침(프로필 배지는 §4.2로 뺌) | 옮김 → develop 502d5d840 (3.4의 랜딩 이동에 포함) |
+| c1325db97 | 프로필 화면 배치, 사이드바 모듈 카드 이름, 메뉴 순서 | 라벨만 옮김 → develop ffbd07628 (사이드바 모듈 카드 이름 7개). 프로필 배치·passkey/2FA 카드·메뉴 순서는 upstream `/security` 구조 유지 |
 
 ## 4. 함께 확인할 것 (dropped이지만 증상이 남는 것)
 
-- **Claude adaptive thinking 표시(9088a5703):** §9 결정 "네이티브 passthrough는 upstream 유지"로 뺐다. develop은 `thinking.display`를 클라이언트가 `IncludeThoughts`를 보낼 때만 설정한다(`relaykit/relayconvert/reasoning/claude.go:139,191,263`). 그래서 `thinking:{"type":"adaptive"}`만 보낸 네이티브 요청은 Opus 4.7+에서 thinking 본문이 비어 돌아온다. 옮김 → develop 13c8c228b (display가 빈 경우에만 `summarized`로 채움; 클라이언트가 보낸 값은 그대로 전달되므로 "네이티브 passthrough 유지" 결정과 충돌하지 않음; AWS/Vertex 경로 포함).
-- **이메일 인증 오류(30a3fe6a9):** `controller/misc.go SendEmailVerification`이 SMTP 원문 오류를 사용자에게 그대로 돌려줬다. 옮김 → develop 9e33b3459 (응답은 고정 문구 "Failed to send email", 원문은 서버 로그에만).
+- **Claude adaptive thinking 표시(9088a5703):** §9 결정 "네이티브 passthrough는 upstream 유지"로 뺐다. develop은 `thinking.display`를 클라이언트가 `IncludeThoughts`를 보낼 때만 설정한다(`relaykit/relayconvert/reasoning/claude.go:139,191,263`). 그래서 `thinking:{"type":"adaptive"}`만 보낸 네이티브 요청은 Opus 4.7+에서 thinking 본문이 비어 돌아온다. 옮김 → develop 0e232486b (display가 빈 경우에만 `summarized`로 채움; 클라이언트가 보낸 값은 그대로 전달되므로 "네이티브 passthrough 유지" 결정과 충돌하지 않음; AWS/Vertex 경로 포함).
+- **이메일 인증 오류(30a3fe6a9):** `controller/misc.go SendEmailVerification`이 SMTP 원문 오류를 사용자에게 그대로 돌려줬다. 옮김 → develop 232b124a0 (응답은 고정 문구 "Failed to send email", 원문은 서버 로그에만).
 - **공식 보기(eb8baa760 외 2):** 과금 상세의 "공식 보기" 접이식 화면은 단계 C 기록대로 뺐다(upstream 상세 대화상자에 공식이 없음). 할인은 분해 행으로 보인다.
 
 ## 5. 제안
@@ -101,8 +101,8 @@
 ## 6. 포팅 후 이월 (2026-10-15)
 
 - **운영자 확인:** 빠른 시작 PDF 두 개(각 약 550KB, 바이너리)는 team에서 그대로 가져왔다. 내용이 upstream 새 UI와 맞는지는 운영자가 확인한다. 가입 안내문은 이메일 도메인 화이트리스트가 켜져 있을 때만 보인다.
-- **배포 설정:** `GOOGLE_ANALYTICS_ID=G-Z73Y7213LF`(3.6 참고).
-- **알려진 한계(심사 minor):** 일부 설치(저장된 확인값이 없는 모든 설치)는 compliance 기본값이 true가 된다. adaptive display 기본값은 Claude 변환을 재사용하는 모든 채널에 닿고, thinking을 끌 수 없는 fallback도 이제 `summarized`다. 랜딩 이동에서 `forceReload` 링크는 다른 링크보다 먼저 그려지지만 Home이 항상 첫 항목이라 같다. 모바일 드롭다운 변형은 테스트가 없고 `mobile-drawer.tsx`·`public-navigation.tsx`는 어디서도 마운트되지 않아 router Link를 그대로 쓴다.
+- **배포 설정:** `GOOGLE_ANALYTICS_ID=G-Z73Y7213LF`(3.6 참고), `CHATBOT_WIDGET_URL=https://chatbot.alrouter.ai`(3.4 참고; 없으면 SPA에 챗봇 위젯이 없다).
+- **알려진 한계(심사 minor):** stored compliance rows가 없는 모든 설치는 compliance 기본값이 true가 된다(upstream이 `CurrentComplianceTermsVersion`을 올리면 다시 결정). adaptive display 기본값은 Claude 변환을 재사용하는 모든 채널에 닿고, thinking을 끌 수 없는 fallback도 이제 `summarized`다. 랜딩 이동에서 `forceReload` 링크는 다른 링크보다 먼저 그려지지만 Home이 항상 첫 항목이라 같다. 모바일 드롭다운 변형은 테스트가 없고 `mobile-drawer.tsx`·`public-navigation.tsx`는 어디서도 마운트되지 않아 router Link를 그대로 쓴다. `auth-layout.tsx:35`(로그인·가입 화면 로고), 오류 화면의 `navigate({ to: '/' })`, 가격·랭킹의 `redirect({ to: '/' })`는 여전히 SPA Home으로 간다(team과 같음).
 - **병합 리허설(`qn/main` 908f94d65, 2026-10-15):** 충돌 8건 모두 `docs/fork-overlays.md`에 해결 방법이 있다 — `go.sum`(O4 메모: moejs 줄, upstream 쪽을 받고 `go mod tidy`), `relay/channel/api_request.go`(O7 타이밍 훅 옆에 upstream이 새 줄을 넣음: 둘 다 유지), `web/src/i18n/locales/{fr,ja,ru,vi,zh-TW,zh}.json` 6건(develop이 지운 파일에 upstream이 수정: 삭제 유지, "삭제한 upstream 파일" 표). 이번 계획의 O11 훅과는 충돌이 없다.
 
 감사 원본: `docs/reviews/2026-10-15-team-parity-audit.tsv` (667행, 묶음 순서, 근거 포함).

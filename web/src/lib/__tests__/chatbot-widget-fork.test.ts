@@ -21,27 +21,26 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-// fork: O11 (team 3757c8244) — the dashboard SPA shell loads the chatbot widget.
+// fork: O11 (team 3757c8244) — the dashboard SPA shell carries a placeholder
+// that main_chatbot_fork.go replaces with the deferred widget script only when
+// CHATBOT_WIDGET_URL is set.
 const indexHtml = readFileSync(
   path.resolve(import.meta.dirname, '../../../index.html'),
   'utf8'
 )
 
-describe('chatbot widget in the SPA shell', () => {
-  it('loads the widget script from the chatbot host after #root in the body', () => {
-    const head = indexHtml.slice(
+describe('chatbot widget placeholder in the SPA shell', () => {
+  it('puts the placeholder on its own line after #root in the body', () => {
+    const body = indexHtml.slice(
       indexHtml.indexOf('id="root"'),
       indexHtml.indexOf('</body>')
     )
-    const script = head.match(
-      /<script\s+src="https:\/\/chatbot\.alrouter\.ai\/widget\.js"\s+data-api-base="https:\/\/chatbot\.alrouter\.ai"\s*><\/script>/
-    )
-    expect(script).not.toBeNull()
+    expect(body).toMatch(/\n\s*<!--chatbot-->\n/)
+    expect(indexHtml.match(/<!--chatbot-->/g)).toHaveLength(1)
   })
 
-  it('loads the widget exactly once', () => {
-    expect(indexHtml.match(/chatbot\.alrouter\.ai\/widget\.js/g)).toHaveLength(
-      1
-    )
+  it('does not hard-code the chatbot host', () => {
+    expect(indexHtml).not.toContain('chatbot.alrouter.ai')
+    expect(indexHtml).not.toMatch(/widget\.js/)
   })
 })

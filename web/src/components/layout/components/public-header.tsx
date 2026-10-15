@@ -37,7 +37,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
 import { BrandLink } from './brand-link-fork' // fork: O11
-import { ForceReloadPublicNavLink } from './force-reload-nav-anchor-fork' // fork: O11
+import { createForceReloadPublicNavLink } from './force-reload-links-fork' // fork: O11
 import { HeaderLogo } from './header-logo'
 
 const AUTH_PROMPT_SECONDS = 5
@@ -198,6 +198,7 @@ export function PublicHeader(props: PublicHeaderProps) {
     },
     [t]
   )
+  const plainLink = createForceReloadPublicNavLink(t, handleNavLinkClick) // fork: O11
 
   return (
     <>
@@ -264,18 +265,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     </a>
                   )
                 }
-                if (link.forceReload) {
-                  // fork: O11
-                  return (
-                    <ForceReloadPublicNavLink
-                      key={`${link.title}:${link.href}`}
-                      link={link}
-                      label={t(link.title)}
-                      isActive={isActive}
-                      onClick={(event) => handleNavLinkClick(event, link)}
-                    />
-                  )
-                }
+                if (link.forceReload) return plainLink(link, isActive) // fork: O11
                 return (
                   <Link
                     key={`${link.title}:${link.href}`}
@@ -407,19 +397,8 @@ export function PublicHeader(props: PublicHeaderProps) {
                 )
               }
               if (link.forceReload) {
-                // fork: O11
-                return (
-                  <ForceReloadPublicNavLink
-                    key={`${link.title}:${link.href}`}
-                    link={link}
-                    label={t(link.title)}
-                    isActive={isActive}
-                    onClick={(event) => handleNavLinkClick(event, link, true)}
-                    className={linkClassName}
-                    style={transitionStyle}
-                  />
-                )
-              }
+                return plainLink(link, isActive, linkClassName, transitionStyle) // fork: O11
+              } // fork: O11
               return (
                 <Link
                   key={`${link.title}:${link.href}`}
