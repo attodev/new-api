@@ -4,6 +4,8 @@
 
 같은 디렉터리의 `web/e2e/korean.e2e.ts`(단계 D, fork: O9)는 한국어 스모크 1개다. `locale: 'ko-KR'` 컨텍스트로 `/sign-in`을 열어 `로그인` 버튼을 확인하고, 한국어 placeholder(`사용자 이름 또는 이메일 입력`, `비밀번호 입력`)로 root 로그인한 뒤 사이드바의 `대시보드`를 확인한다. 아무것도 만들지 않으므로 아래 teardown 검증에 영향이 없다. `bun run e2e`는 두 파일을 함께 돌려 **21개**(조직 20 + 한국어 1)가 통과해야 한다.
 
+커버리지·역할-권한 매트릭스와 검증 갭은 [`E2E_TEST_ANALYSIS.md`](E2E_TEST_ANALYSIS.md)에 있다.
+
 ## 개요
 
 조직(Organization) 기능의 브라우저 스모크 테스트. 총 **20개 (프로비저닝 setup 1 + 기능 18 + 정리 teardown 1)** 테스트를 serial 모드로 실행한다. `beforeAll`에서 4개의 브라우저 컨텍스트를 분리 생성하지만 **root(루트 관리자)만** 로그인한다. owner / org admin / member 계정과 테스트 조직은 첫 번째 setup 테스트에서 **UI를 통해** 런타임에 생성되며, 실행마다 충돌하지 않도록 run-scoped 고유 이름을 사용한다(`runId = Date.now().toString(36)`, 사용자명 `e2e_owner_<runId>` / `e2e_admin_<runId>` / `e2e_member_<runId>`, 조직명 `E2E Org <runId>`). 생성된 계정은 admin 비밀번호를 그대로 재사용한다.

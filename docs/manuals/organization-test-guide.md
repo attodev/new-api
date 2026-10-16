@@ -1,7 +1,7 @@
 # 조직 관리 기능 테스트 가이드
 
 작성일: 2026-06-12  
-개정: 2026-10-14 (upstream 재기반 단계 B — develop 경로·라벨·권한 규칙·상한값에 맞춤. 화면 라벨은 한국어 locale이 들어오기 전(단계 D)이라 영문이다)
+개정: 2026-10-14 (upstream 재기반 단계 B — develop 경로·라벨·권한 규칙·상한값에 맞춤), 2026-10-16 (단계 D 반영 — 한국어 locale이 들어왔다. 이 문서의 화면 라벨은 영문 원문으로 적으며, locale이 `ko`이면 한국어로 표시된다)
 
 ## 1. 목적
 
@@ -121,7 +121,7 @@ bun run test
 - `/wallet` 화면 선택(owner → 조직 지갑, 구성원 → 요약, 그 외 → 개인 지갑)
 - 사이드바 `Organization` 그룹 노출 조건
 
-UI 언어(영어/한국어) 테스트는 develop에 없다. 한국어 locale은 단계 D에서 들어온다.
+UI 언어(영어/한국어)는 `src/i18n/languages.test.ts`(선택지 `en`·`ko`, 한국어 코드 정규화, 제거된 언어의 `en` fallback), `src/lib/interface-languages.test.ts`(관리자 허용 언어 목록), `src/components/__tests__/language-switcher.test.tsx`(언어 선택 메뉴), `src/i18n/__tests__/ko-coverage.test.ts`(`en.json` 키의 `ko.json` 번역 누락, skip 목록 제외)가 확인한다.
 
 ### 3.3 브라우저 E2E 테스트
 
@@ -152,7 +152,7 @@ bun run e2e:install
 - 조직 일반 사용자 조직 관리 메뉴 비노출
 - 조직 일반 사용자 조직 관리 URL 직접 접근 차단
 
-총 19개 테스트. 2026-10-14 실행: 19 passed. `/wallet` 화면, 구독 취소, 실제 relay 과금은 E2E에 없다(수동 시나리오로 확인).
+총 20+1개 테스트(2026-10-16 기준: `organization.e2e.ts` 20개 + `korean.e2e.ts` 1개). 2026-10-14 실행: 19 passed. 이후 조직 멤버 정지·재개(`Suspend`/`Resume` → `Save`) 테스트와 ko-KR 브라우저의 로그인 화면·콘솔 한국어 표시 스모크(`korean.e2e.ts`)가 더해졌다. `/wallet` 화면, 구독 취소, 실제 relay 과금은 E2E에 없다(수동 시나리오로 확인).
 
 ### 3.4 현재 자동 테스트 커버 요약
 
@@ -445,7 +445,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 - 사용자 지정 초 enable/disable UI
 - 플랜 목록의 기간 표시
 - 비활성화 후 화면 표시
-- 한국어 번역 (단계 D)
+- 한국어 번역 (locale `ko`)
 
 ## 4.7 시나리오 G: 조직 구독 플랜 할당
 
@@ -718,7 +718,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 
 ## 4.14 시나리오 N: 한국어 UI와 문구
 
-> develop에서는 실행하지 않는다. 한국어 locale과 언어 선택 제한(영어/한국어)은 단계 D(O9)에서 들어온다. 아래 절차는 그때 쓴다. 현재 조직 화면은 영문 라벨로 표시되고, `languages.test.ts`는 develop에 없다.
+> 언어 선택지와 언어 코드 정규화는 아래 "자동 테스트 커버"의 테스트와 `web/e2e/korean.e2e.ts`가 자동으로 덮는다. 직접 확인할 것은 화면별 실제 한국어 문구다.
 
 목적:
 
@@ -753,9 +753,11 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 자동 테스트 커버:
 
 - `languages.test.ts`
-  - UI 언어 선택지가 `en`, `kr`만 포함되는지 확인
-  - `ko`, `ko-KR`, `kr`을 `kr`로 정규화하는지 확인
+  - UI 언어 선택지가 `en`, `ko`만 포함되는지 확인
+  - `ko`, `ko-KR`, `ko_KR`과 team의 옛 코드 `kr`을 `ko`로 정규화하는지 확인 (`kok`처럼 `ko`로 시작하는 다른 언어 코드는 바꾸지 않음)
   - 제거된 `zh-CN`, `fr`, unknown 값이 `en`으로 fallback되는지 확인
+- `web/e2e/korean.e2e.ts`
+  - ko-KR 브라우저에서 로그인 화면(`로그인` 버튼, 한국어 placeholder)과 로그인 후 사이드바 `대시보드`가 한국어로 표시되는지 확인
 
 직접 확인 필요:
 
@@ -841,7 +843,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 - 대시보드 차트 렌더링과 시각적 정확성
 - 조직 사용 로그/작업 로그 화면 필터
 - 조직 사용 로그/작업 로그의 실제 행 데이터
-- 한국어 번역 품질과 화면별 실제 문구 (단계 D)
+- 한국어 번역 품질과 화면별 실제 문구
 - 실제 API 요청과 화면 수치 갱신 타이밍 (대시보드는 사용량 집계 주기, 기본 5분 뒤)
 - 결제 provider를 통한 조직 지갑 충전 (provider 6종: Epay, Stripe, PayPal, Creem, Waffo, Waffo Pancake)
 
@@ -907,7 +909,7 @@ E2E에는 `/wallet` 테스트가 없다. 2026-10-14 수동 실행에서 member `
 현재 테스트 체계의 한계:
 
 - 프론트 컴포넌트 테스트는 대부분 순수 유틸 또는 server render 수준이다.
-- 실제 브라우저 클릭 기반 E2E는 smoke flow 중심이다 (19개, `/wallet`·구독 취소·relay 과금 없음).
+- 실제 브라우저 클릭 기반 E2E는 smoke flow 중심이다 (조직 20개 + 한국어 스모크 1개, `/wallet`·구독 취소·relay 과금 없음).
 - 다중 DB별 조직 기능 테스트는 컨테이너가 있는 장비에서 `TEST_MYSQL_DSN`/`TEST_POSTGRES_DSN`을 주고 돌려야 한다. 2026-10-14 현재 미실행.
 - 실제 결제 provider를 통한 조직 지갑 충전은 수동 또는 별도 sandbox 검증이 필요하다.
 - 실제 upstream AI provider 요청에 따른 사용량 정산은 환경 의존성이 크므로 수동 확인이 필요하다.

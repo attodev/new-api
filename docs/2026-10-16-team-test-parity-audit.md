@@ -86,6 +86,13 @@ relaykit은 upstream 모듈이라 손대지 않는다. 아래는 호스트 `dto/
 
 반영하지 않는 것: team의 `ErrQuotaCachePending` 차단 테스트(O12 결정으로 비차단), API 키 캐시 동기 델타(사용자 보류), Toss·다국어 테스트 99건(스펙상 삭제).
 
+기록만 하고 바꾸지 않는 차이: develop(upstream)의 `IncreaseUserQuota`는 지갑 상한(`common.MaxWalletQuota`)을 넘기는 증가를 환불이라도 `ErrWalletQuotaLimitExceeded`로 거부한다. team은 환불이 상한을 넘는 것을 허용했다. `model/user_quota_ceiling_fork_test.go`는 develop 동작을 단언한다.
+
 ## 5. 실행
 
 계획: `docs/superpowers/plans/2026-10-16-test-parity-additions.md`. 원칙: upstream `_test.go`는 고치지 않고 새 `*_fork_test.go`로 추가(다음 upstream 동기화 때 충돌을 피함), relaykit 동작은 호스트 패키지에서 테스트, 코드 포팅 셋은 `// fork: O11` 훅 + fork 파일 + `docs/fork-overlays.md` 행.
+
+결과(2026-10-16, `77b711dd1..` 기준): 새 테스트 파일 41개(`*_fork_test.go`, 그중 `model/sqlite_test_helper_fork_test.go`는 헬퍼만 있음)에 테스트 함수 111개, 기존 fork 테스트 파일 2개(`relay/channel/openai/image_stream_error_fork_test.go`, `relay/claude_thinking_display_fork_test.go`)에 3개를 더해 **테스트 함수 114개**를 추가했다. 코드 포팅 3건은 커밋 2개다: 5ceeb8d3a(구독 플랜 기간·리셋 상한, §4 #3), c9e9777a4(`anthropic-beta` 값 정리 §4 #1 + usage fallback의 tool call 포함 §4 #2). `GOWORK=off go test ./... -count=1`은 전부 통과한다. 운영 메모:
+
+1. 이미 저장된 개인 구독 플랜 중 기간(`duration_value` 1..1200, custom 단위면 `custom_seconds` 1..31,536,000)이나 리셋 초(`quota_reset_custom_seconds`, custom 리셋이면 1..31,536,000)가 범위 밖인 플랜은 이제 새 구매가 거부된다. 리셋 초가 범위 밖이면 그 플랜의 기존 구독도 쿼터 리셋이 멈춘다(`calcNextResetTime`이 0을 돌려줌). 배포 전에 그런 플랜이 있는지 확인한다.
+2. 사용자 결정 대기: OpenAI 호환 → Claude 경로에서 thinking을 끌 수 없는 모델(Opus 5.5)에 `reasoning_effort:"none"`이 오면 develop은 fork 기본값 `display:"summarized"`를 보내고, team은 `omitted`를 보냈다(`relay/channel/claude/openai_to_claude_thinking_fork_test.go`가 현재 동작을 고정). team과 맞추려면 요청의 effort를 `NormalizeAdaptiveThinkingDisplay`에 넘기는 작은 fork 훅 변경이 필요하며, 이 계획에서는 하지 않았다.
