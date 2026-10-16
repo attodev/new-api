@@ -309,7 +309,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		completionTokens := simpleResponse.Usage.CompletionTokens
 		if completionTokens == 0 {
 			for _, choice := range simpleResponse.Choices {
-				ctkm := tokenkit.Count(info.UpstreamModelName, choice.Message.StringContent()+choice.Message.GetReasoningContent())
+				ctkm := tokenkit.Count(info.UpstreamModelName, fallbackCompletionText(&choice.Message)) // fork: O11
 				completionTokens += ctkm
 			}
 		}
