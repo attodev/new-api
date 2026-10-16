@@ -106,3 +106,50 @@
 - **병합 리허설(`qn/main` 908f94d65, 2026-10-15):** 충돌 8건 모두 `docs/fork-overlays.md`에 해결 방법이 있다 — `go.sum`(O4 메모: moejs 줄, upstream 쪽을 받고 `go mod tidy`), `relay/channel/api_request.go`(O7 타이밍 훅 옆에 upstream이 새 줄을 넣음: 둘 다 유지), `web/src/i18n/locales/{fr,ja,ru,vi,zh-TW,zh}.json` 6건(develop이 지운 파일에 upstream이 수정: 삭제 유지, "삭제한 upstream 파일" 표). 이번 계획의 O11 훅과는 충돌이 없다.
 
 감사 원본: `docs/reviews/2026-10-15-team-parity-audit.tsv` (667행, 묶음 순서, 근거 포함).
+
+## 7. 재검토 (2026-10-16): 아직 develop에 없는 것
+
+team 팁은 감사 때와 같은 `9ef93eb8c`(origin/team 동일, 새 커밋 없음). 감사의 gap 30 + unsure 3 = 33건 중 22건이 두 계획(`2026-10-15-team-parity-ports.md`, `2026-10-15-team-parity-decisions.md`)으로 포팅됐다. 남은 11건과, 포팅 커밋에서 일부러 뺀 부분, 결정으로 뺀 139건의 분류를 적는다.
+
+### 7.1 남은 11건
+
+| 구분 | team 커밋 | 내용 | 상태·근거 |
+|---|---|---|---|
+| 진행하지 않음(사용자 결정) | e24c060c0, 93b81b0bd | 채널 `UsageSemantic` 덮어쓰기·모델 glob | Claude 채널은 Claude API 직접 사용으로 고정; relaykit 영향 회피 |
+| 진행하지 않음(사용자 결정) | 3cfc88575, f1dd2da1e(키 부분) | API 키 캐시 동기 델타·보상, 키 배치 재큐 | 키 한도·키 통계에만 영향 |
+| 사실상 덮임 | 5e6c6a716 | 지갑 캐시 동기 델타·보상 | develop은 지갑 델타를 이미 동기로 적용하고(`IncreaseUserQuota`/`DecreaseUserQuota`), 실패는 O12 복구 목록이 처리 |
+| 보류(작음) | 43c0105ff | MJ 환불 로그에 제출 노드명 | develop은 NodeName을 소비 로그 내보내기에만 씀; upstream 설계상 의미 적음 |
+| 보류(작음) | 7c0e34323(일부) | 404 페이지 "탭 닫기"(history 1일 때) | 브랜드 링크 부분은 5d65184d6에서 포팅됨 |
+| 보류(작음) | 7fe52317f(일부) | 설정 가이드 완료 시 접기(오래된 펼침 무시), "(Error Code: N)" fallback | 테스트 메일 토스트는 O5로 덮임 |
+| 스타일 | f34c341c2 | 결제 수단 템플릿 기본 이름 영어화 | develop `payment-methods-visual-editor.tsx:71,79,105`는 upstream 중국어(支付宝/微信/自定义1). 관리자 화면에 중국어가 보이므로 작은 포팅 가치 있음 |
+| 스타일 | 428f19795 | 빠른 시작 단계 연결선 간격 | upstream 스타일 유지 |
+| 스타일 | c16e8c6d7 | 스위치 thumb 그림자, 사이드바 간격 | upstream 스타일 유지 |
+
+### 7.2 포팅 커밋에서 일부러 뺀 부분
+
+- 2c619a31e: Toss 생명주기·대사 부분(§2.2 Toss 제외). rate-limit 보정만 옮김.
+- cb220505e: 표 검색 디바운스(upstream `searchDebounceMs`가 이미 제공). 429 재시도 금지만 옮김.
+- 3757c8244: 랜딩 템플릿 부분(랜딩에 이미 같은 스크립트). SPA 부분은 `CHATBOT_WIDGET_URL`로 게이트해 옮김.
+- 7daa397a1: `logo.tsx`의 `SvgImage` 주석 처리, 채팅 키 훅 변경. 가입 안내·토큰 열 이름만 옮김.
+- a2f680700: 로그인 배지와 서버 템플릿 변경(§4.2 결정). Home 링크 전체 새로고침만 옮김.
+- c1325db97: 프로필 화면 배치, passkey·2FA 카드 압축, 메뉴 순서, drawing→task 모듈 매핑(upstream `/security` 구조). 사이드바 라벨 7개만 옮김.
+- 3f6ab2e33: 조직 확장 본체는 단계 B(O3)로 이미 포팅. compliance 기본값만 이번에 옮김.
+- 350662f4c: GA4 ID 코드 고정은 하지 않음(환경 변수 유지, 운영값 문서화).
+
+### 7.3 결정으로 뺀 139건의 분류
+
+| 사유 | 건수 | 근거 |
+|---|---|---|
+| Toss 결제 전체(충전, 빌링키·정기결제, 자동충전·cron, 조직 지갑 Toss, classic 패리티, COOP 헤더) | 113 | 스펙 §2.2, §9 결정 2(테이블만 남김) |
+| 언어(zh/ja/fr/ru/vi/zh-TW 파일·문구, classic locale, 잔여 중국어 문자열) | 16 | 단계 E 결정 1(en/ko만), §9 결정 12 |
+| Redis 쿼터 캐시(team 10ade7045 차단 방식 등) | 3 | O12 상주 방식으로 대체 |
+| 모델 카드 레이아웃 압축 | 3 | 스펙 §4.6, §9 결정 3(upstream 카드 + 할인 배지) |
+| Claude 네이티브 passthrough 재작성 | 2 | §9 결정; 이 중 9088a5703(adaptive display 기본값)은 2026-10-15에 좁은 범위로 포팅(0e232486b) |
+| 기타(30a3fe6a9 이메일 오류 문구 → 232b124a0로 포팅, ae59103a2 로그인 배지 → §4.2) | 2 | — |
+
+공식 보기(eb8baa760 외 2), 조직 이름 변경 제거(e1a680a5c; develop은 변경 허용을 유지), 결제 수단 Excel 등은 위 분류 안에 포함돼 있다(TSV `evidence` 열 참고).
+
+### 7.4 권장
+
+- 7.1의 스타일 3건 중 f34c341c2(결제 수단 템플릿 기본 이름)는 관리자 화면에 중국어가 그대로 보이므로 옮길 가치가 있다(약 3줄, i18n 키). 나머지 스타일 2건과 보류 3건은 사용자 보고가 있을 때 처리한다.
+- 7.2·7.3은 결정 사항이라 그대로 둔다. 다시 보려면 Toss(113건)와 언어(16건)가 대상이다.
