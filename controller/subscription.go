@@ -203,6 +203,10 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Custom reset cycle must be greater than 0 seconds")
 		return
 	}
+	if err := model.ValidateSubscriptionPlanTiming(&req.Plan); err != nil { // fork: O11
+		common.ApiError(c, err)
+		return
+	}
 	err := model.DB.Create(&req.Plan).Error
 	if err != nil {
 		common.ApiError(c, err)
@@ -275,6 +279,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 	req.Plan.QuotaResetPeriod = model.NormalizeResetPeriod(req.Plan.QuotaResetPeriod)
 	if req.Plan.QuotaResetPeriod == model.SubscriptionResetCustom && req.Plan.QuotaResetCustomSeconds <= 0 {
 		common.ApiErrorT(c, "Custom reset cycle must be greater than 0 seconds")
+		return
+	}
+	if err := model.ValidateSubscriptionPlanTiming(&req.Plan); err != nil { // fork: O11
+		common.ApiError(c, err)
 		return
 	}
 

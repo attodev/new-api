@@ -323,6 +323,19 @@ O11 메모(Ali thinking_budget): develop은 예산을 두 곳에서 지운다. `
 
 O11 메모(Claude display): Responses → Claude(`ConvertOpenAIResponsesRequest`)와 Gemini → Claude(`ConvertGeminiRequest`)에는 걸지 않았다. 두 형식은 클라이언트가 요약 여부를 직접 고르는 필드(`reasoning.summary`, `thinkingConfig.includeThoughts`)가 있고 relaykit이 그것을 display로 옮기므로, 값이 없으면 요약을 요청하지 않은 것으로 본다. Chat Completions와 Anthropic 네이티브는 그런 필드가 없거나(전자) 기본값이 4.6 요약이었다(후자). 본문 패스스루(전역/채널)는 변환을 거치지 않으므로 그대로다.
 
+### 테스트 동등성 감사 이월 (2026-10-16)
+
+| overlay | upstream 파일 | 훅 | fork 전용 파일 |
+|---|---|---|---|
+| O11 구독 플랜 기간 상한 | model/subscription.go:310 | `calcPlanEndTime`의 `plan == nil`·`DurationValue <= 0` 검사 두 블록을 `if err := ValidateSubscriptionPlanDuration(plan); err != nil { // fork: O11` + `return 0, err` 블록으로 (duration_value 1..1200, custom_seconds 1..31536000(custom) / 0..31536000(그 외), 단위 검사 — team 메시지 그대로) — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 구독 플랜 기간 상한 (switch) | model/subscription.go:313-324 | `var end time.Time` 한 줄을 더하고 switch 다섯 분기의 `return start.….Unix(), nil`을 `end = start.…` 대입으로 바꿈; custom 분기의 `CustomSeconds <= 0` 검사는 validator가 대신하므로 제거 (`default` 오류 분기는 그대로) — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 구독 플랜 종료 시각 overflow | model/subscription.go:328 | 함수 끝 `return subscriptionEndAfterStart(start, end) // fork: O11` (종료 시각이 시작보다 앞으로 가지 않으면 `subscription plan end time overflowed`) — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 구독 리셋 주기 상한 | model/subscription.go:341 | `calcNextResetTime`의 `if plan == nil {`를 `if ValidateSubscriptionPlanReset(plan) != nil { // fork: O11`로 (quota_reset_custom_seconds 1..31536000(custom) / 0..31536000(그 외); 위반이면 리셋 없음 0) — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 구독 리셋 시각 overflow·종료 뒤 | model/subscription.go:372 | custom 분기의 `QuotaResetCustomSeconds <= 0` 검사(validator가 대신)를 지우고, 끝의 `endUnix` 비교 3줄 + `return next.Unix()`를 `return subscriptionResetAfterBase(base, next, endUnix) // fork: O11`로 — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 구독 생성 시 기간·리셋 검사 | model/subscription.go:484-486 | `CreateUserSubscriptionFromPlanTx`의 `userId <= 0` 검사 뒤 `if err := ValidateSubscriptionPlanTiming(plan); err != nil { // fork: O11` + `return nil, err` 블록 (리셋 주기가 잘못된 플랜은 리셋 없는 구독을 만들지 않고 거부 — team 827행 위치) — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 관리자 플랜 생성 검사 | controller/subscription.go:206-209 | `AdminCreateSubscriptionPlan`의 `QuotaResetCustomSeconds <= 0` 검사 블록 바로 뒤 `if err := model.ValidateSubscriptionPlanTiming(&req.Plan); err != nil { // fork: O11` + `common.ApiError(c, err)` + `return` 블록 — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+| O11 관리자 플랜 수정 검사 | controller/subscription.go:284-287 | `AdminUpdateSubscriptionPlan`의 같은 위치에 같은 블록 — team 2c619a31e | model/subscription_timing_fork.go, model/subscription_timing_fork_test.go |
+
 ## O12 잔액 캐시 상주·Sentinel
 
 사용자 잔액 Redis 캐시를 TTL 만료 없이 상주시키고(차감 때 TTL 연장) Redis Sentinel 연결을 지원하는 fork 고유 기능이다. 설계는 `docs/superpowers/specs/2026-10-15-quota-cache-residency-design.md`에 있다. 로직은 `*_fork.go`에 두고 upstream 파일에는 `// fork: O12` 훅 한 줄만 둔다.

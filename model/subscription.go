@@ -307,29 +307,25 @@ type SubscriptionResetResult struct {
 }
 
 func calcPlanEndTime(start time.Time, plan *SubscriptionPlan) (int64, error) {
-	if plan == nil {
-		return 0, errors.New("plan is nil")
+	if err := ValidateSubscriptionPlanDuration(plan); err != nil { // fork: O11
+		return 0, err
 	}
-	if plan.DurationValue <= 0 && plan.DurationUnit != SubscriptionDurationCustom {
-		return 0, errors.New("duration_value must be > 0")
-	}
+	var end time.Time
 	switch plan.DurationUnit {
 	case SubscriptionDurationYear:
-		return start.AddDate(plan.DurationValue, 0, 0).Unix(), nil
+		end = start.AddDate(plan.DurationValue, 0, 0)
 	case SubscriptionDurationMonth:
-		return start.AddDate(0, plan.DurationValue, 0).Unix(), nil
+		end = start.AddDate(0, plan.DurationValue, 0)
 	case SubscriptionDurationDay:
-		return start.Add(time.Duration(plan.DurationValue) * 24 * time.Hour).Unix(), nil
+		end = start.Add(time.Duration(plan.DurationValue) * 24 * time.Hour)
 	case SubscriptionDurationHour:
-		return start.Add(time.Duration(plan.DurationValue) * time.Hour).Unix(), nil
+		end = start.Add(time.Duration(plan.DurationValue) * time.Hour)
 	case SubscriptionDurationCustom:
-		if plan.CustomSeconds <= 0 {
-			return 0, errors.New("custom_seconds must be > 0")
-		}
-		return start.Add(time.Duration(plan.CustomSeconds) * time.Second).Unix(), nil
+		end = start.Add(time.Duration(plan.CustomSeconds) * time.Second)
 	default:
 		return 0, fmt.Errorf("invalid duration_unit: %s", plan.DurationUnit)
 	}
+	return subscriptionEndAfterStart(start, end) // fork: O11
 }
 
 func NormalizeResetPeriod(period string) string {
@@ -342,7 +338,7 @@ func NormalizeResetPeriod(period string) string {
 }
 
 func calcNextResetTime(base time.Time, plan *SubscriptionPlan, endUnix int64) int64 {
-	if plan == nil {
+	if ValidateSubscriptionPlanReset(plan) != nil { // fork: O11
 		return 0
 	}
 	period := NormalizeResetPeriod(plan.QuotaResetPeriod)
@@ -369,17 +365,11 @@ func calcNextResetTime(base time.Time, plan *SubscriptionPlan, endUnix int64) in
 		next = time.Date(base.Year(), base.Month(), 1, 0, 0, 0, 0, base.Location()).
 			AddDate(0, 1, 0)
 	case SubscriptionResetCustom:
-		if plan.QuotaResetCustomSeconds <= 0 {
-			return 0
-		}
 		next = base.Add(time.Duration(plan.QuotaResetCustomSeconds) * time.Second)
 	default:
 		return 0
 	}
-	if endUnix > 0 && next.Unix() > endUnix {
-		return 0
-	}
-	return next.Unix()
+	return subscriptionResetAfterBase(base, next, endUnix) // fork: O11
 }
 
 func GetSubscriptionPlanById(id int) (*SubscriptionPlan, error) {
@@ -490,6 +480,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	}
 	if userId <= 0 {
 		return nil, errors.New("invalid user id")
+	}
+	if err := ValidateSubscriptionPlanTiming(plan); err != nil { // fork: O11
+		return nil, err
 	}
 	if plan.MaxPurchasePerUser > 0 {
 		var count int64
