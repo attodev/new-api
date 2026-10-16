@@ -105,3 +105,25 @@ func TestOpenAICompatibleClaudeAdaptiveThinkingDisplayFork(t *testing.T) {
 		})
 	}
 }
+
+// Ported from team claude_thinking_test.go (9088a5703). The effort suffix
+// re-renders thinking as adaptive; block_binding is a conversation control
+// the native client sent, so it must survive, and it is never invented when
+// the client did not send one.
+func TestNativeClaudeEffortSuffixKeepsBlockBindingFork(t *testing.T) {
+	binding := `{"prefix_mismatch_behavior":"drop_block"}`
+	body := `{"model":"claude-opus-4-7-high","max_tokens":1024,"thinking":{"type":"adaptive","block_binding":` + binding +
+		`},"messages":[{"role":"user","content":"hi"}]}`
+	upstream := convertNativeClaudeForUpstream(t, constant.APITypeAnthropic, body)
+	require.Equal(t, "claude-opus-4-7", gjson.GetBytes(upstream, "model").String())
+	require.Equal(t, "adaptive", gjson.GetBytes(upstream, "thinking.type").String())
+	require.Equal(t, "summarized", gjson.GetBytes(upstream, "thinking.display").String())
+	require.JSONEq(t, binding, gjson.GetBytes(upstream, "thinking.block_binding").Raw)
+	require.Equal(t, "high", gjson.GetBytes(upstream, "output_config.effort").String())
+
+	body = `{"model":"claude-opus-4-7-high","max_tokens":1024,"messages":[{"role":"user","content":"hi"}]}`
+	upstream = convertNativeClaudeForUpstream(t, constant.APITypeAnthropic, body)
+	require.Equal(t, "claude-opus-4-7", gjson.GetBytes(upstream, "model").String())
+	require.Equal(t, "adaptive", gjson.GetBytes(upstream, "thinking.type").String())
+	require.False(t, gjson.GetBytes(upstream, "thinking.block_binding").Exists())
+}
