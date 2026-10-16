@@ -121,7 +121,7 @@ team 팁은 감사 때와 같은 `9ef93eb8c`(origin/team 동일, 새 커밋 없�
 | 보류(작음) | 43c0105ff | MJ 환불 로그에 제출 노드명 | develop은 NodeName을 소비 로그 내보내기에만 씀; upstream 설계상 의미 적음 |
 | 보류(작음) | 7c0e34323(일부) | 404 페이지 "탭 닫기"(history 1일 때) | 브랜드 링크 부분은 5d65184d6에서 포팅됨 |
 | 보류(작음) | 7fe52317f(일부) | 설정 가이드 완료 시 접기(오래된 펼침 무시), "(Error Code: N)" fallback | 테스트 메일 토스트는 O5로 덮임 |
-| 스타일 | f34c341c2 | 결제 수단 템플릿 기본 이름 영어화 | develop `payment-methods-visual-editor.tsx:71,79,105`는 upstream 중국어(支付宝/微信/自定义1). 관리자 화면에 중국어가 보이므로 작은 포팅 가치 있음 |
+| 옮김(2026-10-16) | f34c341c2 | 결제 수단 템플릿 기본 이름 영어화 | 포팅됨 — `payment-methods-visual-editor.tsx:71,79,105` 세 줄 + 가드 테스트 |
 | 스타일 | 428f19795 | 빠른 시작 단계 연결선 간격 | upstream 스타일 유지 |
 | 스타일 | c16e8c6d7 | 스위치 thumb 그림자, 사이드바 간격 | upstream 스타일 유지 |
 
