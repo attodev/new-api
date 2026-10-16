@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -68,7 +69,13 @@ func TestResponsesHelperCompactionForwardsCacheAndServiceFields(t *testing.T) {
 	require.NotNil(t, apiErr, "upstream stub answers 400 to stop after capture")
 
 	var upstream map[string]json.RawMessage
-	require.NoError(t, common.Unmarshal(<-captured, &upstream))
+	var raw []byte
+	select {
+	case raw = <-captured:
+	case <-time.After(2 * time.Second):
+		t.Fatal("upstream request was never sent")
+	}
+	require.NoError(t, common.Unmarshal(raw, &upstream))
 
 	assert.JSONEq(t, `"gpt-5.1"`, string(upstream["model"]))
 	assert.JSONEq(t, `"hi"`, string(upstream["input"]))
