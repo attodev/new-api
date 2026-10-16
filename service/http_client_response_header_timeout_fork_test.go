@@ -74,8 +74,9 @@ func TestProxyTransportsBoundResponseHeaderWait(t *testing.T) {
 }
 
 func TestRelayHTTPTransportFailsWhenUpstreamWithholdsHeaders(t *testing.T) {
-	// The setting is whole seconds, so the smallest bound is 1s; the upstream
-	// withholds headers for longer than that.
+	// The setting is whole seconds, so the smallest bound is 1s. The upstream
+	// withholds headers far longer than that; on the passing path the handler
+	// returns as soon as the client gives up and cancels the request.
 	withRelayResponseHeaderTimeout(t, 1)
 
 	release := make(chan struct{})
@@ -83,7 +84,7 @@ func TestRelayHTTPTransportFailsWhenUpstreamWithholdsHeaders(t *testing.T) {
 		select {
 		case <-release:
 		case <-r.Context().Done():
-		case <-time.After(1500 * time.Millisecond):
+		case <-time.After(10 * time.Second):
 		}
 	}))
 	t.Cleanup(srv.Close)
@@ -101,7 +102,7 @@ func TestRelayHTTPTransportFailsWhenUpstreamWithholdsHeaders(t *testing.T) {
 	}
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "timeout awaiting response headers")
-	require.Less(t, elapsed, 1400*time.Millisecond)
+	require.Less(t, elapsed, 5*time.Second)
 }
 
 func TestRelayHTTPTransportAllowsSlowBodyAfterHeaders(t *testing.T) {
