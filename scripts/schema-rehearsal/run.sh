@@ -8,6 +8,12 @@
 # (copy of a) team database and only the rebased binary is started. Needs the
 # mysql / psql client on PATH.
 #
+# ROLLBACK=1: after the rebased binary has run, start the legacy (team) binary
+# again on the same database and assert it still boots, keeps the wallet and
+# logs no migration error - the "go back to team" path. Works in both modes
+# (with LEGACY_SKIP=1 it builds the legacy binary from LEGACY_REF just for
+# this step).
+#
 # Every check is asserted: any failure prints "FAIL: ..." and exits 1.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -18,6 +24,7 @@ LEGACY_REF="${LEGACY_REF:-team}"
 PORT_NEW="${PORT_NEW:-3301}"
 PORT_LEGACY="${PORT_LEGACY:-3302}"
 LEGACY_SKIP="${LEGACY_SKIP:-0}"
+ROLLBACK="${ROLLBACK:-0}"
 
 log() { printf '\n== %s\n' "$*"; }
 pass() { printf 'PASS: %s\n' "$*"; }
@@ -188,6 +195,7 @@ build_new() {
 build_legacy() {
   log "building legacy binary from $LEGACY_REF"
   local wt="$WORK/legacy-src"
+  (cd "$ROOT" && git rev-parse --verify --quiet "$LEGACY_REF^{commit}" >/dev/null) || die_usage "LEGACY_REF '$LEGACY_REF' is not a commit in this clone (fetch the team branch or set LEGACY_REF=origin/team)"
   if [ ! -d "$wt" ]; then
     (cd "$ROOT" && git worktree add --detach "$wt" "$LEGACY_REF")
   fi
@@ -252,6 +260,50 @@ rehearse() { # $1=dialect
   pass "[$d] no fatal schema error in the log"
   echo "informational (broader keyword scan):"
   grep -i -E "error|failed" "$logf" | grep -i -E "migrat|column|alter|schema" || echo "(none)"
+
+  [ "$ROLLBACK" = "1" ] || return 0
+  rollback_rehearse "$d" "$want_wallet"
+}
+
+# Reverse step: the legacy binary starts on the database the rebased binary
+# has just migrated. Asserts: it becomes ready, the wallet row is unchanged,
+# the four wallet columns are still bigint, and its log has no migration error.
+rollback_rehearse() { # $1=dialect $2=expected wallet row
+  local d="$1" want_wallet="$2" got rows n bad logf unknown
+  logf="$WORK/rollback-$d.log"
+
+  log "[$d] ROLLBACK: starting legacy binary on the migrated database"
+  start_binary "$d" "$WORK/new-api-legacy" "$PORT_LEGACY" "$DSN" "$logf"
+  wait_http "$PORT_LEGACY" "$SERVER_PID" "$logf" || fail "[$d] ROLLBACK: legacy binary did not start on the migrated database"
+  stop_binary
+  pass "[$d] ROLLBACK: legacy binary became ready"
+
+  log "[$d] ROLLBACK: column types after legacy restart"
+  rows=$(query "$d" "$COL_SQL") || fail "[$d] ROLLBACK: column query failed"
+  printf '%s\n' "$rows"
+  rows=$(printf '%s\n' "$rows" | norm)
+  n=$(printf '%s\n' "$rows" | awk 'NF>=2' | wc -l | tr -d ' ')
+  bad=$(printf '%s\n' "$rows" | awk 'NF>=2 && $2 !~ /^bigint/ {print $1 "=" $2}' | tr '\n' ' ')
+  [ "$n" = "4" ] || fail "[$d] ROLLBACK: expected 4 wallet columns, found $n"
+  [ -z "$bad" ] || fail "[$d] ROLLBACK: wallet columns are not bigint after the legacy restart: $bad"
+  pass "[$d] ROLLBACK: all 4 wallet columns are still bigint"
+
+  log "[$d] ROLLBACK: wallet after legacy restart"
+  got=$(wallet_row "$d")
+  echo "$got"
+  [ "$got" = "$want_wallet" ] || fail "[$d] ROLLBACK: wallet changed: '$got' (wanted '$want_wallet')"
+  pass "[$d] ROLLBACK: wallet preserved ('$got')"
+
+  log "[$d] ROLLBACK: schema errors in legacy log"
+  if grep -q -F -e "failed to migrate" "$logf"; then
+    grep -F -e "failed to migrate" "$logf" | head -5
+    fail "[$d] ROLLBACK: migration error in $logf"
+  fi
+  pass "[$d] ROLLBACK: no migration error in the legacy log"
+  unknown=$(grep -c -F "failed to update option map" "$logf" || true)
+  echo "informational: option keys the legacy binary did not recognise: $unknown (expected > 0 after a rebased run; harmless)"
+  echo "informational (broader keyword scan):"
+  grep -i -E "error|failed" "$logf" | grep -i -E "migrat|column|alter|schema" || echo "(none)"
 }
 
 mkdir -p "$WORK"
@@ -261,7 +313,13 @@ if [ "$LEGACY_SKIP" != "1" ]; then
   log "starting database containers"
   docker compose -f "$HERE/docker-compose.yml" up -d --wait "${DIALECTS[@]}"
   build_legacy
+elif [ "$ROLLBACK" = "1" ]; then
+  build_legacy
 fi
 build_new
 for d in "${DIALECTS[@]}"; do rehearse "$d"; done
-log "PASS: rehearsal finished; logs in $WORK"
+if [ "$ROLLBACK" = "1" ]; then
+  log "PASS: rehearsal (forward + rollback) finished; logs in $WORK"
+else
+  log "PASS: rehearsal finished; logs in $WORK"
+fi

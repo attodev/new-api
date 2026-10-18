@@ -33,6 +33,14 @@ TEST_POSTGRES_DSN='postgres://user:pass@host:5432/db?sslmode=disable' GOWORK=off
 
 통과 기준: 모두 PASS(DSN이 없으면 SKIP으로 나오므로 SKIP이 아니라 PASS인지 본다).
 
+역방향(롤백) 리허설도 같은 사본으로 한 번 돌린다. 시험 중 문제가 생겨 team으로 되돌아갈 때 team 바이너리가 재기반 바이너리가 마이그레이션한 DB에서 기동하는지를 본다.
+
+```bash
+ROLLBACK=1 LEGACY_SKIP=1 SQL_DSN='root:...@tcp(host:3306)/db?parseTime=true' ./scripts/schema-rehearsal/run.sh mysql
+```
+
+통과 기준: `ROLLBACK:` 줄이 모두 `PASS`이고 `FAIL:` 없이 0으로 끝난다. 복제본에 team 브랜치가 없으면 `LEGACY_REF=origin/team`.
+
 ## 2. Redis — Sentinel 장애 조치와 운영 설정
 
 목적: 앱이 Sentinel을 통해 master에 붙고, master가 죽어도 재연결하는지 확인한다(설계 §4.14). 잔액 상주 캐시가 재시작과 장애 조치에서 어떻게 되는지도 본다.
@@ -102,6 +110,7 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | `REDIS_SENTINEL_*` | §2 | Sentinel 없이 단일 주소 |
 | `BATCH_UPDATE_ENABLED` / `BATCH_UPDATE_INTERVAL` | 운영값 유지 | — |
 | `INTERFACE_LANGUAGES` 등 언어 옵션 | en,ko | 다른 언어 코드는 영어로 열림 |
+| `ACCOUNT_PASSWORD_HASH_ALGORITHM` | 시험 기간 `bcrypt` (§9) | argon2id로 저장되어 team으로 롤백하면 그 비밀번호는 검증 불가 |
 
 `.env.example`에 운영값이 주석으로 적혀 있다. GA·GTM 변수 이름은 upstream과 같다.
 
@@ -122,13 +131,42 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | `invalid rate limit configuration normalized to safe bounds` | rate-limit 환경 변수가 잘못됨 | 0건 |
 | `token quota cache reserve unavailable, falling back to database` 등 | Redis 오류 우회 | Redis 장애 때만 |
 
-## 9. 결과 기록
+## 9. 롤백 절차 — develop 시험 중 team으로 되돌아가기
+
+전환 전에 해 둘 것(이 셋이 있어야 롤백이 단순해진다):
+1. **비밀번호 해시를 bcrypt로 고정**: develop은 기본으로 argon2id를 쓰고 team은 bcrypt만 검증한다. 시험 기간 환경 변수에 `ACCOUNT_PASSWORD_HASH_ALGORITHM=bcrypt`를 넣는다. 로그인 시 기존 해시를 바꾸지는 않으므로, 이걸 빠뜨리면 시험 기간에 가입하거나 비밀번호를 바꾼 사용자만 롤백 뒤 로그인이 안 된다(그 사용자들은 비밀번호 재설정).
+2. **`options` 테이블 덤프**: develop은 upstream의 새 설정 키를 쓰고 일부 키의 값 형식이 다를 수 있다. 전환 직전 덤프를 받아 두고 롤백 때 복원한다(시험 기간에 관리자 화면에서 바꾼 설정은 사라진다).
+   ```bash
+   mysqldump --single-transaction db options > options-before-develop.sql
+   pg_dump -t options db > options-before-develop.sql
+   ```
+3. **DB 전체 스냅샷**: 최후 수단. 복원하면 시험 기간의 사용량·충전·구독 기록을 잃으므로, 아래 절차가 실패할 때만 쓴다.
+4. 시험 기간에는 upstream에만 있는 기능(새 채널 타입, 표현식 과금, 패스키·2단계 인증)을 설정하지 않는다. team이 그 데이터를 무시하거나 채널 목록에서 오류를 낼 수 있다.
+
+롤백 순서:
+1. 트래픽을 끊는다(LB에서 제외).
+2. develop에 SIGTERM을 보낸다(SIGKILL 금지). `SHUTDOWN_TIMEOUT_SECONDS`(기본 120초) 안에 배치 큐를 DB에 비우고 끝난다. 로그에서 `flushing batch updates before shutdown` 다음 줄이 `queue empty: true`인지 확인한다. `false`면 `failed to batch update user` 줄의 사용자 id를 적어 두고 DB 값과 대조한다.
+3. Redis에서 사용자·토큰 캐시를 지운다. team은 develop이 쓴 해시(스키마 버전 2)를 어차피 캐시 미스로 보지만, 지우면 첫 요청의 경로가 team의 평소 재적재 경로로 통일된다.
+   ```bash
+   redis-cli --scan --pattern 'user:*' | xargs -r redis-cli DEL
+   redis-cli --scan --pattern 'token:*' | xargs -r redis-cli DEL
+   ```
+   (Sentinel이면 현재 master에, DB 번호를 나눠 썼으면 `-n`으로 그 DB에.)
+4. `options` 덤프를 복원한다(2번에서 받은 것). 스키마는 되돌리지 않는다: develop의 AutoMigrate는 컬럼·테이블을 추가만 했고 team이 없는 유니크 인덱스를 만들지 않았으며, team은 모르는 컬럼·테이블을 무시한다(§1 역방향 리허설이 이를 확인한다).
+5. team 환경 변수로 돌아간다. `SESSION_SECRET`/`CRYPTO_SECRET`은 양쪽이 같아야 세션과 토큰 캐시 키가 이어진다. `QUOTA_CACHE_TTL`은 team 값(600)으로, develop 전용 변수(`REDIS_SENTINEL_*`, `CHATBOT_WIDGET_URL`, `GOOGLE_ANALYTICS_ID`, `ACCOUNT_PASSWORD_HASH_ALGORITHM`)는 team이 무시하므로 두어도 된다.
+6. team 바이너리를 띄우고 로그에 `failed to migrate`가 없는지, `/api/status`가 응답하는지 본다. `failed to update option map`은 develop이 쓴 새 키 때문이며 무해하다.
+7. 트래픽을 되돌리고 로그인 1건, 과금 요청 1건, 충전 화면 1건을 확인한다.
+
+롤백 뒤 남는 것: develop 기간의 로그·충전·구독·조직 데이터는 team에도 같은 컬럼이 있어 그대로 읽힌다. Toss는 develop 기간에 멈춰 있었으므로 활성 정기결제가 있다면 그 기간의 갱신이 빠진 채 재개된다. 재시도 여부는 team의 Toss 조정 로그로 확인한다.
+
+## 10. 결과 기록
 
 | 항목 | 날짜 | 수행자 | 결과 | 비고 |
 |---|---|---|---|---|
 | 1 스키마 리허설 MySQL | | | | |
 | 1 스키마 리허설 PostgreSQL | | | | |
 | 1 DSN 테스트 | | | | |
+| 1 역방향(롤백) 리허설 | | | | |
 | 2 Sentinel 연결·장애 조치 | | | | |
 | 2 Redis AOF·maxmemory 설정 | | | | |
 | 3 스테이징 e2e 21개 | | | | |
@@ -137,3 +175,4 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | 5 Gemini 이미지 상한 1건 | | | | |
 | 6 배포 설정 값 | | | | |
 | 7 PDF·안내문·도메인 옵션 | | | | |
+| 9 전환 전 준비(bcrypt·options 덤프·스냅샷) | | | | |

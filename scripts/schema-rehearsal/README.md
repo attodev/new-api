@@ -10,6 +10,11 @@ spec §5: 기존 운영 DB(bigint quota, Toss 테이블 포함)에서 재기반 
 
 `LEGACY_SKIP=1`에서는 `SQL_DSN` 하나만 받으므로 `mysql`/`postgres` 중 하나를 골라야 한다(`all` 불가). 로컬 모드에서는 `SQL_DSN`을 무시하고 compose DB만 쓴다(운영 DB에 시드 UPDATE가 가는 사고 방지).
 
+역방향(롤백) 리허설: `ROLLBACK=1`을 더하면 재기반 바이너리가 마이그레이션한 같은 DB에 team 바이너리를 다시 띄워 "team으로 되돌아가기"가 되는지 확인한다. 두 모드 모두에서 쓸 수 있다(`LEGACY_SKIP=1`이면 이 단계를 위해서만 `LEGACY_REF`(기본 `team`)에서 team 바이너리를 빌드한다. 복제본에 team 브랜치가 없으면 `LEGACY_REF=origin/team`).
+    ROLLBACK=1 ./scripts/schema-rehearsal/run.sh all
+    ROLLBACK=1 LEGACY_SKIP=1 SQL_DSN='root:...@tcp(host:3306)/db?parseTime=true' ./scripts/schema-rehearsal/run.sh mysql
+이 단계가 단언하는 것: team 바이너리가 `/api/status`에 응답할 때까지 뜬다, 지갑 행이 그대로다, 네 컬럼이 여전히 bigint다, team 로그에 `failed to migrate`가 없다. team이 모르는 옵션 키 수(`failed to update option map`)는 참고용으로만 센다(재기반 바이너리가 새 키를 쓰므로 0보다 크며 무해). 로그는 `$WORK/rollback-<dialect>.log`. Redis 없이 도는 리허설이므로 Redis 쪽 롤백 절차는 운영 체크리스트 §9를 따른다.
+
 스크립트는 검증을 직접 단언하고, 하나라도 어긋나면 `FAIL: ...`을 출력하며 0이 아닌 코드로 종료한다 (인자 오류/도구 누락은 2, 검증 실패는 1):
 - 기동 후 `quota`, `used_quota`, `aff_quota`, `aff_history` 네 컬럼이 모두 bigint
 - 지갑 행(가장 작은 user id)이 기동 전후 동일. 로컬 모드는 team 바이너리가 만든 `id=1` 행에 5000000000/3000000000을 시드한 뒤 그 값과 비교하고, `LEGACY_SKIP=1`에서는 실행 전에 읽은 값과 비교한다
