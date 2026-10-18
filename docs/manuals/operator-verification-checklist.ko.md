@@ -66,10 +66,38 @@ REDIS_SENTINEL_TEST_ADDRS=localhost:26379,localhost:26380,localhost:26381 REDIS_
 - `REDIS_SENTINEL_ADDRS=host1:26379,host2:26379,host3:26379`, `REDIS_SENTINEL_MASTER_NAME`, 필요하면 `REDIS_SENTINEL_USERNAME`/`REDIS_SENTINEL_PASSWORD`.
 - TLS(`rediss://`)를 쓰면 Sentinel 연결에도 같은 TLS가 적용되고 인증서 이름은 `REDIS_CONN_STRING`의 호스트다.
 
-Redis 서버 설정(직접 운영):
-- `appendonly yes`, `appendfsync everysec`(재시작 때 잔액 해시 보존, 손실은 마지막 1초).
-- `maxmemory`를 넉넉히(사용자 10만 명이어도 수십 MB), 다른 용도와 같이 쓰면 DB 번호 분리.
+Redis 서버 설정 변경(직접 운영). 현재 운영 Redis는 캐시 전용(`maxmemory-policy allkeys-lru`, `save ""`, `appendonly no`)이다. develop은 사용자 잔액 해시를 Redis에 상주시키므로(O12) 아래 순서로 바꾼다. 1번은 필수, 2번은 HA, 3번은 권장이다.
+
+| 순서 | 항목 | 현재 | 변경 | 안 바꾸면 |
+|---|---|---|---|---|
+| 1 | eviction | `allkeys-lru` | `maxmemory-policy noeviction`, `maxmemory`는 넉넉히(잔액 해시는 활성 사용자 수 × 수백 바이트) | 메모리가 차면 잔액 해시가 조용히 밀려나고, 그 사용자는 DB 값으로 다시 채워져 배치 대기분(10초 안팎)만큼 초과 사용 창이 반복해서 생긴다 |
+| 2 | 복제·장애 조치 | 단일 노드 | replica 1대 + Sentinel 3대(§2 앞부분, `REDIS_SENTINEL_*`) | 단일 노드 장애 = 전체 재시작과 같다(아래 3번의 손실) |
+| 3 | 영속성 | `save ""`, `appendonly no` | `appendonly yes`, `appendfsync everysec` (데이터 볼륨 필요) | Redis 재시작 때 해시가 전부 사라져 활성 사용자마다 마지막 10초분(배치 대기분) 초과 사용 창이 한 번 생긴다. team도 같은 노출이 있었으므로 새 위험은 아니며, 넣으면 손실이 마지막 1초분으로 준다. 비용은 초당 fsync 1회와 재시작 시 AOF 재생 |
+
+적용 명령(재시작 없이 바꾸고 `redis.conf`에도 같이 적는다):
+
+```bash
+redis-cli CONFIG SET maxmemory-policy noeviction
+redis-cli CONFIG SET maxmemory 2gb            # 운영 메모리에 맞춰
+redis-cli CONFIG SET appendonly yes
+redis-cli CONFIG SET appendfsync everysec
+redis-cli CONFIG REWRITE                      # redis.conf에 반영 (conf 파일로 띄운 경우)
+```
+
+Docker로 띄우면 `command`에 `--maxmemory-policy noeviction --appendonly yes --appendfsync everysec`을 넣고 `/data` 볼륨을 붙인다. `appendonly`를 켜는 순간 Redis가 백그라운드로 첫 AOF를 쓰므로 트래픽이 적을 때 한다. 영속성을 넣지 않기로 하면 Redis 재시작은 트래픽이 적을 때 계획해서 하고, `restart: unless-stopped` 같은 자동 재시작은 로그로 알 수 있게 둔다.
+
+바꾼 뒤 확인:
+
+```bash
+redis-cli CONFIG GET maxmemory-policy         # noeviction
+redis-cli CONFIG GET appendonly               # yes
+redis-cli INFO stats | grep evicted_keys      # 0
+redis-cli INFO persistence | grep -E "aof_enabled|aof_last_write_status"   # 1, ok
+```
+
 - 감시: `evicted_keys = 0`, `rdb_last_bgsave_status`·`aof_last_write_status = ok`, 장애 조치 횟수, 앱 로그의 `falling back to database` 빈도.
+- 다른 용도와 Redis를 같이 쓰면 new-api 전용 인스턴스나 DB 번호를 분리한다(`noeviction`은 다른 용도의 키도 못 밀어내므로).
+- 시험 환경(compose)도 같은 설정으로 돌려 같은 동작을 본다.
 
 잔액 상주 확인(운영 앱 기동 뒤): `redis-cli TTL user:<활성 사용자 id>`가 수만 초(기본 86400)인지, `HGET user:<id> FreshUntil`이 있는지. 기본값을 바꾸려면 `QUOTA_CACHE_TTL`(0 이하면 upstream 동작). 자세한 운영 절차는 `docs/manuals/redis-quota-cache.ko.md`.
 
@@ -168,7 +196,7 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | 1 DSN 테스트 | | | | |
 | 1 역방향(롤백) 리허설 | | | | |
 | 2 Sentinel 연결·장애 조치 | | | | |
-| 2 Redis AOF·maxmemory 설정 | | | | |
+| 2 Redis 설정 변경 (noeviction·AOF·Sentinel) | | | | |
 | 3 스테이징 e2e 21개 | | | | |
 | 4 결제 sandbox (provider별) | | | | |
 | 5 Claude display 3채널 | | | | |
