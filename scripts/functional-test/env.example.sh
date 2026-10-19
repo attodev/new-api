@@ -14,6 +14,12 @@ export ADMIN_PAT="nap_..."
 export USER_ID="123"
 export USER_KEY="sk-..."
 
+# 조직 과금(09): 조직 멤버가 될 두 번째 시험 사용자와 그 API 키. ORG_ID를 비우면 사용자의 조직을 쓰거나 새로 만든다.
+export ORG_USER_ID="124"
+export ORG_USER_KEY="sk-..."
+export ORG_ID=""
+# export ORG_USER_PAT="nap_..."   # 멤버 본인의 접근 토큰(있으면 개인 교환 차단까지 자동 확인)
+
 # 값싼 채팅 모델 하나 (OpenAI 호환 채널). 채널 스모크는 06 스크립트의 MODELS 목록을 따로 쓴다.
 export MODEL="gpt-4o-mini"
 
