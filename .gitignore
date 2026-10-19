@@ -49,3 +49,6 @@ go.work.sum
 
 # fork: O10 diagnostics history
 tools/unode-diagnostics/data/
+
+# functional-test credentials (scripts/functional-test/env.example.sh is the template)
+scripts/functional-test/env.sh
