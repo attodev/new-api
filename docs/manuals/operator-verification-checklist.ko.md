@@ -110,6 +110,8 @@ GOWORK=off go build -o new-api . && ./new-api --port 3000
 cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=12345678 bun run e2e
 ```
 
+기능 확인(과금·상주·종료·채널·인증·상한)은 `docs/manuals/functional-test-runbook.ko.md`와 `scripts/functional-test/`를 따른다.
+
 통과 기준: e2e 21개 통과(조직 20 + 한국어 1). 수동 확인: 로그인 → 대시보드 → 조직 대시보드·지갑·로그 화면이 한국어로 나오고 키 문자열이 보이지 않는다. 조직 시나리오는 `docs/manuals/organization-test-guide.md`.
 
 ## 4. 결제 provider sandbox
