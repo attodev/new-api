@@ -107,7 +107,7 @@ cd web && bun run e2e:install
 E2E_BASE_URL=http://<시험서버>:3000 E2E_BACKEND_URL=http://<시험서버>:3000 E2E_REUSE_SERVER=1 E2E_ALLOW_EXTERNAL_DB=1 \
 E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=<pw> bun run e2e
 ```
-(e2e는 조직·사용자를 만들고 지우므로 운영 사본에서만.)
+(e2e는 조직·사용자를 만들고 지우므로 운영 사본에서만.) 전제 두 가지: 관리자 계정에 2단계 인증·패스키가 없어야 하고, **그 계정의 저장된 UI 언어가 영어**여야 한다. 로그인 뒤 앱이 계정의 언어 설정으로 전환하므로(fork O9) 한국어가 저장된 운영 root로 돌리면 첫 테스트가 `Add User` 버튼을 못 찾고 타임아웃된다. 프로필 → 언어에서 English로 바꾸거나 e2e 전용 관리자 계정을 만든다. 실패 시 `test-results/**/test-failed-1.png`에서 화면 언어를 먼저 확인한다.
 
 ## 12. UI·콘텐츠 (수동)
 
