@@ -5,6 +5,7 @@
 MODELS=${MODELS:-$MODEL}
 CLAUDE_MODELS=${CLAUDE_MODELS:-}
 RESPONSES_MODELS=${RESPONSES_MODELS:-}
+TOOL_CHOICE=${TOOL_CHOICE:-auto}
 
 last_log() { sql "SELECT model_name || ' quota=' || quota || ' p=' || prompt_tokens || ' c=' || completion_tokens FROM logs WHERE user_id=$USER_ID AND type=2 ORDER BY id DESC LIMIT 1"; }
 
@@ -16,10 +17,17 @@ for m in $MODELS; do
   out=$(curl -sS "$BASE_URL/v1/chat/completions" -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
     -d "{\"model\":\"$m\",\"stream\":true,\"stream_options\":{\"include_usage\":true},\"max_tokens\":16,\"messages\":[{\"role\":\"user\",\"content\":\"Reply OK\"}]}")
   printf '%s' "$out" | grep -q '"usage"' && pass "[$m] 스트림 usage 청크" || fail "[$m] 스트림에 usage 없음"
-  log "[$m] tool call"
+  log "[$m] tool call (tool_choice=$TOOL_CHOICE)"
+  # Claude 5.5 계열은 강제 선택(required→any)을 거부하므로 기본은 auto. 강제로 보고 싶으면 TOOL_CHOICE=required.
   out=$(curl -sS "$BASE_URL/v1/chat/completions" -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
-    -d "{\"model\":\"$m\",\"max_tokens\":64,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}}}],\"tool_choice\":\"required\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the weather in Seoul?\"}]}")
-  printf '%s' "$out" | jq -e '.choices[0].message.tool_calls[0].function.name' >/dev/null 2>&1 && pass "[$m] tool_calls 반환" || fail "[$m] tool_calls 없음: $(printf '%s' "$out" | head -c 300)"
+    -d "{\"model\":\"$m\",\"max_tokens\":256,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get the current weather for a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}}}],\"tool_choice\":\"$TOOL_CHOICE\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the get_weather tool to check the weather in Seoul.\"}]}")
+  if printf '%s' "$out" | jq -e '.choices[0].message.tool_calls[0].function.name' >/dev/null 2>&1; then
+    pass "[$m] tool_calls 반환 $(printf '%s' "$out" | jq -c '.choices[0].message.tool_calls[0].function')"
+  elif printf '%s' "$out" | jq -e '.error' >/dev/null 2>&1; then
+    fail "[$m] tool call 오류: $(printf '%s' "$out" | head -c 300)"
+  else
+    echo "note: [$m] 모델이 도구를 쓰지 않고 답함(finish_reason=$(printf '%s' "$out" | jq -r '.choices[0].finish_reason')): $(printf '%s' "$out" | jq -r '.choices[0].message.content' | head -c 120)"
+  fi
   sleep 1; echo "최근 로그: $(last_log)"
 done
 
