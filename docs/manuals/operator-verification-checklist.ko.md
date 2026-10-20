@@ -129,6 +129,7 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 - Anthropic 채널, AWS Bedrock 채널, Vertex 채널 각각에 `thinking: {"type":"adaptive"}`만 보낸 요청(Opus 4.7 이상)을 보내 응답에 thinking 요약이 있는지 확인한다. `display`를 `omitted`로 명시한 요청은 비어 있어야 한다.
 - 통과 기준: 세 채널 모두 400 없이 응답하고 요약이 온다. Bedrock·Vertex가 `display` 필드를 거부하면 그 채널은 보고한다(upstream도 같은 필드를 보내므로 새 위험은 아니지만 확인은 필요).
 - Gemini 채널에 캐시가 큰 이미지 요청을 보내 로그의 과금 금액이 상한 규칙(이미지 토큰 ≤ prompt − cached − audio)에 맞는지 한 건 확인한다.
+- gpt-5.6 계열(OpenAI·OpenRouter 채널)에 `reasoning_effort` + `tools`를 `/v1/chat/completions`로 보내 200과 `tool_calls`가 오는지 확인한다. 400이면 §6의 `global.chat_completions_to_responses_policy`가 저장되지 않은 것이다(team에서 보고된 "추론과 도구를 함께 보내면 400" 문제의 해결 경로).
 
 ## 6. 배포 설정 값
 
@@ -141,6 +142,7 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | `BATCH_UPDATE_ENABLED` / `BATCH_UPDATE_INTERVAL` | 운영값 유지 | — |
 | `INTERFACE_LANGUAGES` 등 언어 옵션 | en,ko | 다른 언어 코드는 영어로 열림 |
 | `ACCOUNT_PASSWORD_HASH_ALGORITHM` | 시험 기간 `bcrypt` (§9) | argon2id로 저장되어 team으로 롤백하면 그 비밀번호는 검증 불가 |
+| 옵션 `global.chat_completions_to_responses_policy` (환경 변수 아님, 시스템 설정 → 모델 설정 → "ChatCompletions -> Responses Compatibility") | `{"enabled":true,"all_channels":true,"model_patterns":["^gpt-5\\.6"]}` | gpt-5.6 계열에 `/v1/chat/completions`로 추론+도구 요청을 보내면 상류가 400(`Function tools with reasoning_effort are not supported … use /v1/responses`)을 돌려준다. 켜면 게이트웨이가 상류에는 Responses API로 보내고 클라이언트에는 chat 형식으로 돌려준다(2026-10-20 시험 서버에서 확인). `options` 테이블 값이라 전환 뒤 운영에서 다시 저장해야 한다 |
 
 `.env.example`에 운영값이 주석으로 적혀 있다. GA·GTM 변수 이름은 upstream과 같다.
 
