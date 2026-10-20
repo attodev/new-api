@@ -171,7 +171,19 @@ async function assignMemberViaUi(page: Page, username: string) {
   await page.getByRole('button', { name: 'Look up user', exact: true }).click()
   await expect(page.getByText(username, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await expect(page.getByText(/organization member assigned/i)).toBeVisible()
+  // Joining from outside requires a cleared personal balance. A production
+  // database copy usually grants new users a sign-up quota
+  // (QuotaForNewUser > 0), which makes the add fail with a toast; surface that
+  // as a precondition error instead of a bare timeout.
+  const assigned = page.getByText(/organization member assigned/i)
+  const refused = page.getByText(/personal balance/i)
+  await expect(assigned.or(refused).first()).toBeVisible()
+  if (await refused.isVisible().catch(() => false)) {
+    throw new Error(
+      'Member add refused: the new user still has a personal balance. Set the "new user initial quota" option (QuotaForNewUser) to 0 in the test environment before running e2e.'
+    )
+  }
+  await expect(assigned).toBeVisible()
 }
 
 async function promoteMemberToAdminViaUi(page: Page, username: string) {

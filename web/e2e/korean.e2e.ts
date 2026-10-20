@@ -26,7 +26,7 @@ import { expect, test } from '@playwright/test'
 const adminUsername = process.env.E2E_ADMIN_USERNAME || 'root'
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || '12345678'
 
-test('a ko-KR browser sees the sign-in page and the console in Korean', async ({
+test('a ko-KR browser sees the sign-in page in Korean and the console in the saved language (Korean when none)', async ({
   browser,
 }) => {
   const context = await browser.newContext({ locale: 'ko-KR' })
@@ -51,8 +51,22 @@ test('a ko-KR browser sees the sign-in page and the console in Korean', async ({
     expect(response.ok()).toBe(true)
 
     await expect(page).toHaveURL(/\/dashboard/)
+    // fork O9: after sign-in the console follows the account's saved UI
+    // language; the browser locale only applies when nothing is saved. On a
+    // production database copy the admin usually has a saved language, so
+    // assert whichever rule applies instead of assuming Korean.
+    const self = await page.request.get('/api/user/self')
+    expect(self.ok()).toBe(true)
+    const body = (await self.json()) as {
+      data?: { language?: string; setting?: { language?: string } }
+    }
+    const saved =
+      body.data?.language ?? body.data?.setting?.language ?? undefined
+    const expectsKorean = !saved || /^(ko|kr)/i.test(saved)
     await expect(
-      page.getByRole('link', { name: '대시보드' }).first()
+      page
+        .getByRole('link', { name: expectsKorean ? '대시보드' : 'Dashboard' })
+        .first()
     ).toBeVisible()
   } finally {
     await context.close()
