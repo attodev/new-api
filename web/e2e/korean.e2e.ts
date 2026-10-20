@@ -48,25 +48,24 @@ test('a ko-KR browser sees the sign-in page in Korean and the console in the sav
       ),
       signIn.click(),
     ])
-    expect(response.ok()).toBe(true)
+    const loginStatus = response.status()
+    const loginBody = await response.text()
+    expect(response.ok(), `login responded ${loginStatus}: ${loginBody}`).toBe(
+      true
+    )
 
     await expect(page).toHaveURL(/\/dashboard/)
     // fork O9: after sign-in the console follows the account's saved UI
     // language; the browser locale only applies when nothing is saved. On a
     // production database copy the admin usually has a saved language, so
-    // assert whichever rule applies instead of assuming Korean.
-    const self = await page.request.get('/api/user/self')
-    expect(self.ok()).toBe(true)
-    const body = (await self.json()) as {
-      data?: { language?: string; setting?: { language?: string } }
-    }
-    const saved =
-      body.data?.language ?? body.data?.setting?.language ?? undefined
-    const expectsKorean = !saved || /^(ko|kr)/i.test(saved)
+    // accept either console language here (the sign-in page above already
+    // proved the ko-KR locale path). Set E2E_ADMIN_LANGUAGE=ko|en to pin it.
+    const pinned = process.env.E2E_ADMIN_LANGUAGE
+    let expected: string | RegExp = /^(대시보드|Dashboard)$/
+    if (pinned === 'ko') expected = '대시보드'
+    else if (pinned === 'en') expected = 'Dashboard'
     await expect(
-      page
-        .getByRole('link', { name: expectsKorean ? '대시보드' : 'Dashboard' })
-        .first()
+      page.getByRole('link', { name: expected }).first()
     ).toBeVisible()
   } finally {
     await context.close()

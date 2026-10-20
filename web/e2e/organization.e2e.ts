@@ -542,8 +542,23 @@ test.describe('organization browser smoke tests', () => {
       memberRow.getByText('Suspended', { exact: true })
     ).toBeVisible()
 
-    await memberRow.getByRole('checkbox').check()
-    await page.getByRole('button', { name: 'Resume', exact: true }).click()
+    // After Save the table reloads and clears the selection; a late reload
+    // can unmount the bulk toolbar between check() and the Resume click.
+    // Let the reload settle, then retry the select-and-mark step.
+    await page.waitForLoadState('networkidle').catch(() => {})
+    const pendingResume = memberRow.getByText('Pending resume')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const checkbox = memberRow.getByRole('checkbox')
+      if (!(await checkbox.isChecked().catch(() => false))) {
+        await checkbox.check()
+      }
+      await page
+        .getByRole('button', { name: 'Resume', exact: true })
+        .click({ timeout: 5_000 })
+        .catch(() => {})
+      if (await pendingResume.isVisible().catch(() => false)) break
+    }
+    await expect(pendingResume).toBeVisible()
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(memberRow.getByText('Active', { exact: true })).toBeVisible()
   })
