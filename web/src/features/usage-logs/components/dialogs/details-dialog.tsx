@@ -94,6 +94,7 @@ import {
 import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
 import { ResponseModelDetails } from '../model-badge'
 import { PluginAuthorLink } from '../plugin-author-link'
+import { BillingFormula } from './billing-formula-fork' // fork: O6
 import { DetailRow, DetailSection } from './log-detail-layout'
 import { TimingBreakdownSection } from './timing-breakdown-section' // fork: O7
 
@@ -386,6 +387,8 @@ export function BillingBreakdown(props: {
         value={formatLogQuota(log.quota)}
         mono
       />
+      {/* fork: O6 */}
+      <BillingFormula log={log} other={other} fmtAmount={fmtPrice} />
     </DetailSection>
   )
 }
