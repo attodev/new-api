@@ -49,13 +49,27 @@ set_user_quota() {
   api_ok POST /api/user/manage "{\"id\":$USER_ID,\"action\":\"add_quota\",\"mode\":\"override\",\"value\":$1}" >/dev/null
 }
 
-# 채팅 요청 1건: chat <stream true|false> [model] -> HTTP 코드 출력
+# 채팅 요청 1건: chat <stream true|false> [model] -> HTTP 코드 한 줄 출력
 chat() {
   local stream=$1 model=${2:-$MODEL}
-  curl -sS -o /dev/null -w '%{http_code}' "$BASE_URL/v1/chat/completions" \
+  curl -sS -o /dev/null -w '%{http_code}\n' "$BASE_URL/v1/chat/completions" \
     -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
     -d "{\"model\":\"$model\",\"stream\":$stream,\"max_tokens\":16,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word OK.\"}]}"
 }
+
+# 예약(pre-consume) 검증용 요청: 긴 프롬프트(약 PROMPT_REPEAT×9 토큰) + 출력 1토큰.
+# 예약액은 "프롬프트 토큰 × pre_consume_multiplier × 모델 ratio × 그룹 ratio"라 프롬프트가 짧고
+# 모델이 싸면 0으로 반올림되어 아무것도 예약되지 않는다. 출력을 1토큰으로 묶으면 실제 비용 ≈ 예약액이
+# 되어 한도 검증이 정확해진다.
+PROMPT_REPEAT=${PROMPT_REPEAT:-400}
+long_prompt() { printf 'The quick brown fox jumps over the lazy dog near the river bank. %.0s' $(seq 1 "$PROMPT_REPEAT"); }
+chat_reserve() { # [model] -> HTTP 코드 한 줄
+  local model=${1:-$MODEL}
+  curl -sS -o /dev/null -w '%{http_code}\n' "$BASE_URL/v1/chat/completions" \
+    -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
+    -d "{\"model\":\"$model\",\"stream\":false,\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"$(long_prompt) Reply OK.\"}]}"
+}
+count_200() { cat "$1"/* | grep -c '^200$' || true; }
 chat_body() { # 본문까지 받는다
   local stream=$1 model=${2:-$MODEL}
   curl -sS "$BASE_URL/v1/chat/completions" \

@@ -15,6 +15,7 @@ set_org_quota()    { api_ok PATCH "/api/organizations/$ORG_ID" "{\"quota\":$1}" 
 set_org_status()   { api_ok PATCH "/api/organizations/$ORG_ID" "{\"status\":$1}" >/dev/null; }
 set_member_limit() { api_ok PATCH "/api/organization/users/$ORG_USER_ID?organization_id=$ORG_ID" "{\"quota\":$1}" >/dev/null; }
 mchat() { USER_KEY="$ORG_USER_KEY" chat false; }
+mchat_reserve() { USER_KEY="$ORG_USER_KEY" chat_reserve; }
 
 log "조직 준비"
 if [ -z "${ORG_ID:-}" ]; then
@@ -46,25 +47,31 @@ echo "logs 합계=$sum (${cnt}건) 조직 감소=$((oq0-oq1)) used 증가=$((ou1
 [ "$((ou1-ou0))" = "$sum" ] && pass "조직 used_quota 증가 = logs" || fail "used 증가 $((ou1-ou0)) ≠ logs $sum"
 [ "$((m0-m1))" = "$sum" ] && pass "멤버 한도 감소 = logs" || fail "멤버 한도 감소 $((m0-m1)) ≠ logs $sum"
 [ "$mr" = "$m1" ] && pass "Redis 멤버 한도 = DB" || fail "Redis $mr ≠ DB $m1"
-cost=$((sum / N)); [ "$cost" -gt 0 ] || cost=1; echo "1건 평균 비용 ≈ $cost"
+log "예약 검증용 요청 비용 측정 (긴 프롬프트, 출력 1토큰)"
+tc=$(now); code=$(mchat_reserve); [ "$code" = 200 ] || { fail "측정 요청 HTTP $code"; finish; }
+wait_batch; read -r cost _ <<<"$(member_logs "$tc")"
+echo "1건 비용 = $cost quota"
+if [ "$cost" -lt 50 ]; then fail "1건 비용 $cost < 50: 모델이 너무 싸서 예약액이 0이 된다(PROMPT_REPEAT를 늘리거나 비싼 모델)"; finish; fi
+slack=$((cost/10 + 1))
 
 log "B. 조직 지갑이 3건분일 때 ${PAR}건 동시 → 조직 지갑 안에서만 성공"
 set_member_limit "$BIG"; set_org_quota $((cost*3 + cost/2)); t1=$(now)
-tmp=$(mktemp -d); for i in $(seq 1 "$PAR"); do ( mchat > "$tmp/$i" ) & done; wait
-succ=$(cat "$tmp"/* | grep -c '^200$' || true); rm -rf "$tmp"
-wait_batch; read -r oq2 _ _ <<<"$(org_row)"; read -r sumB _ <<<"$(member_logs "$t1")"
-echo "성공 $succ/$PAR 조직 잔액=$oq2 과금=$sumB"
-[ "$oq2" -ge 0 ] && pass "조직 잔액 음수 아님" || fail "조직 잔액 음수 $oq2"
+tmp=$(mktemp -d); for i in $(seq 1 "$PAR"); do ( mchat_reserve > "$tmp/$i" ) & done; wait
+succ=$(count_200 "$tmp"); rm -rf "$tmp"
+wait_batch; read -r oq2 _ _ <<<"$(org_row)"; read -r sumB cntB <<<"$(member_logs "$t1")"
+echo "성공 $succ/$PAR 조직 잔액=$oq2 과금=$sumB (${cntB}건, 허용 오차 $slack)"
+[ "$oq2" -ge "$((-slack))" ] && pass "조직 잔액 ≥ -$slack" || fail "조직 잔액 $oq2 < -$slack: 조직 예약이 동작하지 않음"
 [ "$succ" -ge 1 ] && [ "$succ" -le 3 ] && pass "성공 $succ건 (예산 3건)" || fail "성공 $succ건: 조직 예산을 넘었거나 0건"
-[ "$sumB" -le $((cost*3 + cost/2)) ] && pass "과금 ≤ 조직 예산" || fail "과금 $sumB > 조직 예산"
+[ "$cntB" = "$succ" ] && pass "과금 로그 = 성공 건수" || fail "과금 로그 $cntB건 ≠ 성공 $succ건"
+[ "$sumB" -le $((cost*3 + cost/2 + slack)) ] && pass "과금 ≤ 조직 예산+오차" || fail "과금 $sumB > 조직 예산"
 
 log "C. 멤버 한도가 3건분일 때 ${PAR}건 동시 → 멤버 한도 안에서만 성공"
 set_org_quota "$BIG"; set_member_limit $((cost*3 + cost/2)); t2=$(now)
-tmp=$(mktemp -d); for i in $(seq 1 "$PAR"); do ( mchat > "$tmp/$i" ) & done; wait
-succ=$(cat "$tmp"/* | grep -c '^200$' || true); rm -rf "$tmp"
+tmp=$(mktemp -d); for i in $(seq 1 "$PAR"); do ( mchat_reserve > "$tmp/$i" ) & done; wait
+succ=$(count_200 "$tmp"); rm -rf "$tmp"
 wait_batch; m2=$(member_db); read -r oq3 _ _ <<<"$(org_row)"; read -r sumC _ <<<"$(member_logs "$t2")"
-echo "성공 $succ/$PAR 멤버 한도=$m2 조직 감소=$((BIG-oq3)) 과금=$sumC"
-[ "$m2" -ge 0 ] && pass "멤버 한도 음수 아님" || fail "멤버 한도 음수 $m2"
+echo "성공 $succ/$PAR 멤버 한도=$m2 조직 감소=$((BIG-oq3)) 과금=$sumC (허용 오차 $slack)"
+[ "$m2" -ge "$((-slack))" ] && pass "멤버 한도 ≥ -$slack" || fail "멤버 한도 $m2 < -$slack: 멤버 한도 예약이 동작하지 않음"
 [ "$succ" -ge 1 ] && [ "$succ" -le 3 ] && pass "성공 $succ건 (한도 3건)" || fail "성공 $succ건: 멤버 한도를 넘었거나 0건"
 [ "$((BIG-oq3))" = "$sumC" ] && pass "조직 지갑 감소 = 과금 (한도 거부분은 조직에서도 안 빠짐)" || fail "조직 감소 $((BIG-oq3)) ≠ 과금 $sumC"
 
