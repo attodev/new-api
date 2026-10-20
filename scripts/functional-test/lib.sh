@@ -86,7 +86,26 @@ chat_reserve() { # [model] -> HTTP 코드 한 줄
     -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
     -d "{\"model\":\"$model\",\"stream\":false,\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"$(long_prompt) Reply OK.\"}]}"
 }
-count_200() { cat "$1"/* | grep -c '^200$' || true; }
+count_200() { cat "$1"/*.code | grep -c '^200$' || true; }
+# 동시 요청 PAR건: run_parallel <dir> <n> <request-fn> ; <dir>/<i>.code 와 <dir>/<i>.body 를 남긴다
+run_parallel() {
+  local dir=$1 n=$2 fn=$3 i
+  for i in $(seq 1 "$n"); do ( "$fn" "$dir/$i" ) & done; wait
+}
+# 예약 검증용 요청(본문 저장): chat_reserve_to <prefix> [key]
+chat_reserve_to() {
+  local prefix=$1 key=${2:-$USER_KEY}
+  curl -sS -o "$prefix.body" -w '%{http_code}\n' "$BASE_URL/v1/chat/completions" \
+    -H "Authorization: Bearer $key" -H "Content-Type: application/json" \
+    -d "{\"model\":\"$MODEL\",\"stream\":false,\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"$(long_prompt) Reply OK.\"}]}" > "$prefix.code"
+}
+report_parallel() { # <dir> : 코드 분포와 실패 응답 1건 요약
+  echo "HTTP 코드 분포: $(cat "$1"/*.code | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+  local f; f=$(grep -L '^200$' "$1"/*.code | head -1 || true)
+  [ -n "$f" ] && echo "실패 응답 예: $(head -c 300 "${f%.code}.body")"
+}
+# 앱 로그에서 마지막 예약 금액 줄: 'needs pre-consume' (예약액은 로컬 토큰 추정 × 배율 × ratio)
+show_preconsume_log() { app_logs 400 | grep -E "needs pre-consume|trusted without pre-consume" | tail -"${1:-3}" || true; }
 chat_body() { # 본문까지 받는다
   local stream=$1 model=${2:-$MODEL}
   curl -sS "$BASE_URL/v1/chat/completions" \
