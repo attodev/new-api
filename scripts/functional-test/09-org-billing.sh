@@ -11,9 +11,12 @@ org_row()    { sql "SELECT quota || ' ' || used_quota || ' ' || status FROM orga
 member_db()  { sql "SELECT quota FROM users WHERE id=$ORG_USER_ID"; }
 member_rd()  { rds HGET "user:$ORG_USER_ID" Quota; }
 member_logs(){ sql "SELECT COALESCE(SUM(quota),0) || ' ' || COUNT(*) FROM logs WHERE user_id=$ORG_USER_ID AND type=2 AND created_at>=$1"; }
-set_org_quota()    { api_ok PATCH "/api/organizations/$ORG_ID" "{\"quota\":$1}" >/dev/null; }
-set_org_status()   { api_ok PATCH "/api/organizations/$ORG_ID" "{\"status\":$1}" >/dev/null; }
-set_member_limit() { api_ok PATCH "/api/organization/users/$ORG_USER_ID?organization_id=$ORG_ID" "{\"quota\":$1}" >/dev/null; }
+# 조직 관리 API(/api/organizations, /api/organization/*)는 브라우저 세션 전용이라 접근 토큰으로 부를 수 없다.
+# 조직 지갑·상태는 DB에만 있고(캐시 없음, 요청마다 DB를 읽음) SQL로 바꿔도 즉시 반영된다.
+# 멤버 한도(users.quota)는 Redis에 상주하므로 관리자 API(add_quota override)로 바꿔 캐시까지 맞춘다.
+set_org_quota()    { sql "UPDATE organizations SET quota=$1 WHERE id=$ORG_ID" >/dev/null; }
+set_org_status()   { sql "UPDATE organizations SET status=$1 WHERE id=$ORG_ID" >/dev/null; }
+set_member_limit() { api_ok POST /api/user/manage "{\"id\":$ORG_USER_ID,\"action\":\"add_quota\",\"mode\":\"override\",\"value\":$1}" >/dev/null; }
 mchat() { USER_KEY="$ORG_USER_KEY" chat false; }
 mchat_reserve() { USER_KEY="$ORG_USER_KEY" chat_reserve; }
 
@@ -21,16 +24,13 @@ log "조직 준비"
 if [ -z "${ORG_ID:-}" ]; then
   ORG_ID=$(api GET "/api/user/$ORG_USER_ID" | jq -r '.data.organization_id // 0')
   if [ "$ORG_ID" = 0 ] || [ -z "$ORG_ID" ]; then
-    name="ft-org-$(date +%s)"
-    out=$(api_ok POST /api/organizations/ "{\"name\":\"$name\",\"description\":\"functional test\",\"owner_user_id\":$ORG_USER_ID,\"quota\":$BIG}")
-    ORG_ID=$(printf '%s' "$out" | jq -r '.data.id // .data.organization.id // empty')
-    [ -n "$ORG_ID" ] || { echo "$out"; fail "조직 생성 응답에서 id를 찾지 못함"; finish; }
-    echo "조직 $name (id=$ORG_ID) 생성, owner=$ORG_USER_ID"
+    fail "사용자 $ORG_USER_ID 가 조직에 속해 있지 않다. 관리자 화면(조직 관리)에서 조직을 만들고 이 사용자를 멤버로 넣은 뒤 다시 실행한다(조직 API는 세션 전용이라 스크립트가 만들 수 없음)"; finish
   else
     echo "사용자 $ORG_USER_ID 가 속한 조직 id=$ORG_ID 사용"
   fi
 fi
 role=$(api GET "/api/user/$ORG_USER_ID" | jq -r '.data.organization_role')
+cnt_org=$(sql "SELECT COUNT(*) FROM organizations WHERE id=$ORG_ID"); [ "$cnt_org" = 1 ] || { fail "organizations 테이블에 id=$ORG_ID 가 없다"; finish; }
 echo "멤버 역할: $role"
 set_org_quota "$BIG"; set_member_limit "$BIG"
 echo "조직(quota used status)=$(org_row)  멤버 한도 DB=$(member_db)"

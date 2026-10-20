@@ -17,7 +17,8 @@ export ADMIN_PASSWORD=""
 export USER_ID="123"
 export USER_KEY="sk-..."
 
-# 조직 과금(09): 조직 멤버가 될 두 번째 시험 사용자와 그 API 키. ORG_ID를 비우면 사용자의 조직을 쓰거나 새로 만든다.
+# 조직 과금(09): 조직에 속한 두 번째 시험 사용자와 그 API 키. 조직과 멤버십은 관리자 화면에서 미리 만들어 둔다
+# (조직 API는 브라우저 세션 전용). ORG_ID를 비우면 그 사용자의 조직을 쓴다.
 export ORG_USER_ID="124"
 export ORG_USER_KEY="sk-..."
 export ORG_ID=""
