@@ -14,9 +14,9 @@ if [ "$cost" -lt 50 ]; then
   fail "1건 비용 $cost < 50: 한도 검증에 의미 있는 비용이 아님"; finish
 fi
 
-# 예약액 = 로컬 토큰 추정 × pre_consume_multiplier × ratio. 상류 토크나이저가 더 많이 세면 실제 비용이
-# 예약액보다 커서(관측: 10~15%) 예산 3.5건분에 4건이 예약될 수 있고, 잔액은 (성공 수 × 차이)만큼 음수가 된다.
-# 그래서 성공 ≤ 4, 초과 ≤ 성공 수 × 비용의 25%로 판정한다. 차이를 줄이려면 pre_consume_multiplier를 올린다.
+# 예약액 = 로컬 토큰 추정 × pre_consume_multiplier × ratio, 정산 = 상류 usage. 토크나이저가 달라 두 값이
+# 어긋나며 방향은 모델마다 다르다(Qwen: 예약 1.35배 커서 2건 통과; 상류가 더 세는 모델: 4건 예약, 잔액 음수).
+# 그래서 성공 1~4건, 음수 ≤ 성공 수 × 비용의 25%로 판정한다. 음수 방향이면 pre_consume_multiplier를 올린다.
 budget=$((cost*3 + cost/2))
 log "잔액을 ${budget}(3.5건분)으로 맞추고 ${PAR}건 동시 요청"
 set_user_quota "$budget"
