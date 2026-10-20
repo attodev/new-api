@@ -32,6 +32,23 @@ api_ok() { # api 응답의 success 필드가 true가 아니면 메시지와 함�
   printf '%s' "$out"
 }
 
+# 민감한 관리자 작업(사용자 비활성화 등)은 신원 확인(step-up) 증명이 필요하다.
+# ADMIN_PASSWORD(루트 비밀번호)가 있으면 /api/verify로 증명을 받아 X-Security-Proof 헤더로 붙인다.
+# proof_token <scope> <context-json>
+proof_token() {
+  [ -n "${ADMIN_PASSWORD:-}" ] || { echo "ADMIN_PASSWORD 미설정: step-up 증명이 필요한 작업을 건너뛴다" >&2; return 1; }
+  local out
+  out=$(api POST /api/verify "{\"method\":\"password\",\"scope\":\"$1\",\"context\":$2,\"password\":$(printf '%s' "$ADMIN_PASSWORD" | jq -Rs .)}")
+  if [ "$(printf '%s' "$out" | jq -r '.success')" != "true" ]; then printf '%s\n' "$out" >&2; return 1; fi
+  printf '%s' "$out" | jq -r '.data.proof_token'
+}
+# api_proof METHOD PATH BODY SCOPE CONTEXT : 증명을 받아 헤더에 붙여 호출
+api_proof() {
+  local m=$1 p=$2 b=$3 scope=$4 ctx=$5 tok
+  tok=$(proof_token "$scope" "$ctx") || return 1
+  curl -sS -X "$m" "$BASE_URL$p" -H "Authorization: Bearer $ADMIN_PAT" -H "X-Security-Proof: $tok" -H "Content-Type: application/json" -d "$b"
+}
+
 # compose 안의 psql / redis-cli
 sql() { (cd "$COMPOSE_DIR" && $COMPOSE exec -T "$PG_SERVICE" psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -At -c "$1"); }
 rds() { (cd "$COMPOSE_DIR" && $COMPOSE exec -T "$REDIS_SERVICE" sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" exec redis-cli "$@"' sh "$@"); }

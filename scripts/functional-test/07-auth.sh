@@ -12,11 +12,26 @@ code=$(USER_KEY="$key" chat false); [ "$code" = 200 ] && pass "새 키 즉시 �
 api_ok DELETE "/api/token/$tid" >/dev/null
 code=$(USER_KEY="$key" chat false); [ "$code" = 401 ] && pass "삭제 즉시 401" || fail "삭제 뒤 HTTP $code (기대 401)"
 
-log "사용자 $USER_ID 비활성화 → 즉시 거부 → 재활성화"
-api_ok POST /api/user/manage "{\"id\":$USER_ID,\"action\":\"disable\"}" >/dev/null
-code=$(chat false); [ "$code" != 200 ] && pass "비활성화 즉시 HTTP $code" || fail "비활성화 뒤에도 200"
-api_ok POST /api/user/manage "{\"id\":$USER_ID,\"action\":\"enable\"}" >/dev/null
-code=$(chat false); [ "$code" = 200 ] && pass "재활성화 뒤 200" || fail "재활성화 뒤 HTTP $code"
+if [ -n "${ADMIN_PASSWORD:-}" ]; then
+  log "사용자 $USER_ID 비활성화(관리자 API + step-up 증명) → 즉시 거부 → 재활성화"
+  out=$(api_proof POST /api/user/manage "{\"id\":$USER_ID,\"action\":\"disable\"}" admin.user.manage "{\"user_id\":$USER_ID,\"action\":\"disable\"}")
+  [ "$(printf '%s' "$out" | jq -r '.success')" = "true" ] || { echo "$out"; fail "비활성화 호출 실패"; }
+  code=$(chat false); [ "$code" != 200 ] && pass "비활성화 즉시 HTTP $code" || fail "비활성화 뒤에도 200"
+  out=$(api_proof POST /api/user/manage "{\"id\":$USER_ID,\"action\":\"enable\"}" admin.user.manage "{\"user_id\":$USER_ID,\"action\":\"enable\"}")
+  [ "$(printf '%s' "$out" | jq -r '.success')" = "true" ] || { echo "$out"; fail "재활성화 호출 실패"; }
+  code=$(chat false); [ "$code" = 200 ] && pass "재활성화 뒤 200" || fail "재활성화 뒤 HTTP $code"
+else
+  log "사용자 $USER_ID 비활성화(DB 직접 변경; ADMIN_PASSWORD 없음) → SYNC_FREQUENCY 안에 거부 → 재활성화"
+  SYNC=${SYNC_FREQUENCY:-60}
+  sql "UPDATE users SET status=2 WHERE id=$USER_ID" >/dev/null; t0=$(now)
+  for _ in $(seq 1 $((SYNC+30))); do code=$(chat false); [ "$code" != 200 ] && break; sleep 1; done
+  el=$(( $(now) - t0 ))
+  [ "$code" != 200 ] && [ "$el" -le $((SYNC+5)) ] && pass "비활성화 ${el}s 뒤 HTTP $code (≤ $SYNC)" || fail "비활성화가 ${el}s 안에 반영되지 않음(HTTP $code)"
+  sql "UPDATE users SET status=1 WHERE id=$USER_ID" >/dev/null
+  for _ in $(seq 1 $((SYNC+30))); do code=$(chat false); [ "$code" = 200 ] && break; sleep 1; done
+  [ "$code" = 200 ] && pass "재활성화 반영" || fail "재활성화 뒤 HTTP $code"
+  echo "note: 관리자 화면에서 비활성화하면 즉시 거부돼야 한다(auth version). 수동으로 한 번 확인"
+fi
 
 log "비밀번호 해시 알고리즘 (시험 기간 bcrypt)"
 h=$(sql "SELECT substr(password,1,4) FROM users ORDER BY id DESC LIMIT 1")

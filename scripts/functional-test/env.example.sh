@@ -9,6 +9,9 @@ export BASE_URL="http://127.0.0.1:3000"
 #   redemption:write, billing:write (구독 플랜 상한 확인용)
 # 가장 단순한 방법은 모든 권한을 가진 토큰 하나를 시험 기간에만 만드는 것이다.
 export ADMIN_PAT="nap_..."
+# 루트 비밀번호(선택). 사용자 비활성화처럼 신원 확인(step-up)이 필요한 관리자 작업에 /api/verify 증명을 받을 때 쓴다.
+# 비우면 그 단계는 DB 직접 변경으로 대신하고 반영 시간(SYNC_FREQUENCY 안)을 잰다.
+export ADMIN_PASSWORD=""
 
 # 과금 시험에 쓸 사용자(운영 사용자가 아닌 시험용 계정)와 그 사용자의 API 키(sk-...)
 export USER_ID="123"

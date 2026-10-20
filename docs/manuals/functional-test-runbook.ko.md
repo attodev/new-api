@@ -7,11 +7,12 @@
 1. **시험용 사용자**: 운영 사용자가 아닌 계정 하나(`USER_ID`). 잔액은 스크립트가 바꾼다. 그 사용자의 API 키 하나(`USER_KEY`, `sk-…`). 과금은 값싼 모델 하나(`MODEL`)로 한다.
 2. **관리자 접근 토큰**(`ADMIN_PAT`): root 계정으로 로그인 → 설정 → 접근 토큰에서 만든다. 스크립트가 쓰는 권한은 `user:read`, `user:write`, `api_key:*`, `log:read`, `redemption:write`, `billing:write`. 시험 기간에만 쓰는 전체 권한 토큰이 가장 단순하다. 교환 적립까지 자동으로 보려면 시험 사용자의 토큰(`USER_PAT`)도 하나 만든다.
 3. **도구**: 시험 compose가 있는 호스트에서 `curl`, `jq`. DB·Redis 조회는 `docker compose exec`로 한다.
-4. 설정:
+4. **루트 비밀번호(`ADMIN_PASSWORD`, 선택)**: 사용자 비활성화처럼 신원 확인(step-up)이 필요한 관리자 작업은 접근 토큰만으로는 `SECURITY_PROOF_REQUIRED`로 거부된다. 스크립트는 비밀번호가 있으면 `POST /api/verify`로 증명을 받아 `X-Security-Proof` 헤더로 붙이고, 없으면 그 단계를 DB 직접 변경으로 대신한다(반영 시간 ≤ `SYNC_FREQUENCY`).
+5. 설정:
    ```bash
    cd scripts/functional-test && cp env.example.sh env.sh && $EDITOR env.sh
    ```
-5. 모든 확인은 **시험 환경에만** 한다. 스크립트는 잔액을 덮어쓰고 앱과 Redis를 재시작한다.
+6. 모든 확인은 **시험 환경에만** 한다. 스크립트는 잔액을 덮어쓰고 앱과 Redis를 재시작한다.
 
 바로 쓸 조회 명령(아래 절들이 반복해서 쓴다):
 ```bash
@@ -44,7 +45,7 @@ docker compose logs --tail=200 newapi
 
 ## 3. Redis 상주 — `03-residency.sh`
 
-무엇을: 요청 뒤 `TTL user:<id>`가 수만 초, `FreshUntil`이 미래, `CacheSchema=2`인지. 관리자 API로 그룹을 바꾸고 Redis 해시의 `Group`이 바뀌기까지 몇 초인지 잰다(`SYNC_FREQUENCY` 60초 안). 드리프트 로그 0건.
+무엇을: 요청 뒤 `TTL user:<id>`가 수만 초, `FreshUntil`이 now±`SYNC_FREQUENCY` 안, `CacheSchema=2`인지. `FreshUntil`이 지난 뒤 요청하면 DB에서 다시 읽어 `FreshUntil`이 앞으로 밀리는지. DB에서 직접 그룹을 바꾸고(관리자 API는 캐시를 즉시 고치므로 재읽기 경로를 보려면 DB 변경이 맞다) Redis 해시의 `Group`이 바뀌기까지 몇 초인지 잰다(60초 안). 드리프트 로그 0건.
 실패하면: TTL이 작으면 `QUOTA_CACHE_TTL`이 600 같은 값으로 들어온 것. 그룹 반영이 60초를 넘으면 `FreshUntil` 갱신 경로를 본다(`docs/manuals/redis-quota-cache.ko.md`).
 
 ## 4. 종료 경로 — `04-shutdown-flush.sh`
@@ -69,7 +70,7 @@ Bedrock·Vertex 채널을 쓰면 그 채널로 라우팅되는 모델 이름을 
 
 ## 7. 인증 — `07-auth.sh`
 
-무엇을: 관리자 명의 API 키 생성 → 즉시 200 → 삭제 → 즉시 401. 시험 사용자 비활성화 → 즉시 거부 → 재활성화 → 200. 최근 가입자 해시가 bcrypt(`$2a$`)인지.
+무엇을: 관리자 명의 API 키 생성 → 즉시 200 → 삭제 → 즉시 401. 시험 사용자 비활성화 → 거부 → 재활성화 → 200(`ADMIN_PASSWORD`가 있으면 관리자 API로 즉시, 없으면 DB 변경으로 `SYNC_FREQUENCY` 안). 최근 가입자 해시가 bcrypt(`$2a$`)인지.
 수동: 운영 덤프의 기존 사용자로 로그인, 비밀번호 변경 후 재로그인, 운영에서 쓰는 OAuth 로그인 1건.
 
 ## 8. 상한·교환 — `08-bounds.sh`
