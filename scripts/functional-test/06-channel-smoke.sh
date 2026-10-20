@@ -37,7 +37,7 @@ for m in $CLAUDE_MODELS; do
     -d "{\"model\":\"$m\",\"max_tokens\":256,\"thinking\":{\"type\":\"adaptive\"},\"messages\":[{\"role\":\"user\",\"content\":\"In one sentence, why is the sky blue?\"}]}")
   if printf '%s' "$out" | jq -e '.usage.output_tokens' >/dev/null 2>&1; then
     pass "[$m] 응답 usage $(printf '%s' "$out" | jq -c '.usage')"
-    printf '%s' "$out" | jq -e '[.content[] | select(.type=="thinking")] | length > 0' >/dev/null 2>&1 && pass "[$m] thinking 블록(요약) 있음" || echo "note: [$m] thinking 블록 없음 (Opus 4.7+가 아니면 정상)"
+    printf '%s' "$out" | jq -e '[.content[] | select(.type=="thinking")] | length > 0' >/dev/null 2>&1 && pass "[$m] thinking 블록(요약) 있음" || echo "note: [$m] thinking 블록 없음 (adaptive라 모델이 생각하지 않기로 한 것이면 정상; thinking_tokens 확인)"
   else fail "[$m] 오류: $(printf '%s' "$out" | head -c 300)"; fi
   log "[$m] OpenAI 호환 경로 reasoning_effort"
   out=$(curl -sS "$BASE_URL/v1/chat/completions" -H "Authorization: Bearer $USER_KEY" -H "Content-Type: application/json" \
