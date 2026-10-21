@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { PlaygroundChat } from './components/chat/playground-chat'
 import { PlaygroundInput } from './components/input/playground-input'
+import { OpenInChatAppButton } from './components/open-chat-app-fork' // fork: O13
 import {
   useChatHandler,
   usePlaygroundConversation,
@@ -76,6 +77,8 @@ export function Playground() {
 
   return (
     <div className='relative flex size-full min-h-0 flex-col overflow-hidden'>
+      {/* fork: O13 */}
+      <OpenInChatAppButton />
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
         <PlaygroundChat

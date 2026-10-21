@@ -29,6 +29,7 @@ import { applyAuthBundle, isAuthBundle } from '@/lib/api'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { useAuthStore, type AuthBundle } from '@/stores/auth-store'
 
+import { replaceWithOidcPage } from '../lib/redirect-target' // fork: O13
 import { isLoginChallenge } from '../secure-verification/api'
 
 /**
@@ -66,6 +67,7 @@ export function useAuthRedirect() {
 
       const targetPath =
         sanitizeAuthRedirect(redirectTo, window.location.origin) ?? '/dashboard'
+      if (replaceWithOidcPage(targetPath)) return // fork: O13
       await navigate({ href: targetPath, replace: true })
     },
     [navigate, sessionID]

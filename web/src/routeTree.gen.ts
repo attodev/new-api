@@ -30,6 +30,8 @@ import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_authenticated/system-settings/route'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
+import { Route as Oauth2AuthorizeRouteImport } from './routes/oauth2/authorize'
+import { Route as Oauth2LogoutRouteImport } from './routes/oauth2/logout'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
@@ -180,6 +182,16 @@ const AboutIndexRoute = AboutIndexRouteImport.update({
 const OauthProviderRoute = OauthProviderRouteImport.update({
   id: '/oauth/$provider',
   path: '/oauth/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Oauth2AuthorizeRoute = Oauth2AuthorizeRouteImport.update({
+  id: '/oauth2/authorize',
+  path: '/oauth2/authorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Oauth2LogoutRoute = Oauth2LogoutRouteImport.update({
+  id: '/oauth2/logout',
+  path: '/oauth2/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingIndexRoute = PricingIndexRouteImport.update({
@@ -476,6 +488,8 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -543,6 +557,8 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about': typeof AboutIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -614,6 +630,8 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/oauth2/authorize': typeof Oauth2AuthorizeRoute
+  '/oauth2/logout': typeof Oauth2LogoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -684,6 +702,8 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -751,6 +771,8 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about'
     | '/pricing'
     | '/rankings'
@@ -821,6 +843,8 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/chat2link'
     | '/oauth/$provider'
+    | '/oauth2/authorize'
+    | '/oauth2/logout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -883,6 +907,8 @@ export interface RootRouteChildren {
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
   OauthProviderRoute: typeof OauthProviderRoute
+  Oauth2AuthorizeRoute: typeof Oauth2AuthorizeRoute
+  Oauth2LogoutRoute: typeof Oauth2LogoutRoute
   AboutIndexRoute: typeof AboutIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -1037,6 +1063,20 @@ declare module '@tanstack/react-router' {
       path: '/oauth/$provider'
       fullPath: '/oauth/$provider'
       preLoaderRoute: typeof OauthProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth2/authorize': {
+      id: '/oauth2/authorize'
+      path: '/oauth2/authorize'
+      fullPath: '/oauth2/authorize'
+      preLoaderRoute: typeof Oauth2AuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth2/logout': {
+      id: '/oauth2/logout'
+      path: '/oauth2/logout'
+      fullPath: '/oauth2/logout'
+      preLoaderRoute: typeof Oauth2LogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing/': {
@@ -1541,6 +1581,8 @@ const rootRouteChildren: RootRouteChildren = {
   errors500Route: errors500Route,
   errors503Route: errors503Route,
   OauthProviderRoute: OauthProviderRoute,
+  Oauth2AuthorizeRoute: Oauth2AuthorizeRoute,
+  Oauth2LogoutRoute: Oauth2LogoutRoute,
   AboutIndexRoute: AboutIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

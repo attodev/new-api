@@ -20,13 +20,17 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { Main } from '@/components/layout'
 import { Playground } from '@/features/playground'
+import { ChatAppPlaygroundGate } from '@/features/playground/components/open-chat-app-fork' // fork: O13
+import { replacePlaygroundBeforeLoad } from '@/features/playground/lib/chat-app-fork' // fork: O13
 import { isSidebarModuleEnabled } from '@/lib/nav-modules'
 
 export const Route = createFileRoute('/_authenticated/playground/')({
-  beforeLoad: () => {
+  // fork: O13 — `preload` (was `() =>`) lets hover preloads skip the chat app redirect
+  beforeLoad: ({ preload }) => {
     if (!isSidebarModuleEnabled('chat', 'playground')) {
       throw redirect({ to: '/dashboard' })
     }
+    return replacePlaygroundBeforeLoad(preload) // fork: O13
   },
   component: PlaygroundPage,
 })
@@ -34,7 +38,10 @@ export const Route = createFileRoute('/_authenticated/playground/')({
 function PlaygroundPage() {
   return (
     <Main className='p-0'>
-      <Playground />
+      {/* fork: O13 */}
+      <ChatAppPlaygroundGate>
+        <Playground />
+      </ChatAppPlaygroundGate>
     </Main>
   )
 }

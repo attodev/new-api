@@ -20,6 +20,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 
 import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
+import { replaceWithOidcPage } from '@/features/auth/lib/redirect-target' // fork: O13
 import { SignIn } from '@/features/auth/sign-in'
 import { resolveAuthentication } from '@/lib/auth-session'
 import { useAuthStore } from '@/stores/auth-store'
@@ -43,6 +44,7 @@ export const Route = createFileRoute('/(auth)/sign-in')({
       const target =
         sanitizeAuthRedirect(search?.redirect, window.location.origin) ??
         '/dashboard'
+      if (replaceWithOidcPage(target)) return new Promise<never>(() => {}) // fork: O13
       throw redirect({ href: target, replace: true })
     }
   },
