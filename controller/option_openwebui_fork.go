@@ -14,11 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// oidcHiddenOption reports whether GetOptions must skip key. The signing key
-// names also end in "Key" (hidden by the generic suffix filter); this explicit
-// check keeps them hidden even if that filter changes.
+// oidcHiddenOption reports whether key names a signing key option. The
+// signing key names also end in "Key" (hidden by GetOptions' generic suffix
+// filter); this explicit check keeps them hidden even if that filter changes.
+// The match ignores case and surrounding spaces: under MySQL's default *_ci
+// (PAD SPACE) collation model.UpdateOption's FirstOrCreate would match such a
+// variant to the real row and overwrite the stored private key.
 func oidcHiddenOption(key string) bool {
-	return key == oidc.OptionSigningKeyCurrent || key == oidc.OptionSigningKeyPrevious
+	key = strings.TrimSpace(key)
+	return strings.EqualFold(key, oidc.OptionSigningKeyCurrent) || strings.EqualFold(key, oidc.OptionSigningKeyPrevious)
 }
 
 // rejectOIDCSigningKeyWrite refuses any options API write to a signing key and
@@ -64,12 +68,15 @@ func validateOpenWebUIOption(c *gin.Context, option *OptionUpdateRequest) bool {
 		option.Value = normalized
 	case "openwebui.jwt_secret", "openwebui.jwt_previous_secret":
 		v := option.Value.(string)
-		if option.Key == "openwebui.jwt_secret" && strings.TrimSpace(v) == "" &&
+		trimmed := strings.TrimSpace(v)
+		if option.Key == "openwebui.jwt_secret" && trimmed == "" &&
 			system_setting.GetOpenWebUISettings().RelayEnabled {
 			common.ApiErrorT(c, "Disable the Open WebUI relay before clearing the service key or JWT secret")
 			return false
 		}
-		if v != "" && len(v) < 32 {
+		// Surrounding spaces do not count towards the length, so a
+		// space-padded or all-space value is refused as too short.
+		if v != "" && len(trimmed) < 32 {
 			common.ApiErrorT(c, "The Open WebUI JWT secret must be at least 32 characters")
 			return false
 		}

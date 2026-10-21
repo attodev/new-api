@@ -3,6 +3,7 @@
 package controller
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,7 +51,17 @@ func setupOpenWebUIOptionTest(t *testing.T) *model.Token {
 	original := *system_setting.GetOpenWebUISettings()
 	*system_setting.GetOpenWebUISettings() = system_setting.OpenWebUISettings{JwtIssuer: "open-webui", JwtLeewaySeconds: 60, AllowUnsignedRequests: true}
 
+	// Negative paths make model.ValidateUserToken log "record not found" via
+	// common.SysLog; keep the test output quiet.
+	common.LogWriterMu.Lock()
+	originalWriter := gin.DefaultWriter
+	gin.DefaultWriter = io.Discard
+	common.LogWriterMu.Unlock()
+
 	t.Cleanup(func() {
+		common.LogWriterMu.Lock()
+		gin.DefaultWriter = originalWriter
+		common.LogWriterMu.Unlock()
 		if sqlDB, err := db.DB(); err == nil {
 			_ = sqlDB.Close()
 		}
@@ -84,6 +95,26 @@ func TestUpdateOption_OpenWebUI_SecretTooShort(t *testing.T) {
 		require.Contains(t, body, `"success":false`, key)
 		require.Equal(t, "", system_setting.GetOpenWebUISettings().JwtSecret)
 	}
+}
+
+// A secret padded to length with spaces is still too short.
+func TestUpdateOption_OpenWebUI_SecretTrimmedLength(t *testing.T) {
+	token := setupOpenWebUIOptionTest(t)
+	for _, key := range []string{"openwebui.jwt_secret", "openwebui.jwt_previous_secret"} {
+		_, body := putOption(t, key, strings.Repeat(" ", 32))
+		require.Contains(t, body, `"success":false`, key)
+		_, body = putOption(t, key, " short"+strings.Repeat(" ", 30))
+		require.Contains(t, body, `"success":false`, key)
+	}
+	require.Equal(t, "", system_setting.GetOpenWebUISettings().JwtSecret)
+	require.Equal(t, "", system_setting.GetOpenWebUISettings().JwtPreviousSecret)
+
+	// With the relay on, an all-space current secret counts as clearing it.
+	enableOpenWebUIRelay(t, token)
+	_, body := putOption(t, "openwebui.jwt_secret", strings.Repeat(" ", 40))
+	require.Contains(t, body, `"success":false`)
+	require.Contains(t, body, "Disable the Open WebUI relay before clearing the service key or JWT secret")
+	require.Equal(t, strings.Repeat("s", 32), system_setting.GetOpenWebUISettings().JwtSecret)
 }
 
 func TestUpdateOption_OpenWebUI_SecretAccepted(t *testing.T) {

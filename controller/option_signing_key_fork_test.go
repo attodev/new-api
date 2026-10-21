@@ -131,6 +131,38 @@ func TestUpdateOptionRejectsSigningKeyWrites(t *testing.T) {
 		require.Equal(t, before, stored.Value, name)
 	}
 
+	// Case and padding variants: MySQL's default *_ci (PAD SPACE) collation
+	// would match them to the real rows in model.UpdateOption's FirstOrCreate.
+	before := map[string]string{}
+	common.OptionMapRWMutex.RLock()
+	for _, name := range []string{oidc.OptionSigningKeyCurrent, oidc.OptionSigningKeyPrevious} {
+		before[name] = common.OptionMap[name]
+	}
+	common.OptionMapRWMutex.RUnlock()
+	for _, variant := range []string{"oidcsigningcurrentkey", "OIDCSigningCurrentKey ", " oidcsigningpreviouskey", "OIDCSIGNINGPREVIOUSKEY"} {
+		body := putOAuth2Option(t, variant, `{"kid":"x","private_pem":"y"}`)
+		require.Contains(t, body, `"success":false`, "%q", variant)
+		require.Contains(t, body, "Invalid parameters", "%q", variant)
+		common.OptionMapRWMutex.RLock()
+		_, created := common.OptionMap[variant]
+		common.OptionMapRWMutex.RUnlock()
+		require.False(t, created, "%q", variant)
+		var count int64
+		require.NoError(t, model.DB.Model(&model.Option{}).Where("`key` = ?", variant).Count(&count).Error)
+		require.Zero(t, count, "%q", variant)
+	}
+	for name, value := range before {
+		common.OptionMapRWMutex.RLock()
+		after := common.OptionMap[name]
+		common.OptionMapRWMutex.RUnlock()
+		require.Equal(t, value, after, name)
+		var stored model.Option
+		require.NoError(t, model.DB.Where("`key` = ?", name).First(&stored).Error)
+		require.Equal(t, value, stored.Value, name)
+	}
+	require.True(t, oidcHiddenOption(" oidcSigningCurrentKey\t"))
+	require.False(t, oidcHiddenOption("OIDCSigningCurrentKeyX"))
+
 	// The retired key is still the one published next to the new current key.
 	keys, err := oidc.VerificationKeys()
 	require.NoError(t, err)
