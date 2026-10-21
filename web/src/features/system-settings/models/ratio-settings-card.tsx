@@ -45,6 +45,7 @@ import { positiveIntegerSchema } from '../utils/numeric-field'
 import { discountMapValidation } from './discount-utils' // fork: O6
 import { GroupRatioForm } from './group-ratio-form'
 import { ModelRatioForm } from './model-ratio-form'
+import { useStableValue } from './pricing-forms-fork' // fork: O13
 import { ToolPriceSettings } from './tool-price-settings'
 import { UpstreamRatioSync } from './upstream-ratio-sync'
 import {
@@ -169,12 +170,14 @@ type RatioSettingsCardProps = {
 }
 
 export function RatioSettingsCard({
-  modelDefaults: initialModelDefaults,
-  groupDefaults,
+  modelDefaults: rawModelDefaults,
+  groupDefaults: rawGroupDefaults,
   toolPricesDefault,
   titleKey = 'Pricing Ratios',
   visibleTabs = ['models', 'groups', 'tool-prices', 'upstream-sync'],
 }: RatioSettingsCardProps) {
+  const initialModelDefaults = useStableValue(rawModelDefaults) // fork: O13
+  const groupDefaults = useStableValue(rawGroupDefaults) // fork: O13
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const [confirmOpen, setConfirmOpen] = useState(false)
