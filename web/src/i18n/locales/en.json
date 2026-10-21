@@ -5800,6 +5800,7 @@
     "Set Tag": "Set Tag",
     "Set tag for selected channels": "Set tag for selected channels",
     "Set the language used across the interface": "Set the language used across the interface",
+    "Set the server address before enabling external app access": "Set the server address before enabling external app access",
     "Set the service key and a JWT secret of at least 32 characters before enabling the Open WebUI relay": "Set the service key and a JWT secret of at least 32 characters before enabling the Open WebUI relay",
     "Set the user's role (cannot be Root)": "Set the user's role (cannot be Root)",
     "Set the website where users will use their Passkeys.": "Set the website where users will use their Passkeys.",

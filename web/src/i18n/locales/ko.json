@@ -5800,6 +5800,7 @@
     "Set Tag": "태그 설정",
     "Set tag for selected channels": "선택된 채널에 태그 설정",
     "Set the language used across the interface": "인터페이스 전체에서 사용할 언어를 설정합니다",
+    "Set the server address before enabling external app access": "외부 앱 접근을 활성화하려면 먼저 서버 주소를 설정해 주세요",
     "Set the service key and a JWT secret of at least 32 characters before enabling the Open WebUI relay": "Open WebUI 릴레이를 활성화하려면 먼저 서비스 키와 32자 이상의 JWT 시크릿을 설정해 주세요",
     "Set the user's role (cannot be Root)": "사용자의 역할 설정(Root 불가)",
     "Set the website where users will use their Passkeys.": "사용자가 패스키를 사용할 웹사이트를 설정하세요.",

@@ -245,28 +245,25 @@ export function OpenWebUIRelaySection(props: OpenWebUIRelaySectionProps) {
   }
   const secretText: Record<
     SecretField,
-    { label: string; description: string; autoComplete: string }
+    { label: string; description: string }
   > = {
     service_api_key: {
       label: t('Service key'),
       description: t(
         'The key of an enabled token that Open WebUI uses as OPENAI_API_KEYS. Paste it with or without the sk- prefix. IP limits on that token restrict where Open WebUI may call from.'
       ),
-      autoComplete: 'off',
     },
     jwt_secret: {
       label: t('JWT secret'),
       description: t(
         "Must equal Open WebUI's FORWARD_USER_INFO_HEADER_JWT_SECRET (32+ random characters)."
       ),
-      autoComplete: 'new-password',
     },
     jwt_previous_secret: {
       label: t('Previous JWT secret'),
       description: t(
         'Accepted alongside the current secret while rotating. Move the old secret here, set the new one above, restart Open WebUI, then press Clear once every Open WebUI instance uses the new secret.'
       ),
-      autoComplete: 'new-password',
     },
   }
 
@@ -318,7 +315,9 @@ export function OpenWebUIRelaySection(props: OpenWebUIRelaySectionProps) {
                     <FormControl>
                       <Input
                         type='password'
-                        autoComplete={secretText[secret].autoComplete}
+                        // Chrome ignores autocomplete="off" on password inputs and may
+                        // fill in the admin's login password; new-password stops that.
+                        autoComplete='new-password'
                         placeholder={t('Leave empty to keep the current value')}
                         {...field}
                         onChange={(e) => field.onChange(e.target.value)}

@@ -139,6 +139,16 @@ test('never prefills a secret, even if the options API returned one', async () =
   expect(screen.getByText('Not configured')).toBeInTheDocument()
 })
 
+test('secret inputs ask for new-password so the browser never autofills the login password', () => {
+  renderSection()
+  for (const label of [/^Service key/, /^JWT secret/, /^Previous JWT secret/]) {
+    expect(screen.getByLabelText(label)).toHaveAttribute(
+      'autocomplete',
+      'new-password'
+    )
+  }
+})
+
 test('refuses a JWT secret shorter than 32 characters after trimming', async () => {
   renderSection()
   await userEvent.type(

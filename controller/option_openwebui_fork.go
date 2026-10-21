@@ -99,6 +99,12 @@ func validateOpenWebUIOption(c *gin.Context, option *OptionUpdateRequest) bool {
 				common.ApiErrorT(c, "Set a client ID, a client secret of at least 16 characters and an absolute redirect URI before enabling external app access")
 				return false
 			}
+			// The server address is the OIDC issuer (iss, discovery URLs);
+			// without it the provider would advertise an empty issuer.
+			if oidc.Issuer() == "" {
+				common.ApiErrorT(c, "Set the server address before enabling external app access")
+				return false
+			}
 		}
 	case "oauth2.client_id":
 		option.Value = strings.TrimSpace(option.Value.(string))
@@ -120,10 +126,12 @@ func validateOpenWebUIOption(c *gin.Context, option *OptionUpdateRequest) bool {
 
 // openWebUIStatusFields are the public GetStatus fields the frontend reads for
 // the Open WebUI ("external app") entry points. Client credentials stay out.
+// oauth2_enabled uses the same predicate as the provider endpoints, so the
+// entry points stay hidden while the provider is on but unconfigured.
 func openWebUIStatusFields() map[string]any {
 	s := system_setting.GetOAuth2Settings()
 	return map[string]any{
-		"oauth2_enabled":            s.Enabled,
+		"oauth2_enabled":            oauth2ProviderConfigured(s),
 		"oauth2_open_in_new_window": s.OpenInNewWindow,
 		"oauth2_replace_playground": s.ReplacePlayground,
 		"oauth2_app_url":            s.AppUrl,

@@ -86,6 +86,30 @@ func TestUpdateOption_OAuth2_EnableRequiresConfig(t *testing.T) {
 	require.Contains(t, putOAuth2Option(t, "oauth2.enabled", false), `"success":true`)
 }
 
+func TestUpdateOption_OAuth2_EnableRequiresServerAddress(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	originalServerAddress := system_setting.ServerAddress
+	t.Cleanup(func() { system_setting.ServerAddress = originalServerAddress })
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "openwebui"), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_secret", strings.Repeat("s", 16)), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.redirect_uri", "https://chat.example.com/cb"), `"success":true`)
+
+	// The server address is the OIDC issuer; blank (or blank after trimming
+	// spaces and slashes) refuses the enable.
+	for _, addr := range []string{"", "  ", "/"} {
+		system_setting.ServerAddress = addr
+		body := putOAuth2Option(t, "oauth2.enabled", true)
+		require.Contains(t, body, `"success":false`, "server address %q", addr)
+		require.Contains(t, body, "Set the server address before enabling external app access")
+		require.False(t, system_setting.GetOAuth2Settings().Enabled)
+	}
+
+	system_setting.ServerAddress = "https://api.example.com"
+	require.Contains(t, putOAuth2Option(t, "oauth2.enabled", true), `"success":true`)
+	require.True(t, system_setting.GetOAuth2Settings().Enabled)
+}
+
 func TestUpdateOption_OAuth2_OptionalURLs(t *testing.T) {
 	setupOAuth2OptionTest(t)
 	for _, key := range []string{"oauth2.app_url", "oauth2.post_logout_redirect_uri"} {

@@ -59,6 +59,7 @@ import {
   orderAroundEnableKey,
   rotateOidcSigningKey,
   saveOptionsInOrder,
+  withStatusRefresh,
   type OpenWebUIOAuth2Defaults,
 } from './openwebui-fork'
 import { ClearSecretButton } from './openwebui-secret-controls'
@@ -134,6 +135,9 @@ type OpenWebUIOAuth2SectionProps = {
 export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const queryClient = useQueryClient()
+  // Every key here is oauth2.*, which feeds the public status oauth2_* fields.
+  const saveOption = withStatusRefresh(updateOption.mutateAsync, queryClient)
 
   const form = useForm<OAuth2FormValues>({
     resolver: zodResolver(createOAuth2Schema(t)),
@@ -186,7 +190,7 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
     }
 
     const ok = await saveOptionsInOrder(
-      updateOption.mutateAsync,
+      saveOption,
       orderAroundEnableKey(updates, 'oauth2.enabled')
     )
     if (!ok) return
@@ -197,7 +201,7 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
   }
 
   const clearClientSecret = async () => {
-    const ok = await saveOptionsInOrder(updateOption.mutateAsync, [
+    const ok = await saveOptionsInOrder(saveOption, [
       { key: 'oauth2.client_secret', value: '' },
     ])
     if (ok) form.setValue('oauth2.client_secret', '')

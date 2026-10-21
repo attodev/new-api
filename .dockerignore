@@ -10,3 +10,5 @@ docs
 /web/node_modules
 /web/dist
 !THIRD-PARTY-LICENSES.md
+# fork: O13 — test-stack secrets
+deploy/openwebui-test/.env

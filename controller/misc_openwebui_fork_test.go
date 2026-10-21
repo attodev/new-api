@@ -23,12 +23,28 @@ func TestGetStatusExposesOAuth2Fields(t *testing.T) {
 	})
 	common.OptionMap = map[string]string{}
 
-	cases := []system_setting.OAuth2Settings{
-		{},
-		{Enabled: true, OpenInNewWindow: true, ReplacePlayground: true, AppUrl: "https://chat.example.com",
-			ClientId: "openwebui", ClientSecret: "super-secret-value", RedirectURI: "https://chat.example.com/cb"},
+	configured := system_setting.OAuth2Settings{Enabled: true, OpenInNewWindow: true, ReplacePlayground: true,
+		AppUrl: "https://chat.example.com", ClientId: "openwebui", ClientSecret: "super-secret-value",
+		RedirectURI: "https://chat.example.com/cb"}
+	// Enabled but missing part of the client registration: the provider
+	// endpoints answer 404, so the status must not advertise the app either.
+	noClientID, noSecret, blankRedirect := configured, configured, configured
+	noClientID.ClientId = ""
+	noSecret.ClientSecret = ""
+	blankRedirect.RedirectURI = "   "
+
+	cases := []struct {
+		settings    system_setting.OAuth2Settings
+		wantEnabled bool
+	}{
+		{system_setting.OAuth2Settings{}, false},
+		{configured, true},
+		{noClientID, false},
+		{noSecret, false},
+		{blankRedirect, false},
 	}
-	for _, want := range cases {
+	for _, tc := range cases {
+		want := tc.settings
 		*settings = want
 		rec := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(rec)
@@ -40,7 +56,7 @@ func TestGetStatusExposesOAuth2Fields(t *testing.T) {
 			Data map[string]any `json:"data"`
 		}
 		require.NoError(t, common.Unmarshal(rec.Body.Bytes(), &payload))
-		require.Equal(t, want.Enabled, payload.Data["oauth2_enabled"])
+		require.Equal(t, tc.wantEnabled, payload.Data["oauth2_enabled"])
 		require.Equal(t, want.OpenInNewWindow, payload.Data["oauth2_open_in_new_window"])
 		require.Equal(t, want.ReplacePlayground, payload.Data["oauth2_replace_playground"])
 		require.Equal(t, want.AppUrl, payload.Data["oauth2_app_url"])

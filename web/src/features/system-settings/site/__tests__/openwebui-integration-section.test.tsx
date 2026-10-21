@@ -200,6 +200,48 @@ test('turning access off is saved before other changes', async () => {
   )
 })
 
+test('a successful save refreshes the cached status for the chat app entry points', async () => {
+  const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+  window.localStorage.setItem(
+    'status',
+    JSON.stringify({ oauth2_enabled: true })
+  )
+  renderSection({
+    'oauth2.enabled': true,
+    'oauth2.client_id': 'open-webui',
+    'oauth2.redirect_uri': 'https://chat.example.com/cb',
+  })
+  await userEvent.type(
+    screen.getByLabelText('App URL'),
+    'https://chat.example.com'
+  )
+  await save()
+  await waitFor(() => expect(putKeys()).toEqual(['oauth2.app_url']))
+  await waitFor(() =>
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['status'] })
+  )
+  expect(window.localStorage.getItem('status')).toBeNull()
+})
+
+test('a refused save keeps the cached status', async () => {
+  const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+  window.localStorage.setItem(
+    'status',
+    JSON.stringify({ oauth2_enabled: false })
+  )
+  putResults['oauth2.enabled'] = { success: false, message: 'refused' }
+  renderSection({
+    'oauth2.client_id': 'open-webui',
+    'oauth2.redirect_uri': 'https://chat.example.com/cb',
+  })
+  await userEvent.click(enableSwitch())
+  await save()
+  await waitFor(() => expect(toast.error).toHaveBeenCalled())
+  expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['status'] })
+  expect(window.localStorage.getItem('status')).not.toBeNull()
+  window.localStorage.removeItem('status')
+})
+
 test('shows the translated server error when the stored secret is missing', async () => {
   const sentence =
     'Set a client ID, a client secret of at least 16 characters and an absolute redirect URI before enabling external app access'

@@ -18,7 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 // fork: O13 — Open WebUI site settings: option types/defaults, relay-status and
 // signing-key API, and the ordered option save shared by the two sections.
+import type { QueryClient } from '@tanstack/react-query'
+
 import { api } from '@/lib/api'
+import { STATUS_QUERY_KEY, STATUS_STORAGE_KEY } from '@/lib/status-query'
 
 import type { UpdateOptionRequest } from '../types'
 
@@ -158,4 +161,31 @@ export async function saveOptionsInOrder(
     }
   }
   return true
+}
+
+/**
+ * /api/status derives oauth2_* (the Playground "Open in Chat App" button and
+ * replace mode) from every oauth2.* option, so a save must drop both the
+ * React Query entry and the localStorage snapshot readCachedStatus() serves,
+ * as useUpdateOption does for its STATUS_RELATED_KEYS.
+ */
+export function refreshCachedStatus(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: STATUS_QUERY_KEY })
+  try {
+    window.localStorage.removeItem(STATUS_STORAGE_KEY)
+  } catch {
+    /* Storage may be disabled. */
+  }
+}
+
+/** Wrap an option save so each successful save refreshes the cached status. */
+export function withStatusRefresh(
+  save: (request: UpdateOptionRequest) => Promise<unknown>,
+  queryClient: QueryClient
+): (request: UpdateOptionRequest) => Promise<unknown> {
+  return async (request) => {
+    const result = await save(request)
+    refreshCachedStatus(queryClient)
+    return result
+  }
 }

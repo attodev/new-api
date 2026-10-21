@@ -61,7 +61,7 @@ R2: 계획은 별도 사용자 검토 없이 실행했다(사용자가 새 브�
 
 - relay: `openwebui.relay_enabled`, `openwebui.service_api_key`(활성 토큰), `openwebui.jwt_secret`(32자 이상), `openwebui.jwt_previous_secret`(교체 중), `openwebui.jwt_issuer`(기본 `open-webui`), `openwebui.jwt_leeway_seconds`, `openwebui.allow_unsigned_requests`.
 - 내장 OIDC provider: `oauth2.enabled`, `oauth2.client_id`, `oauth2.client_secret`(16자 이상), `oauth2.redirect_uri`, `oauth2.app_url`, `oauth2.post_logout_redirect_uri`, `oauth2.open_in_new_window`, `oauth2.replace_playground`. issuer는 `ServerAddress`.
-- relay를 켜려면 서비스 키와 시크릿이 먼저, OIDC를 켜려면 client id·시크릿·절대 redirect URI가 먼저 있어야 한다. 켜진 동안 서비스 키·JWT 시크릿은 비울 수 없다.
+- relay를 켜려면 서비스 키와 시크릿이 먼저, OIDC를 켜려면 client id·시크릿·절대 redirect URI와 서버 주소(issuer)가 먼저 있어야 한다. 켜진 동안 서비스 키·JWT 시크릿은 비울 수 없다.
 - 서명 키(`OIDCSigningCurrentKey`·`OIDCSigningPreviousKey`)는 첫 사용 때 만들어지고 옵션 API로 보이지도 쓰이지도 않는다. 교체는 화면의 "서명 키 교체"(root) 또는 root 로그인 세션의 `POST /api/oauth2/rotate-signing-key`, 상태는 `GET /api/oauth2/signing-key-status`. 이전 키는 24시간 JWKS에 남는다. 교체 직후 1~2분은 노드 간 옵션 동기화(60초)와 Open WebUI JWKS 캐시 때문에 로그인이 잠깐 실패할 수 있다.
 - JWT 시크릿 교체: 현재 시크릿을 `jwt_previous_secret`으로 옮기고 새 시크릿을 넣은 뒤 Open WebUI를 재시작하고, 모든 Open WebUI가 새 시크릿을 쓰면 이전 시크릿을 지운다.
 - 운영 확인 절차: `docs/manuals/operator-verification-checklist.ko.md` 10절. 시험 스택: `deploy/openwebui-test/README.md`.
@@ -70,10 +70,18 @@ R2: 계획은 별도 사용자 검토 없이 실행했다(사용자가 새 브�
 
 - **실제 결합 미검증**: 이 Mac에는 Docker가 없어 스택과 실제 Open WebUI 로그인·로그아웃 왕복을 돌리지 못했다. `bootstrap.sh`는 로컬 SQLite 서버(같은 브랜치 바이너리, psql 호출은 sqlite3로 대신)에 세 번 돌려 확인했다: 루트 생성, 서비스 토큰, 옵션 12개, 테스트 사용자·이메일, mock 채널·가격·잔액, step-up 수동 연결, 재실행 멱등, 로그인 세션 종료. 서명한 JWT로 `/v1/models`를 불러 이메일 자동 연결도 확인했다. 실제 확인은 운영 확인 절차 10절.
 - **조직 지갑 과금**: 치환 뒤 컨텍스트가 실제 사용자로 바뀌는 것은 테스트(`TestOpenWebUIResolvedTokenUsesUserBillingContext`)로 고정했고, 조직 멤버의 사용량이 조직 지갑에서 빠지는지는 운영 확인 10절의 수동 확인이다.
-- Task 7 정리 후보(미적용): 켜진 상태에서 `oauth2.client_id`·`client_secret`·`redirect_uri`를 비우는 것을 막거나 `/api/status`의 `oauth2_enabled`를 "설정 완료" 기준으로 보고하기(지금은 비우면 authorize가 `invalid_client`로 닫힘), `client_secret` 설정 여부 배지, oauth2 저장 뒤 `['status']` 무효화, 서비스 키 입력 `autoComplete="new-password"`. 링크 취소·relay 끈 상태 테스트 없음, issuer 입력 오류 문구가 일반 문구.
+- Task 7 정리 후보: 마지막 수정 묶음에서 `/api/status`의 `oauth2_enabled`를 provider 엔드포인트와 같은 `oauth2ProviderConfigured` 기준(켜졌지만 client_id·secret·redirect_uri 중 하나가 비면 false)으로 보고하고, OIDC 섹션의 `oauth2.*` 저장이 성공하면 `['status']` 무효화·localStorage `status` 스냅샷 삭제, 서비스 키 입력 `autoComplete="new-password"`를 적용했다. 켜진 상태에서 client_id·secret·redirect_uri를 비우는 것 자체는 여전히 막지 않는다(비우면 authorize가 `invalid_client`로 닫히고 상태 응답도 꺼진 것으로 보인다). 남은 것: `client_secret` 설정 여부 배지, 링크 취소·relay 끈 상태 테스트 없음, issuer 입력 오류 문구가 일반 문구.
+- 서버 주소(OIDC issuer): `oauth2.enabled` 켜기는 이제 `system_setting.ServerAddress`(`oidc.Issuer()`)가 비어 있으면 "Set the server address before enabling external app access"로 거부한다. 켠 뒤에 서버 주소를 바꾸거나 비우는 것은 막지 않는다 — 바꾸면 discovery의 issuer와 이미 발급한 id_token의 `iss`가 달라지므로 Open WebUI 재로그인이 필요하다.
 - Redis를 켠 상태의 로그아웃 테스트가 없다(세션 조회 `GetUserSessionCached`의 Redis 경로는 develop 기존 테스트에만 기댄다).
 - relay 사용자 확인이 O12 Redis 상태에서 `ErrUserAuthCachePending`을 받으면 403이 아니라 500(데이터베이스 오류)으로 거부한다.
 - 호출 위치 AST 검사(`TestOpenWebUISubstitutionOnlyOnRelayTokenAuth`)는 `middleware` 패키지만 본다.
 - root가 없는 `organization_id`로 조직 멤버 API를 부르면 정리되지 않은 record-not-found 오류가 나온다(develop 기존 동작).
 - `oauth2.app_url`이 이 서버의 `/playground`를 가리키는 설정을 막지 않는다. 첫 상태 응답 전에 플레이그라운드가 잠깐 그려질 수 있다.
 - 공유 `TestMain`을 쓰는 model 테스트가 링크 테이블이 필요하면 `MigrateForkOpenWebUITables`를 불러야 한다. fork 테스트 일부가 `model.InitLogDB()`로 컬럼 따옴표 전역값을 남긴다(다른 fork 테스트와 같음).
+- 검토에서 미뤄 둔 사소한 것: Task 5(root의 조직 멤버 관리) 테스트가 감사 로그 매개변수를 단언하지 않는다. Task 4 접근 토큰 레지스트리(`middleware/fork_access_token_routes.go`)는 줄마다 표식 대신 그 파일 관례대로 O13 블록 주석 하나를 쓴다. Task 6 플레이그라운드 라우트(`web/src/routes/_authenticated/playground/index.tsx`)의 `beforeLoad` 표식은 줄 끝이 아니라 위 줄에 있다.
+
+운영자가 알아야 할 남은 위험(브랜치 전체 검토):
+
+- **Open WebUI `ENABLE_SIGNUP`은 운영에서 꺼 둔다.** relay의 이메일 자동 연결은 Open WebUI가 JWT에 넣은 이메일을 믿으므로, 가입이 열려 있으면 누구나 기존 new-api 사용자의 이메일로 Open WebUI 계정을 만들어 그 사용자에게 연결·과금될 수 있다.
+- **`openwebui.allow_unsigned_requests`의 기본값은 true다**(원본 기본값, 의도적). 서명 JWT(`X-OpenWebUI-User-Jwt`) 없이 서비스 키만으로 온 요청은 401 대신 서비스 토큰 소유자에게 과금된다 — 서비스 키를 가진 쪽은 누구든 그 소유자 잔액을 쓸 수 있으므로 키를 사용자 토큰처럼 보관하고, 필요하면 끈다.
+- **upstream 테스트 순서 의존**: `go test -shuffle=on ./controller/`에서 `TestAPITokenAuditDatabaseMatrix`와 task-plugin 레지스트리 테스트(`TestAddChannelTaskPluginRequiresBindPermission` 등)가 순서에 따라 실패한다. 베이스 022def514(develop 자체)에서도 재현되는 upstream 문제이고 O13과 무관하다. 기본 순서(`-count=1`)에서는 통과한다.
