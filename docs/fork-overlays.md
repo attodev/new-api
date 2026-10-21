@@ -394,6 +394,9 @@ Open WebUI 연동(내장 OIDC provider + relay JWT 토큰 치환)을 fork overla
 | O13 Redis 일회용 읽기 | 없음 | 훅 없음 — `RedisGetDel`, `IsRedisNotFound` | common/redis_getdel_fork.go, common/redis_getdel_fork_test.go |
 | O13 relay 오류 i18n 키 | 없음 | 훅 없음 — `MsgOpenWebUIAuthFailed`·`NotLinked`·`LinkConflict`·`LinkNotFound`·`SubRequired` 5개와 `i18n/locales/{en,ko}.yaml`의 `# fork: O13` 블록 (관리 화면 오류는 `ApiErrorT` 영문 문장이라 여기에 없다) | i18n/keys_openwebui_fork.go |
 | O13 i18n 키 검사 | 없음 | 훅 없음 — fork 테스트 파일 `forkDeclaredKeys`가 `keys_openwebui_fork.go`도 읽도록 `forkKeyFiles` 목록으로 바꿈 | i18n/keys_fork_test.go |
+| O13 relay JWT 치환 | middleware/auth.go:607 | `TokenAuth()`에서 토큰 검증·서비스 토큰 IP 허용 목록 검사 뒤, `model.GetUserCache(token.UserId)` 앞에 `if !openWebUISubstitute(c, key, &token) { // fork: O13` + `return` + `}` (gofmt로 3줄). 서비스 키면 `openwebui.Resolve`로 사용자 토큰으로 바꾸고 `id`를 그 사용자로 다시 넣음, 거부면 `abortWithOpenAiMessage(c, status, i18n.T(c, key))`. `TokenAuthReadOnly`·대시보드 인증에는 없다(`TestOpenWebUISubstitutionOnlyOnRelayTokenAuth`가 AST로 호출 위치를 고정) | middleware/auth_openwebui_fork.go, middleware/auth_openwebui_fork_test.go, middleware/auth_openwebui_redis_fork_test.go, service/openwebui/{cache,context,jwt,link,provision,resolve}.go (+ jwt/link/provision/resolve `_test.go`) |
+| O13 JWT 헤더 상류 차단 | relay/channel/api_request.go:96 | `passthroughSkipHeaderNamesLower`의 자격 증명 블록 뒤에 빈 줄 + `"x-openwebui-user-jwt": {}, // fork: O13` (빈 줄로 띄워 기존 줄 gofmt 정렬을 건드리지 않음) | relay/channel/api_request_openwebui_fork_test.go |
+| O13 사용 로그 귀속 정보 | service/log_info_generate.go:129 | `GenerateTextOtherInfo`의 `appendRequestPath(...)` 바로 뒤에 `appendOpenWebUIInfo(ctx, other) // fork: O13` (`owui_sub`·`owui_task`·`owui_unsigned`를 `LogOther.SetPublic`으로) | service/log_info_openwebui_fork.go, service/log_info_openwebui_fork_test.go |
 
 ## 삭제한 upstream 파일
 

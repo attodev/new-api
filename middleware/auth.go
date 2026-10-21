@@ -604,6 +604,10 @@ func TokenAuth() func(c *gin.Context) {
 			logger.LogDebug(c, "Client IP %s passed the token IP restrictions check", clientIp)
 		}
 
+		if !openWebUISubstitute(c, key, &token) { // fork: O13
+			return
+		}
+
 		userCache, err := model.GetUserCache(token.UserId)
 		if err != nil {
 			common.SysLog(common.LogText("TokenAuth GetUserCache error for user %d: %v", token.UserId, err))
