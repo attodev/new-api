@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // setupServiceTestDB gives the openwebui package a real SQLite database with
@@ -31,7 +32,7 @@ func setupServiceTestDB(t *testing.T) {
 	ResetCachesForTest()
 
 	dsn := "file:" + strings.ReplaceAll(t.Name(), "/", "_") + "?mode=memory&cache=shared"
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Discard})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}))
 	require.NoError(t, model.MigrateForkOpenWebUITables(db))
