@@ -33,6 +33,8 @@ var forkMessageSources = []string{
 	"model/wallet_ceiling_fork.go",
 	"controller/email_send_error_fork.go",
 	"controller/option_openwebui_fork.go",
+	"controller/oauth2_provider.go",
+	"controller/openwebui_link.go",
 }
 
 // forkMessageConstants are message keys the fork files pass to NewMessage as
@@ -42,6 +44,11 @@ var forkMessageConstants = []string{
 	OrganizationMemberStatusAllowedError,
 	OrganizationDurationValueRangeError,
 	OrganizationDurationUnitAllowedError,
+	oidcInvalidRequestMessage,
+	oidcEmailRequiredMessage,
+	openWebUILinkConflictMessage,
+	openWebUILinkNotFoundMessage,
+	openWebUISubRequiredMessage,
 }
 
 // A message key is the first argument of NewMessage or the key of ApiErrorT /

@@ -47,6 +47,17 @@ var forkAccessTokenRouteRules = map[string]accessTokenRouteRule{
 	"POST /api/organization/waffo/pay":                accessTokenScopeRule("wallet:write"),
 	"POST /api/organization/waffo-pancake/amount":     accessTokenScopeRule("wallet:read"),
 	"POST /api/organization/waffo-pancake/pay":        accessTokenScopeRule("wallet:write"),
+	// O13 Open WebUI admin API and OIDC provider API (router/openwebui_routes_fork.go):
+	// browser sessions only. A personal access token must not link identities,
+	// mint OIDC codes, end sessions or rotate signing keys.
+	"GET /api/openwebui/relay-status":     accessTokenSessionRule,
+	"GET /api/openwebui/links":            accessTokenSessionRule,
+	"POST /api/openwebui/links":           accessTokenSessionRule,
+	"DELETE /api/openwebui/links/:id":     accessTokenSessionRule,
+	"POST /api/oauth2/authorize":          accessTokenSessionRule,
+	"POST /api/oauth2/logout":             accessTokenSessionRule,
+	"POST /api/oauth2/rotate-signing-key": accessTokenSessionRule,
+	"GET /api/oauth2/signing-key-status":  accessTokenSessionRule,
 }
 
 func init() {

@@ -284,6 +284,7 @@ func SetApiRouter(router *gin.Engine) {
 		registerForkPublicRoutes(apiRouter) // fork: router/fork-router.go
 		// fork: O3 router/organization-router.go
 		registerForkOrganizationRoutes(apiRouter)
+		registerForkOpenWebUIRoutes(apiRouter) // fork: O13 router/openwebui_routes_fork.go
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())
 		tokenRoute.Use(middleware.TokenOperationAudit())
