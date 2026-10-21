@@ -716,13 +716,15 @@ func GetOrganizationUser(c *gin.Context) {
 }
 
 func UpdateOrganizationUser(c *gin.Context) {
+	// Root names the organization with ?organization_id=; anyone else must be owner/admin of
+	// their own organization (the rule the list/import routes use).
+	organizationId, ok := resolveOrganizationAdminTarget(c) // fork: O13
+	if !ok {
+		return
+	}
 	actor, err := getOrganizationActor(c)
 	if err != nil {
 		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorT(c, "organization admin permission required")
 		return
 	}
 
@@ -736,7 +738,7 @@ func UpdateOrganizationUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if !model.CanManageOrganizationTarget(*actor, *target) {
+	if target.OrganizationId != organizationId || target.Role >= common.RoleAdminUser { // fork: O13
 		common.ApiErrorT(c, "organization target permission denied")
 		return
 	}
@@ -778,9 +780,9 @@ func UpdateOrganizationUser(c *gin.Context) {
 		return
 	}
 
-	// Scoped to the actor's organization: a member who left after the
+	// Scoped to the resolved organization: a member who left after the
 	// permission check is not written.
-	if err := model.UpdateOrganizationMemberFields(target.Id, actor.OrganizationId, updates); err != nil {
+	if err := model.UpdateOrganizationMemberFields(target.Id, organizationId, updates); err != nil { // fork: O13
 		common.ApiError(c, err)
 		return
 	}
@@ -788,19 +790,21 @@ func UpdateOrganizationUser(c *gin.Context) {
 		common.SysLog("failed to invalidate organization user cache: " + err.Error())
 	}
 	recordOrganizationAudit(c, "organization.user.update",
-		fmt.Sprintf("Updated organization %d member %d (%s)", actor.OrganizationId, target.Id, formatOrganizationAuditFields(updates)),
-		organizationAuditParams(map[string]any{"organization_id": actor.OrganizationId, "user_id": target.Id}, updates))
+		fmt.Sprintf("Updated organization %d member %d (%s)", organizationId, target.Id, formatOrganizationAuditFields(updates)), // fork: O13
+		organizationAuditParams(map[string]any{"organization_id": organizationId, "user_id": target.Id}, updates))
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
 func AssignOrganizationUser(c *gin.Context) {
+	// Root names the organization with ?organization_id=; anyone else must be owner/admin of
+	// their own organization.
+	organizationId, ok := resolveOrganizationAdminTarget(c) // fork: O13
+	if !ok {
+		return
+	}
 	actor, err := getOrganizationActor(c)
 	if err != nil {
 		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorT(c, "organization admin permission required")
 		return
 	}
 
@@ -840,7 +844,7 @@ func AssignOrganizationUser(c *gin.Context) {
 		return
 	}
 
-	if err := model.AssignUserToOrganization(target.Id, actor.OrganizationId, req.OrganizationRole); err != nil {
+	if err := model.AssignUserToOrganization(target.Id, organizationId, req.OrganizationRole); err != nil { // fork: O13
 		common.ApiError(c, err)
 		return
 	}
@@ -848,19 +852,21 @@ func AssignOrganizationUser(c *gin.Context) {
 		common.SysLog("failed to invalidate organization membership cache: " + err.Error())
 	}
 	recordOrganizationAudit(c, "organization.user.assign",
-		fmt.Sprintf("Assigned user %d to organization %d as %s (previous organization %d)", target.Id, actor.OrganizationId, req.OrganizationRole, target.OrganizationId),
-		map[string]any{"organization_id": actor.OrganizationId, "user_id": target.Id, "organization_role": req.OrganizationRole, "previous_organization_id": target.OrganizationId})
+		fmt.Sprintf("Assigned user %d to organization %d as %s (previous organization %d)", target.Id, organizationId, req.OrganizationRole, target.OrganizationId), // fork: O13
+		map[string]any{"organization_id": organizationId, "user_id": target.Id, "organization_role": req.OrganizationRole, "previous_organization_id": target.OrganizationId})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
 func RemoveOrganizationUserMembership(c *gin.Context) {
+	// Same rule as AssignOrganizationUser: root picks the organization with ?organization_id=,
+	// owners/admins act on their own organization.
+	organizationId, ok := resolveOrganizationAdminTarget(c) // fork: O13
+	if !ok {
+		return
+	}
 	actor, err := getOrganizationActor(c)
 	if err != nil {
 		common.ApiError(c, err)
-		return
-	}
-	if actor.OrganizationId == 0 || !model.HasOrganizationAdminRole(actor.OrganizationRole) {
-		common.ApiErrorT(c, "organization admin permission required")
 		return
 	}
 
@@ -882,7 +888,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.ApiErrorT(c, "organization admins cannot modify their own membership")
 		return
 	}
-	if target.OrganizationId != actor.OrganizationId {
+	if target.OrganizationId != organizationId { // fork: O13
 		common.ApiErrorT(c, "user does not belong to your organization")
 		return
 	}
@@ -891,7 +897,7 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		return
 	}
 
-	previousQuota, err := model.ClearOrganizationMembership(target.Id, actor.OrganizationId)
+	previousQuota, err := model.ClearOrganizationMembership(target.Id, organizationId) // fork: O13
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -900,8 +906,8 @@ func RemoveOrganizationUserMembership(c *gin.Context) {
 		common.SysLog("failed to invalidate cache after membership removal: " + err.Error())
 	}
 	recordOrganizationAudit(c, "organization.user.remove",
-		fmt.Sprintf("Removed user %d (role %s) from organization %d and cleared member quota %d", target.Id, target.OrganizationRole, actor.OrganizationId, previousQuota),
-		map[string]any{"organization_id": actor.OrganizationId, "user_id": target.Id, "organization_role": target.OrganizationRole, "previous_quota": previousQuota})
+		fmt.Sprintf("Removed user %d (role %s) from organization %d and cleared member quota %d", target.Id, target.OrganizationRole, organizationId, previousQuota), // fork: O13
+		map[string]any{"organization_id": organizationId, "user_id": target.Id, "organization_role": target.OrganizationRole, "previous_quota": previousQuota})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
 
