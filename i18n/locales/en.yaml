@@ -88,6 +88,3 @@ organization.wallet_reserve_insufficient: "organization wallet quota insufficien
 # fork: O13 — Open WebUI relay errors
 openwebui.auth_failed: "Open WebUI authentication failed, please contact your administrator"
 openwebui.not_linked: "Your Open WebUI account is not linked to a new-api account"
-openwebui.link_conflict: "This Open WebUI account or new-api user is already linked"
-openwebui.link_not_found: "Open WebUI link not found"
-openwebui.sub_required: "Open WebUI user id (sub) is required"

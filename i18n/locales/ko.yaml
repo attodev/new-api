@@ -89,6 +89,3 @@ organization.wallet_reserve_insufficient: "조직 지갑 쿼터가 부족합니�
 # fork: O13 — Open WebUI relay errors
 openwebui.auth_failed: "Open WebUI 인증에 실패했습니다. 관리자에게 문의해 주세요"
 openwebui.not_linked: "Open WebUI 계정이 new-api 계정에 연결되어 있지 않습니다"
-openwebui.link_conflict: "이 Open WebUI 계정 또는 new-api 사용자는 이미 연결되어 있습니다"
-openwebui.link_not_found: "Open WebUI 연결을 찾을 수 없습니다"
-openwebui.sub_required: "Open WebUI 사용자 ID(sub)가 필요합니다"
