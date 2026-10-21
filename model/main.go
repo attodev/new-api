@@ -383,6 +383,9 @@ func migrateDB() error {
 	if err := MigrateForkOrganizationTables(DB); err != nil { // fork: O3
 		return err
 	}
+	if err := MigrateForkOpenWebUITables(DB); err != nil { // fork: O13
+		return err
+	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err
 	}

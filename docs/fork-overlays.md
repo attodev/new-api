@@ -381,6 +381,20 @@ O12 메모(잔액 어긋남 감지 로그, upstream 훅 없음): `model/user_quo
 user quota cache drift: user=<id> cache=<캐시 잔액> db=<DB 잔액> diff=<캐시 − DB>
 ```
 
+## O13 OpenWebUI
+
+Open WebUI 연동(내장 OIDC provider + relay JWT 토큰 치환)을 fork overlay로 옮긴 것이다. 원본은 legacy `OpenWebUI` 브랜치다. 설정 이름은 원본과 같은 `oauth2`(내장 OIDC provider)·`openwebui`(relay)이며, develop의 `oidc`(OIDC *클라이언트* 로그인)는 건드리지 않는다. 로직은 fork 전용 파일에 두고 upstream 파일에는 `// fork: O13` 훅만 둔다.
+
+| overlay | upstream 파일 | 훅 | fork 전용 파일 |
+|---|---|---|---|
+| O13 링크 테이블 마이그레이션 | model/main.go:386 | `migrateDB`의 `MigrateForkOrganizationTables(DB)` 블록 바로 뒤에 `if err := MigrateForkOpenWebUITables(DB); err != nil { // fork: O13` + `return err` + `}` (gofmt로 3줄; `OpenWebUILink`를 AutoMigrate. develop에는 `migrateDBFast`가 없다) | model/openwebui_migrate_fork.go, model/openwebui_migrate_fork_test.go, model/openwebui_link.go, model/openwebui_token.go, model/openwebui_link_test.go |
+| O13 설정 (내장 OIDC provider) | 없음 | 훅 없음 — `config.GlobalConfig.Register("oauth2", ...)`가 `init()`에서 등록 | setting/system_setting/oauth2_client_fork.go, setting/system_setting/oauth2_client_fork_test.go |
+| O13 설정 (relay) | 없음 | 훅 없음 — `config.GlobalConfig.Register("openwebui", ...)`가 `init()`에서 등록 | setting/system_setting/openwebui_fork.go, setting/system_setting/openwebui_fork_test.go |
+| O13 컨텍스트 키 | 없음 | 훅 없음 — `ContextKeyOpenWebUISub`·`Task`·`Attributed`·`Unsigned`를 별도 `const` 블록으로 선언 | constant/context_key_openwebui_fork.go |
+| O13 Redis 일회용 읽기 | 없음 | 훅 없음 — `RedisGetDel`, `IsRedisNotFound` | common/redis_getdel_fork.go, common/redis_getdel_fork_test.go |
+| O13 relay 오류 i18n 키 | 없음 | 훅 없음 — `MsgOpenWebUIAuthFailed`·`NotLinked`·`LinkConflict`·`LinkNotFound`·`SubRequired` 5개와 `i18n/locales/{en,ko}.yaml`의 `# fork: O13` 블록 (관리 화면 오류는 `ApiErrorT` 영문 문장이라 여기에 없다) | i18n/keys_openwebui_fork.go |
+| O13 i18n 키 검사 | 없음 | 훅 없음 — fork 테스트 파일 `forkDeclaredKeys`가 `keys_openwebui_fork.go`도 읽도록 `forkKeyFiles` 목록으로 바꿈 | i18n/keys_fork_test.go |
+
 ## 삭제한 upstream 파일
 
 단계 E Task 1 (team 66d421d13과 같은 결정): 화면 언어는 영어와 한국어만 둔다.
