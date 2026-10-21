@@ -383,7 +383,8 @@ user quota cache drift: user=<id> cache=<캐시 잔액> db=<DB 잔액> diff=<캐
 
 ## O13 OpenWebUI
 
-Open WebUI 연동(내장 OIDC provider + relay JWT 토큰 치환)을 fork overlay로 옮긴 것이다. 원본은 legacy `OpenWebUI` 브랜치다. 설정 이름은 원본과 같은 `oauth2`(내장 OIDC provider)·`openwebui`(relay)이며, develop의 `oidc`(OIDC *클라이언트* 로그인)는 건드리지 않는다. 로직은 fork 전용 파일에 두고 upstream 파일에는 `// fork: O13` 훅만 둔다.
+Open WebUI 연동(내장 OIDC provider + relay JWT 토큰 치환 + 관리 화면·OIDC 페이지)을 fork overlay로 옮긴 것이다. 원본은 legacy `OpenWebUI` 브랜치(team에서 갈라진 playground + OpenWebUI 줄기, 범위 `5167b251d..origin/OpenWebUI`)이고, 커밋 재생이 아니라 끝 상태를 develop 구조에 맞춰 옮겼다(이식 기록 `docs/2026-10-21-openwebui-on-develop.md`, 시험 스택 `deploy/openwebui-test/`).
+설정 이름은 원본과 같은 `oauth2`(내장 OIDC provider)·`openwebui`(relay)이며, develop의 `oidc`(OIDC *클라이언트* 로그인)는 건드리지 않는다. 로직은 fork 전용 파일에 두고 upstream 파일에는 `// fork: O13` 훅만 둔다. 아래 표는 코드의 모든 `fork: O13` 표식과 대조했다(2026-10-21).
 
 | overlay | upstream 파일 | 훅 | fork 전용 파일 |
 |---|---|---|---|

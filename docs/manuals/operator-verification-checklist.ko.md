@@ -143,6 +143,7 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | `INTERFACE_LANGUAGES` 등 언어 옵션 | en,ko | 다른 언어 코드는 영어로 열림 |
 | `ACCOUNT_PASSWORD_HASH_ALGORITHM` | 시험 기간 `bcrypt` (§9) | argon2id로 저장되어 team으로 롤백하면 그 비밀번호는 검증 불가 |
 | 옵션 `global.chat_completions_to_responses_policy` (환경 변수 아님, 시스템 설정 → 모델 설정 → "ChatCompletions -> Responses Compatibility") | `{"enabled":true,"all_channels":true,"model_patterns":["^gpt-5\\.6"]}` | gpt-5.6 계열에 `/v1/chat/completions`로 추론+도구 요청을 보내면 상류가 400(`Function tools with reasoning_effort are not supported … use /v1/responses`)을 돌려준다. 켜면 게이트웨이가 상류에는 Responses API로 보내고 클라이언트에는 chat 형식으로 돌려준다(2026-10-20 시험 서버에서 확인). `options` 테이블 값이라 전환 뒤 운영에서 다시 저장해야 한다 |
+| 옵션 `openwebui.*`·`oauth2.*` (환경 변수 아님, 시스템 설정 → 사이트 → "OpenWebUI 연동"·"OpenWebUI 릴레이") | Open WebUI를 붙일 때만. 키 목록과 규칙은 §10, `docs/2026-10-21-openwebui-on-develop.md` 5절 | 꺼져 있으면 relay 치환과 내장 OIDC가 동작하지 않는다(다른 기능 영향 없음). `ServerAddress`가 OIDC issuer이므로 운영 주소로 저장되어 있어야 한다 |
 
 `.env.example`에 운영값이 주석으로 적혀 있다. GA·GTM 변수 이름은 upstream과 같다.
 
@@ -191,7 +192,32 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 
 롤백 뒤 남는 것: develop 기간의 로그·충전·구독·조직 데이터는 team에도 같은 컬럼이 있어 그대로 읽힌다. Toss는 develop 기간에 멈춰 있었으므로 활성 정기결제가 있다면 그 기간의 갱신이 빠진 채 재개된다. 재시도 여부는 team의 Toss 조정 로그로 확인한다.
 
-## 10. 결과 기록
+## 10. Open WebUI 연동 (O13)
+
+목적: develop-openwebui의 내장 OIDC provider와 relay JWT 치환이 실제 Open WebUI와 맞물리는지 확인한다. 이 Mac에서는 Docker가 없어 돌리지 못했다(이식 기록 `docs/2026-10-21-openwebui-on-develop.md` 6절). 시험 스택과 자세한 설정은 `deploy/openwebui-test/README.md`.
+
+1. **스택 기동.**
+   ```bash
+   cd deploy/openwebui-test && cp .env.example .env    # PUBLIC_HOST·비밀값 채우기, MOCK_UPSTREAM=1 이면 mock 채널까지
+   docker compose --profile mock up -d --build new-api mock-upstream
+   ./bootstrap.sh
+   docker compose --profile mock up -d
+   ```
+   통과 기준: `bootstrap.sh`가 `완료`로 끝나고 `.env`에 `OWUI_SERVICE_KEY`가 채워진다. Open WebUI 컨테이너에서 `wget -qO- http://PUBLIC_HOST:3000/.well-known/openid-configuration`의 `issuer`가 `http://PUBLIC_HOST:3000`이다. 옵션 조회(`GET /api/option/`)에 `OIDCSigning*`이 없다.
+2. **OIDC 로그인 왕복.** 시크릿 창에서 `http://PUBLIC_HOST:8080`을 연다 → new-api 로그인 화면 → alice로 로그인 → Open WebUI로 돌아와 계정이 생긴다(첫 사용자는 Open WebUI `admin`). 이미 new-api에 로그인된 창이면 로그인 화면 없이 바로 돌아온다. 이메일 없는 계정은 "이메일 주소가 필요합니다" 화면에서 멈춘다.
+   통과 기준: 돌아온 뒤 Open WebUI 사용자 이름·이메일이 new-api 값과 같다. new-api 사용자 편집 → "Open WebUI 연결"에 `linked_by: auto` 링크가 생긴다(첫 채팅 뒤).
+3. **relay JWT 과금 — 개인 지갑.** Open WebUI에서 alice로 mock-gpt(또는 실제 모델)에 채팅 1건. Open WebUI 관리자 설정의 `X-Task` 헤더(README 4절)도 넣고 제목 생성까지 기다린다.
+   통과 기준: new-api 사용 로그에 alice의 `openwebui` 토큰으로 채팅 1건(`other`에 `owui_sub`), `openwebui-task` 토큰으로 제목 생성(`owui_task`)이 남고 alice 잔액만 줄어든다. 서비스 계정(owui-svc) 잔액·로그는 그대로다. 상류로 `X-OpenWebUI-User-Jwt`가 가지 않는 것은 `relay/channel/api_request_openwebui_fork_test.go`가 고정한다(실제 요청으로 보려면 mock 채널의 base URL을 잠시 `http://<호스트>:9101`로 바꾸고 그 호스트에서 `nc -l 9101`로 들어온 헤더를 본다).
+4. **relay JWT 과금 — 조직 지갑.** new-api에서 조직을 만들고 bob을 멤버로 넣는다(조직 지갑에 잔액 충전). Open WebUI에서 bob으로 채팅 1건.
+   통과 기준: 사용 로그가 bob의 `openwebui` 토큰으로 남고 차감이 **조직 지갑**에서 일어난다(bob 개인 잔액은 그대로). 조직 대시보드의 사용량·로그에 같은 건이 보인다.
+5. **서명 키 교체.** root로 시스템 설정 → 사이트 → "OpenWebUI 연동" → "서명 키 교체"(또는 root 세션으로 `POST /api/oauth2/rotate-signing-key`). Open WebUI에서 로그아웃 뒤 다시 로그인한다.
+   통과 기준: `GET /api/oauth2/signing-key-status`의 `current.kid`가 바뀌고 `previous`에 이전 kid가 있다. `/oauth2/jwks`에 두 키가 있다. 1~2분 안에 다시 로그인된다(JWKS 캐시·옵션 동기화 창). 다중 노드면 다른 노드에서도 같은 kid로 서명되는지 60초 뒤 확인한다.
+6. **로그아웃 왕복.** Open WebUI에서 로그아웃한다.
+   통과 기준: new-api `/oauth2/logout`을 거쳐 Open WebUI `/auth`로 돌아오고, `http://PUBLIC_HOST:3000`을 열면 로그인 화면이다(DB `user_sessions`에서 그 세션이 `revoked`, `revoked_reason = oidc_end_session`). 이어서 **needs_confirmation**: new-api에 bob으로 로그인한 상태에서 alice의 Open WebUI 로그아웃 주소(또는 `id_token_hint` 없이 `/oauth2/logout`)를 열면 바로 로그아웃되지 않고 "<사이트 이름>에서 로그아웃할까요?" 확인 화면이 나온다. "로그인 유지"를 누르면 세션이 그대로이고, "로그아웃"을 누르면 끝난다.
+7. **미서명 요청 정책.** 서비스 키만으로(JWT 헤더 없이) `curl http://PUBLIC_HOST:3000/v1/models -H "Authorization: Bearer sk-<OWUI_SERVICE_KEY>"`.
+   통과 기준: `openwebui.allow_unsigned_requests=true`(시험 스택 기본)면 200이고 그 뒤 요청의 로그에 `owui_unsigned`가 남으며 서비스 토큰에 청구된다. 시스템 설정 → "OpenWebUI 릴레이"에서 미서명 허용을 끄면 401이고 new-api 로그에 `openwebui: rejected (401) unsigned_request_rejected`가 남는다. 잘못된 시크릿으로 서명한 JWT는 `jwt_invalid`로 401. 운영에서는 Open WebUI의 임베딩·이미지 등 사용자 맥락이 없는 호출이 있는지 보고 켤지 정한다(켜면 그 사용량은 서비스 계정 지갑으로 간다).
+
+## 11. 결과 기록
 
 | 항목 | 날짜 | 수행자 | 결과 | 비고 |
 |---|---|---|---|---|
@@ -208,3 +234,4 @@ cd web && bun run e2e:install && E2E_ADMIN_USERNAME=root E2E_ADMIN_PASSWORD=1234
 | 6 배포 설정 값 | | | | |
 | 7 PDF·안내문·도메인 옵션 | | | | |
 | 9 전환 전 준비(bcrypt·options 덤프·스냅샷) | | | | |
+| 10 Open WebUI 연동 (기동·OIDC 로그인·개인/조직 과금·서명 키 교체·로그아웃·미서명 정책) | | | | |
