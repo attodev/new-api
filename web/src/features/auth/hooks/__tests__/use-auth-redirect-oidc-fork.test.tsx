@@ -92,6 +92,7 @@ function renderHarness(target: string) {
 }
 
 beforeEach(() => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   vi.mocked(replaceLocation).mockClear()
 })
 

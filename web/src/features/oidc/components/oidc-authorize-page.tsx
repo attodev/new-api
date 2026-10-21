@@ -24,7 +24,11 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { AuthLayout } from '@/features/auth/auth-layout'
-import { clearAuthentication, resolveAuthentication } from '@/lib/auth-session'
+import {
+  clearAuthentication,
+  refreshAuthentication,
+  resolveAuthentication,
+} from '@/lib/auth-session'
 import { getServerMessage } from '@/lib/server-error-message'
 
 import { authorizeOidc, readAuthorizeParams } from '../api'
@@ -76,12 +80,25 @@ export function OidcAuthorizePage() {
 
       // Read the raw query: the router JSON-parses search values, which
       // could turn number-like state/nonce values into numbers.
-      const { status, body } = await authorizeOidc(
-        readAuthorizeParams(window.location.search)
-      )
+      const params = readAuthorizeParams(window.location.search)
+      let { status, body } = await authorizeOidc(params)
       if (status === 401) {
-        // The server refused this session (expired, revoked, disabled user).
-        // Drop it so sign-in asks for credentials instead of bouncing back.
+        // The access token may have expired since it was checked. Refresh it
+        // from the refresh cookie and try once more before asking for a
+        // password.
+        const refreshed = await refreshAuthentication()
+        if (refreshed.kind === 'transient_error') {
+          setPhase({ kind: 'invalid', message: t('Request failed') })
+          return
+        }
+        if (refreshed.kind === 'authenticated') {
+          ;({ status, body } = await authorizeOidc(params))
+        }
+      }
+      if (status === 401) {
+        // The server refused this session (revoked, disabled user) or it could
+        // not be refreshed. Drop it so sign-in asks for credentials instead of
+        // bouncing back here.
         clearAuthentication(false)
         toSignIn()
         return

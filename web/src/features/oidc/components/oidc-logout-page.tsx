@@ -27,6 +27,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { logout } from '@/features/auth/api'
 import { AuthLayout } from '@/features/auth/auth-layout'
+import { useSystemConfig } from '@/hooks/use-system-config'
 import {
   clearAuthenticatedClientState,
   resolveAuthentication,
@@ -72,6 +73,7 @@ export function OidcLogoutPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { systemName } = useSystemConfig()
   const [phase, setPhase] = useState<'working' | 'confirm'>('working')
   const [submitting, setSubmitting] = useState(false)
   const started = useRef(false)
@@ -125,7 +127,7 @@ export function OidcLogoutPage() {
         {phase === 'confirm' && (
           <>
             <h2 className='text-lg font-semibold'>
-              {t('Sign out of new-api?')}
+              {t('Sign out of {{name}}?', { name: systemName })}
             </h2>
             <p className='text-muted-foreground text-sm'>
               {t(

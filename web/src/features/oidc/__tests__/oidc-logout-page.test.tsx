@@ -45,6 +45,9 @@ vi.mock('@/features/auth/auth-layout', () => ({
   AuthLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }))
 vi.mock('@/features/auth/api', () => ({ logout: vi.fn() }))
+vi.mock('@/hooks/use-system-config', () => ({
+  useSystemConfig: () => ({ systemName: 'Acme Gateway' }),
+}))
 vi.mock('@/lib/auth-session', () => ({
   resolveAuthentication: vi.fn(),
   clearAuthenticatedClientState: vi.fn(),
@@ -141,7 +144,7 @@ it('asks before signing out when the server needs confirmation', async () => {
   renderPage()
 
   const signOut = await screen.findByRole('button', { name: 'Sign out' })
-  expect(screen.getByText('Sign out of new-api?')).toBeInTheDocument()
+  expect(screen.getByText('Sign out of Acme Gateway?')).toBeInTheDocument()
   expect(logout).not.toHaveBeenCalled()
   expect(replaceLocation).not.toHaveBeenCalled()
 

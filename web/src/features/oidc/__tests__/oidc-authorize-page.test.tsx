@@ -22,7 +22,11 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, expect, it, vi } from 'vitest'
 
-import { clearAuthentication, resolveAuthentication } from '@/lib/auth-session'
+import {
+  clearAuthentication,
+  refreshAuthentication,
+  resolveAuthentication,
+} from '@/lib/auth-session'
 
 import { authorizeOidc } from '../api'
 import { OidcAuthorizePage } from '../components/oidc-authorize-page'
@@ -39,6 +43,7 @@ vi.mock('@/features/auth/auth-layout', () => ({
 }))
 vi.mock('@/lib/auth-session', () => ({
   resolveAuthentication: vi.fn(),
+  refreshAuthentication: vi.fn(),
   clearAuthentication: vi.fn(),
 }))
 vi.mock('../api', async (importOriginal) => ({
@@ -115,8 +120,32 @@ it('follows a redirectable OAuth error back to the client', async () => {
   await waitFor(() => expect(replaceLocation).toHaveBeenCalledWith(redirect))
 })
 
-it('drops a session the server refused and signs in again', async () => {
+it('refreshes an access token that expired before the POST and retries once', async () => {
+  const redirect = 'https://chat.example.com/oauth/oidc/callback?code=c&state=s'
+  vi.mocked(authorizeOidc)
+    .mockResolvedValueOnce({ status: 401, body: null })
+    .mockResolvedValueOnce({
+      status: 200,
+      body: { success: true, data: { redirect_url: redirect } },
+    })
+  vi.mocked(refreshAuthentication).mockResolvedValue({
+    kind: 'authenticated',
+  } as Awaited<ReturnType<typeof refreshAuthentication>>)
+  render(<OidcAuthorizePage />)
+
+  await waitFor(() => expect(replaceLocation).toHaveBeenCalledWith(redirect))
+  expect(refreshAuthentication).toHaveBeenCalledTimes(1)
+  expect(authorizeOidc).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(authorizeOidc).mock.calls[1]).toEqual(
+    vi.mocked(authorizeOidc).mock.calls[0]
+  )
+  expect(clearAuthentication).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+it('signs in again when the refresh after a 401 fails', async () => {
   vi.mocked(authorizeOidc).mockResolvedValue({ status: 401, body: null })
+  vi.mocked(refreshAuthentication).mockResolvedValue({ kind: 'anonymous' })
   render(<OidcAuthorizePage />)
 
   await waitFor(() =>
@@ -126,6 +155,40 @@ it('drops a session the server refused and signs in again', async () => {
       replace: true,
     })
   )
+  expect(authorizeOidc).toHaveBeenCalledTimes(1)
+  expect(clearAuthentication).toHaveBeenCalledWith(false)
+  expect(replaceLocation).not.toHaveBeenCalled()
+})
+
+it('keeps the session when the refresh after a 401 fails transiently', async () => {
+  vi.mocked(authorizeOidc).mockResolvedValue({ status: 401, body: null })
+  vi.mocked(refreshAuthentication).mockResolvedValue({
+    kind: 'transient_error',
+    error: new Error('offline'),
+  })
+  render(<OidcAuthorizePage />)
+
+  expect(await screen.findByText('Request failed')).toBeInTheDocument()
+  expect(clearAuthentication).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+it('drops a session the server still refuses after a refresh', async () => {
+  vi.mocked(authorizeOidc).mockResolvedValue({ status: 401, body: null })
+  vi.mocked(refreshAuthentication).mockResolvedValue({
+    kind: 'authenticated',
+  } as Awaited<ReturnType<typeof refreshAuthentication>>)
+  render(<OidcAuthorizePage />)
+
+  await waitFor(() =>
+    expect(navigate).toHaveBeenCalledWith({
+      to: '/sign-in',
+      search: { redirect: `/oauth2/authorize${QUERY}` },
+      replace: true,
+    })
+  )
+  expect(authorizeOidc).toHaveBeenCalledTimes(2)
+  expect(refreshAuthentication).toHaveBeenCalledTimes(1)
   expect(clearAuthentication).toHaveBeenCalledWith(false)
   expect(replaceLocation).not.toHaveBeenCalled()
 })
