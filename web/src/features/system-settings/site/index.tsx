@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { SettingsPage } from '../components/settings-page'
 import type { SiteSettings } from '../types'
+import { OPENWEBUI_SITE_DEFAULTS } from './openwebui-fork' // fork: O13
 import {
   SITE_DEFAULT_SECTION,
   getSiteSectionContent,
@@ -38,6 +39,7 @@ const defaultSiteSettings: SiteSettings = {
   'legal.privacy_policy': '',
   HeaderNavModules: '',
   SidebarModulesAdmin: '',
+  ...OPENWEBUI_SITE_DEFAULTS, // fork: O13
 }
 
 export function SiteSettings() {

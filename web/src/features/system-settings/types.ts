@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { OpenWebUISiteSettings } from './site/openwebui-fork' // fork: O13
+
 export type SystemOption = {
   key: string
   value: string
@@ -140,7 +142,8 @@ export type SystemTaskFilters = {
   offset?: number
 }
 
-export type SiteSettings = {
+// fork: O13 — plus the non-secret Open WebUI options (site/openwebui-fork.ts)
+export type SiteSettings = OpenWebUISiteSettings & {
   Notice: string
   SystemName: string
   Logo: string

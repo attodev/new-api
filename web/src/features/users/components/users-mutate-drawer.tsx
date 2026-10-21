@@ -96,6 +96,7 @@ import {
   transformUserToFormDefaults,
 } from '../lib'
 import type { User } from '../types'
+import { UserOpenWebUILinkSection } from './user-openwebui-link-section' // fork: O13
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -548,6 +549,11 @@ export function UsersMutateDrawer({
                     )}
                   </SideDrawerSection>
                 )}
+
+              {/* fork: O13 */}
+              {isUpdate && currentRow && (
+                <UserOpenWebUILinkSection userId={currentRow.id} />
+              )}
 
               {/* Binding Information (Read-only) */}
               {isUpdate && (

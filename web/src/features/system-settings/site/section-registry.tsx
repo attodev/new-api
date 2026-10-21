@@ -28,6 +28,7 @@ import { NoticeSection } from '../maintenance/notice-section'
 import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
 import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { OPENWEBUI_SITE_SECTIONS } from './openwebui-sections-fork' // fork: O13
 
 const SITE_SECTIONS = [
   {
@@ -91,6 +92,7 @@ const SITE_SECTIONS = [
       )
     },
   },
+  ...OPENWEBUI_SITE_SECTIONS, // fork: O13
 ] as const
 
 export type SiteSectionId = (typeof SITE_SECTIONS)[number]['id']
