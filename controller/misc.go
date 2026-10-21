@@ -140,6 +140,7 @@ func GetStatus(c *gin.Context) {
 	if cs.FAQEnabled {
 		data["faq"] = console_setting.GetFAQ()
 	}
+	addOpenWebUIStatusFields(data) // fork: O13
 
 	// Add enabled custom OAuth providers
 	customProviders := oauth.GetEnabledCustomProviders()

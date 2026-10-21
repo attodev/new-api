@@ -88,6 +88,9 @@ func GetOptions(c *gin.Context) {
 		if k == "theme.frontend" || k == "billing_setting.billing_mode" || k == "billing_setting.billing_expr" {
 			continue
 		}
+		if oidcHiddenOption(k) { // fork: O13
+			continue
+		}
 		value := common.Interface2String(v)
 		isSensitiveKey := strings.HasSuffix(k, "Token") ||
 			strings.HasSuffix(k, "Secret") ||
@@ -186,6 +189,9 @@ func UpdateOption(c *gin.Context) {
 		common.ApiErrorStatus(c, http.StatusBadRequest, common.NewMessage("Invalid parameters"))
 		return
 	}
+	if rejectOIDCSigningKeyWrite(c, option.Key) { // fork: O13
+		return
+	}
 	switch option.Value.(type) {
 	case bool:
 		option.Value = common.Interface2String(option.Value.(bool))
@@ -213,6 +219,9 @@ func UpdateOption(c *gin.Context) {
 			common.ApiError(c, err)
 			return
 		}
+	}
+	if !validateOpenWebUIOption(c, &option) { // fork: O13
+		return
 	}
 	switch option.Key {
 	case "GitHubOAuthEnabled":
