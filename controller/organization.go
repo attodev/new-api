@@ -300,7 +300,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 			return
 		}
 		if !(hasStartTimestamp && hasEndTimestamp) {
-			now := time.Now()
+			now := time.Now().In(model.OrganizationDashboardLocation)
 			endTimestamp = now.Unix()
 			switch preset {
 			case "today":

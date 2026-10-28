@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+// OrganizationDashboardLocation is the time zone the organization dashboard
+// uses for day boundaries. Korea has no daylight saving time, so a fixed
+// UTC+9 zone is exact and does not depend on tzdata in the container.
+var OrganizationDashboardLocation = time.FixedZone("KST", 9*60*60)
+
 type OrganizationDashboard struct {
 	Organization OrganizationDashboardOrganization      `json:"organization"`
 	Summary      OrganizationDashboardSummary           `json:"summary"`
@@ -126,7 +131,7 @@ func GetOrganizationDashboard(organizationId int, startTime int64, endTime int64
 		dashboard.Summary.PeriodRequests += quotaRow.Count
 		activeUsers[quotaRow.UserID] = true
 
-		date := time.Unix(quotaRow.CreatedAt, 0).UTC().Format("2006-01-02")
+		date := time.Unix(quotaRow.CreatedAt, 0).In(OrganizationDashboardLocation).Format("2006-01-02")
 		if dailyUsage[date] == nil {
 			dailyUsage[date] = &OrganizationDashboardDailyUsage{Date: date}
 		}
