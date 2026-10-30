@@ -68,6 +68,8 @@ MODELS="gpt-4o-mini gemini-2.5-flash" CLAUDE_MODELS="claude-opus-4-7 claude-sonn
 ```
 Bedrock·Vertex 채널을 쓰면 그 채널로 라우팅되는 모델 이름을 `CLAUDE_MODELS`에 같이 넣는다(세 채널 모두 400 없이 요약이 와야 한다).
 
+gpt-5.6 계열은 `MODELS`에 넣기 전에 시스템 설정 → 모델 설정의 "ChatCompletions -> Responses Compatibility"를 `{"enabled":true,"all_channels":true,"model_patterns":["^gpt-5\\.6"]}`로 켠다. 끄면 tool call 단계가 상류의 400(`Function tools with reasoning_effort are not supported … use /v1/responses`)으로 실패한다. 2026-10-20 시험: 켠 뒤 `reasoning_effort`·OpenRouter식 `reasoning`·`tool_choice: required`·스트리밍 모두 200(team에서 보고된 문제의 해결).
+
 수동: 로그 상세(관리자 → 로그 → 행 클릭)의 과금 정보 끝에 있는 "계산식 보기"를 펼쳐 `Input: 13 / 1M × $4 × Group Ratio 0.9 = …` 식의 줄들이 로그 금액과 맞는지 1건 확인한다(O6 fork). 타이밍 구간(전체·모델·게이트웨이 ms)도 같은 상세에 보여야 한다(O7). Gemini에 이미지 1장을 포함한 요청을 보내고 로그의 과금이 상한 규칙(이미지 토큰 ≤ prompt − cached − audio) 안인지; 이미지 생성·임베딩을 쓰면 1건씩; 스트리밍 중 클라이언트를 끊고(`curl … | head -c 100`) 로그에 부분 토큰이 과금되는지.
 
 ## 7. 인증 — `07-auth.sh`
