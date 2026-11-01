@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -128,4 +129,54 @@ func TestConsumeCode_ConcurrentExchangesYieldOneWinner(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, winners)
+}
+
+// Token-from-key access tokens carry iat/exp and expire on their own,
+// shorter TTL even in the memory store (whose default TTL is AccessTokenTTL).
+func TestIssueAccessTokenWithTTL(t *testing.T) {
+	setupOIDCTestDB(t)
+	ResetStoresForTest()
+	before := time.Now().Unix()
+	raw, err := IssueAccessTokenWithTTL(AccessToken{UserId: 7, ClientId: "openwebui-mcp", Scope: "openid", TokenId: 3}, 600*time.Second)
+	require.NoError(t, err)
+	at, found, err := LookupAccessToken(raw)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.GreaterOrEqual(t, at.IssuedAt, before)
+	require.Equal(t, int64(600), at.ExpiresAt-at.IssuedAt)
+	require.Equal(t, 3, at.TokenId)
+
+	// A TTL above the store's lifetime (or none) falls back to AccessTokenTTL.
+	for _, ttl := range []time.Duration{0, -time.Second, 2 * AccessTokenTTL} {
+		raw, err := IssueAccessTokenWithTTL(AccessToken{UserId: 7}, ttl)
+		require.NoError(t, err)
+		at, _, err := LookupAccessToken(raw)
+		require.NoError(t, err)
+		require.Equal(t, int64(AccessTokenTTL.Seconds()), at.ExpiresAt-at.IssuedAt, ttl)
+	}
+
+	short, err := IssueAccessTokenWithTTL(AccessToken{UserId: 7}, time.Second)
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond)
+	_, found, err = LookupAccessToken(short)
+	require.NoError(t, err)
+	require.False(t, found, "a short-lived token must not outlive its exp")
+}
+
+// A stored record whose exp has passed is not found, even if the store has
+// not evicted it yet; records without exp (issued before iat/exp existed)
+// keep working until the store drops them.
+func TestLookupAccessToken_HonoursStoredExp(t *testing.T) {
+	setupOIDCTestDB(t)
+	ResetStoresForTest()
+	require.NoError(t, accessTokens().SetWithTTL("stale", `{"user_id":7,"client_id":"x","scope":"openid","exp":1}`, time.Minute))
+	_, found, err := LookupAccessToken("stale")
+	require.NoError(t, err)
+	require.False(t, found)
+
+	require.NoError(t, accessTokens().SetWithTTL("legacy", `{"user_id":7,"client_id":"x","scope":"openid"}`, time.Minute))
+	at, found, err := LookupAccessToken("legacy")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, 7, at.UserId)
 }

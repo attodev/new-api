@@ -136,3 +136,51 @@ func TestUpdateOption_OAuth2_TrimsWhitespace(t *testing.T) {
 	require.Equal(t, "https://chat.example.com/bye", s.PostLogoutRedirectURI)
 	require.Equal(t, "https://chat.example.com/cb", common.OptionMap["oauth2.redirect_uri"])
 }
+
+// Ported from OpenWebUI controller/option_oauth2_test.go (bf236c829).
+func TestUpdateOption_OAuth2_TokenFromKey(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "openwebui"), `"success":true`)
+
+	body := putOAuth2Option(t, "oauth2.token_from_key_client_id", "openwebui")
+	require.Contains(t, body, `"success":false`, "must differ from client_id")
+	require.Contains(t, body, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", "  "), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", " openwebui-mcp "), `"success":true`)
+	require.Equal(t, "openwebui-mcp", system_setting.GetOAuth2Settings().TokenFromKeyClientId)
+	require.Equal(t, "openwebui-mcp", common.OptionMap["oauth2.token_from_key_client_id"])
+	body = putOAuth2Option(t, "oauth2.client_id", " openwebui-mcp ")
+	require.Contains(t, body, `"success":false`, "client_id cannot take the API key token client_id")
+	require.Contains(t, body, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
+	require.Equal(t, "openwebui", system_setting.GetOAuth2Settings().ClientId)
+
+	for _, bad := range []any{"30", "59", "901", "abc", "", 3.5} {
+		body := putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", bad)
+		require.Contains(t, body, `"success":false`, "ttl %v", bad)
+		require.Contains(t, body, "The API key token lifetime must be between 60 and 900 seconds")
+	}
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", " 300 "), `"success":true`)
+	require.Equal(t, 300, system_setting.GetOAuth2Settings().TokenFromKeyTTLSeconds)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", 60), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", 900), `"success":true`)
+
+	for _, bad := range []any{"0", 601, "-1", "x"} {
+		body := putOAuth2Option(t, "oauth2.token_from_key_rate_limit", bad)
+		require.Contains(t, body, `"success":false`, "rate %v", bad)
+		require.Contains(t, body, "The API key token rate limit must be between 1 and 600 per minute")
+	}
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_rate_limit", 20), `"success":true`)
+	require.Equal(t, 20, system_setting.GetOAuth2Settings().TokenFromKeyRateLimit)
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_enabled", true), `"success":true`)
+	require.True(t, system_setting.GetOAuth2Settings().TokenFromKeyEnabled)
+}
+
+// With the stored API key token client_id blank (a fresh install's default
+// is used), the main client_id still cannot take the default.
+func TestUpdateOption_OAuth2_ClientIdAvoidsDefaultTokenFromKeyClientId(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	require.Equal(t, "", system_setting.GetOAuth2Settings().TokenFromKeyClientId)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", system_setting.DefaultTokenFromKeyClientId), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", ""), `"success":true`, "clearing the client_id stays allowed")
+}

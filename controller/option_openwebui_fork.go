@@ -1,4 +1,4 @@
-// fork: O13 — options/status API hooks for Open WebUI: hide and protect the OIDC signing keys, validate openwebui.* and oauth2.* saves, oauth2_* status fields (ported from OpenWebUI controller/option.go and misc.go).
+// fork: O13 — options/status API hooks for Open WebUI: hide and protect the OIDC signing keys, validate openwebui.* and oauth2.* saves (including the token-from-key settings), oauth2_* status fields (ported from OpenWebUI controller/option.go and misc.go).
 
 package controller
 
@@ -108,6 +108,30 @@ func validateOpenWebUIOption(c *gin.Context, option *OptionUpdateRequest) bool {
 		}
 	case "oauth2.client_id":
 		option.Value = strings.TrimSpace(option.Value.(string))
+		if v := option.Value.(string); v != "" && v == system_setting.GetOAuth2Settings().EffectiveTokenFromKeyClientId() {
+			common.ApiErrorT(c, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
+			return false
+		}
+	case "oauth2.token_from_key_client_id":
+		option.Value = strings.TrimSpace(option.Value.(string))
+		if v := option.Value.(string); v == "" || v == system_setting.GetOAuth2Settings().ClientId {
+			common.ApiErrorT(c, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
+			return false
+		}
+	case "oauth2.token_from_key_ttl_seconds":
+		ttl, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
+		if err != nil || ttl < system_setting.MinTokenFromKeyTTL || ttl > system_setting.MaxTokenFromKeyTTL {
+			common.ApiErrorT(c, "The API key token lifetime must be between 60 and 900 seconds")
+			return false
+		}
+		option.Value = strconv.Itoa(ttl)
+	case "oauth2.token_from_key_rate_limit":
+		rate, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
+		if err != nil || rate < system_setting.MinTokenFromKeyRate || rate > system_setting.MaxTokenFromKeyRate {
+			common.ApiErrorT(c, "The API key token rate limit must be between 1 and 600 per minute")
+			return false
+		}
+		option.Value = strconv.Itoa(rate)
 	case "oauth2.client_secret":
 		option.Value = strings.TrimSpace(option.Value.(string))
 		if v := option.Value.(string); v != "" && len(v) < 16 {

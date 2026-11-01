@@ -29,8 +29,10 @@ func TestSetOAuth2Router_RegistersExpectedRoutes(t *testing.T) {
 	require.Contains(t, paths, "GET /oauth2/jwks")
 	require.Contains(t, paths, "POST /oauth2/token")
 	require.Contains(t, paths, "GET /oauth2/userinfo")
+	require.Contains(t, paths, "POST /oauth2/introspect")
+	require.Contains(t, paths, "POST /oauth2/token-from-key")
 	require.NotContains(t, paths, "POST /oauth2/session-init")
-	require.Len(t, paths, 4)
+	require.Len(t, paths, 6)
 }
 
 // /oauth2/authorize and /oauth2/logout are SPA pages: the backend routes

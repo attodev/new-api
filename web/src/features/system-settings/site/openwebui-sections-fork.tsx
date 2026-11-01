@@ -37,6 +37,14 @@ export const OPENWEBUI_SITE_SECTIONS = [
             settings['oauth2.post_logout_redirect_uri'],
           'oauth2.open_in_new_window': settings['oauth2.open_in_new_window'],
           'oauth2.replace_playground': settings['oauth2.replace_playground'],
+          'oauth2.token_from_key_enabled':
+            settings['oauth2.token_from_key_enabled'],
+          'oauth2.token_from_key_client_id':
+            settings['oauth2.token_from_key_client_id'],
+          'oauth2.token_from_key_ttl_seconds':
+            settings['oauth2.token_from_key_ttl_seconds'],
+          'oauth2.token_from_key_rate_limit':
+            settings['oauth2.token_from_key_rate_limit'],
         }}
       />
     ),

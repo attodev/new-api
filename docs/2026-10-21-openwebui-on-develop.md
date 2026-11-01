@@ -17,6 +17,7 @@
 | 6 | fde5a14f6, 81ff450dd | OIDC authorize·logout 페이지, 로그인 뒤 복귀, 플레이그라운드 "채팅 앱에서 열기"·대체 | f6a4f3a6c, 766f7615c, 9c47b31b9, 6c30cc039, ab4bbd027, d6833320a, f9fd339b4, 954286a65, 8fbe565fa |
 | 7 | ff3f296ce | 사이트 설정의 OpenWebUI 연동·릴레이 섹션, 사용자 서랍의 링크 관리 | 9a7323dfa, e8605506d, b89ca0f61, acb9c8812, 2cfa8dbbb, 74c440f13, f9fd339b4 |
 | 8 | (이 문서 커밋) | 통합 테스트 스택 `deploy/openwebui-test/`, 이 기록, 운영 확인 절 | 56019efaf, a89ee30a3, a436c7b0b, 0575dce56, 1e6183cb0, 65652850e, 070ffb438, 026125a5a |
+| 후속 (2026-11-01) | `feat(oidc): issue userinfo-only access tokens from API keys and add introspection (O13)` | `POST /oauth2/token-from-key`(API 키 → userinfo·introspection 전용 짧은 수명 토큰), `POST /oauth2/introspect`(RFC 7662), 설정 UI, 시험 스택, 계획 문서 | bf236c829 |
 
 ## 2. 옮기지 않은 것
 
@@ -43,6 +44,7 @@ R2: 계획은 별도 사용자 검토 없이 실행했다(사용자가 새 브�
 - **OIDC 엄격화**: `oauth2.redirect_uri`가 비면 provider를 미설정으로 본다. PKCE는 없거나 `S256`만 받는다(원본은 `plain`을 발급 시점에 거르지 않았다).
 - **프런트**: `web/default/src` → `web/src`, `kr` → `ko`. 로그인 뒤 문서 로드 복귀를 같은 출처 `/oauth2/...` 대상으로 좁혔다(develop은 `navigate({ href })`가 쿼리를 보존하므로). authorize가 401이면 토큰 refresh 뒤 한 번 재시도한다. logout 확인 제목은 사이트 이름을 쓴다.
 - **조직 멤버 관리**: root는 `?organization_id=`로 다른 조직의 멤버를 추가·수정·제거한다(`resolveOrganizationAdminTarget`).
+- **API 키 → OIDC 토큰 (bf236c829)**: 키 검증 `ValidateTokenForIdentity`는 upstream `model/token.go`가 아니라 fork 파일 `model/openwebui_token.go`에 둔다. 발급 기록은 원본의 사용 로그(`RecordLog`, 시스템 유형) 대신 develop 감사 로그(`audit_logs`, category `security`, action `oidc.token_from_key.issue`, auth_method `api_key`, params `user_id`·`token_id`·`client_id`·`ttl_seconds`)에 남긴다(키·토큰 값 없음). 서버 검증 오류는 go-i18n 키 대신 `ApiErrorT` 영문 문장 3개. 오류 본문은 MCP 쪽 계약 `{error, message}`를 지키고 같은 문장을 `error_description`에도 넣는다. 스위치가 꺼져 있으면 원본대로 403 `feature_disabled`(provider 미구성은 다른 OIDC 엔드포인트처럼 404). `oauth2.client_id` 저장은 저장된 값이 비어 있을 때도 실효 기본값 `openwebui-mcp`와 같으면 거부한다. 설정 화면은 켜기를 그 설정 뒤에, 끄기를 앞에 저장한다.
 - **통합 테스트 스택**: 이미지는 저장소 루트 `Dockerfile`(단일 `web/`, Bun 1.4.0, `GOWORK=off`)로 compose가 빌드한다. `bootstrap.sh`는 로그인 응답의 `access_token`을 Bearer로 쓰고(쿠키 세션 아님), 끝나면 그 세션을 닫는다. 일반 사용자 생성은 증명이 필요 없고(`role: 1`), 선택 기능 `OWUI_MANUAL_LINKS`는 `POST /api/verify`(password, `admin.user.update`)로 받은 증명으로 링크한다. 이메일은 관리 API가 없어 psql로 넣고(원본과 같음), mock 잔액은 O12 Redis 상주 때문에 psql 대신 `POST /api/user/manage`(`add_quota`, `override`)로 넣는다. 비밀번호 규칙을 8~128자로, 루트 이름을 최대 12자로 고쳤다.
 
 ## 4. 원본과 같게 둔 것 (검토에서 받아들임)

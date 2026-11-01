@@ -120,6 +120,9 @@ services:
       - OAUTH_GROUPS_CLAIM=groups
       - ENABLE_OAUTH_GROUP_CREATION=${OWUI_GROUP_MANAGEMENT:-false}
       - WEBUI_AUTH_SIGNOUT_REDIRECT_URL=http://${PUBLIC_HOST}:${OPEN_WEBUI_PORT:-8080}/auth
+      # ---- MCP: new-api 키 → /oauth2/token-from-key → OAuth 토큰 교환 ----
+      - ENABLE_OAUTH_TOKEN_EXCHANGE=true
+      - OAUTH_TOKEN_EXCHANGE_TRUSTED_CLIENT_IDS=${OIDC_MCP_CLIENT_ID:-openwebui-mcp}
       # ---- relay: 서비스 키 + 서명 JWT ----
       # 모델 호출은 서버 간 통신이라 컨테이너 내부 이름으로 가도 된다.
       - OPENAI_API_BASE_URLS=http://new-api:3000/v1

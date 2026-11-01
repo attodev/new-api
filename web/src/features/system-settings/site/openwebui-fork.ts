@@ -40,6 +40,10 @@ export type OpenWebUISiteSettings = {
   'oauth2.post_logout_redirect_uri': string
   'oauth2.open_in_new_window': boolean
   'oauth2.replace_playground': boolean
+  'oauth2.token_from_key_enabled': boolean
+  'oauth2.token_from_key_client_id': string
+  'oauth2.token_from_key_ttl_seconds': number
+  'oauth2.token_from_key_rate_limit': number
   'openwebui.relay_enabled': boolean
   'openwebui.jwt_issuer': string
   'openwebui.jwt_leeway_seconds': number
@@ -54,6 +58,12 @@ export const OPENWEBUI_SITE_DEFAULTS: OpenWebUISiteSettings = {
   'oauth2.post_logout_redirect_uri': '',
   'oauth2.open_in_new_window': false,
   'oauth2.replace_playground': false,
+  // Fallbacks only: GET /api/option/ exports the server defaults
+  // (setting/system_setting/oauth2_client_fork.go), which replace these.
+  'oauth2.token_from_key_enabled': false,
+  'oauth2.token_from_key_client_id': 'openwebui-mcp',
+  'oauth2.token_from_key_ttl_seconds': 600,
+  'oauth2.token_from_key_rate_limit': 30,
   'openwebui.relay_enabled': false,
   'openwebui.jwt_issuer': 'open-webui',
   'openwebui.jwt_leeway_seconds': 60,

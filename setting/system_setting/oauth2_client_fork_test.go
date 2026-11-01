@@ -58,3 +58,16 @@ func TestIsAbsoluteHTTPURL(t *testing.T) {
 	require.False(t, IsAbsoluteHTTPURL("http://:8080"), "port without a host")
 	require.False(t, IsAbsoluteHTTPURL("https://chat.example.com/cb#x"), "RFC 6749 §3.1.2: no fragment")
 }
+
+// The API key token settings ship with server defaults; GET /api/option/
+// exports them, so the settings form starts from these values.
+func TestOAuth2Settings_TokenFromKeyDefaults(t *testing.T) {
+	cfg, err := config.ConfigToMap(&defaultOAuth2Settings)
+	require.NoError(t, err)
+	require.Equal(t, "false", cfg["token_from_key_enabled"])
+	require.Equal(t, "openwebui-mcp", cfg["token_from_key_client_id"])
+	require.Equal(t, "600", cfg["token_from_key_ttl_seconds"])
+	require.Equal(t, "30", cfg["token_from_key_rate_limit"])
+	require.Equal(t, DefaultTokenFromKeyClientId, cfg["token_from_key_client_id"])
+	require.True(t, MinTokenFromKeyTTL <= DefaultTokenFromKeyTTL && DefaultTokenFromKeyTTL <= MaxTokenFromKeyTTL)
+}

@@ -47,6 +47,12 @@ type AccessToken struct {
 	UserId   int    `json:"user_id"`
 	ClientId string `json:"client_id"`
 	Scope    string `json:"scope"`
+	// IssuedAt and ExpiresAt (unix seconds) are reported by introspection.
+	IssuedAt  int64 `json:"iat,omitempty"`
+	ExpiresAt int64 `json:"exp,omitempty"`
+	// TokenId is the new-api API key the token was issued from (token-from-key
+	// only), kept for auditing.
+	TokenId int `json:"token_id,omitempty"`
 }
 
 var (
@@ -161,7 +167,21 @@ func ConsumeCode(code, clientId, redirectURI, codeVerifier string) (*AuthCode, e
 	return &ac, nil
 }
 
+// IssueAccessToken stores at under a fresh token that lives AccessTokenTTL.
 func IssueAccessToken(at AccessToken) (string, error) {
+	return IssueAccessTokenWithTTL(at, AccessTokenTTL)
+}
+
+// IssueAccessTokenWithTTL stores at under a fresh token that expires after
+// ttl, recording iat/exp. A ttl that is not positive or exceeds
+// AccessTokenTTL (the store's default lifetime) becomes AccessTokenTTL.
+func IssueAccessTokenWithTTL(at AccessToken, ttl time.Duration) (string, error) {
+	if ttl <= 0 || ttl > AccessTokenTTL {
+		ttl = AccessTokenTTL
+	}
+	now := time.Now()
+	at.IssuedAt = now.Unix()
+	at.ExpiresAt = now.Add(ttl).Unix()
 	token, err := common.GenerateKey()
 	if err != nil {
 		return "", err
@@ -170,7 +190,7 @@ func IssueAccessToken(at AccessToken) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := accessTokens().SetWithTTL(token, string(raw), AccessTokenTTL); err != nil {
+	if err := accessTokens().SetWithTTL(token, string(raw), ttl); err != nil {
 		return "", err
 	}
 	return token, nil
@@ -186,6 +206,11 @@ func LookupAccessToken(raw string) (*AccessToken, bool, error) {
 	}
 	var at AccessToken
 	if err := common.UnmarshalJsonStr(stored, &at); err != nil {
+		return nil, false, nil
+	}
+	// The store's TTL is authoritative; this guards against a coarse expiry
+	// sweep keeping a short-lived token visible past its exp.
+	if at.ExpiresAt != 0 && at.ExpiresAt <= time.Now().Unix() {
 		return nil, false, nil
 	}
 	return &at, true, nil

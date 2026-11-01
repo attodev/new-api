@@ -29,9 +29,34 @@ type OAuth2Settings struct {
 	// immediately act like clicking "Open in Chat App", instead of
 	// rendering the built-in playground UI.
 	ReplacePlayground bool `json:"replace_playground"`
+	// TokenFromKey* configure POST /oauth2/token-from-key, which trades a
+	// new-api API key for a short-lived userinfo-only access token (used by
+	// the Open WebUI MCP server with Open WebUI's OAuth token exchange).
+	TokenFromKeyEnabled bool `json:"token_from_key_enabled"`
+	// TokenFromKeyClientId is the client_id recorded on (and introspected
+	// for) those tokens. It must differ from ClientId.
+	TokenFromKeyClientId string `json:"token_from_key_client_id"`
+	// TokenFromKeyTTLSeconds is the issued token lifetime.
+	TokenFromKeyTTLSeconds int `json:"token_from_key_ttl_seconds"`
+	// TokenFromKeyRateLimit is the per-key issuance limit per minute.
+	TokenFromKeyRateLimit int `json:"token_from_key_rate_limit"`
 }
 
-var defaultOAuth2Settings = OAuth2Settings{}
+const (
+	DefaultTokenFromKeyClientId = "openwebui-mcp"
+	DefaultTokenFromKeyTTL      = 600
+	MinTokenFromKeyTTL          = 60
+	MaxTokenFromKeyTTL          = 900
+	DefaultTokenFromKeyRate     = 30
+	MinTokenFromKeyRate         = 1
+	MaxTokenFromKeyRate         = 600
+)
+
+var defaultOAuth2Settings = OAuth2Settings{
+	TokenFromKeyClientId:   DefaultTokenFromKeyClientId,
+	TokenFromKeyTTLSeconds: DefaultTokenFromKeyTTL,
+	TokenFromKeyRateLimit:  DefaultTokenFromKeyRate,
+}
 
 func init() {
 	config.GlobalConfig.Register("oauth2", &defaultOAuth2Settings)
@@ -39,6 +64,33 @@ func init() {
 
 func GetOAuth2Settings() *OAuth2Settings {
 	return &defaultOAuth2Settings
+}
+
+// EffectiveTokenFromKeyClientId is the client_id token-from-key tokens carry:
+// the configured one, or the default when it is blank.
+func (s *OAuth2Settings) EffectiveTokenFromKeyClientId() string {
+	if v := strings.TrimSpace(s.TokenFromKeyClientId); v != "" {
+		return v
+	}
+	return DefaultTokenFromKeyClientId
+}
+
+// EffectiveTokenFromKeyTTL is the configured lifetime in seconds, or the
+// default when it is outside [MinTokenFromKeyTTL, MaxTokenFromKeyTTL].
+func (s *OAuth2Settings) EffectiveTokenFromKeyTTL() int {
+	if s.TokenFromKeyTTLSeconds < MinTokenFromKeyTTL || s.TokenFromKeyTTLSeconds > MaxTokenFromKeyTTL {
+		return DefaultTokenFromKeyTTL
+	}
+	return s.TokenFromKeyTTLSeconds
+}
+
+// EffectiveTokenFromKeyRate is the configured per-key limit per minute, or
+// the default when it is outside [MinTokenFromKeyRate, MaxTokenFromKeyRate].
+func (s *OAuth2Settings) EffectiveTokenFromKeyRate() int {
+	if s.TokenFromKeyRateLimit < MinTokenFromKeyRate || s.TokenFromKeyRateLimit > MaxTokenFromKeyRate {
+		return DefaultTokenFromKeyRate
+	}
+	return s.TokenFromKeyRateLimit
 }
 
 // IsAbsoluteHTTPURL reports whether raw is an absolute http(s) URL with a

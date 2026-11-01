@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 // fork: O13 — built-in OIDC provider settings for Open WebUI login (Site &
-// Branding section), with the ID token signing key status and rotation.
+// Branding section), the API key token (POST /oauth2/token-from-key)
+// settings, and the ID token signing key status and rotation.
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
@@ -76,21 +77,55 @@ const createOAuth2Schema = (t: TFunction) => {
     .refine((v) => v.trim() === '' || isAbsoluteHttpUrl(v), {
       message: t('Must be an absolute http(s) URL'),
     })
+  // Same ranges and sentences as the server's option validation.
+  const ttlError = {
+    message: t('The API key token lifetime must be between 60 and 900 seconds'),
+  }
+  const rateError = {
+    message: t(
+      'The API key token rate limit must be between 1 and 600 per minute'
+    ),
+  }
   return z.object({
-    oauth2: z.object({
-      enabled: z.boolean(),
-      client_id: z.string(),
-      client_secret: z
-        .string()
-        .refine((v) => v.trim() === '' || v.trim().length >= 16, {
-          message: t('The client secret must be at least 16 characters'),
-        }),
-      redirect_uri: urlRule,
-      app_url: urlRule,
-      post_logout_redirect_uri: urlRule,
-      open_in_new_window: z.boolean(),
-      replace_playground: z.boolean(),
-    }),
+    oauth2: z
+      .object({
+        enabled: z.boolean(),
+        client_id: z.string(),
+        client_secret: z
+          .string()
+          .refine((v) => v.trim() === '' || v.trim().length >= 16, {
+            message: t('The client secret must be at least 16 characters'),
+          }),
+        redirect_uri: urlRule,
+        app_url: urlRule,
+        post_logout_redirect_uri: urlRule,
+        open_in_new_window: z.boolean(),
+        replace_playground: z.boolean(),
+        token_from_key_enabled: z.boolean(),
+        token_from_key_client_id: z.string(),
+        token_from_key_ttl_seconds: z
+          .number(ttlError)
+          .int(ttlError)
+          .min(60, ttlError)
+          .max(900, ttlError),
+        token_from_key_rate_limit: z
+          .number(rateError)
+          .int(rateError)
+          .min(1, rateError)
+          .max(600, rateError),
+      })
+      .refine(
+        (v) => {
+          const id = v.token_from_key_client_id.trim()
+          return id !== '' && id !== v.client_id.trim()
+        },
+        {
+          path: ['token_from_key_client_id'],
+          message: t(
+            'The API key token client ID must not be empty and must differ from the Open WebUI client ID'
+          ),
+        }
+      ),
   })
 }
 
@@ -110,6 +145,10 @@ const toFormValues = (
     post_logout_redirect_uri: d['oauth2.post_logout_redirect_uri'] ?? '',
     open_in_new_window: d['oauth2.open_in_new_window'],
     replace_playground: d['oauth2.replace_playground'],
+    token_from_key_enabled: d['oauth2.token_from_key_enabled'] ?? false,
+    token_from_key_client_id: d['oauth2.token_from_key_client_id'] ?? '',
+    token_from_key_ttl_seconds: d['oauth2.token_from_key_ttl_seconds'] ?? 600,
+    token_from_key_rate_limit: d['oauth2.token_from_key_rate_limit'] ?? 30,
   },
 })
 
@@ -121,11 +160,24 @@ const toDefaults = (v: OAuth2Fields): OpenWebUIOAuth2Defaults => ({
   'oauth2.post_logout_redirect_uri': v.post_logout_redirect_uri.trim(),
   'oauth2.open_in_new_window': v.open_in_new_window,
   'oauth2.replace_playground': v.replace_playground,
+  'oauth2.token_from_key_enabled': v.token_from_key_enabled,
+  'oauth2.token_from_key_client_id': v.token_from_key_client_id.trim(),
+  'oauth2.token_from_key_ttl_seconds': v.token_from_key_ttl_seconds,
+  'oauth2.token_from_key_rate_limit': v.token_from_key_rate_limit,
 })
 
 type TextField = Extract<
   keyof OAuth2Fields,
-  'client_id' | 'redirect_uri' | 'app_url' | 'post_logout_redirect_uri'
+  | 'client_id'
+  | 'redirect_uri'
+  | 'app_url'
+  | 'post_logout_redirect_uri'
+  | 'token_from_key_client_id'
+>
+
+type NumberField = Extract<
+  keyof OAuth2Fields,
+  'token_from_key_ttl_seconds' | 'token_from_key_rate_limit'
 >
 
 type OpenWebUIOAuth2SectionProps = {
@@ -189,9 +241,14 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
       return
     }
 
+    // Each switch is saved after the settings it guards when it turns on,
+    // and before them when it turns off; the provider switch wraps it all.
     const ok = await saveOptionsInOrder(
       saveOption,
-      orderAroundEnableKey(updates, 'oauth2.enabled')
+      orderAroundEnableKey(
+        orderAroundEnableKey(updates, 'oauth2.token_from_key_enabled'),
+        'oauth2.enabled'
+      )
     )
     if (!ok) return
 
@@ -236,7 +293,64 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
         "Open WebUI's WEBUI_AUTH_SIGNOUT_REDIRECT_URL. The only address the end-session endpoint will redirect to after logging out; leave empty to send users to the new-api sign-in page."
       ),
     },
+    token_from_key_client_id: {
+      label: t('API Key Token Client ID'),
+      placeholder: 'openwebui-mcp',
+      description: t(
+        "Reported by introspection for these tokens; add it to Open WebUI's OAUTH_TOKEN_EXCHANGE_TRUSTED_CLIENT_IDS. Must differ from the Client ID."
+      ),
+    },
   }
+
+  const numberFields: Record<
+    NumberField,
+    { label: string; description: string; min: number; max: number }
+  > = {
+    token_from_key_ttl_seconds: {
+      label: t('API Key Token Lifetime (seconds)'),
+      description: t('Between 60 and 900 seconds.'),
+      min: 60,
+      max: 900,
+    },
+    token_from_key_rate_limit: {
+      label: t('API Key Token Requests per Minute'),
+      description: t(
+        'Limit per API key. Each client IP is also limited to 60 per minute.'
+      ),
+      min: 1,
+      max: 600,
+    },
+  }
+
+  const renderNumberField = (name: NumberField) => (
+    <FormField
+      control={form.control}
+      name={`oauth2.${name}`}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{numberFields[name].label}</FormLabel>
+          <FormControl>
+            <Input
+              type='number'
+              min={numberFields[name].min}
+              max={numberFields[name].max}
+              name={field.name}
+              ref={field.ref}
+              onBlur={field.onBlur}
+              value={Number.isNaN(field.value) ? '' : field.value}
+              onChange={(e) =>
+                field.onChange(
+                  e.target.value === '' ? Number.NaN : Number(e.target.value)
+                )
+              }
+            />
+          </FormControl>
+          <FormDescription>{numberFields[name].description}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  )
 
   const renderTextField = (name: TextField) => (
     <FormField
@@ -263,7 +377,11 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
   )
 
   const renderSwitch = (
-    name: 'enabled' | 'open_in_new_window' | 'replace_playground',
+    name:
+      | 'enabled'
+      | 'open_in_new_window'
+      | 'replace_playground'
+      | 'token_from_key_enabled',
     label: string,
     description: string
   ) => (
@@ -354,6 +472,17 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
               'Make the Playground page itself act like the "Open in Chat App" button — visiting Playground goes straight to the external app instead of showing the built-in playground'
             )
           )}
+
+          {renderSwitch(
+            'token_from_key_enabled',
+            t('Issue Tokens from API Keys'),
+            t(
+              "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection."
+            )
+          )}
+          {renderTextField('token_from_key_client_id')}
+          {renderNumberField('token_from_key_ttl_seconds')}
+          {renderNumberField('token_from_key_rate_limit')}
         </SettingsForm>
       </Form>
       <SigningKeyPanel />

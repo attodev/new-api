@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 // fork: O13 — built-in OIDC provider settings: write-only client secret,
-// enable rules, save order, translated server errors and key rotation.
+// enable rules, save order, translated server errors, key rotation and the
+// API key token (token-from-key) settings.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -78,6 +79,10 @@ const defaults: OpenWebUIOAuth2Defaults = {
   'oauth2.post_logout_redirect_uri': '',
   'oauth2.open_in_new_window': false,
   'oauth2.replace_playground': false,
+  'oauth2.token_from_key_enabled': false,
+  'oauth2.token_from_key_client_id': 'openwebui-mcp',
+  'oauth2.token_from_key_ttl_seconds': 600,
+  'oauth2.token_from_key_rate_limit': 30,
 }
 
 function renderSection(values: Partial<OpenWebUIOAuth2Defaults> = {}) {
@@ -299,4 +304,124 @@ test('cancelling the rotation dialog does not rotate', async () => {
   const dialog = await screen.findByRole('alertdialog')
   await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
   expect(post).not.toHaveBeenCalled()
+})
+
+const tokenSwitch = () =>
+  screen.getByRole('switch', { name: 'Issue Tokens from API Keys' })
+
+test('shows the API key token settings from the server defaults', () => {
+  renderWithClient(
+    getSiteSectionContent('openwebui-integration', {
+      ...OPENWEBUI_SITE_DEFAULTS,
+      'oauth2.token_from_key_client_id': 'mcp-from-server',
+      'oauth2.token_from_key_ttl_seconds': 300,
+      'oauth2.token_from_key_rate_limit': 12,
+    } as SiteSettings)
+  )
+  expect(tokenSwitch()).not.toBeChecked()
+  expect(screen.getByLabelText('API Key Token Client ID')).toHaveValue(
+    'mcp-from-server'
+  )
+  expect(screen.getByLabelText('API Key Token Lifetime (seconds)')).toHaveValue(
+    300
+  )
+  expect(
+    screen.getByLabelText('API Key Token Requests per Minute')
+  ).toHaveValue(12)
+})
+
+test('the site defaults match the server defaults', () => {
+  expect(OPENWEBUI_SITE_DEFAULTS).toMatchObject({
+    'oauth2.token_from_key_enabled': false,
+    'oauth2.token_from_key_client_id': 'openwebui-mcp',
+    'oauth2.token_from_key_ttl_seconds': 600,
+    'oauth2.token_from_key_rate_limit': 30,
+  })
+})
+
+test('refuses out-of-range API key token lifetime and rate', async () => {
+  renderSection()
+  const ttl = screen.getByLabelText('API Key Token Lifetime (seconds)')
+  await userEvent.clear(ttl)
+  await userEvent.type(ttl, '30')
+  const rate = screen.getByLabelText('API Key Token Requests per Minute')
+  await userEvent.clear(rate)
+  await userEvent.type(rate, '601')
+  await save()
+  expect(
+    await screen.findByText(
+      'The API key token lifetime must be between 60 and 900 seconds'
+    )
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'The API key token rate limit must be between 1 and 600 per minute'
+    )
+  ).toBeInTheDocument()
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+test('the API key token client ID must be set and differ from the client ID', async () => {
+  const sentence =
+    'The API key token client ID must not be empty and must differ from the Open WebUI client ID'
+  renderSection({ 'oauth2.client_id': 'open-webui' })
+  const mcpClientId = screen.getByLabelText('API Key Token Client ID')
+  await userEvent.clear(mcpClientId)
+  await save()
+  expect(await screen.findByText(sentence)).toBeInTheDocument()
+  await userEvent.type(mcpClientId, ' open-webui ')
+  await save()
+  expect(await screen.findByText(sentence)).toBeInTheDocument()
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+test('turning the API key token feature on saves its settings first', async () => {
+  renderSection({
+    'oauth2.enabled': true,
+    'oauth2.client_id': 'open-webui',
+    'oauth2.redirect_uri': 'https://chat.example.com/cb',
+  })
+  await userEvent.click(tokenSwitch())
+  const mcpClientId = screen.getByLabelText('API Key Token Client ID')
+  await userEvent.clear(mcpClientId)
+  await userEvent.type(mcpClientId, ' mcp ')
+  const ttl = screen.getByLabelText('API Key Token Lifetime (seconds)')
+  await userEvent.clear(ttl)
+  await userEvent.type(ttl, '120')
+  await save()
+  await waitFor(() =>
+    expect(putKeys()).toEqual([
+      'oauth2.token_from_key_client_id',
+      'oauth2.token_from_key_ttl_seconds',
+      'oauth2.token_from_key_enabled',
+    ])
+  )
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'oauth2.token_from_key_client_id',
+    value: 'mcp',
+  })
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'oauth2.token_from_key_ttl_seconds',
+    value: 120,
+  })
+})
+
+test('turning the API key token feature off is saved first', async () => {
+  renderSection({
+    'oauth2.enabled': true,
+    'oauth2.client_id': 'open-webui',
+    'oauth2.redirect_uri': 'https://chat.example.com/cb',
+    'oauth2.token_from_key_enabled': true,
+  })
+  await userEvent.click(tokenSwitch())
+  const rate = screen.getByLabelText('API Key Token Requests per Minute')
+  await userEvent.clear(rate)
+  await userEvent.type(rate, '5')
+  await save()
+  await waitFor(() =>
+    expect(putKeys()).toEqual([
+      'oauth2.token_from_key_enabled',
+      'oauth2.token_from_key_rate_limit',
+    ])
+  )
 })

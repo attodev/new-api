@@ -123,6 +123,9 @@ bootstrap 이 아래 옵션을 넣는다. 화면에서는 시스템 설정 → �
 | `oauth2.post_logout_redirect_uri` | `.../auth` | 로그아웃 뒤 정확히 일치할 때만 이 주소로 돌려보낸다 |
 | `oauth2.open_in_new_window` / `oauth2.replace_playground` | (기본 false) | 채팅 앱을 새 창으로 / 플레이그라운드를 채팅 앱으로 대체 |
 | `oauth2.enabled` | true | client id·16자 이상 시크릿·절대 redirect URI 가 있어야 켜진다 |
+| `oauth2.token_from_key_client_id` | `OIDC_MCP_CLIENT_ID` (기본 `openwebui-mcp`) | 비어 있으면 안 되고 `oauth2.client_id` 와 달라야 한다. Open WebUI 의 `OAUTH_TOKEN_EXCHANGE_TRUSTED_CLIENT_IDS` 에 넣는다 |
+| `oauth2.token_from_key_ttl_seconds` / `oauth2.token_from_key_rate_limit` | (기본 600 / 30) | 발급 토큰 수명 60~900초 / API 키당 분당 1~600회 (IP당 분당 60회는 고정) |
+| `oauth2.token_from_key_enabled` | true | `POST /oauth2/token-from-key` (API 키 → userinfo·introspection 전용 짧은 수명 토큰) |
 
 **서명 키 교체**: 시스템 설정 → 사이트 → "OpenWebUI 연동" → "서명 키 교체"(root 전용, 확인 대화상자), 또는 root 로그인 세션으로
 `POST /api/oauth2/rotate-signing-key`(상태는 `GET /api/oauth2/signing-key-status`). 새 키로 서명을 시작하고 이전 키는 24시간 JWKS 에 남는다.
@@ -141,6 +144,14 @@ bootstrap 이 아래 옵션을 넣는다. 화면에서는 시스템 설정 → �
 | Open WebUI 로그아웃 → new-api 세션 종료 | 로그아웃 뒤 `http://PUBLIC_HOST:3000` 열면 로그인 화면. 다른 계정의 id_token 이거나 힌트가 없으면 "<사이트 이름>에서 로그아웃할까요?" 확인 화면이 먼저 나온다 |
 | 잘못된 비밀·만료 JWT 거부 | new-api 로그 `openwebui: rejected (401) jwt_invalid` |
 | 서명 키 교체 후 로그인 | 5절의 "서명 키 교체" → 다시 로그인 |
+| API 키 → OIDC 토큰 → Open WebUI JWT | 아래 curl (`sk-…` 는 웹 OIDC 로 한 번 이상 로그인한 사용자의 키). 발급은 감사 로그 `oidc.token_from_key.issue` 에 키·토큰 값 없이 남는다 |
+
+```bash
+AT=$(curl -s -X POST -H "Authorization: Bearer sk-…" http://PUBLIC_HOST:3000/oauth2/token-from-key | jq -r .access_token)
+curl -s -H "Authorization: Bearer $AT" http://PUBLIC_HOST:3000/oauth2/userinfo
+curl -s -u "openwebui:$OIDC_CLIENT_SECRET" -d "token=$AT" http://PUBLIC_HOST:3000/oauth2/introspect
+curl -s -X POST -H 'Content-Type: application/json' -d "{\"token\":\"$AT\"}" http://PUBLIC_HOST:8080/api/v1/auths/oauth/oidc/token/exchange
+```
 
 new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI 로그: `docker compose logs -f open-webui`.
 

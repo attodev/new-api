@@ -5,6 +5,7 @@ package oidc
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/alicebob/miniredis/v2"
@@ -123,6 +124,23 @@ func TestAccessTokens_Redis_IssueLookupRevoke(t *testing.T) {
 	RevokeAccessToken(raw)
 	require.False(t, mr.Exists(key))
 	_, found, err = LookupAccessToken(raw)
+	require.NoError(t, err)
+	require.False(t, found)
+}
+
+func TestIssueAccessTokenWithTTL_Redis(t *testing.T) {
+	setupOIDCTestDB(t)
+	mr := setupOIDCRedis(t)
+	raw, err := IssueAccessTokenWithTTL(AccessToken{UserId: 7, ClientId: "openwebui-mcp"}, 600*time.Second)
+	require.NoError(t, err)
+	key := accessTokens().FullKey(raw)
+	require.True(t, mr.Exists(key))
+	ttl := mr.TTL(key)
+	require.Positive(t, ttl)
+	require.LessOrEqual(t, ttl, 600*time.Second)
+
+	mr.FastForward(601 * time.Second)
+	_, found, err := LookupAccessToken(raw)
 	require.NoError(t, err)
 	require.False(t, found)
 }

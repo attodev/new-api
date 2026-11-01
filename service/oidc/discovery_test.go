@@ -17,6 +17,8 @@ func TestDiscoveryDocument(t *testing.T) {
 	require.Equal(t, "https://newapi.example.com/oauth2/userinfo", d["userinfo_endpoint"])
 	require.Equal(t, "https://newapi.example.com/oauth2/jwks", d["jwks_uri"])
 	require.Equal(t, "https://newapi.example.com/oauth2/logout", d["end_session_endpoint"])
+	require.Equal(t, "https://newapi.example.com/oauth2/introspect", d["introspection_endpoint"])
+	require.Equal(t, []string{"client_secret_basic", "client_secret_post"}, d["introspection_endpoint_auth_methods_supported"])
 	require.Equal(t, []string{"code"}, d["response_types_supported"])
 	require.Equal(t, []string{"public"}, d["subject_types_supported"])
 	require.Equal(t, []string{"RS256"}, d["id_token_signing_alg_values_supported"])
