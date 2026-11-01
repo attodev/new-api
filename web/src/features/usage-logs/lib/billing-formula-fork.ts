@@ -91,19 +91,29 @@ export function buildBillingFormula(
   const imageTokens = other.image && other.image_output ? other.image_output : 0
   const audioDeduct = audioInputSeparatePrice ? audioInputTokens : 0
 
-  // Claude reports input_tokens without the cached part; OpenAI-semantic
-  // usage includes cache reads and writes, so only the latter subtracts them.
-  const textInput =
-    other.claude === true
-      ? Math.max(inputTokens - audioDeduct - imageTokens, 0)
-      : Math.max(
-          inputTokens -
-            cacheReadTokens -
-            cacheWrite -
-            audioDeduct -
-            imageTokens,
-          0
-        )
+  // Mirrors service/text_quota.go: cache reads and writes come out of the
+  // input only for OpenAI-semantic usage. Claude requests, anthropic usage
+  // semantics and legacy Claude-derived OpenAI usage
+  // (isLegacyClaudeDerivedOpenAIUsage: no usage semantic/source recorded and
+  // a 5m/1h cache-write split) report input_tokens without the cached part.
+  const usageMeta = other as LogOtherData & {
+    usage_semantic?: string
+    usage_source?: string
+  }
+  const legacyClaudeDerived =
+    !usageMeta.usage_semantic &&
+    !usageMeta.usage_source &&
+    (cacheWrite5m > 0 || cacheWrite1h > 0)
+  const claudeInputRule =
+    other.claude === true ||
+    usageMeta.usage_semantic === 'anthropic' ||
+    legacyClaudeDerived
+  const textInput = claudeInputRule
+    ? Math.max(inputTokens - audioDeduct - imageTokens, 0)
+    : Math.max(
+        inputTokens - cacheReadTokens - cacheWrite - audioDeduct - imageTokens,
+        0
+      )
 
   const lines: string[] = []
   const perMillion = (label: string, tokens: number, price: number) => {

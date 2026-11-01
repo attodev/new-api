@@ -176,6 +176,60 @@ describe('buildBillingFormula (fork: O6)', () => {
     ])
   })
 
+  it('uses the Claude input rule for legacy Claude-derived OpenAI usage', () => {
+    // service/text_quota.go isLegacyClaudeDerivedOpenAIUsage: not a Claude
+    // request, no usage semantic/source, and a 5m/1h cache-write split.
+    const legacy = {
+      model_ratio: 1,
+      cache_creation_tokens: 400,
+      cache_creation_ratio: 1.25,
+      cache_creation_tokens_5m: 400,
+      cache_creation_ratio_5m: 1.25,
+    }
+    const lines = buildBillingFormula(
+      { prompt_tokens: 1000, completion_tokens: 0, quota: 1 },
+      legacy as LogOtherData,
+      usd
+    )
+    // 1,000 + 400 × 1.25 = 1,500 token units at $2/M.
+    expect(lines).toEqual([
+      'Input: 1,000 / 1M × $2 = $0.002',
+      'Cache Write (5m): 400 / 1M × $2.5 = $0.001',
+    ])
+
+    // Cache reads are not subtracted either.
+    const withReads = buildBillingFormula(
+      { prompt_tokens: 1000, completion_tokens: 0, quota: 1 },
+      { ...legacy, cache_tokens: 100, cache_ratio: 0.1 } as LogOtherData,
+      usd
+    )
+    expect(withReads?.[0]).toBe('Input: 1,000 / 1M × $2 = $0.002')
+
+    // A recorded usage source or semantic means the usage is not legacy.
+    const sourced = buildBillingFormula(
+      { prompt_tokens: 1000, completion_tokens: 0, quota: 1 },
+      { ...legacy, usage_source: 'anthropic' } as LogOtherData,
+      usd
+    )
+    expect(sourced?.[0]).toBe('Input: 600 / 1M × $2 = $0.0012')
+  })
+
+  it('uses the Claude input rule for anthropic usage semantics', () => {
+    const lines = buildBillingFormula(
+      { prompt_tokens: 1000, completion_tokens: 0, quota: 1 },
+      {
+        usage_semantic: 'anthropic',
+        model_ratio: 1,
+        cache_tokens: 100,
+        cache_ratio: 0.1,
+        cache_creation_tokens: 300,
+        cache_creation_ratio: 1.25,
+      } as LogOtherData,
+      usd
+    )
+    expect(lines?.[0]).toBe('Input: 1,000 / 1M × $2 = $0.002')
+  })
+
   it('shows a single line for per-call pricing and nothing for tiered expressions', () => {
     expect(
       buildBillingFormula(
