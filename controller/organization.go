@@ -13,7 +13,6 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
-	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -301,7 +300,7 @@ func GetOrganizationDashboard(c *gin.Context) {
 			return
 		}
 		if !(hasStartTimestamp && hasEndTimestamp) {
-			now := time.Now()
+			now := time.Now().In(model.OrganizationDashboardLocation)
 			endTimestamp = now.Unix()
 			switch preset {
 			case "today":
@@ -982,7 +981,7 @@ func ImportOrganizationUsers(c *gin.Context) {
 	}
 	defer file.Close()
 
-	f, err := excelize.OpenReader(file)
+	f, err := service.OpenImportWorkbook(file)
 	if err != nil {
 		common.ApiError(c, common.NewMessage("invalid xlsx file: {{error}}", map[string]any{"error": err.Error()}))
 		return

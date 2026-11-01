@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -588,6 +589,36 @@ func TestOrganizationDashboardAcceptsPresetRanges(t *testing.T) {
 			require.Contains(t, res.Body.String(), `"success":true`)
 		})
 	}
+}
+
+func TestOrganizationDashboardTodayPresetStartsAtKSTMidnight(t *testing.T) {
+	setupOrganizationControllerTestDB(t)
+	admin := model.User{Username: "admin", Password: "password", Role: common.RoleCommonUser, OrganizationId: 1, OrganizationRole: model.OrganizationRoleAdmin, AffCode: "admin"}
+	org := model.Organization{Id: 1, Name: "Acme", OwnerUserId: 1, Quota: 1000, Status: model.OrganizationStatusEnabled}
+	require.NoError(t, model.DB.Create(&admin).Error)
+	require.NoError(t, model.DB.Create(&org).Error)
+
+	kst := time.FixedZone("KST", 9*60*60)
+	kstNow := time.Now().In(kst)
+	kstMidnight := time.Date(kstNow.Year(), kstNow.Month(), kstNow.Day(), 0, 0, 0, 0, kst).Unix()
+	rows := []model.QuotaData{
+		{UserID: admin.Id, Username: admin.Username, ModelName: "gpt-4o", CreatedAt: kstMidnight - 3600, Count: 1, Quota: 100},
+		{UserID: admin.Id, Username: admin.Username, ModelName: "gpt-4o", CreatedAt: kstMidnight, Count: 2, Quota: 200},
+	}
+	require.NoError(t, model.DB.Create(&rows).Error)
+
+	res := performOrganizationRequest(
+		GetOrganizationDashboard,
+		admin,
+		http.MethodGet,
+		"/api/organization/dashboard?preset=today",
+		"",
+	)
+
+	require.Equal(t, http.StatusOK, res.Code)
+	body := res.Body.String()
+	assert.Contains(t, body, `"period_quota":200`)
+	assert.Contains(t, body, `"period_requests":2`)
 }
 
 func TestOrganizationDashboardRejectsInvalidPreset(t *testing.T) {

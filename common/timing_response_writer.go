@@ -35,8 +35,8 @@ func (w *TimingResponseWriter) WriteString(s string) (int, error) {
 // Unwrap exposes the wrapped writer to http.ResponseController. Without it,
 // SetWriteDeadline/SetReadDeadline/EnableFullDuplex cannot reach gin's own
 // (*responseWriter).Unwrap and return http.ErrNotSupported, which would
-// silently disable the per-write stream deadline (relay/helper
-// ExtendWriteDeadline) on every relay route.
+// silently disable the stream write deadline (relay/helper
+// StreamWriteBudget) on every relay route.
 func (w *TimingResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }

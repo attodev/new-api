@@ -108,7 +108,7 @@ type noUnwrapTimingWriter struct {
 // TestTimingResponseWriter_KeepsWriteDeadlineSupport runs a real HTTP server
 // whose gin engine wraps c.Writer exactly like middleware.RequestTiming and
 // checks that http.ResponseController can still set write deadlines (used by
-// relay/helper.ExtendWriteDeadline for every stream write and ping).
+// relay/helper.StreamWriteBudget for every stream write and ping).
 func TestTimingResponseWriter_KeepsWriteDeadlineSupport(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var wrappedErr, unwrappedErr error

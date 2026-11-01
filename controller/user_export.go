@@ -9,7 +9,6 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
-	"github.com/xuri/excelize/v2"
 )
 
 // fork: O4 — admin Excel export/import of users.
@@ -44,7 +43,7 @@ func ImportUsers(c *gin.Context) {
 	}
 	defer file.Close()
 
-	f, err := excelize.OpenReader(file)
+	f, err := service.OpenImportWorkbook(file)
 	if err != nil {
 		common.ApiError(c, fmt.Errorf("invalid xlsx file: %w", err))
 		return

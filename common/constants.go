@@ -12,6 +12,7 @@ import (
 
 var StartTime = time.Now().Unix() // unit: second
 var Version = "v0.0.0"            // this hard coding will be replaced automatically when building, no need to manually change
+var BuildCommit = ""              // commit the binary was built from, set by the Docker build (GIT_COMMIT); readable with `go version -m`
 var SystemName = "New API"
 var Footer = ""
 var InterfaceLanguages = "en,ko" // fork: O8

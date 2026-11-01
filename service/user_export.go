@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -122,6 +123,17 @@ type ImportResult struct {
 	// QuotaErrors lists accounts that were created but whose imported quota could
 	// not be applied; they keep the default new-user balance and need a manual fix.
 	QuotaErrors []string `json:"quota_errors"`
+}
+
+// importWorkbookUnzipLimit caps how far an uploaded import workbook may expand.
+// The upload limit bounds only the compressed size, while a crafted xlsx can
+// declare gigabytes of XML; a 1,000-row import stays far below this.
+const importWorkbookUnzipLimit = 32 << 20
+
+// OpenImportWorkbook opens an uploaded user import workbook (admin or
+// organization import) with its decompressed size capped.
+func OpenImportWorkbook(r io.Reader) (*excelize.File, error) {
+	return excelize.OpenReader(r, excelize.Options{UnzipSizeLimit: importWorkbookUnzipLimit})
 }
 
 // ImportUsersFromFile parses an Excel file and creates new users.

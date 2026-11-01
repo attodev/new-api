@@ -1,6 +1,8 @@
 package service
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -22,6 +24,35 @@ func newImportWorkbook(t *testing.T, rows [][]any) *excelize.File {
 		require.NoError(t, f.SetSheetRow(sheet, cell, &row))
 	}
 	return f
+}
+
+func TestOpenImportWorkbookRejectsOversizedExpansion(t *testing.T) {
+	var workbook bytes.Buffer
+	_, err := newImportWorkbook(t, [][]any{{"username"}, {"small_user"}}).WriteTo(&workbook)
+	require.NoError(t, err)
+
+	f, err := OpenImportWorkbook(bytes.NewReader(workbook.Bytes()))
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	// The same workbook with a padding part that inflates past the cap. It stays
+	// small once compressed, so the 10 MB upload limit alone would accept it.
+	src, err := zip.NewReader(bytes.NewReader(workbook.Bytes()), int64(workbook.Len()))
+	require.NoError(t, err)
+	var bomb bytes.Buffer
+	zw := zip.NewWriter(&bomb)
+	for _, part := range src.File {
+		require.NoError(t, zw.Copy(part))
+	}
+	padding, err := zw.Create("xl/media/padding.bin")
+	require.NoError(t, err)
+	_, err = padding.Write(make([]byte, importWorkbookUnzipLimit))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	require.Less(t, bomb.Len(), 10<<20)
+
+	_, err = OpenImportWorkbook(bytes.NewReader(bomb.Bytes()))
+	require.ErrorContains(t, err, "unzip size exceeds")
 }
 
 func TestImportUsersRejectsQuotaAboveWalletCeiling(t *testing.T) {

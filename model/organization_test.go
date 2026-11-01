@@ -8,6 +8,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -210,6 +211,42 @@ func TestGetOrganizationDashboardScopesQuotaDataToOrganization(t *testing.T) {
 	require.Equal(t, []OrganizationDashboardUserDailyUsage{
 		{Date: "2026-01-02", UserID: owner.Id, Username: owner.Username, DisplayName: owner.Username, Quota: 150, Requests: 3},
 		{Date: "2026-01-03", UserID: member.Id, Username: member.Username, DisplayName: "Member Display", Quota: 200, Requests: 3},
+	}, dashboard.UserUsage)
+}
+
+func TestGetOrganizationDashboardGroupsDaysInKST(t *testing.T) {
+	setupOrganizationModelTestDB(t)
+	require.NoError(t, DB.AutoMigrate(&QuotaData{}))
+
+	owner := User{Username: "kst-owner", Password: "password", Role: common.RoleCommonUser, AffCode: "kst-owner"}
+	require.NoError(t, DB.Create(&owner).Error)
+	org, err := CreateOrganization("KST Org", "KST customer", owner.Id)
+	require.NoError(t, err)
+
+	// 23:00 and 00:00 KST on either side of midnight share the UTC date 2026-01-02.
+	kst := time.FixedZone("KST", 9*60*60)
+	lastHourOfDay := time.Date(2026, 1, 2, 23, 0, 0, 0, kst).Unix()
+	firstHourOfNextDay := time.Date(2026, 1, 3, 0, 0, 0, 0, kst).Unix()
+	rows := []QuotaData{
+		{UserID: owner.Id, Username: owner.Username, ModelName: "gpt-4o", CreatedAt: lastHourOfDay, Count: 1, Quota: 100},
+		{UserID: owner.Id, Username: owner.Username, ModelName: "gpt-4o", CreatedAt: firstHourOfNextDay, Count: 2, Quota: 200},
+	}
+	require.NoError(t, DB.Create(&rows).Error)
+
+	dashboard, err := GetOrganizationDashboard(org.Id, lastHourOfDay, firstHourOfNextDay)
+	require.NoError(t, err)
+
+	assert.Equal(t, []OrganizationDashboardDailyUsage{
+		{Date: "2026-01-02", Quota: 100, Requests: 1},
+		{Date: "2026-01-03", Quota: 200, Requests: 2},
+	}, dashboard.DailyUsage)
+	assert.Equal(t, []OrganizationDashboardModelDailyUsage{
+		{Date: "2026-01-02", Model: "gpt-4o", Quota: 100, Requests: 1},
+		{Date: "2026-01-03", Model: "gpt-4o", Quota: 200, Requests: 2},
+	}, dashboard.ModelUsage)
+	assert.Equal(t, []OrganizationDashboardUserDailyUsage{
+		{Date: "2026-01-02", UserID: owner.Id, Username: owner.Username, DisplayName: owner.Username, Quota: 100, Requests: 1},
+		{Date: "2026-01-03", UserID: owner.Id, Username: owner.Username, DisplayName: owner.Username, Quota: 200, Requests: 2},
 	}, dashboard.UserUsage)
 }
 

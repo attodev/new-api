@@ -78,7 +78,8 @@ func InitEnv() {
 			log.Fatal(err)
 		}
 		if _, err := os.Stat(*LogDir); os.IsNotExist(err) {
-			err = os.Mkdir(*LogDir, 0777)
+			// Logs carry request paths and client addresses; keep them from other users.
+			err = os.Mkdir(*LogDir, 0750)
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -80,6 +80,7 @@ import {
   getOrganizationDashboard,
   getAllOrganizations,
 } from '@/features/organizations/api'
+import { getOrganizationDashboardRange } from '@/features/organizations/lib/dashboard-range'
 import {
   getLastSelectedOrganizationId,
   resolveAvailableOrganizationId,
@@ -130,23 +131,6 @@ const SUMMARY_SKELETON_KEYS = ['balance', 'used', 'period', 'requests']
 let themeManagerPromise: Promise<
   (typeof import('@visactor/vchart'))['ThemeManager']
 > | null = null
-
-function getRangeTimestamps(preset: RangeOption['value']) {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-
-  if (preset === '7d') {
-    start.setDate(start.getDate() - 6)
-  } else if (preset === '30d') {
-    start.setDate(start.getDate() - 29)
-  }
-
-  return {
-    start_timestamp: Math.floor(start.getTime() / 1000),
-    end_timestamp: Math.floor(now.getTime() / 1000),
-  }
-}
 
 function dateToTimestamp(value: string) {
   const date = new Date(`${value}T00:00:00`)
@@ -540,7 +524,10 @@ export function OrganizationDashboard() {
     getLastSelectedOrganizationId
   )
 
-  const range = useMemo(() => getRangeTimestamps(rangePreset), [rangePreset])
+  const range = useMemo(
+    () => getOrganizationDashboardRange(rangePreset),
+    [rangePreset]
+  )
   const organizationsQuery = useQuery({
     queryKey: ['organizations', 'dashboard-selector'],
     queryFn: () => getAllOrganizations(),
