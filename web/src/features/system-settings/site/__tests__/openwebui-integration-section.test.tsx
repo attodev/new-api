@@ -425,3 +425,35 @@ test('turning the API key token feature off is saved first', async () => {
     ])
   )
 })
+
+test('when both client IDs change, the API key token client ID is saved first', async () => {
+  // Server rule: each save is checked against the other, stored client ID.
+  // Moving client_id onto the old API key token client ID only works after
+  // the latter has moved away.
+  renderSection({
+    'oauth2.client_id': 'open-webui',
+    'oauth2.token_from_key_client_id': 'mcp',
+  })
+  const clientId = screen.getByLabelText('Client ID')
+  await userEvent.clear(clientId)
+  await userEvent.type(clientId, 'mcp')
+  const mcpClientId = screen.getByLabelText('API Key Token Client ID')
+  await userEvent.clear(mcpClientId)
+  await userEvent.type(mcpClientId, 'mcp-2')
+  await save()
+  await waitFor(() =>
+    expect(putKeys()).toEqual([
+      'oauth2.token_from_key_client_id',
+      'oauth2.client_id',
+    ])
+  )
+})
+
+test('warns that any API key becomes an Open WebUI sign-in', () => {
+  renderSection()
+  expect(
+    screen.getByText(
+      /any API key works as an Open WebUI sign-in for its owner, admin keys included/
+    )
+  ).toBeInTheDocument()
+})

@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/oidc"
+	"github.com/QuantumNous/new-api/service/openwebui"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,17 @@ func tokenFromKeyError(c *gin.Context, status int, code, message string) {
 	c.JSON(status, gin.H{"error": code, "message": message, "error_description": message})
 }
 
+// tokenFromKeyIncrScript counts one hit and arms the window in one atomic
+// step. A counter found without a TTL (from any earlier failure) is re-armed
+// instead of blocking its IP or key forever.
+const tokenFromKeyIncrScript = `
+local n = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return n
+`
+
 // allowTokenFromKey counts one request against mark within a fixed one-minute
 // window (Redis when enabled, otherwise this process).
 func allowTokenFromKey(mark string, max int) bool {
@@ -57,14 +69,11 @@ func allowTokenFromKey(mark string, max int) bool {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		key := "rateLimit:OIDCK:" + mark
-		n, err := common.RDB.Incr(ctx, key).Result()
+		n, err := common.RDB.Eval(ctx, tokenFromKeyIncrScript, []string{key}, tokenFromKeyWindow).Int64()
 		if err != nil {
 			// Fail open: the limit is a soft guard, the key itself is the credential.
 			common.SysLog("oidc: token-from-key rate limit: " + err.Error())
 			return true
-		}
-		if n == 1 {
-			common.RDB.Expire(ctx, key, tokenFromKeyWindow*time.Second)
 		}
 		return n <= int64(max)
 	}
@@ -122,13 +131,27 @@ func OAuth2TokenFromKey(c *gin.Context) {
 		tokenFromKeyError(c, http.StatusForbidden, "feature_disabled", "issuing tokens from API keys is disabled")
 		return
 	}
+	// Option validation keeps the two client_ids apart, but values loaded from
+	// the database at startup skip it; never issue under the Open WebUI one.
+	if settings.TokenFromKeyClientIdCollides() {
+		logger.LogWarn(c, "oidc: token-from-key refused: its client_id equals the Open WebUI client_id")
+		tokenFromKeyError(c, http.StatusForbidden, "feature_disabled", "issuing tokens from API keys is disabled")
+		return
+	}
 	ip := c.ClientIP()
 	if !allowTokenFromKey("ip:"+ip, tokenFromKeyIPRate) {
 		logger.LogWarn(c, "oidc: token-from-key rejected (rate_limited) ip=%s", ip)
 		tokenFromKeyError(c, http.StatusTooManyRequests, "rate_limited", "too many requests")
 		return
 	}
-	token, err := model.ValidateTokenForIdentity(bearerAPIKey(c))
+	key := bearerAPIKey(c)
+	// The Open WebUI service key is a shared relay credential, not a person's.
+	if openwebui.IsConfiguredServiceKey(key) {
+		logger.LogWarn(c, "oidc: token-from-key rejected (service_key) ip=%s", ip)
+		tokenFromKeyError(c, http.StatusUnauthorized, "invalid_key", "the API key is missing, unknown, disabled or expired")
+		return
+	}
+	token, err := model.ValidateTokenForIdentity(key)
 	if err != nil {
 		if errors.Is(err, model.ErrDatabase) {
 			logger.LogError(c, "oidc: token-from-key: "+err.Error())

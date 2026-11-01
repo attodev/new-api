@@ -75,6 +75,20 @@ func (s *OAuth2Settings) EffectiveTokenFromKeyClientId() string {
 	return DefaultTokenFromKeyClientId
 }
 
+// SameOAuth2ClientId reports whether two client_ids are the same once
+// surrounding spaces and case are ignored (MySQL's default *_ci collation
+// would treat them as equal too).
+func SameOAuth2ClientId(a, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+}
+
+// TokenFromKeyClientIdCollides reports whether the effective token-from-key
+// client_id equals the Open WebUI client_id. Option validation refuses such
+// saves, but values loaded from the database at startup bypass it.
+func (s *OAuth2Settings) TokenFromKeyClientIdCollides() bool {
+	return s.ClientId != "" && SameOAuth2ClientId(s.EffectiveTokenFromKeyClientId(), s.ClientId)
+}
+
 // EffectiveTokenFromKeyTTL is the configured lifetime in seconds, or the
 // default when it is outside [MinTokenFromKeyTTL, MaxTokenFromKeyTTL].
 func (s *OAuth2Settings) EffectiveTokenFromKeyTTL() int {

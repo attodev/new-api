@@ -462,3 +462,92 @@ func TestDiscovery_AdvertisesIntrospection(t *testing.T) {
 	require.Equal(t, oidcTestIssuer+"/oauth2/introspect", doc["introspection_endpoint"])
 	require.Equal(t, []string{"client_secret_basic", "client_secret_post"}, doc["introspection_endpoint_auth_methods_supported"])
 }
+
+// A Redis counter left without a TTL (e.g. an EXPIRE that failed after
+// INCR) must not block that IP or key for good: every hit re-arms the window.
+func TestTokenFromKey_RateLimit_Redis_RearmsMissingTTL(t *testing.T) {
+	env := setupTokenFromKeyTest(t)
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	originalRDB, originalEnabled := common.RDB, common.RedisEnabled
+	common.RDB = redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	common.RedisEnabled = true
+	t.Cleanup(func() {
+		_ = common.RDB.Close()
+		common.RDB, common.RedisEnabled = originalRDB, originalEnabled
+		oidc.ResetStoresForTest()
+	})
+	oidc.ResetStoresForTest()
+	require.NoError(t, model.PublishUserAuthCache(7))
+
+	ipKey, keyKey := "rateLimit:OIDCK:ip:"+tfkRemoteIP, "rateLimit:OIDCK:key:1"
+	require.NoError(t, mr.Set(ipKey, "3"))
+	require.NoError(t, mr.Set(keyKey, "3"))
+	require.Zero(t, mr.TTL(ipKey), "precondition: no TTL")
+
+	status, res := env.tokenFromKey(t, "Bearer sk-"+tfkAliceKey)
+	require.Equal(t, http.StatusOK, status, res)
+	for _, k := range []string{ipKey, keyKey} {
+		ttl := mr.TTL(k)
+		require.Greater(t, ttl, time.Duration(0), k)
+		require.LessOrEqual(t, ttl, time.Duration(tokenFromKeyWindow)*time.Second, k)
+	}
+	v, err := mr.Get(keyKey)
+	require.NoError(t, err)
+	require.Equal(t, "4", v)
+
+	// Once the window passes the counters are gone and requests flow again.
+	system_setting.GetOAuth2Settings().TokenFromKeyRateLimit = 4
+	status, _ = env.tokenFromKey(t, "Bearer sk-"+tfkAliceKey)
+	require.Equal(t, http.StatusTooManyRequests, status)
+	mr.FastForward(time.Duration(tokenFromKeyWindow+1) * time.Second)
+	status, _ = env.tokenFromKey(t, "Bearer sk-"+tfkAliceKey)
+	require.Equal(t, http.StatusOK, status)
+}
+
+// The Open WebUI service key is a shared relay credential, not a person's
+// key: it never identifies anyone, whether or not the relay is on.
+func TestTokenFromKey_RefusesOpenWebUIServiceKey(t *testing.T) {
+	env := setupTokenFromKeyTest(t)
+	original := *system_setting.GetOpenWebUISettings()
+	t.Cleanup(func() { *system_setting.GetOpenWebUISettings() = original })
+
+	for _, relayOn := range []bool{false, true} {
+		ow := system_setting.GetOpenWebUISettings()
+		ow.ServiceApiKey = tfkAliceKey
+		ow.RelayEnabled = relayOn
+		for _, auth := range []string{"Bearer sk-" + tfkAliceKey, "Bearer " + tfkAliceKey + "-3"} {
+			status, res := env.tokenFromKey(t, auth)
+			requireTokenFromKeyError(t, status, res, http.StatusUnauthorized, "invalid_key", auth)
+		}
+	}
+	var count int64
+	require.NoError(t, model.LOG_DB.Model(&model.AuditLog{}).Count(&count).Error)
+	require.Zero(t, count)
+
+	// Other keys of the same user still work.
+	status, res := env.tokenFromKey(t, "Bearer sk-"+tfkExhaustedKey)
+	require.Equal(t, http.StatusOK, status, res)
+}
+
+// Settings loaded from the database at startup skip option validation, so
+// issuance itself refuses a token-from-key client_id that collides with the
+// Open WebUI client_id (ignoring case and spaces, as MySQL *_ci would).
+func TestTokenFromKey_RefusesClientIdCollision(t *testing.T) {
+	env := setupTokenFromKeyTest(t)
+	s := system_setting.GetOAuth2Settings()
+	for _, tc := range []struct{ clientId, tfkClientId string }{
+		{"openwebui-mcp", "openwebui-mcp"},
+		{" OpenWebUI-MCP ", "openwebui-mcp"},
+		{"openwebui-mcp", ""}, // blank means the default openwebui-mcp
+		{"openwebui", " OPENWEBUI "},
+	} {
+		s.ClientId, s.TokenFromKeyClientId = tc.clientId, tc.tfkClientId
+		status, res := env.tokenFromKey(t, "Bearer sk-"+tfkAliceKey)
+		requireTokenFromKeyError(t, status, res, http.StatusForbidden, "feature_disabled", tc.clientId+"/"+tc.tfkClientId)
+	}
+	var count int64
+	require.NoError(t, model.LOG_DB.Model(&model.AuditLog{}).Count(&count).Error)
+	require.Zero(t, count)
+}

@@ -47,8 +47,15 @@ func (e *RejectError) Error() string {
 // IsServiceKey reports whether the parsed bearer key is the configured Open
 // WebUI service key and the relay is enabled. Constant-time comparison.
 func IsServiceKey(key string) bool {
+	return system_setting.GetOpenWebUISettings().RelayEnabled && IsConfiguredServiceKey(key)
+}
+
+// IsConfiguredServiceKey reports whether the parsed bearer key is the
+// configured Open WebUI service key, whether or not the relay is enabled.
+// Constant-time comparison.
+func IsConfiguredServiceKey(key string) bool {
 	s := system_setting.GetOpenWebUISettings()
-	if !s.RelayEnabled || s.ServiceApiKey == "" || key == "" {
+	if s.ServiceApiKey == "" || key == "" {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(key), []byte(s.ServiceApiKey)) == 1

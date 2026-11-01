@@ -3447,7 +3447,7 @@
     "Key Update Mode": "Key Update Mode",
     "Keys, OAuth credentials, and multi-key update behavior.": "Keys, OAuth credentials, and multi-key update behavior.",
     "Kind": "Kind",
-    "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection.": "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection.",
+    "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection. While this is on, any API key works as an Open WebUI sign-in for its owner, admin keys included.": "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection. While this is on, any API key works as an Open WebUI sign-in for its owner, admin keys included.",
     "Limit per API key. Each client IP is also limited to 60 per minute.": "Limit per API key. Each client IP is also limited to 60 per minute.",
     "Linux DO trust level does not meet the minimum required by administrator": "Linux DO trust level does not meet the minimum required by administrator",
     "Kling": "Kling",

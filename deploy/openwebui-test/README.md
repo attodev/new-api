@@ -125,7 +125,7 @@ bootstrap 이 아래 옵션을 넣는다. 화면에서는 시스템 설정 → �
 | `oauth2.enabled` | true | client id·16자 이상 시크릿·절대 redirect URI 가 있어야 켜진다 |
 | `oauth2.token_from_key_client_id` | `OIDC_MCP_CLIENT_ID` (기본 `openwebui-mcp`) | 비어 있으면 안 되고 `oauth2.client_id` 와 달라야 한다. Open WebUI 의 `OAUTH_TOKEN_EXCHANGE_TRUSTED_CLIENT_IDS` 에 넣는다 |
 | `oauth2.token_from_key_ttl_seconds` / `oauth2.token_from_key_rate_limit` | (기본 600 / 30) | 발급 토큰 수명 60~900초 / API 키당 분당 1~600회 (IP당 분당 60회는 고정) |
-| `oauth2.token_from_key_enabled` | true | `POST /oauth2/token-from-key` (API 키 → userinfo·introspection 전용 짧은 수명 토큰) |
+| `oauth2.token_from_key_enabled` | true | `POST /oauth2/token-from-key` (API 키 → userinfo·introspection 전용 짧은 수명 토큰). **켜 두면 모든 API 키가 그 주인의 Open WebUI 로그인 수단이 된다(관리자 키 포함).** Open WebUI 서비스 키는 거부한다 |
 
 **서명 키 교체**: 시스템 설정 → 사이트 → "OpenWebUI 연동" → "서명 키 교체"(root 전용, 확인 대화상자), 또는 root 로그인 세션으로
 `POST /api/oauth2/rotate-signing-key`(상태는 `GET /api/oauth2/signing-key-status`). 새 키로 서명을 시작하고 이전 키는 24시간 JWKS 에 남는다.
@@ -157,6 +157,7 @@ new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI �
 
 ## 7. 알아둘 점
 
+- **API 키 → OIDC 토큰을 켜면 API 키가 곧 Open WebUI 로그인이다.** `oauth2.token_from_key_enabled` 가 켜져 있으면 유효한 API 키를 가진 누구나 `/oauth2/token-from-key` → Open WebUI 토큰 교환으로 그 키 주인으로 Open WebUI 에 들어간다. 관리자 키도 마찬가지이므로 관리자 계정의 API 키는 최소한으로 두고 `AllowIps` 로 묶는다. Open WebUI 서비스 키는 거부된다.
 - **이메일이 매핑의 열쇠다.** relay 는 처음 보는 Open WebUI 계정을 이메일로 new-api 사용자에 연결한다. new-api 의 관리자 "사용자 추가" API 는
   이메일을 저장하지 않아서 `bootstrap.sh` 는 테스트 사용자의 이메일을 psql 로 직접 넣는다. 운영에서는 이메일 인증 가입(SMTP) 또는 내장 OIDC 로
   만들어진 계정만 쓰고, Open WebUI 의 자체 가입(`ENABLE_SIGNUP`)은 꺼 둔다. 그렇지 않으면 남의 이메일로 Open WebUI 에 가입한 계정이 그 사람의 지갑에 먼저 연결될 수 있다.

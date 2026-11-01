@@ -108,13 +108,13 @@ func validateOpenWebUIOption(c *gin.Context, option *OptionUpdateRequest) bool {
 		}
 	case "oauth2.client_id":
 		option.Value = strings.TrimSpace(option.Value.(string))
-		if v := option.Value.(string); v != "" && v == system_setting.GetOAuth2Settings().EffectiveTokenFromKeyClientId() {
+		if v := option.Value.(string); v != "" && system_setting.SameOAuth2ClientId(v, system_setting.GetOAuth2Settings().EffectiveTokenFromKeyClientId()) {
 			common.ApiErrorT(c, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
 			return false
 		}
 	case "oauth2.token_from_key_client_id":
 		option.Value = strings.TrimSpace(option.Value.(string))
-		if v := option.Value.(string); v == "" || v == system_setting.GetOAuth2Settings().ClientId {
+		if v := option.Value.(string); v == "" || system_setting.SameOAuth2ClientId(v, system_setting.GetOAuth2Settings().ClientId) {
 			common.ApiErrorT(c, "The API key token client ID must not be empty and must differ from the Open WebUI client ID")
 			return false
 		}

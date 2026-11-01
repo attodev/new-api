@@ -3447,7 +3447,7 @@
     "Key Update Mode": "키 업데이트 모드",
     "Keys, OAuth credentials, and multi-key update behavior.": "키, OAuth 자격 증명 및 다중 키 업데이트 동작.",
     "Kind": "유형",
-    "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection.": "사용자의 API 키를 가진 서버가 POST /oauth2/token-from-key로 그 사용자의 짧은 수명 OIDC 액세스 토큰을 받게 합니다(OAuth 토큰 교환을 쓰는 Open WebUI MCP 서버용). 이 토큰은 userinfo와 introspection에만 쓸 수 있습니다.",
+    "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection. While this is on, any API key works as an Open WebUI sign-in for its owner, admin keys included.": "사용자의 API 키를 가진 서버가 POST /oauth2/token-from-key로 그 사용자의 짧은 수명 OIDC 액세스 토큰을 받게 합니다(OAuth 토큰 교환을 쓰는 Open WebUI MCP 서버용). 이 토큰은 userinfo와 introspection에만 쓸 수 있습니다. 켜 두면 모든 API 키가 그 주인의 Open WebUI 로그인 수단이 되며, 관리자 키도 마찬가지입니다.",
     "Limit per API key. Each client IP is also limited to 60 per minute.": "API 키별 제한입니다. 클라이언트 IP마다 분당 60회 제한도 함께 적용됩니다.",
     "Linux DO trust level does not meet the minimum required by administrator": "Linux DO 신뢰 등급이 관리자가 요구하는 최소 등급에 미치지 못합니다",
     "Kling": "Kling",

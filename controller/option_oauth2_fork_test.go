@@ -184,3 +184,13 @@ func TestUpdateOption_OAuth2_ClientIdAvoidsDefaultTokenFromKeyClientId(t *testin
 	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", system_setting.DefaultTokenFromKeyClientId), `"success":false`)
 	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", ""), `"success":true`, "clearing the client_id stays allowed")
 }
+
+// The client_id pair is compared like the runtime guard: case and
+// surrounding spaces do not make two ids different.
+func TestUpdateOption_OAuth2_ClientIdPairIgnoresCase(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "openwebui"), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", "OpenWebUI"), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", "mcp"), `"success":true`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", " MCP "), `"success":false`)
+}

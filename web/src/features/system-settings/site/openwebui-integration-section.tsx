@@ -228,9 +228,17 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
       return
     }
 
-    const updates: UpdateOptionRequest[] = (
-      Object.keys(next) as Array<keyof OpenWebUIOAuth2Defaults>
-    )
+    // The server checks each client ID against the other one as stored, so
+    // when both change the API key token client ID moves first (freeing its
+    // old value for oauth2.client_id).
+    const tfkClientIdKey = 'oauth2.token_from_key_client_id'
+    const keys: Array<keyof OpenWebUIOAuth2Defaults> = [
+      tfkClientIdKey,
+      ...(Object.keys(next) as Array<keyof OpenWebUIOAuth2Defaults>).filter(
+        (key) => key !== tfkClientIdKey
+      ),
+    ]
+    const updates: UpdateOptionRequest[] = keys
       .filter((key) => next[key] !== baselineRef.current[key])
       .map((key) => ({ key, value: next[key] }))
     if (clientSecret !== '') {
@@ -477,7 +485,7 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
             'token_from_key_enabled',
             t('Issue Tokens from API Keys'),
             t(
-              "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection."
+              "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection. While this is on, any API key works as an Open WebUI sign-in for its owner, admin keys included."
             )
           )}
           {renderTextField('token_from_key_client_id')}
