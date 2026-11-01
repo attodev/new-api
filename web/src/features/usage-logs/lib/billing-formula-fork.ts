@@ -79,16 +79,31 @@ export function buildBillingFormula(
   const cacheWrite = other.cache_creation_tokens ?? 0
   const cacheWrite5m = other.cache_creation_tokens_5m ?? 0
   const cacheWrite1h = other.cache_creation_tokens_1h ?? 0
+  const cacheWrite12h = other.cache_creation_tokens_12h ?? 0
+  // cache_creation_tokens is the total: the backend prices the 5m/1h (Claude)
+  // and 12h (OpenAI) parts at their own ratios and only the remainder at
+  // cache_creation_ratio (OpenAI's 30-minute writes when 12h writes exist).
+  const cacheWriteRest = Math.max(
+    cacheWrite - cacheWrite5m - cacheWrite1h - cacheWrite12h,
+    0
+  )
   const audioInputTokens = other.audio_input_token_count ?? 0
   const imageTokens = other.image && other.image_output ? other.image_output : 0
   const audioDeduct = audioInputSeparatePrice ? audioInputTokens : 0
 
   // Claude reports input_tokens without the cached part; OpenAI-semantic
-  // usage includes it, so only the latter subtracts cache reads.
+  // usage includes cache reads and writes, so only the latter subtracts them.
   const textInput =
     other.claude === true
       ? Math.max(inputTokens - audioDeduct - imageTokens, 0)
-      : Math.max(inputTokens - cacheReadTokens - audioDeduct - imageTokens, 0)
+      : Math.max(
+          inputTokens -
+            cacheReadTokens -
+            cacheWrite -
+            audioDeduct -
+            imageTokens,
+          0
+        )
 
   const lines: string[] = []
   const perMillion = (label: string, tokens: number, price: number) => {
@@ -110,10 +125,10 @@ export function buildBillingFormula(
   if (cacheReadTokens > 0) {
     perMillion('Cache Read', cacheReadTokens, basePrice * cacheRatio)
   }
-  if (cacheWrite > 0 && other.cache_creation_ratio != null) {
+  if (cacheWriteRest > 0 && other.cache_creation_ratio != null) {
     perMillion(
-      'Cache Write',
-      cacheWrite,
+      cacheWrite12h > 0 ? 'Cache Write (30m)' : 'Cache Write',
+      cacheWriteRest,
       basePrice * other.cache_creation_ratio
     )
   }
@@ -129,6 +144,13 @@ export function buildBillingFormula(
       'Cache Write (1h)',
       cacheWrite1h,
       basePrice * other.cache_creation_ratio_1h
+    )
+  }
+  if (cacheWrite12h > 0 && other.cache_creation_ratio_12h != null) {
+    perMillion(
+      'Cache Write (12h)',
+      cacheWrite12h,
+      basePrice * other.cache_creation_ratio_12h
     )
   }
   if (imageTokens > 0) {
