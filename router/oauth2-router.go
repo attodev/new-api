@@ -16,5 +16,7 @@ func SetOAuth2Router(router *gin.Engine) {
 		oauth2Router.GET("/jwks", controller.OAuth2JWKS)
 		oauth2Router.POST("/token", controller.OAuth2Token)
 		oauth2Router.GET("/userinfo", controller.OAuth2UserInfo)
+		oauth2Router.POST("/introspect", controller.OAuth2Introspect)
+		oauth2Router.POST("/token-from-key", controller.OAuth2TokenFromKey)
 	}
 }

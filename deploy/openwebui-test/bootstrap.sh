@@ -132,6 +132,8 @@ opt("oauth2.redirect_uri", OWUI_BASE + "/oauth/oidc/login/callback")
 opt("oauth2.app_url", OWUI_BASE)
 opt("oauth2.post_logout_redirect_uri", OWUI_BASE + "/auth")
 opt("oauth2.enabled", True)
+opt("oauth2.token_from_key_client_id", E.get("OIDC_MCP_CLIENT_ID", "openwebui-mcp"))
+opt("oauth2.token_from_key_enabled", True)
 log(f"옵션 주입 완료 (issuer={PUBLIC_BASE}, redirect_uri={OWUI_BASE}/oauth/oidc/login/callback)")
 
 def psql(sql):

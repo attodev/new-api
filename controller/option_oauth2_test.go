@@ -107,3 +107,26 @@ func TestUpdateOption_OAuth2_TrimsWhitespace(t *testing.T) {
 	require.Equal(t, "https://chat.example.com/bye", s.PostLogoutRedirectURI)
 	require.Equal(t, "https://chat.example.com/cb", common.OptionMap["oauth2.redirect_uri"])
 }
+
+func TestUpdateOption_OAuth2_TokenFromKey(t *testing.T) {
+	setupOAuth2OptionTest(t)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "openwebui"), `"success":true`)
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", "openwebui"), `"success":false`, "must differ from client_id")
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", "  "), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_client_id", " openwebui-mcp "), `"success":true`)
+	require.Equal(t, "openwebui-mcp", system_setting.GetOAuth2Settings().TokenFromKeyClientId)
+	require.Contains(t, putOAuth2Option(t, "oauth2.client_id", "openwebui-mcp"), `"success":false`, "client_id cannot take the MCP client_id")
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", "30"), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", "901"), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_ttl_seconds", "300"), `"success":true`)
+	require.Equal(t, 300, system_setting.GetOAuth2Settings().TokenFromKeyTTLSeconds)
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_rate_limit", "0"), `"success":false`)
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_rate_limit", 20), `"success":true`)
+	require.Equal(t, 20, system_setting.GetOAuth2Settings().TokenFromKeyRateLimit)
+
+	require.Contains(t, putOAuth2Option(t, "oauth2.token_from_key_enabled", true), `"success":true`)
+	require.True(t, system_setting.GetOAuth2Settings().TokenFromKeyEnabled)
+}

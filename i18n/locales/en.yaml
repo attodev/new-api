@@ -599,5 +599,8 @@ option.openwebui_cannot_clear_while_enabled: "Disable the Open WebUI relay befor
 option.oauth2_config_missing: "Cannot enable external app access, please set the client ID, a client secret of at least 16 characters and an absolute redirect URI first"
 option.oauth2_invalid_url: "Must be an absolute http(s) URL"
 option.oauth2_secret_too_short: "The client secret must be at least 16 characters"
+option.oauth2_token_from_key_client_id: "The API-key token client_id must be non-empty and differ from the Open WebUI client_id"
+option.oauth2_token_from_key_ttl: "The API-key token lifetime must be between 60 and 900 seconds"
+option.oauth2_token_from_key_rate: "The API-key token rate limit must be between 1 and 600 per minute"
 oidc.email_required: "Register an email address in your profile before signing in to the external app"
 oidc.invalid_request: "The sign-in request is not valid, please contact your administrator"

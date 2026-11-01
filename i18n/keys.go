@@ -720,9 +720,12 @@ const (
 
 // Built-in OIDC provider (Open WebUI login)
 const (
-	MsgOptionOAuth2ConfigMissing  = "option.oauth2_config_missing"
-	MsgOptionOAuth2InvalidURL     = "option.oauth2_invalid_url"
-	MsgOptionOAuth2SecretTooShort = "option.oauth2_secret_too_short"
-	MsgOIDCEmailRequired          = "oidc.email_required"
-	MsgOIDCInvalidRequest         = "oidc.invalid_request"
+	MsgOptionOAuth2ConfigMissing        = "option.oauth2_config_missing"
+	MsgOptionOAuth2InvalidURL           = "option.oauth2_invalid_url"
+	MsgOptionOAuth2SecretTooShort       = "option.oauth2_secret_too_short"
+	MsgOptionOAuth2TokenFromKeyClientId = "option.oauth2_token_from_key_client_id"
+	MsgOptionOAuth2TokenFromKeyTTL      = "option.oauth2_token_from_key_ttl"
+	MsgOptionOAuth2TokenFromKeyRate     = "option.oauth2_token_from_key_rate"
+	MsgOIDCEmailRequired                = "oidc.email_required"
+	MsgOIDCInvalidRequest               = "oidc.invalid_request"
 )

@@ -603,5 +603,8 @@ option.openwebui_cannot_clear_while_enabled: "서비스 키나 JWT 비밀을 비
 option.oauth2_config_missing: "외부 앱 접근을 활성화하려면 먼저 클라이언트 ID, 16자 이상의 클라이언트 시크릿, 절대 경로 Redirect URI를 설정해 주세요"
 option.oauth2_invalid_url: "절대 경로 http(s) URL이어야 합니다"
 option.oauth2_secret_too_short: "클라이언트 시크릿은 16자 이상이어야 합니다"
+option.oauth2_token_from_key_client_id: "API 키 토큰용 client_id는 비어 있으면 안 되며 Open WebUI client_id와 달라야 합니다"
+option.oauth2_token_from_key_ttl: "API 키 토큰 수명은 60~900초여야 합니다"
+option.oauth2_token_from_key_rate: "API 키 토큰 발급 제한은 분당 1~600회여야 합니다"
 oidc.email_required: "외부 앱에 로그인하려면 먼저 프로필에서 이메일을 등록해 주세요"
 oidc.invalid_request: "로그인 요청이 올바르지 않습니다. 관리자에게 문의해 주세요"

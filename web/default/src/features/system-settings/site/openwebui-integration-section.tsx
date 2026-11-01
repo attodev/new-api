@@ -64,6 +64,10 @@ const oauth2Schema = z.object({
     post_logout_redirect_uri: z.string(),
     open_in_new_window: z.boolean(),
     replace_playground: z.boolean(),
+    token_from_key_enabled: z.boolean(),
+    token_from_key_client_id: z.string().trim().min(1),
+    token_from_key_ttl_seconds: z.number().int().min(60).max(900),
+    token_from_key_rate_limit: z.number().int().min(1).max(600),
   }),
 })
 
@@ -78,6 +82,10 @@ type FlatOauth2Defaults = {
   'oauth2.post_logout_redirect_uri': string
   'oauth2.open_in_new_window': boolean
   'oauth2.replace_playground': boolean
+  'oauth2.token_from_key_enabled': boolean
+  'oauth2.token_from_key_client_id': string
+  'oauth2.token_from_key_ttl_seconds': number
+  'oauth2.token_from_key_rate_limit': number
 }
 
 const buildFormDefaults = (defaults: FlatOauth2Defaults): Oauth2FormValues => ({
@@ -90,6 +98,13 @@ const buildFormDefaults = (defaults: FlatOauth2Defaults): Oauth2FormValues => ({
     post_logout_redirect_uri: defaults['oauth2.post_logout_redirect_uri'] ?? '',
     open_in_new_window: defaults['oauth2.open_in_new_window'],
     replace_playground: defaults['oauth2.replace_playground'],
+    token_from_key_enabled: defaults['oauth2.token_from_key_enabled'] ?? false,
+    token_from_key_client_id:
+      defaults['oauth2.token_from_key_client_id'] || 'openwebui-mcp',
+    token_from_key_ttl_seconds:
+      Number(defaults['oauth2.token_from_key_ttl_seconds']) || 600,
+    token_from_key_rate_limit:
+      Number(defaults['oauth2.token_from_key_rate_limit']) || 30,
   },
 })
 
@@ -102,6 +117,11 @@ const normalizeFormValues = (values: Oauth2FormValues): FlatOauth2Defaults => ({
   'oauth2.post_logout_redirect_uri': values.oauth2.post_logout_redirect_uri,
   'oauth2.open_in_new_window': values.oauth2.open_in_new_window,
   'oauth2.replace_playground': values.oauth2.replace_playground,
+  'oauth2.token_from_key_enabled': values.oauth2.token_from_key_enabled,
+  'oauth2.token_from_key_client_id':
+    values.oauth2.token_from_key_client_id.trim(),
+  'oauth2.token_from_key_ttl_seconds': values.oauth2.token_from_key_ttl_seconds,
+  'oauth2.token_from_key_rate_limit': values.oauth2.token_from_key_rate_limit,
 })
 
 interface OpenWebUIOAuth2SectionProps {
@@ -383,6 +403,124 @@ export function OpenWebUIOAuth2Section(props: OpenWebUIOAuth2SectionProps) {
                   />
                 </FormControl>
               </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.token_from_key_enabled'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Issue Tokens from API Keys')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      "Let a server holding a user's API key get a short-lived OIDC access token for that user from POST /oauth2/token-from-key (for the Open WebUI MCP server with OAuth token exchange). The token only works with userinfo and introspection."
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.token_from_key_client_id'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('API Key Token Client ID')}</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder='openwebui-mcp'
+                    autoComplete='off'
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    "Reported by introspection for these tokens; add it to Open WebUI's OAUTH_TOKEN_EXCHANGE_TRUSTED_CLIENT_IDS. Must differ from the Client ID."
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.token_from_key_ttl_seconds'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('API Key Token Lifetime (seconds)')}</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={60}
+                    max={900}
+                    value={
+                      Number.isNaN(field.value) ? '' : (field.value ?? 600)
+                    }
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ''
+                          ? Number.NaN
+                          : Number(e.target.value)
+                      )
+                    }
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t('Between 60 and 900 seconds.')}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='oauth2.token_from_key_rate_limit'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('API Key Token Requests per Minute')}</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={600}
+                    value={Number.isNaN(field.value) ? '' : (field.value ?? 30)}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value === ''
+                          ? Number.NaN
+                          : Number(e.target.value)
+                      )
+                    }
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Limit per API key. Each client IP is also limited to 60 per minute.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
             )}
           />
 

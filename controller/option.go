@@ -589,6 +589,28 @@ func UpdateOption(c *gin.Context) {
 		}
 	case "oauth2.client_id":
 		option.Value = strings.TrimSpace(option.Value.(string))
+		if v := option.Value.(string); v != "" && v == system_setting.GetOAuth2Settings().TokenFromKeyClientId {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2TokenFromKeyClientId)
+			return
+		}
+	case "oauth2.token_from_key_client_id":
+		option.Value = strings.TrimSpace(option.Value.(string))
+		if v := option.Value.(string); v == "" || v == system_setting.GetOAuth2Settings().ClientId {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2TokenFromKeyClientId)
+			return
+		}
+	case "oauth2.token_from_key_ttl_seconds":
+		ttl, err := strconv.Atoi(strings.TrimSpace(fmt.Sprint(option.Value)))
+		if err != nil || ttl < system_setting.MinTokenFromKeyTTL || ttl > system_setting.MaxTokenFromKeyTTL {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2TokenFromKeyTTL)
+			return
+		}
+	case "oauth2.token_from_key_rate_limit":
+		rate, err := strconv.Atoi(strings.TrimSpace(fmt.Sprint(option.Value)))
+		if err != nil || rate < 1 || rate > 600 {
+			common.ApiErrorI18n(c, i18n.MsgOptionOAuth2TokenFromKeyRate)
+			return
+		}
 	case "oauth2.client_secret":
 		option.Value = strings.TrimSpace(option.Value.(string))
 		if v := option.Value.(string); v != "" && len(v) < 16 {

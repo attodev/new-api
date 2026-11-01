@@ -224,6 +224,30 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 }
 
+// ValidateTokenForIdentity checks key for identity-only use (OIDC
+// token-from-key): the key must exist, be enabled and unexpired. Remaining
+// quota is deliberately ignored, so a key marked exhausted still identifies
+// its owner. Unknown, disabled and expired keys all yield ErrTokenInvalid.
+func ValidateTokenForIdentity(key string) (*Token, error) {
+	if key == "" {
+		return nil, ErrTokenInvalid
+	}
+	token, err := GetTokenByKey(key, false)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrTokenInvalid
+		}
+		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
+	}
+	if token.Status != common.TokenStatusEnabled && token.Status != common.TokenStatusExhausted {
+		return nil, ErrTokenInvalid
+	}
+	if token.ExpiredTime != -1 && token.ExpiredTime < common.GetTimestamp() {
+		return nil, ErrTokenInvalid
+	}
+	return token, nil
+}
+
 func GetTokenByIds(id int, userId int) (*Token, error) {
 	if id == 0 || userId == 0 {
 		return nil, errors.New("id or userId is empty")

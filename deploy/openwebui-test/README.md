@@ -93,6 +93,15 @@ docker compose --profile mock up -d new-api mock-upstream && ./bootstrap.sh && d
 | 잘못된 비밀·만료 JWT 거부 | new-api 로그 `openwebui: rejected (401) jwt_invalid` |
 | 서명 키 교체 후 로그인 | 시스템 설정 → OpenWebUI 연동 → "서명 키 교체" → 다시 로그인 |
 
+| API 키 → OIDC 토큰 → Open WebUI JWT | 아래 curl (`sk-…` 는 웹 OIDC 로 한 번 이상 로그인한 사용자의 키) |
+
+```bash
+AT=$(curl -s -X POST -H "Authorization: Bearer sk-…" http://PUBLIC_HOST:3000/oauth2/token-from-key | jq -r .access_token)
+curl -s -H "Authorization: Bearer $AT" http://PUBLIC_HOST:3000/oauth2/userinfo
+curl -s -u "openwebui:$OIDC_CLIENT_SECRET" -d "token=$AT" http://PUBLIC_HOST:3000/oauth2/introspect
+curl -s -X POST -H 'Content-Type: application/json' -d "{\"token\":\"$AT\"}" http://PUBLIC_HOST:8080/api/v1/auths/oauth/oidc/token/exchange
+```
+
 new-api 로그: `docker compose logs -f new-api | grep openwebui`. Open WebUI 로그: `docker compose logs -f open-webui`.
 
 ## 6. 알아둘 점

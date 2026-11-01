@@ -91,6 +91,10 @@ export type SiteSettings = {
   'oauth2.post_logout_redirect_uri': string
   'oauth2.open_in_new_window': boolean
   'oauth2.replace_playground': boolean
+  'oauth2.token_from_key_enabled': boolean
+  'oauth2.token_from_key_client_id': string
+  'oauth2.token_from_key_ttl_seconds': number
+  'oauth2.token_from_key_rate_limit': number
   /**
    * Open WebUI relay: Open WebUI calls new-api with one shared service key
    * plus a signed per-request user JWT; new-api bills the identified user.

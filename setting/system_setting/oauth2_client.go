@@ -27,9 +27,32 @@ type OAuth2Settings struct {
 	// immediately act like clicking "Open in Chat App", instead of
 	// rendering the built-in playground UI.
 	ReplacePlayground bool `json:"replace_playground"`
+	// TokenFromKey* configure POST /oauth2/token-from-key, which trades a
+	// new-api API key for a short-lived userinfo-only access token (used by
+	// the Open WebUI MCP server with Open WebUI's OAuth token exchange).
+	TokenFromKeyEnabled bool `json:"token_from_key_enabled"`
+	// TokenFromKeyClientId is the client_id recorded on (and introspected
+	// for) those tokens. It must differ from ClientId.
+	TokenFromKeyClientId string `json:"token_from_key_client_id"`
+	// TokenFromKeyTTLSeconds is the issued token lifetime.
+	TokenFromKeyTTLSeconds int `json:"token_from_key_ttl_seconds"`
+	// TokenFromKeyRateLimit is the per-key issuance limit per minute.
+	TokenFromKeyRateLimit int `json:"token_from_key_rate_limit"`
 }
 
-var defaultOAuth2Settings = OAuth2Settings{}
+const (
+	DefaultTokenFromKeyClientId = "openwebui-mcp"
+	DefaultTokenFromKeyTTL      = 600
+	MinTokenFromKeyTTL          = 60
+	MaxTokenFromKeyTTL          = 900
+	DefaultTokenFromKeyRate     = 30
+)
+
+var defaultOAuth2Settings = OAuth2Settings{
+	TokenFromKeyClientId:   DefaultTokenFromKeyClientId,
+	TokenFromKeyTTLSeconds: DefaultTokenFromKeyTTL,
+	TokenFromKeyRateLimit:  DefaultTokenFromKeyRate,
+}
 
 func init() {
 	config.GlobalConfig.Register("oauth2", &defaultOAuth2Settings)
